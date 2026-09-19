@@ -35,7 +35,7 @@ function createDeadlines({ db, audit, actes, acl, titulaires, settings, bus }) {
       const mode = cfg['seances.blocage_date_limite']?.value === 'alerter' ? 'alerter' : 'bloquer';
       if (mode === 'alerter') { await bus.emit('deadline.warning', { organismeId: a.organisme_id, acteId: a.id, seanceId: s.id, ctx }); return; }
       const next = await db.get("SELECT id, date_seance FROM seances WHERE organisme_id = $1 AND instance_id = $2 AND date_seance > $3 AND statut IN ('planifiee','convoquee') ORDER BY date_seance LIMIT 1", [s.organisme_id, s.instance_id, s.date_seance]);
-      throw E.locked(`La date limite de rédaction de la séance du ${fmt(s.date_seance)} (${fmt(s.date_limite_redaction)}) est dépassée : demandez une dérogation ou reportez l'acte à la séance suivante`,
+      throw E.deadline(`La date limite de rédaction de la séance du ${fmt(s.date_seance)} (${fmt(s.date_limite_redaction)}) est dépassée : demandez une dérogation ou reportez l'acte à la séance suivante`,
         { seanceId: s.id, dateLimiteRedaction: s.date_limite_redaction, derogationPossible: true, seanceSuivanteId: next?.id ?? null });
     },
 

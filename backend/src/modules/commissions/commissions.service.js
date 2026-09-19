@@ -105,10 +105,17 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log }) {
       return { horsCommission: rows.filter((r) => !r.retiree_at).length === 0, items: rows.map(toAc) };
     },
 
+    /** Rédacteur (acte éditable) ou SCC / administrateur, à tout moment du circuit. */
+    async loadEditable(ctx, organismeId, acteId) {
+      const a = await actes.load(ctx, organismeId, acteId);
+      if (!acl.isAdmin(ctx, a.organisme_id) && !(await acl.canEdit(ctx, a))) throw E.forbidden('Vous ne pouvez pas modifier cet acte à ce stade');
+      return a;
+    },
+
     async count(acteId) { return (await db.get('SELECT count(*)::int AS n FROM acte_commissions WHERE acte_id = $1 AND retiree_at IS NULL', [acteId])).n; },
 
     async addToActe(ctx, organismeId, acteId, commissionId) {
-      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const a = await svc.loadEditable(ctx, organismeId, acteId);
       const c = await db.get('SELECT * FROM commissions WHERE id = $1 AND organisme_id = $2 AND actif', [commissionId, a.organisme_id]);
       if (!c) throw E.badRequest('Commission inconnue ou inactive dans cet organisme');
       try {
@@ -122,7 +129,7 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log }) {
 
     /** Retrait : motif obligatoire après mise à disposition, et les membres sont prévenus (CMN-06). */
     async removeFromActe(ctx, organismeId, acteId, commissionId, motif) {
-      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const a = await svc.loadEditable(ctx, organismeId, acteId);
       const r = await db.get('SELECT ac.*, c.nom AS commission_nom FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id WHERE ac.acte_id = $1 AND ac.commission_id = $2 AND ac.retiree_at IS NULL', [a.id, commissionId]);
       if (!r) throw E.notFound('Cette commission n\'est pas rattachée à l\'acte');
       if (r.mis_a_disposition_at && !motif) throw E.badRequest('Un motif est obligatoire : le projet a déjà été mis à disposition de la commission');
@@ -177,6 +184,11 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log }) {
   const guard = (fn) => (p) => fn(p).catch((e) => log.error({ err: e.message }, 'commissions : traitement d\'événement en erreur'));
   bus.on('acte.valide_dgs', guard(async (p) => { if ((await svc.trigger(p.organismeId)) === 'dgs') await svc.makeAvailable(p.acteId); }));
   bus.on('circuit.completed', guard(async (p) => { if ((await svc.trigger(p.organismeId)) === 'scc') await svc.makeAvailable(p.acteId); }));
+  // circuit repris directement à l'étape qui avait refusé : la mise à disposition suspendue reprend dès que l'acte est de nouveau validé par le DGS
+  bus.on('step.entered', guard(async (p) => {
+    const a = await db.get('SELECT statut FROM actes WHERE id = $1', [p.acteId]);
+    if (['valide_dgs', 'en_attente_scc'].includes(a?.statut) && (await svc.trigger(p.organismeId)) === 'dgs') await svc.makeAvailable(p.acteId);
+  }));
   bus.on('acte.refused', guard(async (p) => { await svc.suspend(p.acteId, p.motif); }));
   return svc;
 }

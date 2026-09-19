@@ -15,6 +15,7 @@ const E = {
   forbidden: (m = 'Accès refusé') => new AppError(403, 'FORBIDDEN', m),
   notFound: (m = 'Introuvable') => new AppError(404, 'NOT_FOUND', m),
   conflict: (m = 'Conflit', d) => new AppError(409, 'CONFLICT', m, d),
+  deadline: (m, details) => new AppError(423, 'DEADLINE_PASSED', m, details),
   locked: (m = 'Compte temporairement verrouillé') => new AppError(429, 'LOCKED', m),
   incomplete: (m = 'Dossier incomplet', d) => new AppError(422, 'INCOMPLETE', m, d),
   upstream: (m = 'Service externe indisponible') => new AppError(502, 'UPSTREAM_ERROR', m),

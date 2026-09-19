@@ -66,14 +66,14 @@ const AGENTS = [
   { username: 'moreau', displayName: 'Moreau Luc', email: 'luc.moreau@ivry.test', service: 'COMPTABILITÉ', direction: 'DIRECTION DES FINANCES', poste: 'Agent comptable', matricule: '006' },
 ];
 
-async function createTestEnv({ users = USERS, agents = AGENTS, directions = DIRECTIONS, env = {}, guard } = {}) {
+async function createTestEnv({ users = USERS, agents = AGENTS, directions = DIRECTIONS, elus = [], env = {}, guard } = {}) {
   const schema = PREFIX + crypto.randomBytes(4).toString('hex');
   const config = testConfig(schema, env);
   const log = createLogger('silent');
   const db = createDb(config, log);
   await migrate(db, log);
   const ad = createFakeAuth({ users });
-  const directoryAdapter = createFakeDirectory({ directions, agents });
+  const directoryAdapter = createFakeDirectory({ directions, agents, elus });
   const mail = createFakeMail();
   const c = buildContainer({ config, log, db, ad, directoryAdapter, mail, guard });
   const boot = await bootstrap(c);
