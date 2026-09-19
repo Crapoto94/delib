@@ -71,6 +71,12 @@ const RULES = [
   { code: 'odj.modifie', nom: "Modification de l'ordre du jour après son arrêt", family: 'suivi', kind: 'event', mandatory: false,
     trigger: { event: 'odj.modifie' }, recipients: ['redacteur', 'rapporteur', 'scc'],
     subject: "Ordre du jour modifié : {titre}", body: "L'ordre du jour a été modifié après son arrêt pour l'acte n° {numero} « {titre} » ({motif}).\n{lien}" },
+  { code: 'ia.terminee', nom: 'Propositions de l\u2019IA prêtes', family: 'suivi', kind: 'event', mandatory: false, channels: ['inapp'],
+    trigger: { event: 'ai.done' }, recipients: ['requester'],
+    subject: 'Propositions de l\u2019IA prêtes : {titre}', body: "L\u2019IA a terminé l\u2019analyse du dossier n° {numero} « {titre} » : les propositions sont à examiner.\n{lien}" },
+  { code: 'ia.echec', nom: 'L\u2019IA n\u2019a pas pu répondre', family: 'suivi', kind: 'event', mandatory: false, channels: ['inapp'],
+    trigger: { event: 'ai.failed' }, recipients: ['requester'],
+    subject: 'L\u2019IA n\u2019a pas pu analyser : {titre}', body: "L\u2019analyse du dossier n° {numero} « {titre} » a échoué ({motif}). Vous pouvez réessayer ou adapter les textes à la main.\n{lien}" },
 
   // ---- temporelles : relances (paliers par défaut de la section 22.3 bis, jours ouvrés) ------------------------------
   { code: 'relance.etape', nom: "Relance d'un acte qui attend un valideur", family: 'validation', kind: 'temporal', mandatory: true,

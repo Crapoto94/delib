@@ -174,6 +174,27 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
       return rows.map((r) => ({ id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, direction: r.direction_label, seanceViseeId: r.seance_visee_id, rubrique: r.rubrique, rapporteur: r.rapporteur, deliberations: r.nb_delib, commissions: r.nb_commissions, avisRendus: r.avis_rendus }));
     },
 
+    /**
+     * Tous les dossiers qui VISENT cette séance (séance visée), quel que soit leur avancement : ceux dont le circuit est terminé
+     * peuvent être affectés ; les autres montrent où ils en sont (brouillon, étape du circuit, date limite).
+     */
+    async visant(organismeId, seanceId) {
+      const org = requireOrg(organismeId);
+      const rows = await db.all(
+        `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.redacteur, a.direction_label, a.current_step_key, a.seance_id, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
+                i.label AS etape, i.holders AS etape_holders, i.due_at AS etape_due
+         FROM actes a LEFT JOIN ref_items ru ON ru.id = a.rubrique_id LEFT JOIN elus e ON e.id = a.rapporteur_id
+              LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+         WHERE a.organisme_id = $1 AND a.seance_visee_id = $2 AND a.statut NOT IN ('abandonne', 'retire', 'archive')
+         ORDER BY a.numero_suivi`, [org, seanceId]);
+      const inOdj = new Set((await db.all("SELECT acte_id FROM seance_items WHERE seance_id = $1 AND statut = 'a_traiter' AND acte_id IS NOT NULL", [seanceId])).map((r) => r.acte_id));
+      return rows.map((r) => ({
+        id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, redacteur: r.redacteur, direction: r.direction_label, rubrique: r.rubrique, rapporteur: r.rapporteur,
+        etape: r.etape || null, holders: r.etape_holders || [], dueAt: r.etape_due || null, dansOdj: inOdj.has(r.id) || r.statut === 'inscrit_odj',
+        eligible: r.statut === ELIGIBLE_STATUT && !r.current_step_key && !r.seance_id,
+      }));
+    },
+
     async affecter(ctx, organismeId, seanceId, { acteIds, motif }) {
       const org = requireOrg(organismeId);
       await mutate(ctx, org, seanceId, { motif }, async (q, s, after) => {

@@ -86,17 +86,31 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
     },
 
     // ---- composition --------------------------------------------------------------------------------------------------
+    /** Logo de l'organisme à poser en tête de la première page, mis à l'échelle (points) ; null si non demandé ou absent. */
+    async logoFor(organismeId, cfg, hasBackground) {
+      const opt = cfg.logo?.afficher;
+      if (opt === false || (opt !== true && hasBackground)) return null;
+      const r = await db.get('SELECT logo_path, logo_mime, logo_sha256 FROM organismes WHERE id = $1', [organismeId]);
+      if (!r?.logo_path) return null;
+      let bytes; try { bytes = await storage.get(r.logo_path); } catch { return null; }
+      const d = await PDFDocument.create();
+      const img = r.logo_mime === 'image/png' ? await d.embedPng(bytes) : await d.embedJpg(bytes);
+      const w = (cfg.logo?.largeur ?? 28) * T.MM; const scaled = img.scale(w / img.width);
+      return { bytes, mime: r.logo_mime, sha256: r.logo_sha256, w: scaled.width, h: scaled.height };
+    },
+
     async varsFor(acte, delib) {
       const org = requireOrg(acte.organisme_id);
       const [orgRow, rub, mat, nat] = await Promise.all([
-        db.get('SELECT nom FROM organismes WHERE id = $1', [org]),
+        db.get('SELECT nom, adresse, contact FROM organismes WHERE id = $1', [org]),
         acte.rubrique_id ? db.get('SELECT libelle FROM ref_items WHERE id = $1', [acte.rubrique_id]) : null,
         acte.matiere_id ? db.get('SELECT code, libelle FROM ref_items WHERE id = $1', [acte.matiere_id]) : null,
         acte.nature_id ? db.get('SELECT libelle FROM ref_items WHERE id = $1', [acte.nature_id]) : null,
       ]);
       const seance = acte.seance_id || acte.seance_visee_id ? await db.get('SELECT date_seance FROM seances WHERE id = $1', [acte.seance_id || acte.seance_visee_id]).catch(() => null) : null;
       return {
-        organisme: orgRow?.nom || '', numero_suivi: acte.numero_suivi, titre: delib?.titre || acte.titre, titre_dossier: acte.titre,
+        organisme: orgRow?.nom || '', adresse: orgRow?.adresse || '', ville: orgRow?.contact?.ville || '', code_postal: orgRow?.contact?.codePostal || '', telephone: orgRow?.contact?.telephone || '',
+        email: orgRow?.contact?.email || '', site_web: orgRow?.contact?.siteWeb || '', signataire: orgRow?.contact?.signataire || '', numero_suivi: acte.numero_suivi, titre: delib?.titre || acte.titre, titre_dossier: acte.titre,
         rubrique: rub?.libelle || '', matiere: mat ? `${mat.code} ${mat.libelle}` : '', nature: nat?.libelle || '',
         direction: acte.direction_label || acte.direction_code, service: acte.service_label || '', redacteur: acte.redacteur, statut: acte.statut,
         date_seance: seance?.date_seance ? new Date(seance.date_seance).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() : '[date de séance à définir]',
@@ -120,10 +134,11 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
       const cfg = { ...tpl.cfg, ...(cfgOverride || {}) };
       const [bf, bn] = await Promise.all([svc.bgBytes(tpl.bgFirstFileId), svc.bgBytes(tpl.bgNextFileId)]);
       const wm = watermark === undefined ? cfg.filigrane : watermark;
-      const key = sha(JSON.stringify({ docType, content, cfg, vars, wm, bf: bf?.sha256, bn: bn?.sha256, v: tpl.version }));
+      const logo = await svc.logoFor(organismeId, cfg, !!bf);
+      const key = sha(JSON.stringify({ docType, content, cfg, vars, wm, bf: bf?.sha256, bn: bn?.sha256, v: tpl.version, logo: logo?.sha256 }));
       if (cache.has(key)) return cache.get(key);
-      const layout = T.layoutDocument({ content, cfg, vars, measure: await measure(cfg.police?.famille) });
-      const out = await T.paintDocument({ layout, cfg, vars, bgFirst: bf?.bytes, bgNext: bn?.bytes, watermark: wm || null, title, fontsDir: config.fontsDir });
+      const layout = T.layoutDocument({ content, cfg, vars, measure: await measure(cfg.police?.famille), logo });
+      const out = await T.paintDocument({ layout, cfg, vars, bgFirst: bf?.bytes, bgNext: bn?.bytes, watermark: wm || null, title, fontsDir: config.fontsDir, logo });
       return remember(key, { ...out, layout, key });
     },
 
@@ -184,7 +199,16 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
         const parts = [{ titre: 'Exposé des motifs', pdf: await exposePdf() }];
         for (const d of delibs) parts.push({ titre: `Délibération : ${d.titre}`, pdf: await delibPdf(d) });
         const annexes = await db.all('SELECT a.titre, a.ordre, f.storage_key, f.pages FROM annexes a JOIN files f ON f.id = a.file_id WHERE a.acte_id = $1 ORDER BY a.ordre, a.id', [acte.id]);
-        for (const [i, a] of annexes.entries()) parts.push({ titre: `Annexe ${i + 1} : ${a.titre}`, pdf: { buffer: await storage.get(a.storage_key), pageCount: a.pages } });
+        for (const [i, a] of annexes.entries()) {
+          try { parts.push({ titre: `Annexe ${i + 1} : ${a.titre}`, pdf: { buffer: await storage.get(a.storage_key), pageCount: a.pages } }); }
+          catch (e) {
+            // fichier introuvable : le dossier reste imprimable, l'annexe est remplacée par une page d'avertissement
+            const doc = await PDFDocument.create(); const pg = doc.addPage([T.A4.w, T.A4.h]);
+            pg.drawText(`Annexe ${i + 1} : ${String(a.titre).replace(/[^ -~ -ÿ]/g, '?')}`, { x: 56, y: 760, size: 14 });
+            pg.drawText('Fichier indisponible sur le serveur : redeposez cette annexe.', { x: 56, y: 730, size: 11 });
+            parts.push({ titre: `Annexe ${i + 1} : ${a.titre} (indisponible)`, pdf: { buffer: Buffer.from(await doc.save()), pageCount: 1 } });
+          }
+        }
         return svc.assemble({ organismeId: acte.organisme_id, titre: `Dossier n° ${acte.numero_suivi} — ${acte.titre}`, parts, vars: await svc.varsFor(acte, null), watermark });
       }
       throw E.badRequest('cible inconnue');

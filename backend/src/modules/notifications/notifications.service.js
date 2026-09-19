@@ -55,6 +55,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
       else if (r === 'mentions') list = payload.comment?.mentions || [];
       else if (r === 'delegue') list = [payload.delegation?.delegue];
       else if (r === 'grantee') list = [payload.grant?.username];
+      else if (r === 'requester') list = [payload.requestedBy];
       else if (r === 'deciders') list = await late.deadlines.deciders(orgId);
       else if (r === 'demandeur') list = [payload.derogation?.demandeur];
       else if (r === 'rapporteur') list = acte.rapporteur_id ? [`elu:${acte.rapporteur_id}`] : [];
@@ -143,7 +144,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
 
   // ------------------------------------------------------------------------------------------- événements
   const EVENT_MAP = ['step.entered', 'acte.refused', 'circuit.completed', 'circuit.recalculated', 'comment.added', 'delegation.created', 'redaction.granted', 'circuit.blocked', 'circuit.published', 'circuit.missing_holders',
-  'derogation.requested', 'derogation.decided', 'commission.mise_a_disposition', 'commission.suspendue', 'commission.retiree', 'commission.avis', 'acte.seance_changed', 'odj.arrete', 'odj.modifie'];
+  'derogation.requested', 'derogation.decided', 'commission.mise_a_disposition', 'commission.suspendue', 'commission.retiree', 'commission.avis', 'acte.seance_changed', 'odj.arrete', 'odj.modifie', 'ai.done', 'ai.failed'];
 
   async function onEvent(type, p) {
     const orgId = p.organismeId; if (!orgId) return;
@@ -160,7 +161,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
       if (!users.size) continue;
       const actorName = actor ? await nameOf(actor) : '';
       const vars = acte ? await varsOf(acte, { inst, etape: p.label || p.steps?.map((s) => s.label).join(', '), dueAt: p.dueAt, vars: {
-        acteur: actorName, motif: p.motif || p.derogation?.decisionMotif || p.derogation?.motif || p.comment?.body || (p.avis ? `avis ${p.avis}` : ''), ajoutees: (p.labels || []).join(', '),
+        acteur: actorName, motif: p.error || p.motif || p.derogation?.decisionMotif || p.derogation?.motif || p.comment?.body || (p.avis ? `avis ${p.avis}` : ''), ajoutees: (p.labels || []).join(', '),
         commission: p.commissionNom || '', numero_odj: p.numero || '', ordre_odj: p.ordre || '', decision: p.derogation?.statut === 'accordee' ? 'accordé' : p.derogation?.statut === 'refusee' ? 'refusé' : '',
       } }) : { acteur: actorName, version: p.version, circuit: p.circuitName || '', portee: p.delegation?.scope || '', direction: p.grant?.directionCode || '' };
       if (p.circuitName === undefined && type === 'circuit.published') vars.circuit = (await db.get('SELECT nom FROM circuit_definitions WHERE id = $1', [p.definitionId]))?.nom || '';

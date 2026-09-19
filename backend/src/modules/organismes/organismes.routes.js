@@ -14,15 +14,33 @@ const Create = z.object({
   couleurs: z.record(z.string(), z.string().max(40)).optional(),
   vocabulaire: z.record(z.string(), z.string().max(120)).optional(),
 });
-const Update = Create.omit({ code: true }).partial().extend({ actif: z.boolean().optional() });
+const Contact = z.object({
+  adresse2: z.string().max(200), codePostal: z.string().max(10), ville: z.string().max(100), telephone: z.string().max(40), email: z.string().max(200),
+  siteWeb: z.string().max(200), signataire: z.string().max(120).describe('Nom du signataire des convocations (Maire)'), signataireQualite: z.string().max(120),
+}).partial();
+const Update = Create.omit({ code: true }).partial().extend({ actif: z.boolean().optional(), contact: Contact.optional() });
 const Directions = z.object({
   directions: z.array(z.object({ code: z.string().trim().min(1).max(40), label: z.string().trim().max(200).optional() })).max(500),
 });
 const RoleBody = z.object({ username: z.string().trim().min(1).max(128), role: z.enum(ORG_ROLES) });
 const AdminBody = z.object({ username: z.string().trim().min(1).max(128) });
 
+const multer = require('multer');
+
 module.exports = ({ makeRouter, organismes }) => {
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
   const r = makeRouter('/api/v1/organismes');
+  const pub = makeRouter('/api/v1/public');
+
+  pub.get('/branding', { summary: "Identité de l'application (nom et logo de l'organisme par défaut)", tags: ['public'], auth: false },
+    async (req, res) => res.json(await organismes.branding()));
+  const sendLogo = async (res, id) => {
+    const l = await organismes.getLogo(id);
+    if (!l) return res.status(404).json({ error: 'Pas de logo', code: 'NOT_FOUND' });
+    return res.set({ 'Content-Type': l.mime, 'Cache-Control': 'public, max-age=3600', ETag: `"${l.sha256}"` }).send(l.buffer);
+  };
+  pub.get('/organismes/:orgId/logo', { summary: "Logo d'un organisme (public : affiché avant la connexion)", tags: ['public'], auth: false, params: OrgParams },
+    async (req, res) => sendLogo(res, req.valid.params.orgId));
 
   r.get('/', {
     summary: "Organismes accessibles à l'utilisateur", tags: ['organismes'],
@@ -37,6 +55,12 @@ module.exports = ({ makeRouter, organismes }) => {
 
   r.put('/:orgId', { summary: 'Modifie un organisme', tags: ['organismes'], org: true, roles: ['org_admin'], params: OrgParams, body: Update },
     async (req, res) => res.json(await organismes.update(req.ctx, req.org.id, req.valid.body)));
+
+  r.post('/:orgId/logo', { summary: "Dépose le logo de l'organisme (PNG ou JPEG)", tags: ['organismes'], org: true, roles: ['org_admin'], params: OrgParams,
+    description: "multipart/form-data, champ « file ». C'est aussi le logo de l'application (en-tête, page de connexion, icône) et des PDF (option « logo » des gabarits). 1,5 Mo au plus." },
+  upload.single('file'), async (req, res) => res.json(await organismes.setLogo(req.ctx, req.org.id, req.file)));
+  r.delete('/:orgId/logo', { summary: "Retire le logo de l'organisme", tags: ['organismes'], org: true, roles: ['org_admin'], params: OrgParams },
+    async (req, res) => res.json(await organismes.removeLogo(req.ctx, req.org.id)));
 
   r.get('/:orgId/directions', { summary: "Directions rattachées à l'organisme", tags: ['organismes'], org: true, params: OrgParams },
     async (req, res) => res.json({ items: await organismes.directions(req.ctx, req.org.id) }));
@@ -65,5 +89,5 @@ module.exports = ({ makeRouter, organismes }) => {
   p.delete('/:roleId', { summary: 'Retire un administrateur de plateforme', tags: ['plateforme'], platform: true, params: AdminParams, responses: { 204: 'Supprimé' } },
     async (req, res) => { await organismes.removePlatformAdmin(req.ctx, req.valid.params.roleId); res.status(204).end(); });
 
-  return [r, p];
+  return [r, p, pub];
 };

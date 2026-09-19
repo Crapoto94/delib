@@ -3,8 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Check, CheckCircle2, Download, Eye, FileText, Copy, Paperclip, Pencil, RotateCcw, Send, Sparkles, Trash2, Upload } from 'lucide-react';
 import TexteModal, { KIND_LABEL } from '../TexteModal';
 import { MentionTextarea } from '../AgentPicker';
+import { Progress, useAiJobs } from '../AiStatus';
 import { mdToHtml } from '../mdconv';
-import { api, errMsg, org as orgPath } from '../api';
+import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { d, dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, useLoad, useToast } from '../ui';
@@ -291,7 +292,7 @@ function CopieModal({ acte, onClose, toast }: { acte: any; onClose: () => void; 
     setBusy(true);
     try {
       const r = (await api.post(orgPath(o, `/actes/${acte.id}/copie`), adapter ? { adapter: true, contexte } : {})).data;
-      if (r.iaError) toast(`Copie créée, mais l'IA n'a pas répondu : ${r.iaError}`, 'ko'); else toast(adapter ? `Copie créée : ${r.suggestions.filter((x: any) => x.kind === 'remplacement').length} proposition(s) à examiner` : 'Copie créée');
+      if (r.iaError) toast(`Copie créée, mais l'IA n'a pas pu être sollicitée : ${r.iaError}`, 'ko'); else toast(adapter ? "Copie créée. L'IA prépare ses propositions en arrière plan : vous pouvez continuer à travailler." : 'Copie créée');
       onClose(); nav(`/dossiers/${r.acte.id}`);
     } catch (e) { toast(errMsg(e), 'ko'); setBusy(false); }
   };
@@ -313,8 +314,21 @@ function IaPanel({ acte, editable, onApplied, toast }: { acte: any; editable: bo
   const { org } = useAuth(); const o = org!.id;
   const list = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/ia/propositions`))).data.items as any[], [acte.id]);
   const [edit, setEdit] = useState<{ id: number; text: string } | null>(null);
+  const { active, jobs } = useAiJobs((j) => { list.reload(); if (j.status === 'done') toast("L'IA a terminé : des propositions sont à examiner"); else if (j.status === 'error') toast(`L'IA n'a pas pu répondre : ${j.error ?? ''}`, 'ko'); }, acte.id);
   const pending = (list.data ?? []).filter((x) => x.status === 'pending');
-  if (!pending.length) return null;
+  const failed = jobs.find((j) => j.status === 'error' && !active.length);
+  if (active.length) {
+    const j = active[0];
+    return (
+      <div className="card border-action/40 p-5" role="status" aria-live="polite">
+        <h3 className="mb-1 flex items-center gap-2"><Sparkles className="h-5 w-5 animate-pulse text-action" /> L'IA analyse ce dossier…</h3>
+        <p className="text-[12px] text-mute">{j.status === 'queued' ? `En file d'attente (n° ${j.position}) — l'IA est sollicitée par plusieurs personnes.` : `${j.stepLabel ?? 'Analyse'} (${j.progress}/${j.total || '?'})`} Vous pouvez continuer à travailler : cela se fait en arrière plan.</p>
+        <Progress job={j} />
+        <button className="mt-3 text-[12px] font-semibold text-ko" onClick={async () => { await api.delete(orgPath(o, `/ia/taches/${j.id}`)); }}>Annuler</button>
+      </div>
+    );
+  }
+  if (!pending.length) return failed ? <div className="card p-4 text-[12px] text-warn"><Sparkles className="mr-1 inline h-4 w-4" /> L'IA n'a pas pu analyser ce dossier ({failed.error}). Adaptez les textes à la main ou relancez plus tard.</div> : null;
   const KIND: Record<string, string> = { expose: 'Exposé', visas: 'Vu et considérant', dispositif: 'Délibéré' };
   const decide = async (p: any, decision: 'accept' | 'reject', replacement?: string) => {
     try { await api.post(orgPath(o, `/actes/${acte.id}/ia/propositions/${p.id}/decision`), { decision, replacement }); setEdit(null); list.reload(); if (decision === 'accept') onApplied(); }
@@ -365,7 +379,7 @@ export default function Dossier() {
         <div className="mb-1 text-[12px] text-mute"><Link to="/dossiers" className="hover:underline">Actes & Dossiers</Link> › Dossier #{a.numeroSuivi}</div>
         <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><StatutBadge statut={a.statut} />
           <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
-          <button className="btn-secondary" onClick={async () => { try { const r = await api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }); window.open(URL.createObjectURL(r.data), '_blank'); } catch { toast('Aperçu du dossier impossible (textes ou fond de page manquants ?)', 'ko'); } }}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button></div>
+          <button className="btn-secondary" onClick={async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' })); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); }}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button></div>
       </div>
       {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { api, getActAs, getOrgId, getToken, setActAs, setOrgId, setToken } from './api';
 
-export type Organisme = { id: number; code: string; nom: string; type: string; isDefault: boolean; roles: string[]; via?: string };
+export type Organisme = { id: number; code: string; nom: string; type: string; isDefault: boolean; roles: string[]; via?: string; hasLogo?: boolean; logoVersion?: string | null; contact?: Record<string, string>; adresse?: string | null };
 export type Me = {
   username: string; displayName: string; email: string | null; kind: string; isPlatformAdmin: boolean;
   agent: null | { displayName?: string; direction?: { code: string; label: string }; service?: { code: string; label: string } | null; poste?: string };

@@ -11,6 +11,7 @@ export default function Odj() {
   const { id } = useParams();
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const odj = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj`))).data, [o, id]);
+  const visant = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj/visant`))).data.items as any[], [o, id]);
   const pendingLoad = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj/en-attente`))).data.items as any[], [o, id]);
   const [order, setOrder] = useState<any[]>([]); const [dragFrom, setDragFrom] = useState<number | null>(null); const [over, setOver] = useState<number | null>(null);
   const [history, setHistory] = useState<any[][]>([]); const [sel, setSel] = useState<number[]>([]);
@@ -28,7 +29,7 @@ export default function Odj() {
   const run = async (fn: (motif?: string) => Promise<any>, ok?: string) => {
     const motif = motifIfNeeded(); if (motif === null) return;
     setBusy(true);
-    try { await fn(motif); if (ok) toast(ok); odj.reload(); pendingLoad.reload(); }
+    try { await fn(motif); if (ok) toast(ok); odj.reload(); pendingLoad.reload(); visant.reload(); }
     catch (e: any) { toast(errMsg(e), 'ko'); odj.reload(); } finally { setBusy(false); }
   };
   const lock = async () => { try { await api.post(orgPath(o, `/seances/${id}/odj/verrou`), {}); clearInterval(lockTimer.current); lockTimer.current = setInterval(() => api.post(orgPath(o, `/seances/${id}/odj/verrou`), {}).catch(() => {}), 240000); } catch (e: any) { toast(errMsg(e), 'ko'); throw e; } };
@@ -129,6 +130,23 @@ export default function Odj() {
             </>)}
         </aside>
       </div>
+
+
+      {(visant.data?.length ?? 0) > 0 && (
+        <section className="card mt-6" aria-labelledby="visant">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3"><h3 id="visant">Dossiers proposés à cette séance</h3><Badge tone="blue">{visant.data!.length}</Badge>
+            <span className="text-[12px] text-mute">Tous ceux qui visent cette séance, où qu'ils en soient dans le circuit.</span></div>
+          <table className="w-full"><thead><tr><th>N°</th><th>Dossier</th><th>Direction</th><th>Rapporteur</th><th>Avancement</th><th /></tr></thead><tbody>
+            {visant.data!.map((a: any) => (
+              <tr key={a.id} className="hover:bg-soft">
+                <td className="font-mono text-[12px]">#{a.numeroSuivi}</td>
+                <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link><div className="text-[12px] text-mute">{a.rubrique ?? '—'} · {a.redacteur}</div></td>
+                <td className="text-mute">{a.direction}</td><td>{a.rapporteur ?? <span className="text-warn">à désigner</span>}</td>
+                <td>{a.dansOdj ? <Badge tone="ok">À l'ordre du jour</Badge> : a.eligible ? <Badge tone="ok">Prêt à affecter</Badge> : a.statut === 'brouillon' ? <Badge>En rédaction</Badge> : a.statut === 'modification_demandee' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{a.etape ?? a.statut}</Badge>}{a.holders?.length ? <div className="text-[11px] text-mute">chez {a.holders.join(', ')}</div> : null}</td>
+                <td className="text-right">{canEdit && a.eligible && !a.dansOdj && !arrete && <button className="btn-secondary !py-1" disabled={busy} onClick={() => run((motif) => api.post(orgPath(o, `/seances/${id}/odj/affectations`), { acteIds: [a.id], motif }), 'Ajouté à l\'ordre du jour')}>Ajouter à l'ordre du jour</button>}</td>
+              </tr>))}
+          </tbody></table>
+        </section>)}
 
       {point && <Modal title="Ajouter à l'ordre du jour" onClose={() => setPoint(null)}><div className="space-y-4">
         <Field label="Type"><select className="input" value={point.kind} onChange={(e) => setPoint({ ...point, kind: e.target.value as any })}><option value="libre">Point libre (approbation du PV, questions diverses…)</option><option value="chapitre">Chapitre (titre de regroupement, sans numéro)</option></select></Field>

@@ -60,14 +60,18 @@ function HorsDelai() {
 
 function SeancesList() {
   const { org, isScc } = useAuth(); const o = org!.id;
-  const [tab, setTab] = useState<'seances' | 'hors'>('seances'); const [creating, setCreating] = useState(false);
-  const list = useLoad(async () => (await api.get(orgPath(o, '/seances'), { params: { limit: 100 } })).data.items as any[], [o]);
+  const [tab, setTab] = useState<'avenir' | 'passees' | 'hors'>('avenir'); const [creating, setCreating] = useState(false);
+  const list = useLoad(async () => {
+    const now = new Date().toISOString();
+    const items = (await api.get(orgPath(o, '/seances'), { params: tab === 'passees' ? { to: now, limit: 200 } : { from: now, limit: 200 } })).data.items as any[];
+    return tab === 'passees' ? items : [...items].sort((a, b) => +new Date(a.dateSeance) - +new Date(b.dateSeance)); // les prochaines d'abord ; les passées, la plus récente d'abord
+  }, [o, tab]);
   return (
     <div>
       <PageTitle title="Séances & Ordre du jour" sub="Calendrier des instances, dates clés et actes en attente." actions={isScc && <button className="btn-primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nouvelle séance</button>} />
-      {isScc && <div className="mb-4 flex rounded bg-white p-1 shadow-card w-fit">{([['seances', 'Séances'], ['hors', 'Hors délai & dérogations']] as const).map(([k, l]) => (
-        <button key={k} onClick={() => setTab(k)} className={`rounded px-3 py-2 text-[13px] font-semibold ${tab === k ? 'bg-primary text-white' : ''}`}>{l}</button>))}</div>}
-      {tab === 'hors' ? <HorsDelai /> : list.loading ? <Loading /> : !list.data?.length ? <div className="card"><Empty>Aucune séance planifiée.</Empty></div> : (
+      <div className="mb-4 flex w-fit rounded bg-white p-1 shadow-card" role="tablist">{([['avenir', 'À venir'], ['passees', 'Séances passées'], ...(isScc ? [['hors', 'Hors délai & dérogations']] : [])] as [string, string][]).map(([k, l]) => (
+        <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k as any)} className={`rounded px-3 py-2 text-[13px] font-semibold ${tab === k ? 'bg-primary text-white' : ''}`}>{l}</button>))}</div>
+      {tab === 'hors' ? <HorsDelai /> : list.loading ? <Loading /> : !list.data?.length ? <div className="card"><Empty>{tab === 'passees' ? 'Aucune séance passée.' : 'Aucune séance à venir.'}</Empty></div> : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{list.data.map((s) => {
           const j = daysUntil(s.dateSeance); const lim = daysUntil(s.dateLimiteRedaction);
           return (

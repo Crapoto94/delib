@@ -304,3 +304,29 @@ describe('utilisateurs et rôles (D41)', () => {
     expect(r.body.error).toMatch(/dernier administrateur/);
   });
 });
+
+describe('dossiers proposés à une séance (visant), quel que soit leur avancement', () => {
+  it('liste brouillons, dossiers en circuit et dossiers prêts ; seuls les prêts sont affectables', async () => {
+    const s = (await as(admin).post(`${base()}/seances`, { instanceId: instance.id, dateSeance: '2028-03-09T18:00:00Z' })).body;
+    const mk = async (titre, { submit = false, finish = false } = {}) => {
+      const a = (await as(t.dupont).post(`${base()}/actes`, { typeId: typeDelib.id, titre })).body;
+      await as(t.dupont).put(A(a.id), { matiereId: matiere.id, rubriqueId: rubriques[0].id, incidenceFinanciere: false, rapporteurId: 1, seanceViseeId: s.id });
+      if (submit || finish) {
+        for (const x of (await as(t.dupont).get(`${A(a.id)}/textes`)).body.items) await as(t.dupont).put(`${A(a.id)}/textes/${x.id}`, { markdown: 'Texte.', baseVersion: x.version });
+        await as(t.dupont).post(`${A(a.id)}/envoi`);
+      }
+      if (finish) for (let i = 0; i < 10; i++) { const v = (await as(t.dupont).get(`${A(a.id)}/circuit`)).body; if (!v.currentStepKey) break; await as(t[WHO[v.currentStepKey]]).post(`${A(a.id)}/validation`, {}); }
+      return a;
+    };
+    const brouillon = await mk('Visant : brouillon'); const enCircuit = await mk('Visant : en circuit', { submit: true }); const pret = await mk('Visant : prêt', { finish: true });
+    const r = (await as(t.martin).get(`${O(s.id)}/visant`)).body.items;
+    const by = (a) => r.find((x) => x.id === a.id);
+    expect(by(brouillon)).toMatchObject({ statut: 'brouillon', eligible: false, dansOdj: false });
+    expect(by(enCircuit)).toMatchObject({ statut: 'en_circuit', eligible: false, etape: 'Chef de service', holders: ['durand'] });
+    expect(by(pret)).toMatchObject({ eligible: true, dansOdj: false });
+    expect((await as(t.martin).get(`${base()}/seances/${s.id}`)).body.actesEnAttente).toBe(3); // le compteur de la carte = la liste affichée
+    await as(t.martin).post(`${O(s.id)}/affectations`, { acteIds: [pret.id] });
+    expect((await as(t.martin).get(`${O(s.id)}/visant`)).body.items.find((x) => x.id === pret.id)).toMatchObject({ dansOdj: true, eligible: false });
+    expect((await as(t.dupont).get(`${O(s.id)}/visant`)).status).toBe(403);
+  });
+});

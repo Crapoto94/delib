@@ -94,3 +94,15 @@ describe('autocomplétion « @nom » des agents', () => {
     expect(r.map((a) => a.username)).toContain('nouvel.rh');
   });
 });
+
+describe('liste des utilisateurs (administration)', () => {
+  it('sans recherche : les agents connus, avec leurs rôles ; filtre « avec un rôle »', async () => {
+    const tk = await adminToken(env);
+    const all = (await get(tk, `${base()}/utilisateurs`)).body.items;
+    expect(all.map((a) => a.username)).toEqual(expect.arrayContaining(['dupont', 'durand', 'leroy', 'martin']));
+    expect(all.find((a) => a.username === 'martin').roles.map((r) => r.role)).toContain('scc');
+    const withRole = (await get(tk, `${base()}/utilisateurs?avecRole=true`)).body.items;
+    expect(withRole.map((a) => a.username)).toEqual(expect.arrayContaining(['martin', 'leroy']));
+    expect(withRole.some((a) => a.username === 'dupont')).toBe(false);
+  });
+});

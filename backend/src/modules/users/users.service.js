@@ -14,15 +14,19 @@ const toA = (r) => ({
 function createUsers({ db, audit, dir, organismes, access, log }) {
   const svc = {
     /** Recherche : agents connus localement puis annuaire RH (une panne de l'annuaire n'empêche pas la recherche locale). */
-    async search(ctx, organismeId, q) {
+    async search(ctx, organismeId, q, { avecRole = false, limit = 100, offset = 0 } = {}) {
       const org = requireOrg(organismeId);
-      const like = `%${q.trim().replace(/[%_]/g, '\\$&')}%`;
-      const local = (await db.all(
-        `SELECT * FROM agent_ref WHERE username ILIKE $1 OR display_name ILIKE $1 OR email ILIKE $1 OR nom ILIKE $1 OR prenom ILIKE $1 ORDER BY display_name NULLS LAST, username LIMIT 30`, [like])).map(toA);
+      const text = (q || '').trim();
+      // sans recherche : la liste des agents connus (déjà connectés), éventuellement ceux qui ont un rôle ici
+      const where = [text ? '(username ILIKE $1 OR display_name ILIKE $1 OR email ILIKE $1 OR nom ILIKE $1 OR prenom ILIKE $1)' : 'TRUE'];
+      const p = text ? [`%${text.replace(/[%_]/g, '\\$&')}%`] : [];
+      if (avecRole) { p.push(org); where.push(`EXISTS (SELECT 1 FROM user_org_roles r WHERE r.username = agent_ref.username AND (r.organisme_id = $${p.length} OR r.organisme_id IS NULL))`); }
+      p.push(limit, offset);
+      const local = (await db.all(`SELECT * FROM agent_ref WHERE ${where.join(' AND ')} ORDER BY display_name NULLS LAST, username LIMIT $${p.length - 1} OFFSET $${p.length}`, p)).map(toA);
       const seen = new Set(local.map((a) => a.username));
       let remote = [];
       try {
-        remote = (await dir.searchLogins(q, 20)).filter((a) => !seen.has(a.username))
+        if (text.length >= 2 && !avecRole) remote = (await dir.searchLogins(text, 20)).filter((a) => !seen.has(a.username))
           .map((a) => ({ username: a.username, displayName: a.displayName, email: a.email, matricule: null, direction: a.direction ? { code: null, label: a.direction } : null, service: a.service ? { code: null, label: a.service } : null, poste: a.poste, source: 'rh', actif: true, lastLoginAt: null, knownLocally: false }));
       } catch (e) { log.warn({ err: e.message }, 'recherche annuaire indisponible : résultats locaux seulement'); }
       const list = [...local, ...remote];

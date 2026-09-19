@@ -34,6 +34,7 @@ const { createDeadlines } = require('./modules/seances/deadlines.service');
 const { createOdj } = require('./modules/seances/odj.service');
 const { createUsers } = require('./modules/users/users.service');
 const { createAi } = require('./modules/ai/ai.service');
+const { createAiQueue } = require('./modules/ai/queue');
 
 function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, guard }) {
   assertAuthPort(ad);
@@ -44,12 +45,12 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const access = createAccess(db);
   const sessions = createSessions(db);
   const dir = createDirectoryService({ db, adapter: directoryAdapter, config, log });
-  const organismes = createOrganismes({ db, audit });
+  const storage = createStorage(config);
+  const organismes = createOrganismes({ db, audit, storage });
   const settings = createSettings({ db, audit });
   const onboarding = createOnboarding(db);
   const auth = createAuthService({ db, config, log, ad, dir, sessions, audit, guard: guard || createLoginGuard() });
   const bus = createBus(log);
-  const storage = createStorage(config);
   const late = {}; // services liés après coup pour éviter les dépendances circulaires (textes suivis, circuit…)
   const elus = createElus({ db, audit, directoryAdapter, log });
   late.elus = elus;
@@ -71,14 +72,15 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   late.deadlines = deadlines;
   const odj = createOdj({ db, audit, actes, acl, titulaires, settings, bus, late });
   late.odj = odj;
-  const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log });
+  const aiQueue = createAiQueue({ db, settings, access, bus, log });
+  const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log, queue: aiQueue });
   const users = createUsers({ db, audit, dir, organismes, access, log });
   const delegations = createDelegations({ db, audit, access, titulaires, dir, bus });
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
   const scheduler = createScheduler({ db, notifications, config, log });
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, users, ai };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, users, ai, aiQueue };
 }
 
 module.exports = { buildContainer };

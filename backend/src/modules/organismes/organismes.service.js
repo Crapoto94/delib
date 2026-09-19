@@ -9,12 +9,16 @@ const ORG_ROLES = ['org_admin', 'scc', 'teletransmission', 'lecteur'];
 const json = (v) => JSON.stringify(v ?? {});
 
 const toOrg = (r) => r && ({
-  id: r.id, code: r.code, nom: r.nom, type: r.type, siren: r.siren, adresse: r.adresse, logoPath: r.logo_path,
+  id: r.id, code: r.code, nom: r.nom, type: r.type, siren: r.siren, adresse: r.adresse, contact: r.contact || {}, hasLogo: !!r.logo_path, logoVersion: r.logo_sha256 ? r.logo_sha256.slice(0, 12) : null,
   couleurs: r.couleurs, vocabulaire: r.vocabulaire, isDefault: r.is_default, actif: r.actif, createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const toRole = (r) => ({ id: r.id, username: r.username, organismeId: r.organisme_id, role: r.role, createdBy: r.created_by, createdAt: r.created_at });
 
-function createOrganismes({ db, audit }) {
+const LOGO_MAX = 1.5 * 1024 * 1024;
+const CONTACT_KEYS = ['adresse2', 'codePostal', 'ville', 'telephone', 'email', 'siteWeb', 'signataire', 'signataireQualite'];
+const mimeOf = (b) => (b.length > 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ? 'image/png' : b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff ? 'image/jpeg' : null);
+
+function createOrganismes({ db, audit, storage }) {
   const svc = {
     ORG_ROLES,
     async getById(id) { return toOrg(await db.get('SELECT * FROM organismes WHERE id = $1', [id])); },
@@ -42,12 +46,50 @@ function createOrganismes({ db, audit }) {
       const r = await db.get(
         `UPDATE organismes SET nom = COALESCE($2, nom), type = COALESCE($3, type), siren = COALESCE($4, siren),
            adresse = COALESCE($5, adresse), couleurs = COALESCE($6::jsonb, couleurs), vocabulaire = COALESCE($7::jsonb, vocabulaire),
-           actif = COALESCE($8, actif) WHERE id = $1 RETURNING *`,
+           actif = COALESCE($8, actif), contact = CASE WHEN $9::jsonb IS NULL THEN contact ELSE contact || $9::jsonb END WHERE id = $1 RETURNING *`,
         [id, d.nom ?? null, d.type ?? null, d.siren ?? null, d.adresse ?? null,
-          d.couleurs ? json(d.couleurs) : null, d.vocabulaire ? json(d.vocabulaire) : null, d.actif ?? null]);
+          d.couleurs ? json(d.couleurs) : null, d.vocabulaire ? json(d.vocabulaire) : null, d.actif ?? null,
+          d.contact ? json(Object.fromEntries(Object.entries(d.contact).filter(([k]) => CONTACT_KEYS.includes(k)))) : null]);
       const after = toOrg(r);
       await audit.log(ctx, { organismeId: id, action: 'organisme.update', entity: 'organismes', entityId: id, before, after });
       return after;
+    },
+
+    /** Logo (PNG ou JPEG, 1,5 Mo au plus) : logo de l'application ET des PDF. Signature vérifiée, jamais l'extension. */
+    async setLogo(ctx, id, file) {
+      const org = await svc.getById(id);
+      if (!org) throw E.notFound('Organisme introuvable');
+      if (!file?.buffer) throw E.badRequest('Fichier manquant (champ « file »)');
+      if (file.buffer.length > LOGO_MAX) throw E.badRequest('Logo trop lourd (1,5 Mo au maximum)');
+      const mime = mimeOf(file.buffer);
+      if (!mime) throw E.badRequest('Le logo doit être une image PNG ou JPEG');
+      const { PDFDocument } = require('pdf-lib');
+      try { const d = await PDFDocument.create(); if (mime === 'image/png') await d.embedPng(file.buffer); else await d.embedJpg(file.buffer); } catch { throw E.badRequest('Image illisible ou corrompue'); }
+      const put = await storage.put(file.buffer, { organismeId: id, ext: mime === 'image/png' ? 'png' : 'jpg' });
+      const old = await db.get('SELECT logo_path FROM organismes WHERE id = $1', [id]);
+      await db.run('UPDATE organismes SET logo_path = $2, logo_mime = $3, logo_sha256 = $4, logo_updated_at = now() WHERE id = $1', [id, put.key, mime, put.sha256]);
+      if (old?.logo_path) await storage.remove(old.logo_path).catch(() => {});
+      await audit.log(ctx, { organismeId: id, action: 'organisme.logo', entity: 'organismes', entityId: id, after: { mime, taille: file.buffer.length, sha256: put.sha256 } });
+      return svc.getById(id);
+    },
+    async removeLogo(ctx, id) {
+      const old = await db.get('SELECT logo_path FROM organismes WHERE id = $1', [id]);
+      if (!old) throw E.notFound('Organisme introuvable');
+      await db.run('UPDATE organismes SET logo_path = NULL, logo_mime = NULL, logo_sha256 = NULL, logo_updated_at = now() WHERE id = $1', [id]);
+      if (old.logo_path) await storage.remove(old.logo_path).catch(() => {});
+      await audit.log(ctx, { organismeId: id, action: 'organisme.logo.remove', entity: 'organismes', entityId: id });
+      return svc.getById(id);
+    },
+    /** { buffer, mime, sha256 } ou null. */
+    async getLogo(id) {
+      const r = await db.get('SELECT logo_path, logo_mime, logo_sha256 FROM organismes WHERE id = $1 AND actif', [id]);
+      if (!r?.logo_path) return null;
+      try { return { buffer: await storage.get(r.logo_path), mime: r.logo_mime, sha256: r.logo_sha256 }; } catch { return null; }
+    },
+    /** Identité publique de l'application (page de connexion) : organisme par défaut, sans donnée sensible. */
+    async branding() {
+      const r = await db.get('SELECT id, nom, logo_sha256, logo_path FROM organismes WHERE is_default');
+      return r ? { organismeId: r.id, nom: r.nom, hasLogo: !!r.logo_path, logoVersion: r.logo_sha256 ? r.logo_sha256.slice(0, 12) : null } : { organismeId: null, nom: 'IvryDélib', hasLogo: false, logoVersion: null };
     },
 
     /** Amorçage : garantit l'existence de l'organisme par défaut (Ville). */

@@ -101,7 +101,8 @@ function buildConfig(env = process.env) {
     }),
     corsOrigins: e.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
     directoryCacheMs: Math.round(e.DIRECTORY_CACHE_TTL_MIN * 60 * 1000),
-    storage: Object.freeze({ dir: path.resolve(e.STORAGE_DIR), maxUploadBytes: Math.round(e.MAX_UPLOAD_MB * 1024 * 1024) }),
+    storage: Object.freeze({ dir: path.resolve(path.resolve(__dirname, '../..'), e.STORAGE_DIR), // relatif au dossier backend, JAMAIS au dossier de lancement (sinon deux processus lancés de dossiers différents ne voient pas les mêmes fichiers)
+       maxUploadBytes: Math.round(e.MAX_UPLOAD_MB * 1024 * 1024) }),
     mailRedirectTo: e.MAIL_REDIRECT_TO || null,
     fontsDir: e.FONTS_DIR ? path.resolve(e.FONTS_DIR) : path.resolve(__dirname, '../../../police'),
     devLoginPassword: e.DEV_LOGIN_PASSWORD || null,

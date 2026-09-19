@@ -25,12 +25,13 @@ async function main() {
   const app = createApp(c);
   const server = app.listen(config.port, () => log.info({ port: config.port, env: config.env, schema: config.db.schema }, 'IvryDélib démarré'));
 
+  c.aiQueue.start();
   if (config.schedulerEnabled) c.scheduler.start();
   else log.info('planificateur désactivé (SCHEDULER_ENABLED=false) : ni relances ni envoi de mails');
 
   const stop = async (signal) => {
     log.info({ signal }, 'arrêt en cours');
-    c.scheduler.stop();
+    c.scheduler.stop(); c.aiQueue.stop();
     server.close(async () => { await db.close().catch(() => {}); process.exit(0); });
     setTimeout(() => process.exit(1), 10000).unref();
   };

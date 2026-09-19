@@ -88,13 +88,13 @@ function tokenize(runs) {
  * content : [{ type:'title', text, size, align, bold, boxed, after }, { type:'runs', runs:[{text,type,color}] }, { type:'space', h }]
  * cfg : { marges:{haut,bas,gauche,droite} (mm), police:{taille,interligne,justifie}, pied:{texte,pagination}, entete:[…] }
  */
-function layoutDocument({ content, cfg, vars, measure }) {
+function layoutDocument({ content, cfg, vars, measure, logo }) {
   const m = cfg.marges;
   const size = cfg.police.taille; const lh = size * cfg.police.interligne;
   const left = m.gauche * MM; const width = A4.w - (m.gauche + m.droite) * MM;
   const top = A4.h - m.haut * MM; const bottom = m.bas * MM;
   const pages = [{ ops: [] }];
-  let y = top; let page = pages[0];
+  let y = top - (logo ? logo.h + 10 : 0); let page = pages[0]; // le logo occupe le haut de la première page
   const newPage = () => { page = { ops: [] }; pages.push(page); y = top; };
   const need = (h) => { if (y - h < bottom) newPage(); };
 
@@ -174,17 +174,24 @@ function layoutDocument({ content, cfg, vars, measure }) {
 }
 
 /** Dessine les pages composées (fond, contenu, pied de page, filigrane). Renvoie { buffer, pageCount }. */
-async function paintDocument({ layout, cfg, vars, bgFirst, bgNext, watermark, title, fontsDir }) {
+async function paintDocument({ layout, cfg, vars, bgFirst, bgNext, watermark, title, fontsDir, logo }) {
   const doc = await PDFDocument.create();
   doc.setTitle(title || 'Document'); doc.setProducer('IvryDélib'); doc.setCreator('IvryDélib');
   const fonts = await embedFamily(doc, cfg.police?.famille, fontsDir);
   const bg = async (bytes) => (bytes ? (await doc.embedPdf(bytes, [0]))[0] : null);
   const first = await bg(bgFirst); const next = (await bg(bgNext)) || first;
   const total = layout.pages.length;
+  const logoImg = logo ? (logo.mime === 'image/png' ? await doc.embedPng(logo.bytes) : await doc.embedJpg(logo.bytes)) : null;
   layout.pages.forEach((p, i) => {
     const page = doc.addPage([A4.w, A4.h]);
     const b = i === 0 ? first : next;
     if (b) page.drawPage(b, { x: 0, y: 0, width: A4.w, height: A4.h });
+    if (logoImg && i === 0) {
+      const gauche = cfg.marges.gauche * MM; const droite = A4.w - cfg.marges.droite * MM;
+      const al = cfg.logo?.align || 'left';
+      const x = al === 'center' ? (A4.w - logo.w) / 2 : al === 'right' ? droite - logo.w : gauche;
+      page.drawImage(logoImg, { x, y: A4.h - cfg.marges.haut * MM - logo.h, width: logo.w, height: logo.h });
+    }
     if (watermark) {
       const f = fonts.bold; const sz = 64; const txt = winAnsi(f, watermark);
       const tw = f.widthOfTextAtSize(txt, sz);

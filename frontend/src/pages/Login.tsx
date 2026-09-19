@@ -3,12 +3,14 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { errMsg } from '../api';
 import { ErrorBox, Spinner } from '../ui';
+import { OrgLogo, useBranding, useFavicon } from '../Brand';
 
 export default function Login() {
   const { me, login } = useAuth();
   const nav = useNavigate();
   const [u, setU] = useState(''); const [p, setP] = useState(''); const [local, setLocal] = useState(false);
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  const brand = useBranding(); useFavicon(brand);
   if (me) return <Navigate to="/" replace />;
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr(null);
@@ -18,8 +20,8 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-soft p-4">
       <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-8">
         <div className="text-center">
-          <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded bg-primary text-2xl font-bold text-white">Iv</span>
-          <h2>IvryDélib</h2><p className="text-mute">Ville d'Ivry-sur-Seine · gestion des délibérations</p>
+          <div className="mb-3 flex justify-center"><OrgLogo orgId={brand?.organismeId ?? null} nom={brand?.nom ?? 'Iv'} hasLogo={!!brand?.hasLogo} version={brand?.logoVersion ?? null} className="h-16" /></div>
+          <h2>IvryDélib</h2><p className="text-mute">{brand?.nom ?? ''} · gestion des délibérations</p>
         </div>
         <ErrorBox msg={err} />
         <label className="block"><span className="label">{local ? 'Compte de secours' : 'Identifiant (compte Windows)'}</span>

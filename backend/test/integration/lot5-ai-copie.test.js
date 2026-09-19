@@ -11,6 +11,8 @@ const base = () => `/api/v1/organismes/${ville.id}`;
 const A = (id) => `${base()}/actes/${id}`;
 const texts = async (id, tok = t.dupont) => (await as(tok).get(`${A(id)}/textes`)).body.items;
 const read = async (id, kind, tok = t.dupont) => { const it = (await texts(id, tok)).find((x) => x.kind === kind); return (await as(tok).get(`${A(id)}/textes/${it.id}?mode=propre`)).body; };
+const settle = async () => { await env.c.aiQueue.drain(); };
+const proposals = async (id, q = '') => (await as(t.dupont).get(`${A(id)}/ia/propositions${q}`)).body.items;
 const CONTEXTE = "Subvention 2027 à l'association Ivry Théâtre pour un montant de 8 000 euros, versée en deux fois.";
 
 beforeAll(async () => {
@@ -62,7 +64,7 @@ describe('copie simple', () => {
     const r = await as(t.dupont).post(`${A(src.id)}/copie`, {});
     expect(r.status).toBe(201);
     expect(r.body.acte).toMatchObject({ statut: 'brouillon', titre: "Subvention 2026 à l'association Ivry Sport (copie)" });
-    expect(r.body.suggestions).toEqual([]);
+    expect(r.body.job).toBeNull();
     expect(env.ai.state.calls.length).toBe(before);
     expect((await read(r.body.acte.id, 'expose')).markdown).toContain('5 000 euros');
   });
@@ -79,7 +81,13 @@ describe('copie assistée par l\'IA : elle propose, l\'agent décide', () => {
     const r = await as(t.dupont).post(`${A(src.id)}/copie`, { adapter: true, contexte: CONTEXTE });
     expect(r.status).toBe(201);
     copy = r.body.acte;
-    props = r.body.suggestions;
+    // l'IA n'est PAS interrogée dans la requête : une tâche est déposée dans la file
+    expect(r.body.job).toMatchObject({ status: 'queued', kind: 'adaptation', requestedBy: 'dupont' });
+    expect(env.ai.state.calls.length).toBe(0);
+    await settle();
+    const j = (await as(t.dupont).get(`${base()}/ia/taches/${r.body.job.id}`)).body;
+    expect(j).toMatchObject({ status: 'done', progress: 3, total: 3, result: { propositions: 3, alertes: 2 } });
+    props = await proposals(copy.id);
     const rempl = props.filter((p) => p.kind === 'remplacement');
     expect(rempl).toHaveLength(3); // 1 exposé + 2 dispositif ; le passage inventé est écarté
     expect(props.filter((p) => p.kind === 'alerte').map((p) => p.reason)).toEqual(expect.arrayContaining([expect.stringContaining('plan de financement'), expect.stringContaining('illisible')]));
@@ -117,8 +125,10 @@ describe('copie assistée par l\'IA : elle propose, l\'agent décide', () => {
   it('une proposition devenue caduque (texte modifié entre-temps) est refusée proprement', async () => {
     env.ai.state.handler = ({ prompt }) => (prompt.includes('Type de texte : exposé')
       ? JSON.stringify({ propositions: [{ find: 'subvention de 8 000 euros', replace: 'subvention de 9 000 euros', raison: 'test' }] }) : '{"propositions":[]}');
-    const s = (await as(t.dupont).post(`${A(copy.id)}/ia/adaptation`, { contexte: CONTEXTE })).body;
-    const p = s.items.find((x) => x.kind === 'remplacement');
+    const job = await as(t.dupont).post(`${A(copy.id)}/ia/adaptation`, { contexte: CONTEXTE });
+    expect(job.status).toBe(202);
+    await settle();
+    const p = (await proposals(copy.id)).find((x) => x.kind === 'remplacement' && x.status === 'pending');
     const it = (await texts(copy.id)).find((x) => x.kind === 'expose');
     const v = (await as(t.dupont).get(`${A(copy.id)}/textes/${it.id}?mode=propre`)).body;
     await as(t.dupont).put(`${A(copy.id)}/textes/${it.id}`, { markdown: 'Texte entièrement réécrit à la main.', baseVersion: v.version });
@@ -130,8 +140,9 @@ describe('copie assistée par l\'IA : elle propose, l\'agent décide', () => {
 
   it('une alerte ne peut qu\'être écartée ; il n\'existe pas de « tout accepter »', async () => {
     env.ai.state.handler = answer;
-    const s = (await as(t.dupont).post(`${A(copy.id)}/ia/adaptation`, { contexte: CONTEXTE })).body;
-    const al = s.items.find((x) => x.kind === 'alerte');
+    await as(t.dupont).post(`${A(copy.id)}/ia/adaptation`, { contexte: CONTEXTE });
+    await settle();
+    const al = (await proposals(copy.id)).find((x) => x.kind === 'alerte' && x.status === 'pending');
     expect((await as(t.dupont).post(`${A(copy.id)}/ia/propositions/${al.id}/decision`, { decision: 'accept' })).body.status).toBe('rejected');
     const paths = Object.keys((await env.http().get('/swagger.json')).body.paths);
     expect(paths.some((p) => /tout|accept-all|accepter-tout/i.test(p))).toBe(false);
@@ -146,12 +157,16 @@ describe('copie assistée par l\'IA : elle propose, l\'agent décide', () => {
 describe('IA indisponible ou réponse malformée', () => {
   it('la copie simple est créée quand même, avec l\'erreur signalée', async () => {
     env.ai.state.failing = true;
+    await env.db.query("INSERT INTO settings (scope, scope_id, key, value, updated_by) VALUES ('platform', '', 'ai.tentatives', '1'::jsonb, 't') ON CONFLICT (scope, scope_id, key) DO UPDATE SET value = '1'::jsonb");
     const r = await as(t.dupont).post(`${A(src.id)}/copie`, { adapter: true, contexte: CONTEXTE });
     expect(r.status).toBe(201);
-    expect(r.body.acte.statut).toBe('brouillon');
-    expect(r.body.iaError).toMatch(/indisponible/);
+    expect(r.body.acte.statut).toBe('brouillon'); // la copie est créée quoi qu'il arrive
+    await settle();
+    const j = (await as(t.dupont).get(`${base()}/ia/taches/${r.body.job.id}`)).body;
+    expect(j).toMatchObject({ status: 'error', error: expect.stringMatching(/indisponible/) });
     env.ai.state.failing = false;
     expect((await env.db.get('SELECT status FROM ai_runs ORDER BY id DESC LIMIT 1')).status).toBe('error');
+    expect((await as(t.dupont).get(`${base()}/notifications`)).body.items.some((n) => n.title.includes('n’a pas pu analyser'))).toBe(true);
   });
 
   it('parseJson accepte un bloc de code, du texte autour, et refuse le reste', () => {

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText, Search, Shield, Trash2, Upload } from 'lucide-react';
-import { api, errMsg, org as orgPath } from '../api';
+import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
+import { OrgLogo, resetBranding } from '../Brand';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
 
 /* ------------------------------------------------------------------------------------------ utilisateurs et rôles */
@@ -59,19 +60,23 @@ function Fiche({ username, onClose, onChanged }: { username: string; onClose: ()
 
 export function Utilisateurs() {
   const { org } = useAuth(); const o = org!.id;
-  const [q, setQ] = useState(''); const [open, setOpen] = useState<string | null>(null);
-  const res = useLoad(async () => (q.trim().length >= 2 ? ((await api.get(orgPath(o, '/utilisateurs'), { params: { q } })).data.items as any[]) : null), [o, q]);
-  const [typed, setTyped] = useState('');
+  const [q, setQ] = useState(''); const [typed, setTyped] = useState(''); const [open, setOpen] = useState<string | null>(null); const [avecRole, setAvecRole] = useState(false);
+  const res = useLoad(async () => (await api.get(orgPath(o, '/utilisateurs'), { params: { q: q.trim().length >= 2 ? q : undefined, avecRole: avecRole || undefined } })).data.items as any[], [o, q, avecRole]);
   useEffect(() => { const t = setTimeout(() => setQ(typed), 350); return () => clearTimeout(t); }, [typed]);
   return (
     <div className="space-y-4">
-      <p className="text-mute">Recherchez un agent (nom, identifiant, e-mail) pour lui attribuer ou retirer des rôles. La recherche couvre les agents déjà connectés et l'annuaire RH.</p>
-      <div className="flex items-center rounded border border-slate-300 bg-white px-3"><Search className="h-4 w-4 text-mute" /><input autoFocus className="w-full bg-transparent px-2 py-3 outline-none" placeholder="Rechercher un utilisateur…" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Rechercher un utilisateur" /></div>
-      <div className="card">
-        {res.loading && q ? <Loading /> : res.data === null ? <Empty>Tapez au moins deux lettres.</Empty> : !res.data?.length ? <Empty>Aucun agent trouvé.</Empty> : (
-          <table className="w-full"><thead><tr><th>Agent</th><th>Direction</th><th>Rôles ici</th><th /></tr></thead><tbody>{res.data.map((a: any) => (
+      <p className="text-mute">Les agents qui se sont déjà connectés à l'application. Recherchez par nom, identifiant ou e-mail (l'annuaire RH est aussi interrogé) pour attribuer ou retirer des rôles.</p>
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex min-w-[280px] flex-1 items-center rounded border border-slate-300 bg-white px-3"><Search className="h-4 w-4 text-mute" /><input autoFocus className="w-full bg-transparent px-2 py-3 outline-none" placeholder="Filtrer ou rechercher un utilisateur…" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Rechercher un utilisateur" /></div>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={avecRole} onChange={(e) => setAvecRole(e.target.checked)} /> Seulement ceux qui ont un rôle</label>
+        {res.data && <span className="text-[12px] text-mute">{res.data.length} utilisateur(s)</span>}
+      </div>
+      <div className="card overflow-x-auto">
+        {res.loading && !res.data ? <Loading /> : !res.data?.length ? <Empty>Aucun utilisateur trouvé.</Empty> : (
+          <table className="w-full"><thead><tr><th>Agent</th><th>Direction</th><th>Rôles ici</th><th>Dernière connexion</th><th /></tr></thead><tbody>{res.data.map((a: any) => (
             <tr key={a.username} className="hover:bg-soft"><td><b>{a.displayName}</b><div className="text-[12px] text-mute">{a.username} · {a.email}</div></td><td className="text-mute">{a.direction?.label}{a.poste ? <div className="text-[12px]">{a.poste}</div> : null}</td>
               <td>{a.isPlatformAdmin && <Badge tone="warn">plateforme</Badge>} {a.roles.map((r: any) => <Badge key={r.id} tone="blue">{ROLES[r.role]}</Badge>)}{!a.roles.length && !a.isPlatformAdmin && <span className="text-mute">—</span>}</td>
+              <td className="text-[12px] text-mute">{a.lastLoginAt ? dt(a.lastLoginAt, { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td>
               <td className="text-right">{a.knownLocally ? <button className="btn-secondary" onClick={() => setOpen(a.username)}>Gérer</button> : <span className="text-[12px] text-mute">Jamais connecté</span>}</td></tr>))}</tbody></table>)}
       </div>
       {open && <Fiche username={open} onClose={() => setOpen(null)} onChanged={res.reload} />}
@@ -104,7 +109,7 @@ export function Gabarits() {
   const upload = async (which: 'first' | 'next', file: File) => {
     try { const fd = new FormData(); fd.append('file', file); await api.post(orgPath(o, `/gabarits/${sel}/fond/${which}`), fd); toast('Fond déposé'); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
-  const calibrate = async () => { try { const r = await api.get(orgPath(o, `/gabarits/${sel}/etalonnage`), { responseType: 'blob' }); window.open(URL.createObjectURL(r.data), '_blank'); } catch { toast("Étalonnage impossible", 'ko'); } };
+  const calibrate = async () => { const m = await openPdf(() => api.get(orgPath(o, `/gabarits/${sel}/etalonnage`), { responseType: 'blob' })); if (m) toast(`Étalonnage impossible : ${m}`, 'ko'); };
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
       <nav aria-label="Gabarits" className="card h-fit p-2">
@@ -151,6 +156,55 @@ export function Gabarits() {
               <div className="flex gap-2"><button className="btn-secondary" onClick={() => ref.current?.click()}><Upload className="h-3.5 w-3.5" /> Déposer un PDF</button>
                 {id && <button className="btn-ko" onClick={async () => { await api.delete(orgPath(o, `/gabarits/${sel}/fond/${w}`)); list.reload(); }}>Retirer</button>}</div></div>))}</div></section>
       </div>{node}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------- identité de l'organisme (nom, logo…) */
+export function Identite() {
+  const { org, reload } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const cur = useLoad(async () => (await api.get(`/organismes/${o}`)).data, [o]);
+  const [f, setF] = useState<any>(null); const [busy, setBusy] = useState(false); const file = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (cur.data) setF({ nom: cur.data.nom, adresse: cur.data.adresse ?? '', siren: cur.data.siren ?? '', ...Object.fromEntries(['adresse2', 'codePostal', 'ville', 'telephone', 'email', 'siteWeb', 'signataire', 'signataireQualite'].map((k) => [k, cur.data.contact?.[k] ?? ''])) }); }, [cur.data]);
+  if (cur.loading && !f) return <Loading />;
+  if (!f) return <ErrorBox msg={cur.error} />;
+  const set = (k: string, v: string) => setF({ ...f, [k]: v });
+  const save = async () => {
+    setBusy(true);
+    try {
+      const { nom, adresse, siren, ...contact } = f;
+      await api.put(`/organismes/${o}`, { nom, adresse: adresse || undefined, siren: siren || undefined, contact });
+      toast('Identité enregistrée'); await reload(); cur.reload();
+    } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
+  const upload = async (fl: File) => { try { const fd = new FormData(); fd.append('file', fl); await api.post(`/organismes/${o}/logo`, fd); resetBranding(); toast('Logo enregistré'); await reload(); cur.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const c = cur.data;
+  return (
+    <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="card h-fit p-5"><h3 className="mb-3">Logo</h3>
+        <div className="flex h-32 items-center justify-center rounded border border-dashed border-line bg-soft p-4"><OrgLogo orgId={o} nom={c.nom} hasLogo={c.hasLogo} version={c.logoVersion} className="h-24" /></div>
+        <p className="mt-2 text-[12px] text-mute">PNG ou JPEG, 1,5 Mo au plus. C'est aussi <b>le logo de l'application</b> (en-tête, page de connexion, icône de l'onglet) et celui des <b>PDF</b> (option dans les gabarits).</p>
+        <input ref={file} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => { const fl = e.target.files?.[0]; if (fl) upload(fl); e.target.value = ''; }} />
+        <div className="mt-3 flex gap-2"><button className="btn-primary" onClick={() => file.current?.click()}><Upload className="h-3.5 w-3.5" /> {c.hasLogo ? 'Remplacer' : 'Déposer un logo'}</button>
+          {c.hasLogo && <button className="btn-ko" onClick={async () => { await api.delete(`/organismes/${o}/logo`); resetBranding(); toast('Logo retiré'); await reload(); cur.reload(); }}>Retirer</button>}</div>
+      </section>
+      <section className="card p-5"><h3 className="mb-3">Nom et coordonnées</h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2"><Field label="Nom de la collectivité" hint="Affiché dans l'application, les mails et les PDF ({organisme}).">
+            <input className="input" value={f.nom} onChange={(e) => set('nom', e.target.value)} /></Field></div>
+          <div className="md:col-span-2"><Field label="Adresse"><input className="input" value={f.adresse} onChange={(e) => set('adresse', e.target.value)} /></Field></div>
+          <Field label="Complément d'adresse"><input className="input" value={f.adresse2} onChange={(e) => set('adresse2', e.target.value)} /></Field>
+          <div className="grid grid-cols-[120px_1fr] gap-3"><Field label="Code postal"><input className="input" value={f.codePostal} onChange={(e) => set('codePostal', e.target.value)} /></Field><Field label="Ville"><input className="input" value={f.ville} onChange={(e) => set('ville', e.target.value)} /></Field></div>
+          <Field label="Téléphone"><input className="input" value={f.telephone} onChange={(e) => set('telephone', e.target.value)} /></Field>
+          <Field label="E-mail"><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></Field>
+          <Field label="Site web"><input className="input" value={f.siteWeb} onChange={(e) => set('siteWeb', e.target.value)} /></Field>
+          <Field label="SIREN"><input className="input" value={f.siren} onChange={(e) => set('siren', e.target.value)} /></Field>
+          <Field label="Signataire des convocations"><input className="input" value={f.signataire} onChange={(e) => set('signataire', e.target.value)} placeholder="Prénom Nom" /></Field>
+          <Field label="Qualité du signataire"><input className="input" value={f.signataireQualite} onChange={(e) => set('signataireQualite', e.target.value)} placeholder="Le Maire" /></Field>
+        </div>
+        <p className="mt-3 text-[12px] text-mute">Variables utilisables dans les gabarits PDF : {'{organisme} {adresse} {ville} {code_postal} {telephone} {email} {site_web} {signataire}'}.</p>
+        <div className="mt-4 flex justify-end"><button className="btn-primary" onClick={save} disabled={busy}>{busy && <Spinner />} Enregistrer</button></div>
+      </section>{node}
     </div>
   );
 }

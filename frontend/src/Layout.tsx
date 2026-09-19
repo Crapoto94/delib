@@ -3,6 +3,8 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, Eye, LogOut, Search } from 'lucide-react';
 import AgentPicker from './AgentPicker';
 import { Modal, useToast } from './ui';
+import { OrgLogo, useFavicon } from './Brand';
+import { AiChip } from './AiStatus';
 import { useAuth } from './auth';
 import { api, org as orgPath } from './api';
 import { dt } from './format';
@@ -53,6 +55,7 @@ export default function Layout() {
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
+  useFavicon(org ? { organismeId: org.id, nom: org.nom, hasLogo: !!org.hasLogo, logoVersion: org.logoVersion ?? null } : null);
   if (!me || !org) return null;
   return (
     <div className="min-h-screen pb-16">
@@ -64,7 +67,7 @@ export default function Layout() {
       <header className="sticky top-0 z-30 border-b border-line bg-white">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-2 md:px-8">
           <NavLink to="/" className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded bg-primary text-[15px] font-bold text-white">Iv</span>
+            <OrgLogo orgId={org.id} nom={org.nom} hasLogo={!!org.hasLogo} version={org.logoVersion ?? null} className="h-10" />
             <span className="leading-tight"><span className="block text-[16px] font-bold text-primary">IvryDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
           </NavLink>
           <nav className="ml-2 flex flex-wrap gap-1" aria-label="Navigation principale">
@@ -82,6 +85,7 @@ export default function Layout() {
               {me.organismes.map((o) => <option key={o.id} value={o.id}>{o.nom}</option>)}
             </select>
           )}
+          <AiChip />
           <Bells orgId={org.id} />
           <div className="relative" ref={ref}>
             <button className="flex items-center gap-2 rounded p-1 hover:bg-slate-100" onClick={() => setMenu(!menu)} aria-haspopup="menu" aria-expanded={menu}>

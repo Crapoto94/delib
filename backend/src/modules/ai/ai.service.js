@@ -37,22 +37,31 @@ function parseJson(text) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-function createAi({ db, audit, ai, actes, textes, acl, log }) {
+function createAi({ db, audit, ai, actes, textes, acl, log, queue }) {
   const svc = {
-    /** Copie simple (CPY-01) + adaptation IA facultative (CPY-02). L'IA indisponible n'empêche jamais la copie (CPY-05). */
+    /** Copie simple (CPY-01) ; avec `adapter`, l'adaptation est DÉPOSÉE dans la file d'attente (arrière plan) — la copie est immédiate. */
     async copy(ctx, organismeId, sourceId, { contexte, adapter = false } = {}) {
+      if (adapter && (!contexte || contexte.trim().length < 10)) throw E.badRequest('Décrivez le nouveau contexte (objet, bénéficiaire, montant, dates…) — au moins une phrase');
       const copy = await actes.duplicate(ctx, organismeId, sourceId);
-      let suggestions = []; let iaError = null;
+      let job = null; let iaError = null;
       if (adapter) {
-        try { suggestions = (await svc.suggest(ctx, organismeId, copy.id, { contexte, sourceId })).items; }
-        catch (e) { iaError = e.message; log.warn({ err: e.message }, "copie assistée : l'IA n'a pas répondu, copie simple conservée"); }
+        try { job = await queue.enqueue(ctx, { organismeId: copy.organismeId, acteId: copy.id, kind: 'adaptation', payload: { contexte, sourceId } }); }
+        catch (e) { iaError = e.message; log.warn({ err: e.message }, "copie assistée : tâche IA refusée, copie simple conservée"); }
       }
-      await audit.log(ctx, { organismeId: copy.organismeId, action: 'acte.copie', entity: 'actes', entityId: copy.id, after: { source: sourceId, assistee: adapter, propositions: suggestions.length, iaError } });
-      return { acte: copy, suggestions, iaError };
+      await audit.log(ctx, { organismeId: copy.organismeId, action: 'acte.copie', entity: 'actes', entityId: copy.id, after: { source: sourceId, assistee: adapter, job: job?.id ?? null, iaError } });
+      return { acte: copy, job, iaError };
+    },
+
+    /** Redemande les propositions pour un brouillon : tâche en arrière plan. */
+    async requestAdaptation(ctx, organismeId, acteId, { contexte }) {
+      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      if (!contexte || contexte.trim().length < 10) throw E.badRequest('Décrivez le nouveau contexte (objet, bénéficiaire, montant, dates…) — au moins une phrase');
+      if (contexte.length > MAX_CONTEXT) throw E.badRequest(`Contexte trop long (maximum ${MAX_CONTEXT} caractères)`);
+      return queue.enqueue(ctx, { organismeId: a.organisme_id, acteId: a.id, kind: 'adaptation', payload: { contexte } });
     },
 
     /** Demande à l'IA des propositions pour chaque texte non vide du dossier ; remplace les propositions en attente. */
-    async suggest(ctx, organismeId, acteId, { contexte, sourceId } = {}) {
+    async suggest(ctx, organismeId, acteId, { contexte, sourceId } = {}, helpers = null) {
       const a = await actes.load(ctx, organismeId, acteId, { edit: true });
       if (!contexte || contexte.trim().length < 10) throw E.badRequest('Décrivez le nouveau contexte (objet, bénéficiaire, montant, dates…) — au moins une phrase');
       if (contexte.length > MAX_CONTEXT) throw E.badRequest(`Contexte trop long (maximum ${MAX_CONTEXT} caractères)`);
@@ -60,15 +69,17 @@ function createAi({ db, audit, ai, actes, textes, acl, log }) {
       const run = await db.get("INSERT INTO ai_runs (organisme_id, acte_id, kind, requested_by, context) VALUES ($1,$2,'copie',$3,$4) RETURNING id", [a.organisme_id, a.id, ctx.username, contexte]);
       await db.run("UPDATE ai_suggestions SET status = 'obsolete' WHERE acte_id = $1 AND status = 'pending'", [a.id]);
       let promptChars = 0; let responseChars = 0; let model = null; const out = [];
+      const ask = (req) => (helpers ? helpers.query(() => ai.query(req)) : ai.query(req));
       try {
-        for (const t of list) {
+        for (const [ti, t] of list.entries()) {
+          if (helpers) { if (await helpers.cancelled()) break; await helpers.progress(ti, list.length, KIND_LABEL[t.kind]); }
           const v = await textes.view(ctx, a.organisme_id, a.id, t.id, { mode: 'propre' });
           const md = v.markdown || '';
           if (!md.trim()) continue;
           if (md.length > MAX_CHARS) { out.push(await svc.addAlert(a, t.id, run.id, `Texte « ${KIND_LABEL[t.kind]} » trop long pour l'analyse automatique : relisez-le entièrement.`)); continue; }
           const prompt = `Nouveau contexte décrit par l'agent :\n${contexte.trim()}\n\nFiche du dossier : titre « ${a.titre} »${a.montant ? `, montant ${Number(a.montant)} €` : ''}.\n${sourceId ? `Le texte ci-dessous provient d'un dossier existant (n° ${sourceId}).\n` : ''}\nType de texte : ${KIND_LABEL[t.kind]}.\n<TEXTE>\n${md}\n</TEXTE>`;
           promptChars += prompt.length + SYSTEM.length;
-          const r = await ai.query({ system: SYSTEM, prompt });
+          const r = await ask({ system: SYSTEM, prompt });
           model = r.model || model; responseChars += r.text.length;
           const j = parseJson(r.text);
           if (!j) { out.push(await svc.addAlert(a, t.id, run.id, `Réponse de l'IA illisible pour « ${KIND_LABEL[t.kind]} » : aucune proposition retenue.`)); continue; }
@@ -128,6 +139,11 @@ function createAi({ db, audit, ai, actes, textes, acl, log }) {
     },
   };
   void acl;
+  // le travail de fond : l'exécutant de la file appelle `suggest` pour le compte du demandeur
+  queue.register('adaptation', async (job, ctx, helpers) => {
+    const r = await svc.suggest(ctx, job.organisme_id, job.acte_id, job.payload, helpers);
+    return { runId: r.runId, propositions: r.items.filter((i) => i.kind === 'remplacement').length, alertes: r.items.filter((i) => i.kind === 'alerte').length };
+  });
   return svc;
 }
 

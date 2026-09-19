@@ -5,6 +5,7 @@ const BASE = {
   pied: { texte: '', pagination: true },
   entete: [],
   filigrane: 'PROJET — non définitif',
+  logo: { afficher: 'auto', largeur: 28, align: 'left' }, // « auto » : affiché seulement s'il n'y a pas de PDF de fond (papier à en-tête)
   a4Strict: true,
 };
 
@@ -37,6 +38,7 @@ function resolveConfig(docType, stored = {}) {
     marges: { ...d.marges, ...(stored.marges || {}) },
     police: { ...d.police, ...(stored.police || {}) },
     pied: { ...d.pied, ...(stored.pied || {}) },
+    logo: { ...d.logo, ...(stored.logo || {}) },
     entete: stored.entete || d.entete,
   };
 }

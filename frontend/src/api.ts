@@ -37,3 +37,21 @@ export function errMsg(e: any): string {
 
 /** Chemin d'une ressource de l'organisme courant : org(3, '/actes') -> /organismes/3/actes */
 export const org = (id: number, path = '') => `/organismes/${id}${path}`;
+
+/** Message d'une erreur dont le corps est un Blob (les aperçus PDF demandent `responseType: 'blob'`). */
+export async function blobErrMsg(e: any): Promise<string> {
+  const d = e?.response?.data;
+  if (d instanceof Blob) { try { const j = JSON.parse(await d.text()); return j.error || 'Erreur du serveur'; } catch { return 'Erreur du serveur'; } }
+  return errMsg(e);
+}
+
+/** Ouvre un PDF dans un nouvel onglet (fenêtre ouverte tout de suite pour ne pas être bloquée) ; renvoie null ou le message d'erreur. */
+export async function openPdf(request: () => Promise<{ data: Blob }>): Promise<string | null> {
+  const w = window.open('', '_blank');
+  try {
+    const r = await request();
+    const url = URL.createObjectURL(r.data);
+    if (w) w.location.href = url; else window.open(url, '_blank');
+    return null;
+  } catch (e) { w?.close(); return blobErrMsg(e); }
+}

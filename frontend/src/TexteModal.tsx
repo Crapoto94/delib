@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Eye, X, XCircle } from 'lucide-react';
-import { api, errMsg, org as orgPath } from './api';
+import { api, errMsg, openPdf, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { dt } from './format';
 import { Loading } from './ui';
@@ -61,11 +61,9 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
     try { await commit(); await api.post(`${base}/modifications`, cid ? { decision, cids: [cid] } : { decision, all: true }); latest.current.dirty = false; await load(); onChanged(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
   const preview = async () => {
-    try {
-      await commit();
-      const r = await api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' });
-      window.open(URL.createObjectURL(r.data), '_blank');
-    } catch { toast("Aperçu impossible pour l'instant", 'ko'); }
+    await commit();
+    const m = await openPdf(() => api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' }));
+    if (m) toast(`Aperçu impossible : ${m}`, 'ko');
   };
   if (!view) return <Loading />;
   const canEdit = editable && view.canEdit;

@@ -19,6 +19,7 @@ const Config = z.object({
   pied: z.object({ texte: z.string().max(200), pagination: z.boolean() }).partial().optional(),
   entete: z.array(Block).max(12).optional(),
   filigrane: z.string().max(60).optional(),
+  logo: z.object({ afficher: z.union([z.boolean(), z.literal('auto')]), largeur: num(10, 90), align: z.enum(['left', 'center', 'right']) }).partial().optional(),
   a4Strict: z.boolean().optional(),
   sections: z.object({ visas: z.string().max(200).nullable(), dispositif: z.string().max(200).nullable() }).partial().optional(),
 });

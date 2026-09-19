@@ -31,6 +31,10 @@ module.exports = ({ makeRouter, odj }) => {
   r.get('/seances/:id/odj/en-attente', { summary: "Actes en attente d'affectation (circuit terminé)", tags: T, org: true, roles: ADMIN, params: PS, query: Pending },
     async (req, res) => res.json({ items: await odj.pending(req.org.id, req.valid.params.id, req.valid.query) }));
 
+  r.get('/seances/:id/odj/visant', { summary: "Tous les dossiers qui visent cette séance, quel que soit leur avancement", tags: T, org: true, roles: ADMIN, params: PS,
+    description: "Brouillons, dossiers en circuit (avec l'étape et les valideurs), dossiers terminés. `eligible` : circuit terminé, prêt à être affecté à l'ordre du jour ; `dansOdj` : déjà inscrit." },
+  async (req, res) => res.json({ items: await odj.visant(req.org.id, req.valid.params.id) }));
+
   r.post('/seances/:id/odj/affectations', { summary: 'Affecte des actes à l\'ordre du jour', tags: T, org: true, params: PS, body: Affecter,
     description: "Crée une ligne par délibération de l'acte (l'exposé n'est imprimé qu'une fois par dossier). Après l'arrêt : motif obligatoire, l'ajout reçoit le numéro suivant (ou « bis », paramètre `odj.ajout_apres_arret`)." },
   async (req, res) => res.json(await odj.affecter(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
