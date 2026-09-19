@@ -454,6 +454,42 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       return items;
     },
 
+    /**
+     * Suivi du tableau de bord : (1) les actes que mes collaborateurs (N-x, selon mes fonctions de titulaire) rédigent ou font
+     * valider ; (2) les actes que J'AI validés et qui poursuivent leur circuit.
+     */
+    async tracking(ctx, organismeId) {
+      const org = organismeId;
+      const step = (r) => (r.cur_key ? { key: r.cur_key, label: r.cur_label, holders: r.cur_holders, dueAt: r.cur_due, late: !!r.cur_due && new Date(r.cur_due) < new Date() } : null);
+      const shape = (r, extra = {}) => ({ acte: actes.toActe(r), step: step(r), ...extra });
+      const validated = (await db.all(
+        `SELECT DISTINCT ON (a.id) a.*, i.step_key AS cur_key, i.label AS cur_label, i.holders AS cur_holders, i.due_at AS cur_due, my.acted_at AS my_at, my.label AS my_label
+         FROM actes a JOIN step_instances my ON my.acte_id = a.id AND (my.acted_by = $2 OR my.on_behalf_of = $2) AND my.decision IN ('validation', 'auto')
+              LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+         WHERE a.organisme_id = $1 AND a.current_step_key IS NOT NULL AND a.statut IN ('en_circuit', 'modification_demandee', 'en_attente_scc')
+           AND NOT (COALESCE(i.holders, '[]'::jsonb) ? $2)
+         ORDER BY a.id, my.acted_at DESC`, [org, ctx.username]))
+        .sort((x, y) => new Date(y.my_at) - new Date(x.my_at)).map((r) => shape(r, { validatedAt: r.my_at, validatedStep: r.my_label }));
+
+      const h = await titulaires.hierarchyScope(ctx.username, org);
+      const isDgs = (await titulaires.resolve(org, 'dgs', {})).some((t) => t.username === ctx.username || t.suppleant === ctx.username);
+      let team = [];
+      if (isDgs || h.dgaOrganisme || h.directions.length || h.services.length) {
+        const p = [org, ctx.username]; const or = [];
+        if (isDgs || h.dgaOrganisme) or.push('TRUE');
+        if (h.directions.length) { p.push(h.directions); or.push(`a.direction_code = ANY($${p.length}::text[])`); }
+        for (const [d, sv] of h.services) { p.push(d, sv); or.push(`(a.direction_code = $${p.length - 1} AND a.service_code = $${p.length})`); }
+        team = (await db.all(
+          `SELECT a.*, i.step_key AS cur_key, i.label AS cur_label, i.holders AS cur_holders, i.due_at AS cur_due
+           FROM actes a LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+           WHERE a.organisme_id = $1 AND a.redacteur <> $2 AND (${or.join(' OR ')})
+             AND ((a.statut IN ('brouillon', 'modification_demandee', 'en_circuit') ) OR (a.statut = 'en_attente_scc' AND a.current_step_key IS NOT NULL))
+             AND NOT (COALESCE(i.holders, '[]'::jsonb) ? $2)
+           ORDER BY a.updated_at DESC LIMIT 200`, p)).map((r) => shape(r, { phase: r.statut === 'brouillon' ? 'redaction' : r.statut === 'modification_demandee' ? 'correction' : 'validation' }));
+      }
+      return { equipe: team, valides: validated };
+    },
+
     async lateActes(ctx, organismeId) {
       const rows = await db.all(
         `SELECT a.*, i.step_key, i.label AS step_label, i.holders, i.due_at FROM step_instances i JOIN actes a ON a.id = i.acte_id

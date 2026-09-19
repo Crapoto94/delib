@@ -6,6 +6,7 @@ import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
 import { Gabarits, Utilisateurs } from './AdminExtra';
+import AgentPicker, { AgentList } from '../AgentPicker';
 
 const FONCTIONS: Record<string, string> = { responsable_intermediaire: 'Responsable intermédiaire', chef_service: 'Chef de service', directeur: 'Directeur', dga: 'DGA', dgs: 'DGS' };
 
@@ -33,7 +34,7 @@ function Titulaires() {
       <section className="card p-5"><h3 className="mb-3">Titulaires des fonctions de validation</h3>
         <form onSubmit={add} className="mb-4 grid gap-3 md:grid-cols-5 md:items-end"><ErrorBox msg={err} />
           <Field label="Fonction"><select className="input" value={f.fonction} onChange={(e) => setF({ ...f, fonction: e.target.value })}>{Object.entries(FONCTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
-          <Field label="Identifiant de l'agent"><input className="input" required value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} /></Field>
+          <Field label="Agent (@nom)"><AgentPicker value={f.username} onChange={(u) => setF({ ...f, username: u })} required /></Field>
           <Field label="Direction"><select className="input" value={f.directionCode} onChange={(e) => setF({ ...f, directionCode: e.target.value, serviceCode: '' })}><option value="">(toutes — DGS)</option>{dirs.data?.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}</select></Field>
           <Field label="Service"><select className="input" value={f.serviceCode} onChange={(e) => setF({ ...f, serviceCode: e.target.value })} disabled={!f.directionCode}><option value="">(toute la direction)</option>{services.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>
           <button className="btn-primary">Ajouter</button>
@@ -47,7 +48,7 @@ function Titulaires() {
 
       <section className="card p-5"><h3 className="mb-3">Autorisations de rédaction hors direction</h3>
         <form onSubmit={grant} className="mb-4 grid gap-3 md:grid-cols-4 md:items-end">
-          <Field label="Agent autorisé"><input className="input" required value={a.username} onChange={(e) => setA({ ...a, username: e.target.value })} /></Field>
+          <Field label="Agent autorisé (@nom)"><AgentPicker value={a.username} onChange={(u) => setA({ ...a, username: u })} required /></Field>
           <Field label="Direction"><select className="input" required value={a.directionCode} onChange={(e) => setA({ ...a, directionCode: e.target.value, serviceCode: '' })}><option value="">— choisir —</option>{dirs.data?.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}</select></Field>
           <Field label="Service (facultatif)"><select className="input" value={a.serviceCode} onChange={(e) => setA({ ...a, serviceCode: e.target.value })}><option value="">Toute la direction</option>{dirs.data?.find((x) => x.code === a.directionCode)?.services?.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>
           <button className="btn-primary">Autoriser</button>
@@ -65,10 +66,10 @@ function Titulaires() {
 }
 
 function GroupeCard({ g, o, reload, toast }: { g: any; o: number; reload: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
-  const [txt, setTxt] = useState((g.membres as string[]).join(', '));
-  const save = async () => { try { await api.put(orgPath(o, `/groupes/${g.id}/membres`), { usernames: txt.split(/[\s,;]+/).filter(Boolean) }); toast('Groupe enregistré'); reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const [members, setMembers] = useState<string[]>(g.membres as string[]);
+  const save = async () => { try { await api.put(orgPath(o, `/groupes/${g.id}/membres`), { usernames: members }); toast('Groupe enregistré'); reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
   return <div className="rounded border border-line p-3"><b>{g.nom}</b> <span className="text-[11px] text-mute">({g.code})</span>
-    <textarea className="input mt-2" rows={3} value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="identifiants séparés par des virgules" /><button className="btn-secondary mt-2" onClick={save}>Enregistrer</button></div>;
+    <div className="mt-2"><AgentList value={members} onChange={setMembers} /></div><button className="btn-secondary mt-2" onClick={save}>Enregistrer</button></div>;
 }
 
 /* -------------------------------------------------------------------------------------------------------- circuits */

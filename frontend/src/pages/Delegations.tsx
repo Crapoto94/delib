@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { d } from '../format';
+import AgentPicker from '../AgentPicker';
 import { Badge, Empty, ErrorBox, Field, Loading, PageTitle, useLoad, useToast } from '../ui';
 
 export default function Delegations() {
@@ -18,7 +19,7 @@ export default function Delegations() {
       <PageTitle title="Mes délégations" sub="Déléguez vos validations quand vous vous absentez. Vous gardez vos droits (co-détention)." />
       <form onSubmit={create} className="card grid gap-4 p-5 md:grid-cols-[1fr_200px_auto] md:items-end">
         <ErrorBox msg={err} />
-        <Field label="Je délègue toutes mes validations à (identifiant)"><input className="input" required value={delegue} onChange={(e) => setDelegue(e.target.value)} placeholder="ex. cmoreau" /></Field>
+        <Field label="Je délègue toutes mes validations à (@nom)"><AgentPicker value={delegue} onChange={setDelegue} required /></Field>
         <Field label="Jusqu'au (facultatif)"><input className="input" type="date" value={fin} onChange={(e) => setFin(e.target.value)} /></Field>
         <button className="btn-primary">Déléguer</button>
       </form>

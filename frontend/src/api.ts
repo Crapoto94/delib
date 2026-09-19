@@ -8,13 +8,20 @@ export const setToken = (t: string | null) => (t ? localStorage.setItem(TOKEN_KE
 export const getOrgId = (): number | null => { const v = localStorage.getItem(ORG_KEY); return v ? Number(v) : null; };
 export const setOrgId = (id: number) => localStorage.setItem(ORG_KEY, String(id));
 
+const ACT_AS_KEY = 'ivrydelib.actas';
+export const getActAs = () => localStorage.getItem(ACT_AS_KEY);
+export const setActAs = (u: string | null) => (u ? localStorage.setItem(ACT_AS_KEY, u) : localStorage.removeItem(ACT_AS_KEY));
+
 export const api = axios.create({ baseURL: '/api/v1' });
 api.interceptors.request.use((cfg) => {
   const t = getToken();
   if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  const a = getActAs();
+  if (a) cfg.headers['X-Act-As'] = a; // « Afficher en tant que » : mêmes droits que cet utilisateur
   return cfg;
 });
 api.interceptors.response.use((r) => r, (e) => {
+  if (getActAs() && [403, 404].includes(e.response?.status) && String(e.config?.url) === '/me') { setActAs(null); location.href = '/'; }
   if (e.response?.status === 401 && !String(e.config?.url).includes('/auth/login')) { setToken(null); if (!location.pathname.startsWith('/connexion')) location.href = '/connexion'; }
   return Promise.reject(e);
 });

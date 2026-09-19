@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Check, CheckCircle2, Download, Eye, FileText, Copy, Paperclip, Pencil, RotateCcw, Send, Sparkles, Trash2, Upload } from 'lucide-react';
 import TexteModal, { KIND_LABEL } from '../TexteModal';
+import { MentionTextarea } from '../AgentPicker';
 import { mdToHtml } from '../mdconv';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -177,7 +178,7 @@ function Discussion({ acte, toast }: { acte: any; toast: (m: string, k?: 'ok' | 
           <div className="flex justify-between text-[11px] text-mute"><b className="text-slate-700">{c.author}{c.kind === 'refus' ? ' · modification demandée' : ''}</b><span>{dt(c.createdAt, { dateStyle: 'short', timeStyle: 'short' })}</span></div>
           <div className="mt-1 whitespace-pre-wrap">{c.body}</div></li>))}
       </ul>
-      <textarea className="input" rows={2} placeholder="Écrire une consigne ou mentionner un collègue avec @identifiant…" value={body} onChange={(e) => setBody(e.target.value)} />
+      <MentionTextarea rows={2} placeholder="Écrire une consigne ou mentionner un collègue en tapant @nom…" value={body} onChange={setBody} />
       <div className="mt-2 flex justify-end"><button className="btn-secondary" onClick={send}>Publier</button></div>
     </section>
   );

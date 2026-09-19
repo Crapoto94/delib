@@ -1,6 +1,6 @@
 # MANIFEST — IvryDélib : gestion des délibérations
 
-> **Statut : v1.2 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.3 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -191,6 +191,21 @@ Lu dans le tutoriel de formation (18 pages).
 | **Administrateur d'organisme** | Paramètre son organisme (circuits, référentiels, membres…) | rôle par organisme |
 | **Secrétaire de séance** | Élu désigné pour la séance | saisi par le SCC |
 | **Télétransmission** | Prépare et confirme l'envoi au contrôle de légalité | rôle par organisme |
+
+### « Afficher en tant que » (D47)
+
+- **ACT-01** — Menu utilisateur → **« Afficher en tant que… »** (visible de l'administrateur de plateforme, de l'administrateur d'organisme et du SCC) : on choisit un agent par autocomplétion (D48) ; l'application se recharge avec **exactement les droits de cet agent**.
+- **ACT-02** — Un **bandeau permanent** (« Vous voyez IvryDélib en tant que… ») rappelle le mode et permet de **revenir à son compte** en un clic ; le mode ne survit pas à la déconnexion.
+- **ACT-03** — **Plafonds** : administrateur de plateforme → tout agent ; administrateur d'organisme → agents de ses organismes, **jamais** un administrateur de plateforme ; SCC → agents **ordinaires** de ses organismes (pas d'administrateur, pas de SCC). Pas d'enchaînement de deux « en tant que » ; l'en-tête est ignoré sur les routes d'authentification.
+- **ACT-04** — **Traçabilité** : début et fin du mode sont audités (`auth.act_as`, `auth.act_as_end`) ; toute action faite dans le mode est enregistrée avec **le vrai acteur** (`actor`) et l'utilisateur usurpé (`on_behalf_of`) ; les écrans métier montrent l'utilisateur affiché.
+- **ACT-05** — Techniquement, chaque requête porte l'en-tête `X-Act-As` ; le serveur **revérifie à chaque requête** que l'appelant a le droit d'agir en tant que cet utilisateur (jamais de confiance dans le client).
+
+### Autocomplétion des agents (D48)
+
+- **AUT-01** — Tout champ « agent » (configuration) est un **champ à autocomplétion** : deux lettres suffisent, recherche par nom, prénom, identifiant ou e-mail, avec ou sans `@`, flèches et Entrée au clavier.
+- **AUT-02** — Dans la **discussion** et tout champ de texte libre destiné à des collègues, taper `@` puis des lettres ouvre la liste ; le choix insère `@identifiant`, et la personne est notifiée (règle « mention »).
+- **AUT-03** — La liste montre d'abord les agents **déjà connectés**, puis ceux de l'**annuaire RH** (marqués « jamais connecté ») ; l'identifiant proposé est l'**identifiant de connexion** (partie locale de l'e-mail).
+- **AUT-04** — Une panne de l'annuaire RH ne bloque pas la recherche : seuls les agents connus localement sont proposés.
 
 ### Administration des utilisateurs et des rôles (D41)
 
@@ -1488,6 +1503,9 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D44** | **Commissions réelles** : « La Ville qui débat » (13 sièges dont 3 d'opposition), « La Ville en transition » (13 dont 3), « La Ville solidaire » (12 dont 2), « La Ville qui émancipe » (11 dont 2), avec leurs **thématiques** (délibération de création, `commissions.txt`) ; sièges et thématiques sont des champs de la commission. | 15 |
 | **D45** | **L'AD ne fournit pas toujours l'adresse e-mail** : la fiche RH est alors cherchée par `<identifiant>@<domaine>` (`EMAIL_DOMAIN`, défaut `ivry94.fr`) puis par recherche dans l'annuaire ; nom, prénom, direction, service et poste en sont déduits. | 5, 24 |
 | **D46** | **Date limite de rédaction dépassée → erreur 423** `DEADLINE_PASSED` avec l'identifiant de la séance suivante ; dérogation, report ou alerte seule selon le paramètre `seances.blocage_date_limite`. | 22.1 |
+| **D47** | **« Afficher en tant que »** (administrateur, administrateur d'organisme, SCC) : on choisit un utilisateur et on a **exactement ses droits** (ce qu'il voit, ce qu'il peut faire) ; un bandeau permanent l'indique ; **l'audit conserve le vrai acteur** et l'utilisateur au nom duquel il a agi. Plafonds : la plateforme tout agent ; l'administrateur d'organisme les agents de ses organismes (jamais un administrateur de plateforme) ; le SCC les agents ordinaires (ni administrateur, ni SCC). | 4, 29 |
+| **D48** | **Autocomplétion des agents partout** : chaque fois qu'un agent doit être désigné — configuration (titulaires, groupes, autorisations de rédaction, délégations, rôles, « afficher en tant que ») ou discussion (mentions) — on tape **@nom** (ou un prénom) et la liste propose les agents, avec l'**identifiant de connexion** réel (partie locale de l'e-mail, pas l'identifiant interne du Hub). | 14, 23 |
+| **D49** | **Tableau de bord** : outre « à traiter » et « mes dossiers », il montre **les actes que mes collaborateurs (N-x) rédigent ou font valider** (d'après mes fonctions de directeur, chef de service, DGA, DGS) et **les actes que j'ai validés qui poursuivent leur circuit** (avec l'étape actuelle et l'échéance). | 9, 23 |
 
 ---
 
@@ -1508,4 +1526,5 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.3** | 2026-09-19 | décisions **D47 à D49** : « Afficher en tant que » (administrateur, SCC), autocomplétion des agents partout (`@nom`), tableau de bord avec l'équipe (N-x) et les actes validés en cours de circuit ; **ODJ et numérotation**, utilisateurs et rôles, gabarits PDF (police Interstate, choix du gabarit) réalisés |
 | **1.2** | 2026-09-19 | **lots 1 à 4a réalisés** (actes, textes suivis, PDF, circuit, délégations, notifications et relances, élus, commissions, séances, dérogations) ; **premier frontend** d'après Stitch ; décisions **D39 à D46** : éditeur en modale WYSIWYG (articles automatiques), copie de délibération assistée par IA, administration des utilisateurs et des rôles, connexion de développement, jeu de démonstration, commissions réelles (sièges, thématiques), fiche RH sans e-mail AD, erreur 423 de date limite |

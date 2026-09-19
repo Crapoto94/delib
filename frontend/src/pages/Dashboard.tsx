@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ClipboardCheck, PenLine } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, PenLine, Route, Users } from 'lucide-react';
 import { api, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -11,6 +11,7 @@ export default function Dashboard() {
   const todo = useLoad(async () => (await api.get(orgPath(o, '/circuit/a-traiter'))).data.items as any[], [o]);
   const mine = useLoad(async () => (await api.get(orgPath(o, '/actes'), { params: { scope: 'mine', limit: 8 } })).data.items as any[], [o]);
   const late = useLoad(async () => (await api.get(orgPath(o, '/circuit/en-retard'))).data.items as any[], [o]);
+  const suivi = useLoad(async () => (await api.get(orgPath(o, '/circuit/suivi'))).data as { equipe: any[]; valides: any[] }, [o]);
   const first = me?.displayName.split(' ').slice(-1)[0];
 
   return (
@@ -32,6 +33,38 @@ export default function Dashboard() {
           </tbody></table>
         )}
       </section>
+
+
+      {(suivi.data?.equipe.length ?? 0) > 0 && (
+        <section aria-labelledby="equipe" className="card">
+          <div className="flex items-center gap-2 border-b border-line px-5 py-3"><Users className="h-5 w-5 text-action" /><h3 id="equipe">Dossiers de mon équipe</h3><Badge tone="blue">{suivi.data!.equipe.length}</Badge>
+            <span className="ml-2 text-[12px] text-mute">Ce que vos collaborateurs rédigent ou font valider.</span></div>
+          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Rédacteur</th><th>Où en est-il ?</th><th>Échéance</th></tr></thead><tbody>
+            {suivi.data!.equipe.slice(0, 25).map((t) => (
+              <tr key={t.acte.id} className="hover:bg-soft">
+                <td className="w-20 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
+                <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link></td>
+                <td>{t.acte.redacteur}</td>
+                <td>{t.phase === 'redaction' ? <Badge>En rédaction</Badge> : t.phase === 'correction' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{t.step?.label ?? 'En validation'}</Badge>}{t.step?.holders?.length ? <div className="text-[11px] text-mute">chez {t.step.holders.join(', ')}</div> : null}</td>
+                <td>{t.step?.dueAt ? (t.step.late ? <Badge tone="ko">En retard · {dt(t.step.dueAt, { dateStyle: 'short' })}</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>
+              </tr>))}
+          </tbody></table>
+        </section>)}
+
+      {(suivi.data?.valides.length ?? 0) > 0 && (
+        <section aria-labelledby="valides" className="card">
+          <div className="flex items-center gap-2 border-b border-line px-5 py-3"><Route className="h-5 w-5 text-ok" /><h3 id="valides">Dossiers que j'ai validés, en cours de circuit</h3><Badge tone="ok">{suivi.data!.valides.length}</Badge></div>
+          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Ma validation</th><th>Maintenant</th><th>Échéance</th></tr></thead><tbody>
+            {suivi.data!.valides.slice(0, 25).map((t) => (
+              <tr key={t.acte.id} className="hover:bg-soft">
+                <td className="w-20 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
+                <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link><div className="text-[12px] text-mute">{t.acte.direction?.label}</div></td>
+                <td>{t.validatedStep}<div className="text-[11px] text-mute">{dt(t.validatedAt, { dateStyle: 'short' })}</div></td>
+                <td>{t.step ? <><Badge tone="blue">{t.step.label}</Badge>{t.step.holders?.length ? <div className="text-[11px] text-mute">chez {t.step.holders.join(', ')}</div> : null}</> : '—'}</td>
+                <td>{t.step?.dueAt ? (t.step.late ? <Badge tone="ko">En retard</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>
+              </tr>))}
+          </tbody></table>
+        </section>)}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="mesdossiers" className="card">

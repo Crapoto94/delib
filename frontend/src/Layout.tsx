@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, Search } from 'lucide-react';
+import { Bell, ChevronDown, Eye, LogOut, Search } from 'lucide-react';
+import AgentPicker from './AgentPicker';
+import { Modal, useToast } from './ui';
 import { useAuth } from './auth';
 import { api, org as orgPath } from './api';
 import { dt } from './format';
@@ -44,7 +46,8 @@ function Bells({ orgId }: { orgId: number }) {
 const tab = ({ isActive }: { isActive: boolean }) => `rounded px-3 py-2 text-[13px] font-semibold ${isActive ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`;
 
 export default function Layout() {
-  const { me, org, setOrg, logout, isAdmin, isScc } = useAuth();
+  const { me, org, setOrg, logout, isAdmin, isScc, startActAs, stopActAs } = useAuth();
+  const [asOpen, setAsOpen] = useState(false); const [asUser, setAsUser] = useState(''); const { toast, node: toastNode } = useToast();
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
   const [q, setQ] = useState('');
@@ -53,6 +56,11 @@ export default function Layout() {
   if (!me || !org) return null;
   return (
     <div className="min-h-screen pb-16">
+      {me.impersonation && (
+        <div role="status" className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-3 bg-warn px-4 py-2 text-[13px] font-semibold text-white">
+          <Eye className="h-4 w-4" /> Vous voyez IvryDélib en tant que {me.displayName} (@{me.username}) — vos actions sont faites avec ses droits et journalisées à votre nom.
+          <button className="rounded bg-white px-3 py-1 text-warn" onClick={stopActAs}>Revenir à mon compte ({me.impersonation.by})</button>
+        </div>)}
       <header className="sticky top-0 z-30 border-b border-line bg-white">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-2 md:px-8">
           <NavLink to="/" className="flex items-center gap-2">
@@ -82,6 +90,7 @@ export default function Layout() {
               <ChevronDown className="h-4 w-4" />
             </button>
             {menu && <div role="menu" className="card absolute right-0 z-40 mt-2 w-56 p-1 shadow-float">
+              {me.canImpersonate && !me.impersonation && <button role="menuitem" onClick={() => { setMenu(false); setAsOpen(true); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft"><Eye className="h-4 w-4" /> Afficher en tant que…</button>}
               <NavLink role="menuitem" to="/delegations" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Mes délégations</NavLink>
               <NavLink role="menuitem" to="/preferences" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Mes notifications</NavLink>
               <button role="menuitem" onClick={async () => { await logout(); nav('/connexion'); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft"><LogOut className="h-4 w-4" /> Se déconnecter</button>
@@ -90,6 +99,14 @@ export default function Layout() {
         </div>
       </header>
       <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8"><Outlet /></main>
+      {asOpen && (
+        <Modal title="Afficher en tant que…" onClose={() => setAsOpen(false)}>
+          <p className="mb-3 text-mute">Choisissez un utilisateur : vous aurez <b>exactement ses droits</b> (ce qu'il voit, ce qu'il peut faire). Chaque action est journalisée à votre nom.</p>
+          <AgentPicker value={asUser} onChange={setAsUser} label="Utilisateur" placeholder="Tapez @nom ou un prénom…" autoFocus />
+          <div className="mt-4 flex justify-end gap-2"><button className="btn-secondary" onClick={() => setAsOpen(false)}>Annuler</button>
+            <button className="btn-primary" disabled={!asUser} onClick={async () => { try { await startActAs(asUser); } catch (e: any) { toast(e?.response?.data?.error || 'Impossible', 'ko'); } }}>Afficher</button></div>
+        </Modal>)}
+      {toastNode}
       <footer className="fixed bottom-0 left-0 right-0 border-t border-line bg-white px-6 py-2 text-[11px] text-mute">
         Ville d'Ivry-sur-Seine · IvryDélib — version de test
       </footer>

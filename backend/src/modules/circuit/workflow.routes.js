@@ -55,6 +55,11 @@ module.exports = ({ makeRouter, engine }) => {
     description: "Actes en attente de MA validation (titulaire ou délégué) et actes renvoyés à mon attention, avec l'échéance et le retard.",
   }, async (req, res) => res.json({ items: await engine.todo(req.ctx, req.org.id) }));
 
+  r.get('/circuit/suivi', {
+    summary: 'Suivi du tableau de bord : les actes de mon équipe et ceux que j’ai validés', tags: ['circuit'], org: true, params: P,
+    description: "`equipe` : actes rédigés ou en validation par mes collaborateurs (N-x) d'après mes fonctions de directeur, chef de service, DGA ou DGS ; `valides` : actes que j'ai validés (ou validés pour moi par un délégué) et qui poursuivent leur circuit, avec l'étape actuelle.",
+  }, async (req, res) => res.json(await engine.tracking(req.ctx, req.org.id)));
+
   r.get('/circuit/en-retard', { summary: 'Actes dont l\'étape courante a dépassé son délai (dans mon périmètre)', tags: ['circuit'], org: true, params: P },
     async (req, res) => res.json({ items: await engine.lateActes(req.ctx, req.org.id) }));
 
