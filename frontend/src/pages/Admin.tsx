@@ -1,0 +1,172 @@
+import { FormEvent, useState } from 'react';
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { RefreshCw, Trash2 } from 'lucide-react';
+import { api, errMsg, org as orgPath } from '../api';
+import { useAuth } from '../auth';
+import { dt } from '../format';
+import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
+
+const FONCTIONS: Record<string, string> = { responsable_intermediaire: 'Responsable intermédiaire', chef_service: 'Chef de service', directeur: 'Directeur', dga: 'DGA', dgs: 'DGS' };
+
+/* ---------------------------------------------------------------------------------------------- titulaires & droits */
+function Titulaires() {
+  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const dirs = useLoad(async () => (await api.get('/directory/directions')).data.items as any[], []);
+  const tit = useLoad(async () => (await api.get(orgPath(o, '/titulaires'))).data.items as any[], [o]);
+  const grp = useLoad(async () => (await api.get(orgPath(o, '/groupes'))).data.items as any[], [o]);
+  const aut = useLoad(async () => (await api.get(orgPath(o, '/redaction/autorisations'))).data.items as any[], [o]);
+  const [f, setF] = useState({ fonction: 'chef_service', username: '', directionCode: '', serviceCode: '' }); const [err, setErr] = useState<string | null>(null);
+  const [a, setA] = useState({ username: '', directionCode: '', serviceCode: '' });
+  const services = dirs.data?.find((x) => x.code === f.directionCode)?.services ?? [];
+  const add = async (e: FormEvent) => {
+    e.preventDefault(); setErr(null);
+    try { await api.post(orgPath(o, '/titulaires'), { fonction: f.fonction, username: f.username.trim().toLowerCase(), directionCode: f.directionCode || undefined, serviceCode: f.serviceCode || undefined }); setF({ ...f, username: '' }); tit.reload(); toast('Titulaire ajouté'); } catch (x) { setErr(errMsg(x)); }
+  };
+  const grant = async (e: FormEvent) => {
+    e.preventDefault();
+    try { await api.post(orgPath(o, '/redaction/autorisations'), { username: a.username.trim().toLowerCase(), directionCode: a.directionCode, serviceCode: a.serviceCode || undefined }); setA({ ...a, username: '' }); aut.reload(); toast('Autorisation accordée'); } catch (x) { toast(errMsg(x), 'ko'); }
+  };
+  const label = (code?: string) => dirs.data?.find((x) => x.code === code)?.label ?? code ?? 'Toute la collectivité';
+  return (
+    <div className="space-y-6">
+      <section className="card p-5"><h3 className="mb-3">Titulaires des fonctions de validation</h3>
+        <form onSubmit={add} className="mb-4 grid gap-3 md:grid-cols-5 md:items-end"><ErrorBox msg={err} />
+          <Field label="Fonction"><select className="input" value={f.fonction} onChange={(e) => setF({ ...f, fonction: e.target.value })}>{Object.entries(FONCTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+          <Field label="Identifiant de l'agent"><input className="input" required value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} /></Field>
+          <Field label="Direction"><select className="input" value={f.directionCode} onChange={(e) => setF({ ...f, directionCode: e.target.value, serviceCode: '' })}><option value="">(toutes — DGS)</option>{dirs.data?.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}</select></Field>
+          <Field label="Service"><select className="input" value={f.serviceCode} onChange={(e) => setF({ ...f, serviceCode: e.target.value })} disabled={!f.directionCode}><option value="">(toute la direction)</option>{services.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>
+          <button className="btn-primary">Ajouter</button>
+        </form>
+        {tit.loading ? <Loading /> : !tit.data?.length ? <Empty>Aucun titulaire désigné : les étapes obligatoires bloqueront l'envoi des actes.</Empty> : (
+          <table className="w-full"><thead><tr><th>Fonction</th><th>Agent</th><th>Périmètre</th><th /></tr></thead><tbody>{tit.data.map((t) => (
+            <tr key={t.id}><td className="font-semibold">{FONCTIONS[t.fonction]}</td><td>{t.username}{t.suppleant && <span className="text-mute"> (suppl. {t.suppleant})</span>}</td>
+              <td>{label(t.directionCode)}{t.serviceCode ? ` › ${dirs.data?.find((x) => x.code === t.directionCode)?.services?.find((s: any) => s.code === t.serviceCode)?.label ?? t.serviceCode}` : ''}</td>
+              <td className="text-right"><button aria-label="Retirer" className="text-ko" onClick={async () => { await api.delete(orgPath(o, `/titulaires/${t.id}`)); tit.reload(); }}><Trash2 className="h-4 w-4" /></button></td></tr>))}</tbody></table>)}
+      </section>
+
+      <section className="card p-5"><h3 className="mb-3">Autorisations de rédaction hors direction</h3>
+        <form onSubmit={grant} className="mb-4 grid gap-3 md:grid-cols-4 md:items-end">
+          <Field label="Agent autorisé"><input className="input" required value={a.username} onChange={(e) => setA({ ...a, username: e.target.value })} /></Field>
+          <Field label="Direction"><select className="input" required value={a.directionCode} onChange={(e) => setA({ ...a, directionCode: e.target.value, serviceCode: '' })}><option value="">— choisir —</option>{dirs.data?.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}</select></Field>
+          <Field label="Service (facultatif)"><select className="input" value={a.serviceCode} onChange={(e) => setA({ ...a, serviceCode: e.target.value })}><option value="">Toute la direction</option>{dirs.data?.find((x) => x.code === a.directionCode)?.services?.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>
+          <button className="btn-primary">Autoriser</button>
+        </form>
+        {!aut.data?.length ? <p className="text-mute">Aucune autorisation étendue. Par défaut, un agent rédige pour sa propre direction.</p> : (
+          <table className="w-full"><thead><tr><th>Agent</th><th>Périmètre</th><th>Accordée par</th><th /></tr></thead><tbody>{aut.data.map((g) => (
+            <tr key={g.id}><td>{g.username}</td><td>{label(g.directionCode)}{g.serviceCode ? ` › ${g.serviceCode}` : ''}</td><td>{g.grantedBy}</td><td className="text-right"><button aria-label="Révoquer" className="text-ko" onClick={async () => { await api.delete(orgPath(o, `/redaction/autorisations/${g.id}`)); aut.reload(); }}><Trash2 className="h-4 w-4" /></button></td></tr>))}</tbody></table>)}
+      </section>
+
+      <section className="card p-5"><h3 className="mb-3">Groupes de valideurs (Service financier, juridique, SCC…)</h3>
+        {grp.loading ? <Loading /> : <div className="grid gap-4 md:grid-cols-3">{grp.data?.map((g) => <GroupeCard key={g.id} g={g} o={o} reload={grp.reload} toast={toast} />)}</div>}
+      </section>{node}
+    </div>
+  );
+}
+
+function GroupeCard({ g, o, reload, toast }: { g: any; o: number; reload: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
+  const [txt, setTxt] = useState((g.membres as string[]).join(', '));
+  const save = async () => { try { await api.put(orgPath(o, `/groupes/${g.id}/membres`), { usernames: txt.split(/[\s,;]+/).filter(Boolean) }); toast('Groupe enregistré'); reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  return <div className="rounded border border-line p-3"><b>{g.nom}</b> <span className="text-[11px] text-mute">({g.code})</span>
+    <textarea className="input mt-2" rows={3} value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="identifiants séparés par des virgules" /><button className="btn-secondary mt-2" onClick={save}>Enregistrer</button></div>;
+}
+
+/* -------------------------------------------------------------------------------------------------------- circuits */
+function Circuits() {
+  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const list = useLoad(async () => (await api.get(orgPath(o, '/circuits'))).data.items as any[], [o]);
+  const [open, setOpen] = useState<any>(null);
+  const show = async (c: any) => { const v = c.versions.find((x: any) => x.status === 'published') ?? c.versions[0]; setOpen({ c, v: (await api.get(orgPath(o, `/circuits/${c.id}/versions/${v.version}`))).data }); };
+  const RES: Record<string, string> = { redacteur: 'Rédacteur', titulaire: 'Titulaire', groupe: 'Groupe', agent: 'Agent' };
+  return (
+    <div><p className="mb-4 text-mute">Le circuit est une donnée : il se modifie sans toucher au code (administrateur et SCC). L'éditeur graphique complet arrive ; ici, consultation et publication.</p>
+      {list.loading ? <Loading /> : <div className="grid gap-4 md:grid-cols-2">{list.data?.map((c) => (
+        <article key={c.id} className="card p-5"><div className="flex items-start justify-between"><h3>{c.nom}</h3><Badge tone="blue">{c.versions.find((v: any) => v.status === 'published') ? `v${c.versions.find((v: any) => v.status === 'published').version} publiée` : 'brouillon'}</Badge></div>
+          <p className="text-mute">{c.directionCode ? `Direction ${c.directionCode}` : 'Toutes directions'} · {c.versions.length} version(s)</p>
+          <div className="mt-3 flex gap-2"><button className="btn-secondary" onClick={() => show(c)}>Voir le parcours</button>
+            {c.versions.filter((v: any) => v.status === 'draft').map((v: any) => <button key={v.version} className="btn-primary" onClick={async () => { try { await api.post(orgPath(o, `/circuits/${c.id}/versions/${v.version}/publication`), {}); toast('Version publiée'); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); } }}>Publier v{v.version}</button>)}</div>
+        </article>))}</div>}
+      {open && <Modal title={`${open.c.nom} — version ${open.v.version}`} onClose={() => setOpen(null)} wide>
+        <ol className="space-y-2">{open.v.graph.steps.map((s: any, i: number) => (
+          <li key={s.key} className="flex items-center gap-3 rounded border border-line p-3"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[12px] font-bold text-white">{i + 1}</span>
+            <div className="flex-1"><b>{s.label}</b><div className="text-[12px] text-mute">{RES[s.resolver?.kind]} {s.resolver?.fonction || s.resolver?.code || s.resolver?.username || ''}{s.slaDays ? ` · délai ${s.slaDays} j ouvrés` : ''}{s.optional ? ' · optionnelle' : ''}{s.nonDelegable ? ' · non déléguable' : ''}</div></div></li>))}</ol>
+        <p className="mt-3 text-[12px] text-mute">Transitions conditionnelles : {open.v.graph.transitions.filter((t: any) => t.when).map((t: any) => `${t.from} → ${t.to} si ${t.when.field} = ${String(t.when.value)}`).join(' ; ') || 'aucune'}</p>
+      </Modal>}{node}</div>
+  );
+}
+
+/* --------------------------------------------------------------------------------------------- règles de notification */
+function Regles() {
+  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const r = useLoad(async () => (await api.get(orgPath(o, '/notifications/regles'))).data, [o]);
+  const dash = useLoad(async () => (await api.get(orgPath(o, '/notifications/tableau'))).data, [o]);
+  const [edit, setEdit] = useState<any>(null);
+  const save = async () => { try { await api.put(orgPath(o, `/notifications/regles/${edit.code}`), { subject: edit.subject, body: edit.body, enabled: edit.enabled }); toast('Règle enregistrée'); setEdit(null); r.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  return (
+    <div className="space-y-6">
+      {dash.data && <div className="grid gap-4 md:grid-cols-4">
+        {[['Envoyés (7 j)', dash.data.last7Days.sent ?? 0], ['En échec', dash.data.last7Days.failed ?? 0], ['Actes sans titulaire', dash.data.blocked.length], ['Bloqués > 10 j', dash.data.stuckMoreThan10Days.length]].map(([l, v]) => (
+          <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-primary">{v}</div></div>))}</div>}
+      <div className="card">{r.loading ? <Loading /> : (
+        <table className="w-full"><thead><tr><th>Règle</th><th>Type</th><th>Famille</th><th>État</th><th /></tr></thead><tbody>{r.data.items.map((x: any) => (
+          <tr key={x.code}><td><b>{x.nom}</b><div className="text-[11px] text-mute">{x.code}{x.origin === 'organisme' && ' · personnalisée'}</div></td><td>{x.kind === 'event' ? 'Événement' : 'Relance'}</td><td>{r.data.families[x.family]?.label}</td>
+            <td>{x.enabled ? <Badge tone="ok">active</Badge> : <Badge>désactivée</Badge>}{x.mandatory && <Badge tone="warn"> obligatoire</Badge>}</td><td className="text-right"><button className="btn-secondary" onClick={() => setEdit({ ...x })}>Modifier</button></td></tr>))}</tbody></table>)}</div>
+      {edit && <Modal title={edit.nom} onClose={() => setEdit(null)} wide><div className="space-y-4">
+        {edit.palliers?.length > 0 && <p className="rounded bg-soft p-2 text-[12px]">Paliers : {edit.palliers.map((p: any) => p.id).join(' → ')} (jours ouvrés, 8 h – 18 h). Destinataires : {edit.recipients.join(', ')}</p>}
+        <Field label="Objet"><input className="input" value={edit.subject} onChange={(e) => setEdit({ ...edit, subject: e.target.value })} /></Field>
+        <Field label="Corps" hint="Variables : {titre} {numero} {etape} {lien} {redacteur} {acteur} {motif} {echeance} {retard}"><textarea className="input" rows={7} value={edit.body} onChange={(e) => setEdit({ ...edit, body: e.target.value })} /></Field>
+        {!edit.mandatory && <label className="flex items-center gap-2"><input type="checkbox" checked={edit.enabled} onChange={(e) => setEdit({ ...edit, enabled: e.target.checked })} /> Règle active</label>}
+        <div className="flex justify-between"><button className="btn-secondary" onClick={async () => { try { await api.post(orgPath(o, `/notifications/regles/${edit.code}/test`), {}); toast('Mail de test envoyé'); } catch (e) { toast(errMsg(e), 'ko'); } }}>M'envoyer un test</button><button className="btn-primary" onClick={save}>Enregistrer</button></div></div></Modal>}{node}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------------------------------------------------- élus */
+function Elus() {
+  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const list = useLoad(async () => (await api.get(orgPath(o, '/elus'))).data.items as any[], [o]);
+  const [f, setF] = useState({ nom: '', prenom: '', email: '', role: '' });
+  const add = async (e: FormEvent) => { e.preventDefault(); try { await api.post(orgPath(o, '/elus'), { nom: f.nom, prenom: f.prenom, email: f.email || undefined, role: f.role || undefined }); setF({ nom: '', prenom: '', email: '', role: '' }); list.reload(); } catch (x) { toast(errMsg(x), 'ko'); } };
+  const sync = async () => { try { const r = (await api.post(orgPath(o, '/elus/synchronisation'))).data; toast(`Hub : ${r.created} nouveau(x), ${r.updated} mis à jour, ${r.deactivated} désactivé(s)`); list.reload(); } catch (x) { toast(errMsg(x), 'ko'); } };
+  return (
+    <div className="space-y-6">
+      <form onSubmit={add} className="card grid gap-3 p-5 md:grid-cols-5 md:items-end">
+        <Field label="Nom"><input className="input" required value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} /></Field>
+        <Field label="Prénom"><input className="input" value={f.prenom} onChange={(e) => setF({ ...f, prenom: e.target.value })} /></Field>
+        <Field label="Courriel"><input className="input" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+        <Field label="Rôle"><input className="input" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} placeholder="Adjoint(e), conseiller(ère)…" /></Field>
+        <div className="flex gap-2"><button className="btn-primary">Ajouter</button><button type="button" className="btn-secondary" onClick={sync}><RefreshCw className="h-3.5 w-3.5" /> Hub</button></div>
+      </form>
+      <div className="card">{list.loading ? <Loading /> : !list.data?.length ? <Empty>Aucun élu. Ajoutez-en ou synchronisez depuis le Hub DSI.</Empty> : (
+        <table className="w-full"><thead><tr><th>Nom</th><th>Rôle</th><th>Courriel</th><th>Source</th></tr></thead><tbody>{list.data.map((e) => <tr key={e.id}><td className="font-semibold">{e.nomComplet}</td><td>{e.role}</td><td>{e.email}</td><td><Badge tone={e.source === 'hub' ? 'blue' : 'gray'}>{e.source}</Badge></td></tr>)}</tbody></table>)}</div>{node}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------------------------------------------- jours fériés */
+function Calendrier() {
+  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const list = useLoad(async () => (await api.get(orgPath(o, '/calendrier/jours-feries'))).data.items as any[], [o]);
+  const year = new Date().getFullYear();
+  return (
+    <div className="space-y-4"><p className="text-mute">Les jours fériés sont exclus du calcul des délais (jours ouvrés) et des relances.</p>
+      <div className="flex gap-2">{[year, year + 1].map((y) => <button key={y} className="btn-secondary" onClick={async () => { await api.post(orgPath(o, '/calendrier/jours-feries/generer'), { year: y }); toast(`Jours fériés ${y} générés`); list.reload(); }}>Générer {y}</button>)}</div>
+      <div className="card">{list.loading ? <Loading /> : !list.data?.length ? <Empty>Aucun jour férié défini.</Empty> : <table className="w-full"><tbody>{list.data.map((h) => <tr key={h.id}><td className="w-48 font-mono">{dt(h.day, { dateStyle: 'full' })}</td><td>{h.label}</td><td className="text-right">{h.origin === 'organisme' && <button className="text-ko" onClick={async () => { await api.delete(orgPath(o, `/calendrier/jours-feries/${h.id}`)); list.reload(); }}><Trash2 className="h-4 w-4" /></button>}</td></tr>)}</tbody></table>}</div>{node}</div>
+  );
+}
+
+export default function Admin() {
+  const { isAdmin } = useAuth();
+  const tabs = [['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['notifications', 'Notifications & relances'], ['elus', 'Élus'], ['calendrier', 'Jours fériés']];
+  return (
+    <div>
+      <PageTitle title="Administration" sub={isAdmin ? "Paramétrage de l'organisme." : "Paramétrage accessible au SCC."} />
+      <nav className="mb-6 flex flex-wrap gap-1 border-b border-line" aria-label="Administration">{tabs.map(([k, l]) => (
+        <NavLink key={k} to={`/admin/${k}`} className={({ isActive }) => `-mb-px border-b-2 px-4 py-2 text-[13px] font-semibold ${isActive ? 'border-primary text-primary' : 'border-transparent text-mute hover:text-ink'}`}>{l}</NavLink>))}</nav>
+      <Routes>
+        <Route index element={<Navigate to="titulaires" replace />} />
+        <Route path="titulaires" element={<Titulaires />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
+        <Route path="elus" element={<Elus />} /><Route path="calendrier" element={<Calendrier />} />
+      </Routes>
+    </div>
+  );
+}

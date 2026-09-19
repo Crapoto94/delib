@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300..900;1,300..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"tertiary-fixed-dim":"#68dba9","on-error":"#ffffff","inverse-primary":"#b0c9e8","surface-dim":"#ccdbf4","secondary-fixed-dim":"#b4c5ff","surface-container-low":"#eff4ff","on-secondary":"#ffffff","on-primary":"#ffffff","on-tertiary-fixed-variant":"#005137","primary":"#001428","on-primary-container":"#7991af","primary-fixed-dim":"#b0c9e8","surface":"#f8f9ff","error-container":"#ffdad6","on-tertiary":"#ffffff","secondary":"#0051d5","outline":"#74777e","inverse-surface":"#233144","primary-container":"#0f2942","surface-container":"#e6eeff","on-surface-variant":"#43474d","tertiary":"#00170d","surface-container-highest":"#d5e3fd","tertiary-fixed":"#85f8c4","on-primary-fixed":"#011d35","surface-tint":"#49607c","surface-container-lowest":"#ffffff","on-tertiary-fixed":"#002114","surface-container-high":"#dde9ff","secondary-fixed":"#dbe1ff","background":"#f8f9ff","outline-variant":"#c3c6ce","on-background":"#0d1c2f","tertiary-container":"#002e1d","on-secondary-fixed":"#00174b","on-secondary-fixed-variant":"#003ea8","on-surface":"#0d1c2f","error":"#ba1a1a","on-primary-fixed-variant":"#314863","secondary-container":"#316bf3","on-secondary-container":"#fefcff","primary-fixed":"#d1e4ff","on-error-container":"#93000a","inverse-on-surface":"#ebf1ff","surface-bright":"#f8f9ff","surface-variant":"#d5e3fd","on-tertiary-container":"#21a173"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"gutter":"1rem","space-md":"1rem","space-xs":"0.25rem","margin-desktop":"2rem","space-lg":"1.5rem","gutter-desktop":"1.5rem","space-sm":"0.5rem","space-xl":"2.5rem","margin":"1rem"},"fontFamily":{"body-sm":["\"Source Sans 3\""],"headline-lg-mobile":["\"Source Sans 3\""],"headline-sm":["\"Source Sans 3\""],"body-lg":["\"Source Sans 3\""],"label-md":["\"Source Sans 3\""],"label-lg":["\"Source Sans 3\""],"headline-md":["\"Source Sans 3\""],"headline-xl-mobile":["\"Source Sans 3\""],"headline-lg":["\"Source Sans 3\""],"label-sm":["\"Source Sans 3\""],"body-md":["\"Source Sans 3\""],"headline-xl":["\"Source Sans 3\""]},"fontSize":{"body-sm":["12px",{"lineHeight":"18px","fontWeight":"400"}],"headline-lg-mobile":["20px",{"lineHeight":"28px","fontWeight":"700"}],"headline-sm":["16px",{"lineHeight":"24px","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"label-md":["12px",{"lineHeight":"16px","fontWeight":"600"}],"label-lg":["14px",{"lineHeight":"20px","fontWeight":"600"}],"headline-md":["19px",{"lineHeight":"26px","fontWeight":"600"}],"headline-xl-mobile":["26px",{"lineHeight":"34px","fontWeight":"700"}],"headline-lg":["24px",{"lineHeight":"32px","fontWeight":"700"}],"label-sm":["11px",{"lineHeight":"14px","fontWeight":"700"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"headline-xl":["32px",{"lineHeight":"40px","fontWeight":"700"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/40 shadow-[0_1px_4px_rgba(13,28,47,0.05)]"><div class="h-20 w-full px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg shrink-0"><div class="flex items-center gap-space-sm"><img alt="Logo IvryDélib" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U6Txvyk_obVczAHEyoJgRYmflszhnvftalfZ2FeHWE8HTAoMTH3QWtOWVtLE3pa9B8-5PuyzYPVNgvVcS1X53X-Ckp9UO_gcIoY8p0ulpvYt-94yYZlCNWSfNEtn9Pyc_DWSmBAEUiamsEBFgJBqnrQ7kyUpU9tuBD6Ljz75hTCzYWCqHwtS-nD9giQXtWC4xy3IcYBFkqOt-vkrEcjuTu7AhHn0lzzcfXq3OjL452"/><div class="flex flex-col pl-space-xs border-l border-outline-variant/50"><span class="font-headline-sm text-headline-sm text-primary leading-tight tracking-tight">IvryDélib</span><span class="font-label-sm text-label-sm text-on-surface-variant font-medium tracking-wide uppercase">Ville d'Ivry-sur-Seine</span></div></div><div class="h-7 w-[1px] bg-outline-variant/40 hidden lg:block"></div><nav class="hidden xl:flex items-center gap-space-xs" data-active-classes="bg-primary text-on-primary font-label-md rounded-lg shadow-sm"><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="tableau-de-bord" href="#">Tableau de bord</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="commissions-et-avis-elus" href="#">Commissions &amp; Avis</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="derogations-et-hors-delais-scc" href="#">Dérogations SCC</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="titulaires-et-droits-redaction" href="#">Titulaires &amp; Droits</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="regles-notifications-relances" href="#">Notifications &amp; Relances</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="gabarits-edition-referentiels" href="#">Gabarits &amp; Référentiels</a></nav></div><div class="flex-1 max-w-md hidden 2xl:block"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px] pointer-events-none">search</span><input class="w-full pl-10 pr-16 py-1.5 bg-surface-container-low border border-outline-variant/60 rounded-lg text-on-surface font-body-sm text-body-sm placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-1 focus:ring-secondary focus:border-secondary transition-all" placeholder="Rechercher actes, visas, titulaires..." type="text"/><div class="absolute right-2 flex items-center gap-1 pointer-events-none"><kbd class="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/60 rounded font-label-sm text-label-sm text-on-surface-variant shadow-xs">⌘K</kbd></div></div></div><div class="flex items-center gap-space-md shrink-0"><div class="flex items-center gap-1"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Aide réglementaire &amp; guides" type="button"><span class="material-symbols-outlined text-[22px]">help</span></button><button class="relative p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Notifications et alertes" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-4 h-4 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-tight flex items-center justify-center font-bold">4</span></button></div><div class="h-7 w-[1px] bg-outline-variant/40"></div><div class="relative flex items-center gap-space-sm pl-space-xs bg-surface-container-low/70 hover:bg-surface-container-high/60 px-space-sm py-1.5 rounded-lg border border-outline-variant/40 transition-colors"><div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-md text-label-md font-bold ring-1 ring-outline-variant/50">MV</div><div class="flex flex-col text-left"><div class="flex items-center gap-1"><select aria-label="Sélecteur d'opérateur actif" class="bg-transparent font-label-md text-label-md text-on-surface font-semibold focus:outline-none cursor-pointer pr-4"><option selected="" value="vasseur">Marc Vasseur</option><option value="moreau">Claire Moreau</option><option value="admin-scc">Admin SCC</option></select></div><span class="font-label-sm text-label-sm text-on-surface-variant">Direction Juridique / SCC</span></div></div></div></div></header><main class="w-full pt-20 bg-surface flex-1"><div class="flex flex-col w-full">
+<!-- Zone En-tête Institutionnelle & Sélecteur de Territoire -->
+<section class="w-full bg-surface-container-lowest shadow-sm px-space-lg py-space-xl">
+<div class="max-w-[1600px] mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-lg">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-label-sm text-label-sm tracking-wide">RÉFÉRENTIEL RH &amp; JURIDIQUE</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant font-medium">Décision D3 • DRO-01 à DRO-10 • CIR-25</span>
+</div>
+<h1 class="font-headline-xl text-headline-xl text-primary tracking-tight">Titulaires des Circuits de Validation &amp; Autorisations de Rédaction</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-3xl">
+          Paramétrage manuel des liaisons hiérarchiques des maillons décisionnels et administration des prérogatives de rédaction inter-directions avec synchronisation SIRH sécurisée.
+        </p>
+</div>
+<!-- Instance & Métadonnées d'autorité -->
+<div class="flex flex-wrap items-center gap-space-md bg-surface-container-low p-space-md rounded-xl shadow-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container-lowest flex items-center justify-center text-secondary shadow-xs">
+<span class="material-symbols-outlined text-[24px]">account_balance</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Collectivité délibérante</span>
+<div class="flex items-center gap-space-xs">
+<select class="bg-transparent font-headline-sm text-headline-sm text-primary font-bold focus:outline-none cursor-pointer">
+<option selected="" value="ivry">Ville d'Ivry-sur-Seine (94200)</option>
+<option value="ccas">CCAS d'Ivry-sur-Seine</option>
+<option value="caisse-ecoles">Caisse des Écoles</option>
+</select>
+</div>
+</div>
+</div>
+<div class="h-8 w-px bg-surface-container-highest hidden sm:block"></div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Dernier sync SIRH</span>
+<span class="font-label-md text-label-md text-tertiary-container flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-tertiary-container"></span>
+            Aujourd'hui 06:12 • Automatisé
+          </span>
+</div>
+</div>
+</div>
+</section>
+<!-- Navigation par Onglets Principaux & Actions Globales -->
+<div class="w-full bg-surface-container-low shadow-xs">
+<div class="max-w-[1600px] mx-auto px-space-lg flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-xs overflow-x-auto" id="mainTabGroup">
+<button class="px-space-lg py-4 font-headline-sm text-headline-sm text-primary border-b-2 border-primary flex items-center gap-space-sm transition-all whitespace-nowrap" id="tabBtn1" onclick="switchTab('tab1')">
+<span class="material-symbols-outlined text-[20px]">account_tree</span>
+          Table des Titulaires &amp; Hiérarchie (CIR-25)
+          <span class="px-2 py-0.5 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm">8 Directions</span>
+</button>
+<button class="px-space-lg py-4 font-headline-sm text-headline-sm text-on-surface-variant hover:text-primary border-b-2 border-transparent hover:border-surface-container-highest flex items-center gap-space-sm transition-all whitespace-nowrap" id="tabBtn2" onclick="switchTab('tab2')">
+<span class="material-symbols-outlined text-[20px]">swap_horiz</span>
+          Autorisations de Rédaction Croisées (DRO-06)
+          <span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">14 Actives</span>
+</button>
+</div>
+<div class="flex items-center gap-space-sm py-2">
+<button class="px-space-md py-2 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-primary font-label-md text-label-md shadow-xs flex items-center gap-2 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+          Journal d'audit
+        </button>
+<button class="px-space-md py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md shadow-sm flex items-center gap-2 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">person_add</span>
+          Modifier les titulaires
+        </button>
+</div>
+</div>
+</div>
+<div class="w-full max-w-[1600px] mx-auto px-space-lg py-space-xl flex flex-col gap-space-xl">
+<!-- CONTENU ONGLET 1 : TABLE DES TITULAIRES & HIÉRARCHIE (CIR-25) -->
+<div class="flex flex-col gap-space-lg" id="tab1Content">
+<!-- Alerte de Détection RH SIRH (Alerte D3 / Vacance de poste) -->
+<div class="p-space-md rounded-xl bg-error-container text-on-error-container shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-full bg-error text-on-error flex items-center justify-center shrink-0 shadow-xs">
+<span class="material-symbols-outlined text-[22px]">warning</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold">1 anomalie de maillon orphelin identifiée par le SIRH</span>
+<p class="font-body-md text-body-md text-on-error-container">
+              Poste de Direction vacant sans titulaire actif sur la <strong>Direction des Affaires Culturelles</strong>. Le circuit ne peut être visé au niveau Étape 4 sans nomination d'un intérim.
+            </p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0 w-full md:w-auto">
+<button class="w-full md:w-auto px-space-md py-2 rounded-lg bg-error text-on-error hover:opacity-95 font-label-md text-label-md shadow-xs transition-all" type="button">
+            Désigner l'intérim D4
+          </button>
+</div>
+</div>
+<!-- Métriques de couverture des circuits -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm tracking-wider uppercase">Couverture globale</span>
+<span class="material-symbols-outlined text-[20px] text-tertiary-container">verified</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-space-sm">
+<span class="font-headline-xl text-headline-xl text-primary font-bold">96.8%</span>
+<span class="font-label-md text-label-md text-tertiary-container font-semibold">7/8 Opérationnelles</span>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-1.5 mt-space-md overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 96.8%"></div>
+</div>
+</div>
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm tracking-wider uppercase">Délégations Actives (CIR-30)</span>
+<span class="material-symbols-outlined text-[20px] text-secondary">assignment_turned_in</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-space-sm">
+<span class="font-headline-xl text-headline-xl text-primary font-bold">5</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Délégations de congés/intérim</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-space-md">3 expirent sous 15 jours</span>
+</div>
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm tracking-wider uppercase">Périmètre DGS &amp; DGA</span>
+<span class="material-symbols-outlined text-[20px] text-primary">groups</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-space-sm">
+<span class="font-headline-xl text-headline-xl text-primary font-bold">4 DGA</span>
+<span class="font-label-md text-label-md text-on-surface-variant">1 DGS rattaché</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold mt-space-md">Liaisons directes 100% à jour</span>
+</div>
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm tracking-wider uppercase">Gestion Absence</span>
+<span class="material-symbols-outlined text-[20px] text-outline">event_busy</span>
+</div>
+<div class="mt-space-md flex items-center gap-space-sm">
+<button class="w-full py-2 px-space-sm rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-primary font-label-md text-label-md text-center transition-all" type="button">
+              Gérer délégations (CIR-30)
+            </button>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-space-md">Suppléants automatiques configurés</span>
+</div>
+</div>
+<!-- Filtres & Tableau Matriciel des Maillons CIR-25 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<!-- Barre d'outils du tableau -->
+<div class="p-space-lg bg-surface-container-low/50 flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="flex flex-wrap items-center gap-space-sm">
+<span class="font-label-md text-label-md text-primary font-bold">Filtrer les Pôles :</span>
+<button class="px-space-md py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm shadow-xs">Toutes les directions (8)</button>
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm text-label-sm shadow-xs transition-all">Cadre de Vie &amp; Aménagement</button>
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm text-label-sm shadow-xs transition-all">Ressources &amp; Juridique</button>
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm text-label-sm shadow-xs transition-all">Éducation &amp; Solidarités</button>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-on-surface-variant">search</span>
+<input class="pl-8 pr-3 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-secondary shadow-xs" placeholder="Filtrer agent, titulaire..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Matrice des Maillons -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-space-md px-space-lg">Direction Porteuse</th>
+<th class="py-space-md px-space-md">Responsable Interm. (D4)</th>
+<th class="py-space-md px-space-md">Chef de Service (D3)</th>
+<th class="py-space-md px-space-md">Directrice / Directeur (D2)</th>
+<th class="py-space-md px-space-md">DGA de Tutelle (D1)</th>
+<th class="py-space-md px-space-md">DGS</th>
+<th class="py-space-md px-space-md text-center">Conformité</th>
+<th class="py-space-md px-space-lg text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high font-body-md text-body-md text-on-surface">
+<!-- Ligne 1 : Urbanisme & Aménagement (Exemple énoncé) -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-lg px-space-lg">
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Direction de l'Urbanisme et de l'Aménagement</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Pôle Cadre de Vie • Réf. ACTES 2.1</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Claire Moreau</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Cheffe de secteur</span>
+<span class="font-label-sm text-label-sm text-secondary">Suppléant : Alain T.</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Thomas Renoir</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Resp. Urbanisme Réglementaire</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Hélène Caron</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Directrice Générale Aménagement</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Philippe Mercier</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGA Cadre de Vie &amp; Transition</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Jean-Marc Bertrand</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGS Ville d'Ivry</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold shadow-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                    Complet (100%)
+                  </span>
+</td>
+<td class="py-space-lg px-space-lg text-right">
+<button class="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all" title="Modifier cette chaîne" type="button">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</td>
+</tr>
+<!-- Ligne 2 : Finances & Commande Publique -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-lg px-space-lg">
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Direction des Finances &amp; Commande Publique</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Pôle Ressources • Réf. ACTES 7.1</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface-variant italic">Non requis pour ce circuit</span>
+<span class="font-label-sm text-label-sm text-outline">Pass-through direct Chef</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Sandrine Lopez</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Resp. Budgets &amp; Prospective</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">David Kalfon</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Directeur des Finances</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Valérie Perrin</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGA Ressources Internes</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Jean-Marc Bertrand</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGS Ville d'Ivry</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold shadow-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                    Complet (100%)
+                  </span>
+</td>
+<td class="py-space-lg px-space-lg text-right">
+<button class="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all" title="Modifier cette chaîne" type="button">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</td>
+</tr>
+<!-- Ligne 3 : Affaires Culturelles (Ligne en anomalie détectée) -->
+<tr class="bg-error-container/20 hover:bg-error-container/30 transition-colors">
+<td class="py-space-lg px-space-lg">
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Direction des Affaires Culturelles</span>
+<span class="font-label-sm text-label-sm text-error font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">error</span>
+                      Poste de Direction à pourvoir
+                    </span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Benoît Larivière</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Coord. Événements publics</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Myriam Chennouf</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Cheffe de Service Médiation</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="p-2 rounded-lg bg-surface-container-lowest text-error flex flex-col gap-1 shadow-xs">
+<span class="font-label-sm text-label-sm font-bold uppercase">Vacance détectée</span>
+<button class="px-2 py-1 rounded bg-error text-on-error font-label-sm text-label-sm hover:opacity-90 text-left" type="button">
+                      + Assigner intérim
+                    </button>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Samia Meziani</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGA Citoyenneté &amp; Culture</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Jean-Marc Bertrand</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGS Ville d'Ivry</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold shadow-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                    Bloquant (80%)
+                  </span>
+</td>
+<td class="py-space-lg px-space-lg text-right">
+<button class="px-space-md py-1.5 rounded-lg bg-error text-on-error font-label-sm text-label-sm shadow-xs" type="button">
+                    Résoudre
+                  </button>
+</td>
+</tr>
+<!-- Ligne 4 : Affaires Juridiques & Assemblées -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-lg px-space-lg">
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Direction des Affaires Juridiques &amp; SCC</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Secrétariat du Conseil • Réf. ACTES 5.2</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Marc Vasseur</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Juriste Délibérations</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Nadia Benali</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Cheffe du Service Assemblées</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Laurent Guichard</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Directeur des Affaires Juridiques</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Valérie Perrin</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGA Ressources Internes</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Jean-Marc Bertrand</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGS Ville d'Ivry</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold shadow-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                    Complet (100%)
+                  </span>
+</td>
+<td class="py-space-lg px-space-lg text-right">
+<button class="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container transition-all" title="Modifier cette chaîne" type="button">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pied de matrice d'approbation -->
+<div class="p-space-md bg-surface-container-low/30 border-t border-surface-container-high flex flex-col sm:flex-row items-center justify-between text-body-sm text-on-surface-variant">
+<span>Affichage de 4 sur 8 directions territoriales répertoriées.</span>
+<div class="flex items-center gap-space-sm mt-2 sm:mt-0">
+<span class="font-label-sm text-label-sm">Validation du circuit : Décret n° 2021-1311 du 7 oct. 2021</span>
+</div>
+</div>
+</div>
+</div>
+<!-- CONTENU ONGLET 2 : AUTORISATIONS DE RÉDACTION CROISÉES (DRO-02 & DRO-06) -->
+<div class="hidden flex-col gap-space-lg" id="tab2Content">
+<!-- Bandeau d'information réglementaire DRO-02/DRO-06 -->
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-space-lg">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[28px]">verified_user</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary">Principe d'habilitation de rédaction croisée</span>
+<p class="font-body-md text-body-md text-on-surface-variant">
+              Par défaut, un agent dispose du droit de proposition sur sa direction de rattachement. Les autorisations croisées (DRO-06) étendent ce droit à d'autres directions porteuses avec visa préalable du directeur délégant.
+            </p>
+</div>
+</div>
+<button class="px-space-lg py-2.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md shadow-sm flex items-center gap-2 whitespace-nowrap transition-all" onclick="document.getElementById('modalNewAuth').classList.remove('hidden')" type="button">
+<span class="material-symbols-outlined text-[20px]">add_moderator</span>
+          + Accorder une nouvelle autorisation
+        </button>
+</div>
+<!-- Recherche & Table des Délégations de Rédaction Accordées -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<div class="p-space-lg bg-surface-container-low/50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-md">
+<div class="relative flex-1 max-w-lg">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full pl-10 pr-4 py-2 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-secondary" id="filterInput" onkeyup="filterAgents()" placeholder="Rechercher par nom d'agent, matricule RH ou direction porteuse..." type="text"/>
+</div>
+<div class="flex items-center gap-space-sm">
+<select class="px-space-md py-2 rounded-lg bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs focus:outline-none">
+<option>Tous les statuts (Actifs &amp; Expirés)</option>
+<option selected="">Statut : Actif uniquement</option>
+<option>Statut : Révocation récente</option>
+</select>
+<button class="p-2 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:text-primary shadow-xs" title="Exporter le registre RGPD">
+<span class="material-symbols-outlined text-[20px]">download</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse" id="authTable">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-space-md px-space-lg">Agent Bénéficiaire</th>
+<th class="py-space-md px-space-md">Direction d'Origine</th>
+<th class="py-space-md px-space-md">Direction Porteuse Autorisée</th>
+<th class="py-space-md px-space-md">Accordé par (Délégant)</th>
+<th class="py-space-md px-space-md">Date d'Effet</th>
+<th class="py-space-md px-space-md">Expiration</th>
+<th class="py-space-md px-space-md text-center">Statut</th>
+<th class="py-space-md px-space-lg text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high font-body-md text-body-md text-on-surface">
+<!-- Exemple Enoncé : Marc Vasseur -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-lg px-space-lg">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-label-md shrink-0">
+                      MV
+                    </div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Marc Vasseur</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Matricule RH : #08942-AJ</span>
+</div>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<span class="inline-flex items-center px-2 py-1 rounded bg-surface-container-high text-primary font-label-sm text-label-sm">
+                    Urbanisme &amp; Aménagement
+                  </span>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex items-center gap-1 font-semibold text-secondary">
+<span class="material-symbols-outlined text-[18px]">arrow_right_alt</span>
+<span>Direction de la Culture</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Hélène Caron</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Directrice Générale</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md font-body-sm text-body-sm">
+                  01/01/2024
+                </td>
+<td class="py-space-lg px-space-md">
+<span class="font-body-sm text-body-sm text-primary font-medium">31/12/2026</span>
+</td>
+<td class="py-space-lg px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                    Actif
+                  </span>
+</td>
+<td class="py-space-lg px-space-lg text-right">
+<button class="px-2.5 py-1 rounded-lg bg-surface-container text-error hover:bg-error hover:text-on-error font-label-sm text-label-sm transition-all" title="Révoquer l'autorisation" type="button">
+                    Révoquer
+                  </button>
+</td>
+</tr>
+<!-- Ligne 2 : Juliette Marchand -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-lg px-space-lg">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-bold text-label-md shrink-0">
+                      JM
+                    </div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Juliette Marchand</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Matricule RH : #11043-EF</span>
+</div>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<span class="inline-flex items-center px-2 py-1 rounded bg-surface-container-high text-primary font-label-sm text-label-sm">
+                    Affaires Scolaires &amp; Enfance
+                  </span>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex items-center gap-1 font-semibold text-secondary">
+<span class="material-symbols-outlined text-[18px]">arrow_right_alt</span>
+<span>Services Techniques &amp; Travaux</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">David Kalfon</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Directeur des Bâtiments</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md font-body-sm text-body-sm">
+                  15/09/2023
+                </td>
+<td class="py-space-lg px-space-md">
+<span class="font-body-sm text-body-sm text-primary font-medium">31/08/2025</span>
+</td>
+<td class="py-space-lg px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                    Actif
+                  </span>
+</td>
+<td class="py-space-lg px-space-lg text-right">
+<button class="px-2.5 py-1 rounded-lg bg-surface-container text-error hover:bg-error hover:text-on-error font-label-sm text-label-sm transition-all" type="button">
+                    Révoquer
+                  </button>
+</td>
+</tr>
+<!-- Ligne 3 : Paul N'Guyen -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-lg px-space-lg">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-surface-container-highest text-primary flex items-center justify-center font-bold text-label-md shrink-0">
+                      PN
+                    </div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Paul N'Guyen</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Matricule RH : #07198-SG</span>
+</div>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<span class="inline-flex items-center px-2 py-1 rounded bg-surface-container-high text-primary font-label-sm text-label-sm">
+                    DGS / Coordination Sécurité
+                  </span>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex items-center gap-1 font-semibold text-secondary">
+<span class="material-symbols-outlined text-[18px]">arrow_right_alt</span>
+<span>Police Municipale &amp; Prévention</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Jean-Marc Bertrand</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">DGS</span>
+</div>
+</td>
+<td class="py-space-lg px-space-md font-body-sm text-body-sm">
+                  01/02/2024
+                </td>
+<td class="py-space-lg px-space-md">
+<span class="font-body-sm text-body-sm text-on-surface-variant">31/12/2024</span>
+</td>
+<td class="py-space-lg px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                    Permanent
+                  </span>
+</td>
+<td class="py-space-lg px-space-lg text-right">
+<button class="px-2.5 py-1 rounded-lg bg-surface-container text-error hover:bg-error hover:text-on-error font-label-sm text-label-sm transition-all" type="button">
+                    Révoquer
+                  </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Journal d'audit des révocations récentes (Sécurité & Traçabilité DRO-10) -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between border-b border-surface-container-high pb-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-outline text-[20px]">security</span>
+<h3 class="font-headline-sm text-headline-sm text-primary font-bold">Journal d'audit des révocations &amp; modifications récentes</h3>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Registre immuable des accès délibératifs</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-md pt-space-xs">
+<!-- Audit Card 1 -->
+<div class="p-space-md rounded-lg bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-error font-bold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+                Révocation effective
+              </span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">14 mars 2024 • 11:42</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface mt-1">
+              Délégation accordée à <strong>Karim Zidane</strong> pour la Direction des Bâtiments révoquée suite à mobilité interne.
+            </p>
+<div class="text-on-surface-variant font-label-sm text-label-sm mt-space-xs">
+              Opérateur : Admin SCC (L. Guichard)
+            </div>
+</div>
+<!-- Audit Card 2 -->
+<div class="p-space-md rounded-lg bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                Prorogation d'échéance
+              </span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">10 mars 2024 • 09:15</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface mt-1">
+              Droit étendu étendu jusqu'au 31/12/2026 pour <strong>Marc Vasseur</strong> (Direction de la Culture).
+            </p>
+<div class="text-on-surface-variant font-label-sm text-label-sm mt-space-xs">
+              Opérateur : Hélène Caron (Visa D2)
+            </div>
+</div>
+<!-- Audit Card 3 -->
+<div class="p-space-md rounded-lg bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-tertiary-container font-bold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-tertiary-container"></span>
+                Attribution temporaire
+              </span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">02 mars 2024 • 16:30</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface mt-1">
+              Délégation temporaire accordée à <strong>Alain T.</strong> en suppléance pour Claire Moreau.
+            </p>
+<div class="text-on-surface-variant font-label-sm text-label-sm mt-space-xs">
+              Opérateur : P. Mercier (DGA)
+            </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- MODAL : ACCORDER UNE NOUVELLE AUTORISATION DE RÉDACTION (DRO-06) -->
+<div class="fixed inset-0 z-50 bg-primary/40 backdrop-blur-xs flex items-center justify-center p-space-md hidden" id="modalNewAuth">
+<div class="bg-surface-container-lowest w-full max-w-2xl rounded-xl shadow-xl overflow-hidden flex flex-col">
+<div class="p-space-lg bg-surface-container-low flex items-center justify-between border-b border-surface-container-high">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-secondary text-on-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">add_moderator</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-primary font-bold">Nouvelle autorisation de rédaction croisée</h3>
+</div>
+<button class="p-1 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" onclick="document.getElementById('modalNewAuth').classList.add('hidden')" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<div class="p-space-lg flex flex-col gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-primary font-semibold">Agent municipal bénéficiaire</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">person_search</span>
+<input class="w-full pl-10 pr-4 py-2 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:ring-1 focus:ring-secondary focus:outline-none" placeholder="Rechercher nom, prénom ou matricule RH..." type="text" value="Vasseur Marc (#08942-AJ)"/>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Direction d'origine détectée : Urbanisme et Cadre de Vie</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-primary font-semibold">Direction porteuse autorisée</label>
+<select class="w-full px-space-md py-2 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:ring-1 focus:ring-secondary focus:outline-none">
+<option>Direction des Affaires Culturelles</option>
+<option>Direction des Bâtiments &amp; Travaux</option>
+<option>Direction de la Jeunesse &amp; Sport</option>
+<option>Direction des Finances</option>
+</select>
+</div>
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-primary font-semibold">Autorité délégante (Directeur)</label>
+<select class="w-full px-space-md py-2 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:ring-1 focus:ring-secondary focus:outline-none">
+<option>Hélène Caron (Directrice Générale)</option>
+<option>David Kalfon (Directeur)</option>
+<option>Laurent Guichard (Directeur Juridique)</option>
+</select>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-primary font-semibold">Date de prise d'effet</label>
+<input class="w-full px-space-md py-2 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:ring-1 focus:ring-secondary focus:outline-none" type="date" value="2024-04-01"/>
+</div>
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-primary font-semibold">Date d'expiration légale</label>
+<input class="w-full px-space-md py-2 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:ring-1 focus:ring-secondary focus:outline-none" type="date" value="2026-12-31"/>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-primary font-semibold">Motif administratif de la dérogation (archivage obligatoire)</label>
+<textarea class="w-full px-space-md py-2 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm focus:ring-1 focus:ring-secondary focus:outline-none" placeholder="Préciser le cadre de travail inter-direction (ex: Projet ZAC Ivry Confluences - Volet patrimonial)..." rows="2"></textarea>
+</div>
+<div class="p-space-md rounded-lg bg-surface-container text-on-surface-variant font-body-sm text-body-sm flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[18px] text-secondary shrink-0">info</span>
+<span>Cette habilitation sera immédiatement tracée dans le registre d'audit interne conformément aux règles du contrôle de légalité dématérialisé.</span>
+</div>
+</div>
+<div class="p-space-lg bg-surface-container-low flex items-center justify-end gap-space-sm border-t border-surface-container-high">
+<button class="px-space-lg py-2 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-md text-label-md transition-all" onclick="document.getElementById('modalNewAuth').classList.add('hidden')" type="button">
+          Annuler
+        </button>
+<button class="px-space-lg py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md shadow-sm transition-all" onclick="document.getElementById('modalNewAuth').classList.add('hidden')" type="button">
+          Valider l'attribution
+        </button>
+</div>
+</div>
+</div>
+<script>
+    function switchTab(tabId) {
+      const tab1Content = document.getElementById('tab1Content');
+      const tab2Content = document.getElementById('tab2Content');
+      const tabBtn1 = document.getElementById('tabBtn1');
+      const tabBtn2 = document.getElementById('tabBtn2');
+
+      if (tabId === 'tab1') {
+        tab1Content.classList.remove('hidden');
+        tab2Content.classList.add('hidden');
+        
+        tabBtn1.classList.add('text-primary', 'border-primary');
+        tabBtn1.classList.remove('text-on-surface-variant', 'border-transparent');
+
+        tabBtn2.classList.remove('text-primary', 'border-primary');
+        tabBtn2.classList.add('text-on-surface-variant', 'border-transparent');
+      } else {
+        tab1Content.classList.add('hidden');
+        tab2Content.classList.remove('hidden');
+
+        tabBtn2.classList.add('text-primary', 'border-primary');
+        tabBtn2.classList.remove('text-on-surface-variant', 'border-transparent');
+
+        tabBtn1.classList.remove('text-primary', 'border-primary');
+        tabBtn1.classList.add('text-on-surface-variant', 'border-transparent');
+      }
+    }
+
+    function filterAgents() {
+      const input = document.getElementById('filterInput');
+      const filter = input.value.toLowerCase();
+      const table = document.getElementById('authTable');
+      const tr = table.getElementsByTagName('tr');
+
+      for (let i = 1; i < tr.length; i++) {
+        const td = tr[i].getElementsByTagName('td');
+        let txtValue = '';
+        for (let j = 0; j < td.length; j++) {
+          txtValue += td[j].textContent || td[j].innerText;
+        }
+        if (txtValue.toLowerCase().indexOf(filter) > -1) {
+          tr[i].style.display = '';
+        } else {
+          tr[i].style.display = 'none';
+        }
+      }
+    }
+  </script>
+</div></main><footer class="w-full bg-surface-container-lowest border-t border-outline-variant/40 py-space-lg text-on-surface-variant mt-auto"><div class="w-full px-space-lg flex flex-col md:flex-row items-center justify-between gap-space-md"><div class="flex items-center gap-space-sm text-center md:text-left"><span class="font-label-md text-label-md text-on-surface font-semibold">IvryDélib</span><span class="text-on-surface-variant font-body-sm text-body-sm">— Direction des Affaires Juridiques &amp; Commande Publique • Mairie d'Ivry-sur-Seine</span></div><div class="flex items-center gap-space-lg font-label-sm text-label-sm"><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Nomenclature ACTES</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Règlement du Conseil</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Sécurité &amp; Traçabilité</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support SCC</a></div></div></footer>
+</body></html>

@@ -1,0 +1,13 @@
+# secrets et environnement
+.env
+.env.*
+!.env.example
+# dépendances et sorties
+node_modules/
+coverage/
+dist/
+*.log
+# poste local
+.claude/
+design/*/node_modules/
+storage/

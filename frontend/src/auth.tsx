@@ -1,0 +1,42 @@
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
+import { api, getOrgId, getToken, setOrgId, setToken } from './api';
+
+export type Organisme = { id: number; code: string; nom: string; type: string; isDefault: boolean; roles: string[]; via?: string };
+export type Me = {
+  username: string; displayName: string; email: string | null; kind: string; isPlatformAdmin: boolean;
+  agent: null | { displayName?: string; direction?: { code: string; label: string }; service?: { code: string; label: string } | null; poste?: string };
+  organismes: Organisme[]; defaultOrganismeId: number | null; onboarding: { toShow: any[] };
+};
+type Ctx = {
+  me: Me | null; loading: boolean; org: Organisme | null; setOrg: (id: number) => void; isAdmin: boolean; isScc: boolean;
+  login: (u: string, p: string, local?: boolean) => Promise<void>; logout: () => Promise<void>; reload: () => Promise<void>;
+};
+const AuthCtx = createContext<Ctx>(null as any);
+export const useAuth = () => useContext(AuthCtx);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [me, setMe] = useState<Me | null>(null);
+  const [loading, setLoading] = useState(!!getToken());
+  const [orgId, setOrgIdState] = useState<number | null>(getOrgId());
+
+  const reload = useCallback(async () => {
+    if (!getToken()) { setMe(null); setLoading(false); return; }
+    try { setMe((await api.get('/me')).data); } catch { setMe(null); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  const org = me ? (me.organismes.find((o) => o.id === orgId) ?? me.organismes.find((o) => o.id === me.defaultOrganismeId) ?? me.organismes[0] ?? null) : null;
+  const roles = org?.roles ?? [];
+  const value: Ctx = {
+    me, loading, org, reload,
+    setOrg: (id) => { setOrgId(id); setOrgIdState(id); },
+    isAdmin: !!me?.isPlatformAdmin || roles.includes('org_admin'),
+    isScc: !!me?.isPlatformAdmin || roles.includes('org_admin') || roles.includes('scc'),
+    login: async (username, password, local) => {
+      const r = await api.post(local ? '/auth/login-local' : '/auth/login', { username, password });
+      setToken(r.data.token); setLoading(true); await reload();
+    },
+    logout: async () => { try { await api.post('/auth/logout'); } catch { /* déjà expirée */ } setToken(null); setMe(null); },
+  };
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}

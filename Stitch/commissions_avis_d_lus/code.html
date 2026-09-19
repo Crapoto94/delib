@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300..900;1,300..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"tertiary-fixed-dim":"#68dba9","on-error":"#ffffff","inverse-primary":"#b0c9e8","surface-dim":"#ccdbf4","secondary-fixed-dim":"#b4c5ff","surface-container-low":"#eff4ff","on-secondary":"#ffffff","on-primary":"#ffffff","on-tertiary-fixed-variant":"#005137","primary":"#001428","on-primary-container":"#7991af","primary-fixed-dim":"#b0c9e8","surface":"#f8f9ff","error-container":"#ffdad6","on-tertiary":"#ffffff","secondary":"#0051d5","outline":"#74777e","inverse-surface":"#233144","primary-container":"#0f2942","surface-container":"#e6eeff","on-surface-variant":"#43474d","tertiary":"#00170d","surface-container-highest":"#d5e3fd","tertiary-fixed":"#85f8c4","on-primary-fixed":"#011d35","surface-tint":"#49607c","surface-container-lowest":"#ffffff","on-tertiary-fixed":"#002114","surface-container-high":"#dde9ff","secondary-fixed":"#dbe1ff","background":"#f8f9ff","outline-variant":"#c3c6ce","on-background":"#0d1c2f","tertiary-container":"#002e1d","on-secondary-fixed":"#00174b","on-secondary-fixed-variant":"#003ea8","on-surface":"#0d1c2f","error":"#ba1a1a","on-primary-fixed-variant":"#314863","secondary-container":"#316bf3","on-secondary-container":"#fefcff","primary-fixed":"#d1e4ff","on-error-container":"#93000a","inverse-on-surface":"#ebf1ff","surface-bright":"#f8f9ff","surface-variant":"#d5e3fd","on-tertiary-container":"#21a173"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"gutter":"1rem","space-md":"1rem","space-xs":"0.25rem","margin-desktop":"2rem","space-lg":"1.5rem","gutter-desktop":"1.5rem","space-sm":"0.5rem","space-xl":"2.5rem","margin":"1rem"},"fontFamily":{"body-sm":["\"Source Sans 3\""],"headline-lg-mobile":["\"Source Sans 3\""],"headline-sm":["\"Source Sans 3\""],"body-lg":["\"Source Sans 3\""],"label-md":["\"Source Sans 3\""],"label-lg":["\"Source Sans 3\""],"headline-md":["\"Source Sans 3\""],"headline-xl-mobile":["\"Source Sans 3\""],"headline-lg":["\"Source Sans 3\""],"label-sm":["\"Source Sans 3\""],"body-md":["\"Source Sans 3\""],"headline-xl":["\"Source Sans 3\""]},"fontSize":{"body-sm":["12px",{"lineHeight":"18px","fontWeight":"400"}],"headline-lg-mobile":["20px",{"lineHeight":"28px","fontWeight":"700"}],"headline-sm":["16px",{"lineHeight":"24px","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"label-md":["12px",{"lineHeight":"16px","fontWeight":"600"}],"label-lg":["14px",{"lineHeight":"20px","fontWeight":"600"}],"headline-md":["19px",{"lineHeight":"26px","fontWeight":"600"}],"headline-xl-mobile":["26px",{"lineHeight":"34px","fontWeight":"700"}],"headline-lg":["24px",{"lineHeight":"32px","fontWeight":"700"}],"label-sm":["11px",{"lineHeight":"14px","fontWeight":"700"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"headline-xl":["32px",{"lineHeight":"40px","fontWeight":"700"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/40 shadow-[0_1px_4px_rgba(13,28,47,0.05)]"><div class="h-20 w-full px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg shrink-0"><div class="flex items-center gap-space-sm"><img alt="Logo IvryDélib" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U6Txvyk_obVczAHEyoJgRYmflszhnvftalfZ2FeHWE8HTAoMTH3QWtOWVtLE3pa9B8-5PuyzYPVNgvVcS1X53X-Ckp9UO_gcIoY8p0ulpvYt-94yYZlCNWSfNEtn9Pyc_DWSmBAEUiamsEBFgJBqnrQ7kyUpU9tuBD6Ljz75hTCzYWCqHwtS-nD9giQXtWC4xy3IcYBFkqOt-vkrEcjuTu7AhHn0lzzcfXq3OjL452"/><div class="flex flex-col pl-space-xs border-l border-outline-variant/50"><span class="font-headline-sm text-headline-sm text-primary leading-tight tracking-tight">IvryDélib</span><span class="font-label-sm text-label-sm text-on-surface-variant font-medium tracking-wide uppercase">Ville d'Ivry-sur-Seine</span></div></div><div class="h-7 w-[1px] bg-outline-variant/40 hidden lg:block"></div><nav class="hidden xl:flex items-center gap-space-xs" data-active-classes="bg-primary text-on-primary font-label-md rounded-lg shadow-sm"><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="tableau-de-bord" href="#">Tableau de bord</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="commissions-et-avis-elus" href="#">Commissions &amp; Avis</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="derogations-et-hors-delais-scc" href="#">Dérogations SCC</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="titulaires-et-droits-redaction" href="#">Titulaires &amp; Droits</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="regles-notifications-relances" href="#">Notifications &amp; Relances</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="gabarits-edition-referentiels" href="#">Gabarits &amp; Référentiels</a></nav></div><div class="flex-1 max-w-md hidden 2xl:block"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px] pointer-events-none">search</span><input class="w-full pl-10 pr-16 py-1.5 bg-surface-container-low border border-outline-variant/60 rounded-lg text-on-surface font-body-sm text-body-sm placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-1 focus:ring-secondary focus:border-secondary transition-all" placeholder="Rechercher actes, visas, titulaires..." type="text"/><div class="absolute right-2 flex items-center gap-1 pointer-events-none"><kbd class="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/60 rounded font-label-sm text-label-sm text-on-surface-variant shadow-xs">⌘K</kbd></div></div></div><div class="flex items-center gap-space-md shrink-0"><div class="flex items-center gap-1"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Aide réglementaire &amp; guides" type="button"><span class="material-symbols-outlined text-[22px]">help</span></button><button class="relative p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Notifications et alertes" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-4 h-4 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-tight flex items-center justify-center font-bold">4</span></button></div><div class="h-7 w-[1px] bg-outline-variant/40"></div><div class="relative flex items-center gap-space-sm pl-space-xs bg-surface-container-low/70 hover:bg-surface-container-high/60 px-space-sm py-1.5 rounded-lg border border-outline-variant/40 transition-colors"><div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-md text-label-md font-bold ring-1 ring-outline-variant/50">MV</div><div class="flex flex-col text-left"><div class="flex items-center gap-1"><select aria-label="Sélecteur d'opérateur actif" class="bg-transparent font-label-md text-label-md text-on-surface font-semibold focus:outline-none cursor-pointer pr-4"><option selected="" value="vasseur">Marc Vasseur</option><option value="moreau">Claire Moreau</option><option value="admin-scc">Admin SCC</option></select></div><span class="font-label-sm text-label-sm text-on-surface-variant">Direction Juridique / SCC</span></div></div></div></div></header><main class="w-full pt-20 bg-surface flex-1"><div class="flex flex-col w-full">
+<!-- Dynamic Notification / Legal Banner (CMN-04 Compliance) -->
+<section class="w-full bg-surface-container-high px-gutter-desktop py-space-sm shadow-xs">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-space-sm text-on-surface">
+<div class="flex items-center gap-space-sm min-w-0">
+<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-on-secondary shrink-0">
+<span class="material-symbols-outlined text-[16px]">verified</span>
+</span>
+<p class="font-body-sm text-body-sm text-on-surface">
+<strong class="font-semibold text-primary">Conformité MANIFEST (CMN-04) :</strong> Dossiers mis à disposition par arbitrage DGS le 02/10/2026. Clôture des avis programmée à J-5 avant l’envoi de la convocation du Conseil Municipal.
+        </p>
+</div>
+<div class="flex items-center gap-space-md shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">timer</span> Échéance : 10 Octobre 2026 à 12h00
+        </span>
+<span class="px-space-xs py-0.5 bg-tertiary-fixed text-on-tertiary-fixed rounded font-label-sm text-label-sm">
+          Circuit scellé
+        </span>
+</div>
+</div>
+</section>
+<!-- Session Context Header with Metric Strip -->
+<section class="w-full px-gutter-desktop py-space-lg">
+<div class="max-w-7xl mx-auto">
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-lg">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="px-space-sm py-0.5 rounded-full bg-primary-container text-on-primary-container font-label-sm text-label-sm tracking-wide uppercase">
+              Section 14 • MANIFEST CMN-01 à CMN-07
+            </span>
+<span class="px-space-sm py-0.5 rounded-full bg-surface-container text-secondary font-label-sm text-label-sm font-semibold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span> Séance en cours d'examen
+            </span>
+</div>
+<div class="flex items-baseline gap-space-md">
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">Commissions Préparatoires au Conseil Municipal</h1>
+<span class="font-body-md text-body-md text-on-surface-variant hidden sm:inline">• Conseil du 22 Octobre 2026</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+            Saisie et scellement des avis consultatifs des commissions municipales sectorielles. Tous les avis validés sont automatiquement injectés au cahier de séance de la télétransmission préfectorale ACTES.
+          </p>
+</div>
+<!-- Session Selector & Context Stats -->
+<div class="flex flex-wrap sm:flex-nowrap items-stretch gap-space-md shrink-0">
+<div class="bg-surface-container-low rounded-lg p-space-md flex flex-col justify-center min-w-[220px]">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider block mb-1" for="select-session">
+              Séance cible du Conseil
+            </label>
+<div class="relative">
+<select class="w-full bg-surface-container-lowest text-primary font-headline-sm text-headline-sm py-1.5 pl-space-sm pr-space-xl rounded-lg focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer shadow-xs" id="select-session">
+<option selected="" value="2026-10-22">Séance du 22 Octobre 2026</option>
+<option value="2026-11-26">Séance du 26 Novembre 2026</option>
+<option value="2026-12-17">Séance du 17 Décembre 2026 (Budget)</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2 text-on-surface-variant pointer-events-none text-[20px]">expand_more</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1.5">Convocations dématérialisées Hub DSI</span>
+</div>
+<!-- Total Progress Gauge Widget -->
+<div class="bg-surface-container-low rounded-lg p-space-md flex items-center gap-space-md min-w-[190px]">
+<div class="relative w-14 h-14 shrink-0 flex items-center justify-center">
+<svg class="w-14 h-14 -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-container-highest" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+<path class="text-secondary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="68, 100" stroke-linecap="round" stroke-width="3.5"></path>
+</svg>
+<span class="absolute font-headline-sm text-headline-sm text-primary font-bold">68%</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Global 4 commissions</span>
+<span class="font-headline-sm text-headline-sm text-primary">22 / 32 avis</span>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">10 en attente</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 4 Commissions Tab Navigation (CMN-01) -->
+<section class="w-full px-gutter-desktop">
+<div class="max-w-7xl mx-auto">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm" role="tablist">
+<!-- Tab 1: La Ville en transition (ACTIVE) -->
+<button aria-selected="true" class="bg-surface-container-lowest p-space-md rounded-xl shadow-md text-left transition-all duration-200 relative overflow-hidden group" role="tab">
+<div class="absolute top-0 left-0 right-0 h-1 bg-secondary"></div>
+<div class="flex items-center justify-between gap-space-xs mb-space-xs">
+<span class="font-label-sm text-label-sm font-bold text-secondary uppercase tracking-wider">Commission 1</span>
+<span class="px-space-xs py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-bold">5 / 8 avis</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-primary mb-1">La Ville en transition</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mb-space-sm">Aménagement, Climat, Voirie &amp; Énergie</p>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 62.5%"></div>
+</div>
+<div class="flex items-center justify-between mt-space-xs font-label-sm text-label-sm text-on-surface-variant">
+<span>Prés. Sarah O.</span>
+<span class="text-secondary font-semibold">62% traité</span>
+</div>
+</button>
+<!-- Tab 2: La Ville solidaire -->
+<button aria-selected="false" class="bg-surface-container-low hover:bg-surface-container p-space-md rounded-xl shadow-xs text-left transition-all duration-200 group" role="tab">
+<div class="flex items-center justify-between gap-space-xs mb-space-xs">
+<span class="font-label-sm text-label-sm font-bold text-on-surface-variant uppercase tracking-wider">Commission 2</span>
+<span class="px-space-xs py-0.5 rounded-full bg-surface-container-highest text-on-surface font-label-sm text-label-sm font-semibold">7 / 7 avis</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface mb-1">La Ville solidaire</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mb-space-sm">Action sociale, Santé, Logement &amp; Aînés</p>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-tertiary-container h-full rounded-full" style="width: 100%"></div>
+</div>
+<div class="flex items-center justify-between mt-space-xs font-label-sm text-label-sm text-on-surface-variant">
+<span>Prés. Karim B.</span>
+<span class="text-on-tertiary-container font-semibold">100% scellé</span>
+</div>
+</button>
+<!-- Tab 3: La Ville qui émancipe -->
+<button aria-selected="false" class="bg-surface-container-low hover:bg-surface-container p-space-md rounded-xl shadow-xs text-left transition-all duration-200 group" role="tab">
+<div class="flex items-center justify-between gap-space-xs mb-space-xs">
+<span class="font-label-sm text-label-sm font-bold text-on-surface-variant uppercase tracking-wider">Commission 3</span>
+<span class="px-space-xs py-0.5 rounded-full bg-surface-container-highest text-on-surface font-label-sm text-label-sm font-semibold">6 / 9 avis</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface mb-1">La Ville qui émancipe</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mb-space-sm">Éducation, Enfance, Culture &amp; Sports</p>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary-container h-full rounded-full" style="width: 66%"></div>
+</div>
+<div class="flex items-center justify-between mt-space-xs font-label-sm text-label-sm text-on-surface-variant">
+<span>Prés. Nadine V.</span>
+<span class="text-secondary font-semibold">66% traité</span>
+</div>
+</button>
+<!-- Tab 4: La Ville qui débat -->
+<button aria-selected="false" class="bg-surface-container-low hover:bg-surface-container p-space-md rounded-xl shadow-xs text-left transition-all duration-200 group" role="tab">
+<div class="flex items-center justify-between gap-space-xs mb-space-xs">
+<span class="font-label-sm text-label-sm font-bold text-on-surface-variant uppercase tracking-wider">Commission 4</span>
+<span class="px-space-xs py-0.5 rounded-full bg-surface-container-highest text-on-surface font-label-sm text-label-sm font-semibold">4 / 8 avis</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface mb-1">La Ville qui débat</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mb-space-sm">Finances, Démocratie locale &amp; RH</p>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary-container h-full rounded-full" style="width: 50%"></div>
+</div>
+<div class="flex items-center justify-between mt-space-xs font-label-sm text-label-sm text-on-surface-variant">
+<span>Prés. Alain T.</span>
+<span class="text-secondary font-semibold">50% traité</span>
+</div>
+</button>
+</div>
+</div>
+</section>
+<!-- Active Commission Workspace Hero Banner -->
+<section class="w-full px-gutter-desktop mt-space-lg">
+<div class="max-w-7xl mx-auto">
+<div class="bg-primary-container text-on-primary rounded-xl p-space-lg shadow-md relative overflow-hidden">
+<!-- Background subtle administrative visual pattern -->
+<div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
+<span class="material-symbols-outlined text-[240px]">account_balance</span>
+</div>
+<div class="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-space-lg">
+<div class="flex flex-col gap-space-xs max-w-3xl">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="px-space-sm py-0.5 rounded bg-surface-container-lowest/15 backdrop-blur font-label-sm text-label-sm uppercase tracking-wider text-primary-fixed">
+                Commission Thématique N°1
+              </span>
+<span class="flex items-center gap-1 font-body-sm text-body-sm text-surface-container-highest">
+<span class="material-symbols-outlined text-[16px]">location_on</span> Salle du Conseil Municipal - Hôtel de Ville
+              </span>
+<span class="flex items-center gap-1 font-body-sm text-body-sm text-surface-container-highest">
+<span class="material-symbols-outlined text-[16px]">calendar_today</span> Jeudi 8 Octobre 2026 à 18h30
+              </span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-white font-bold tracking-tight">
+              La Ville en transition — Aménagement, Climat, Voirie
+            </h2>
+<!-- Presence & Officers Metadata Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-md pt-space-xs mt-space-xs">
+<div class="flex items-center gap-space-sm bg-surface-container-lowest/10 backdrop-blur rounded-lg px-space-md py-space-sm">
+<span class="w-8 h-8 rounded-full bg-surface-container-lowest/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-white">person</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-surface-container-highest">Présidente de séance</span>
+<span class="font-label-lg text-label-lg text-white font-semibold">Sarah O. (Adjointe)</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm bg-surface-container-lowest/10 backdrop-blur rounded-lg px-space-md py-space-sm">
+<span class="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-white">edit_note</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-surface-container-highest">Secrétaire de séance (Saisie)</span>
+<span class="font-label-lg text-label-lg text-white font-semibold">Marc Vasseur (SCC)</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm bg-surface-container-lowest/10 backdrop-blur rounded-lg px-space-md py-space-sm">
+<span class="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center shrink-0 text-on-tertiary-container">
+<span class="material-symbols-outlined text-[18px]">how_to_reg</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-surface-container-highest">Quorum &amp; Présences (CMN-02)</span>
+<span class="font-label-lg text-label-lg text-white font-semibold">10 présents • 2 procurations (12/12)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Action Buttons for Secretary -->
+<div class="flex flex-col sm:flex-row xl:flex-col gap-space-sm shrink-0">
+<button class="px-space-md py-2.5 bg-surface-container-lowest text-primary hover:bg-surface-container font-label-md text-label-md rounded-lg shadow-sm flex items-center justify-center gap-space-sm transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">download_for_offline</span>
+              Dossier complet PDF (8 actes)
+            </button>
+<button class="px-space-md py-2.5 bg-surface-container-lowest/20 hover:bg-surface-container-lowest/30 text-white font-label-md text-label-md rounded-lg flex items-center justify-center gap-space-sm transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">badge</span>
+              Feuille d'émargement signée
+            </button>
+<button class="px-space-md py-2.5 bg-surface-container-lowest/20 hover:bg-surface-container-lowest/30 text-white font-label-md text-label-md rounded-lg flex items-center justify-center gap-space-sm transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">assignment_turned_in</span>
+              Exporter le relevé des avis
+            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Asymmetric Workspace Layout: Dossiers List (8 cols) + Inspector Pane (4 cols) -->
+<section class="w-full px-gutter-desktop py-space-lg mb-space-xl">
+<div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT: Dossiers Queue & Saisie Active Form (8 Cols) -->
+<div class="lg:col-span-8 flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<h3 class="font-headline-sm text-headline-sm text-primary">Ordre du Jour de la Commission</h3>
+<span class="px-2 py-0.5 bg-surface-container-high rounded text-on-surface-variant font-label-sm text-label-sm">4 dossiers affichés sur 8</span>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">info</span>
+            Règlement intérieur : 3 min max d'intervention par groupe politique
+          </div>
+</div>
+<!-- DOSSIER 1: SCELLED / AVIS RENDU -->
+<article class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm transition-all hover:shadow-md">
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-space-sm mb-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-sm py-0.5 bg-surface-container font-mono text-label-sm font-bold text-on-surface rounded">
+                Dossier #7855
+              </span>
+<span class="px-space-sm py-0.5 bg-surface-container text-on-surface-variant rounded font-label-sm text-label-sm">
+                Nomenclature 1.1 • Urbanisme
+              </span>
+<span class="px-space-xs py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">lock</span> Avis scellé
+              </span>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Rapporteur : </span>
+<strong class="font-label-sm text-label-sm text-primary">Julien D. (Adjoint Urbanisme)</strong>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-md text-primary font-bold mb-space-xs">
+            Cession d'emprise parcellaire publique Boulevard Gabriel Péri au profit du projet ZAC Ivry Confluences
+          </h4>
+<p class="font-body-md text-body-md text-on-surface-variant mb-space-md">
+            Régularisation foncière suite à enquête publique parcellaire. Avis d'évaluation des Domaines conforme émis le 14/08/2026.
+          </p>
+<!-- Rendered Vote Box -->
+<div class="bg-tertiary-container/10 rounded-lg p-space-md flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-on-tertiary-container text-[24px] shrink-0">check_circle</span>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-sm text-headline-sm text-on-tertiary-container font-bold">Avis Favorable à l'unanimité</span>
+<span class="px-space-xs py-0.5 bg-tertiary-fixed text-on-tertiary-fixed rounded font-label-sm text-label-sm">12 voix Pour / 0 Contre / 0 Abst.</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+<span class="font-semibold text-primary">Observation de la commission :</span> Accord complet sans réserve. Demande de présentation du phasage des plantations d'alignement lors de la plénière du Conseil.
+                </p>
+</div>
+</div>
+<div class="flex items-center gap-space-xs shrink-0 self-end md:self-center">
+<span class="px-space-sm py-1 bg-surface-container-lowest text-on-surface-variant rounded font-label-sm text-label-sm shadow-xs flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">auto_stories</span> Joint au cahier de séance
+              </span>
+</div>
+</div>
+</article>
+<!-- DOSSIER 2: SAISIE ACTIVE FORM (Subvention Théâtre des Quartiers) -->
+<article class="bg-surface-container-lowest rounded-xl p-space-lg shadow-md transition-all">
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-space-sm mb-space-sm">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="px-space-sm py-0.5 bg-secondary-fixed text-on-secondary-fixed font-mono text-label-sm font-bold rounded">
+                Dossier #7842
+              </span>
+<span class="px-space-sm py-0.5 bg-surface-container text-on-surface-variant rounded font-label-sm text-label-sm">
+                Nomenclature 7.1 • Culture &amp; Spectacle
+              </span>
+<span class="px-space-xs py-0.5 rounded bg-secondary text-on-secondary font-label-sm text-label-sm font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit</span> Saisie de l'avis en cours
+              </span>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Rapporteur : </span>
+<strong class="font-label-sm text-label-sm text-primary">Fabienne L. (Culture)</strong>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-md text-primary font-bold mb-space-xs">
+            Subvention pluriannuelle d'objectifs 2026-2029 au Théâtre des Quartiers d'Ivry - Centre Dramatique National
+          </h4>
+<p class="font-body-md text-body-md text-on-surface-variant mb-space-md">
+            Approbation de l'avenant triennal et versement du 1er acompte 2026 d'un montant de 480 000 €. Conditionnement des créneaux d'ateliers scolaires municipaux.
+          </p>
+<!-- Interactive Saisie Container for Commission Secretary -->
+<form class="bg-surface-container-low rounded-xl p-space-lg flex flex-col gap-space-md" onsubmit="event.preventDefault();">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">how_to_vote</span>
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Saisie de l'Avis de la Commission</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">
+                Opérateur certifié : <strong class="text-primary font-semibold">Marc Vasseur (SCC)</strong>
+</span>
+</div>
+<!-- Opinion Selector Radio Group -->
+<div>
+<label class="font-label-md text-label-md text-primary block mb-space-xs">
+                Type d'avis collégial de la Commission *
+              </label>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-space-sm">
+<label class="cursor-pointer">
+<input checked="" class="peer sr-only" name="avis-decision" type="radio" value="favorable"/>
+<div class="p-space-sm rounded-lg bg-surface-container-lowest peer-checked:bg-primary peer-checked:text-on-primary text-on-surface text-center transition-all shadow-xs flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-[20px] text-tertiary-fixed-dim peer-checked:text-tertiary-fixed">thumb_up</span>
+<span class="font-label-md text-label-md">Favorable</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="avis-decision" type="radio" value="reserve"/>
+<div class="p-space-sm rounded-lg bg-surface-container-lowest peer-checked:bg-primary peer-checked:text-on-primary text-on-surface text-center transition-all shadow-xs flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-[20px] text-secondary">info</span>
+<span class="font-label-md text-label-md">Sous réserve</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="avis-decision" type="radio" value="defavorable"/>
+<div class="p-space-sm rounded-lg bg-surface-container-lowest peer-checked:bg-primary peer-checked:text-on-primary text-on-surface text-center transition-all shadow-xs flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-[20px] text-error">thumb_down</span>
+<span class="font-label-md text-label-md">Défavorable</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="avis-decision" type="radio" value="sans-avis"/>
+<div class="p-space-sm rounded-lg bg-surface-container-lowest peer-checked:bg-primary peer-checked:text-on-primary text-on-surface text-center transition-all shadow-xs flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant">question_mark</span>
+<span class="font-label-md text-label-md">Sans avis</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Detailed Tally Counts -->
+<div>
+<label class="font-label-md text-label-md text-primary block mb-space-xs">
+                Décompte des suffrages exprimés (Total : 12 élus)
+              </label>
+<div class="grid grid-cols-3 gap-space-md">
+<div class="bg-surface-container-lowest p-space-sm rounded-lg shadow-xs flex flex-col">
+<div class="flex items-center justify-between text-on-tertiary-container mb-1">
+<span class="font-label-sm text-label-sm font-bold uppercase">Pour</span>
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div class="flex items-center justify-between">
+<input class="w-16 font-headline-md text-headline-md text-primary bg-surface-container-low px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-secondary font-bold text-center" max="12" min="0" type="number" value="10"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant">voix</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-space-sm rounded-lg shadow-xs flex flex-col">
+<div class="flex items-center justify-between text-error mb-1">
+<span class="font-label-sm text-label-sm font-bold uppercase">Contre</span>
+<span class="material-symbols-outlined text-[16px]">close</span>
+</div>
+<div class="flex items-center justify-between">
+<input class="w-16 font-headline-md text-headline-md text-primary bg-surface-container-low px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-secondary font-bold text-center" max="12" min="0" type="number" value="0"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant">voix</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-space-sm rounded-lg shadow-xs flex flex-col">
+<div class="flex items-center justify-between text-on-surface-variant mb-1">
+<span class="font-label-sm text-label-sm font-bold uppercase">Abstention</span>
+<span class="material-symbols-outlined text-[16px]">remove</span>
+</div>
+<div class="flex items-center justify-between">
+<input class="w-16 font-headline-md text-headline-md text-primary bg-surface-container-low px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-secondary font-bold text-center" max="12" min="0" type="number" value="2"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant">voix</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Secretary Observation / Reserve Statement -->
+<div>
+<div class="flex items-center justify-between mb-space-xs">
+<label class="font-label-md text-label-md text-primary" for="observations-secretaire">
+                  Observations et réserves consignées au procès-verbal *
+                </label>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Sera reproduit in extenso au Conseil</span>
+</div>
+<textarea class="w-full bg-surface-container-lowest p-space-md rounded-lg text-primary font-body-md text-body-md placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-secondary shadow-xs resize-none" id="observations-secretaire" placeholder="Exposer les arguments des groupes politiques ou les documents demandés avant la séance plénière..." rows="3">Avis favorable assorti d'une réserve expresse : le groupe d'opposition sollicite la transmission détaillée du bilan financier certifié 2025 et de la grille tarifaire solidaire avant la mise aux voix du 22 Octobre.</textarea>
+</div>
+<!-- Action Buttons Footer -->
+<div class="flex flex-col sm:flex-row items-center justify-between gap-space-md pt-space-xs">
+<div class="flex items-center gap-space-sm text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">fingerprint</span>
+                Horodatage cryptographique automatique lors de la validation
+              </div>
+<div class="flex items-center gap-space-sm w-full sm:w-auto">
+<button class="w-full sm:w-auto px-space-md py-2 bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-md text-label-md rounded-lg shadow-xs transition-colors" type="button">
+                  Brouillon temporaire
+                </button>
+<button class="w-full sm:w-auto px-space-lg py-2 bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md rounded-lg shadow-sm flex items-center justify-center gap-space-xs transition-all" type="submit">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+                  Enregistrer et sceller l'avis
+                </button>
+</div>
+</div>
+</form>
+</article>
+<!-- DOSSIER 3: EN DÉLIBÉRATION (Réseau de Chaleur Géothermie) -->
+<article class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-space-sm mb-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-sm py-0.5 bg-surface-container font-mono text-label-sm font-bold text-on-surface rounded">
+                Dossier #7860
+              </span>
+<span class="px-space-sm py-0.5 bg-surface-container text-on-surface-variant rounded font-label-sm text-label-sm">
+                Nomenclature 8.2 • Énergie &amp; Climat
+              </span>
+<span class="px-space-xs py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-semibold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span> Débat en cours
+              </span>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Rapporteur : </span>
+<strong class="font-label-sm text-label-sm text-primary">Sarah O. (Transition écologique)</strong>
+</div>
+</div>
+<h4 class="font-headline-md text-headline-md text-primary font-bold mb-space-xs">
+            Raccordement au réseau public de distribution de chaleur géothermique du quartier Ivry-Port
+          </h4>
+<p class="font-body-md text-body-md text-on-surface-variant mb-space-md">
+            Convention de délégation de service public n°DSP-2024-03. Approbation des tarifs de raccordement pour les bailleurs sociaux de la commune.
+          </p>
+<div class="flex items-center justify-between pt-space-xs">
+<div class="flex items-center gap-space-sm text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">hourglass_empty</span>
+              Exposé du rapporteur terminé • Échanges des commissaires en cours
+            </div>
+<button class="px-space-md py-1.5 bg-surface-container-low hover:bg-surface-container text-primary font-label-md text-label-md rounded-lg transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">edit_note</span> Ouvrir la saisie d'avis
+            </button>
+</div>
+</article>
+<!-- DOSSIER 4: EN ATTENTE D'EXAMEN (Placette Barbusse) -->
+<article class="bg-surface-container-low rounded-xl p-space-md shadow-xs opacity-85 hover:opacity-100 transition-opacity">
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-space-sm mb-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-sm py-0.5 bg-surface-container-highest font-mono text-label-sm font-bold text-on-surface rounded">
+                Dossier #7851
+              </span>
+<span class="px-space-sm py-0.5 bg-surface-container-highest text-on-surface-variant rounded font-label-sm text-label-sm">
+                Nomenclature 1.2 • Voirie communale
+              </span>
+<span class="px-space-xs py-0.5 rounded bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm font-semibold">
+                En attente d'examen
+              </span>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Rapporteur : </span>
+<strong class="font-label-sm text-label-sm text-primary">Romain M. (Espaces Publics)</strong>
+</div>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-primary font-bold mb-space-xs">
+            Réaménagement végétalisé et apaisement de circulation de la placette Henri Barbusse
+          </h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Plan pluriannuel d'investissement voirie 2026. Adoption du programme définitif et lancement de la consultation des entreprises de travaux publics.
+          </p>
+</article>
+</div>
+<!-- RIGHT: Inspector Panel - Quick Consultation & Manifest Metadata (4 Cols) -->
+<aside class="lg:col-span-4 flex flex-col gap-space-md sticky top-24">
+<!-- Inspector Card -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">quick_reference</span>
+<h3 class="font-headline-sm text-headline-sm text-primary font-bold">Fiche Synthétique du Dossier</h3>
+</div>
+<span class="font-mono text-label-sm font-bold text-secondary">#7842</span>
+</div>
+<!-- Project Thumbnail Graphic Representation -->
+<div class="w-full h-36 rounded-lg bg-surface-container-low overflow-hidden relative shadow-xs flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Intérieur architectural chaleureux du Théâtre des Quartiers d'Ivry avec une scène illuminée, structure industrielle rénovée en briques et charpente métallique typique de la Manufacture des Œillets, tons bleu nuit et bois naturel." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJm5YkJU8mCi-03fOrsQ5CKMyQHjYov6mN6AoW_WmWW4HOV7uEoLrD2phwTthFbEBUTYZ9zfTc-V3Qcw4FHCOG9g942BYOXF29-F7s80xu6SW-119GdtIauM2A3Z917cVmDgAI4ldTEmtD3aBZAeQAzIb31p2wK_X5giknrB8wIWvYuo2xywHNFbf1tlKkpnb81eNC7u4sFmNdeDZiZqWH6x_OJVHFO0rqX0ad-AAerC6hjKB-XVAD"/>
+<div class="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-transparent"></div>
+<div class="absolute bottom-2 left-3 right-3 text-white">
+<span class="font-label-sm text-label-sm tracking-wide uppercase text-secondary-fixed">Manufacture des Œillets</span>
+<p class="font-label-md text-label-md truncate">Théâtre des Quartiers d'Ivry - CDN</p>
+</div>
+</div>
+<!-- Synthetic Motifs Summary -->
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider block mb-1">
+              Extrait de l'Exposé des Motifs
+            </span>
+<div class="p-space-sm bg-surface-container-low rounded-lg font-body-sm text-body-sm text-on-surface-variant max-h-44 overflow-y-auto leading-relaxed">
+<p class="mb-space-xs">
+                « Le Théâtre des Quartiers d’Ivry joue un rôle structurant dans le rayonnement culturel de notre Ville et l’accès à la création dramatique contemporaine pour tous les Ivryens.
+              </p>
+<p>
+                La présente délibération formalise le renouvellement du soutien municipal pour la période 2026-2029 à hauteur de 480 000 € annuels, sous condition du maintien des tarifs préférentiels pour les jeunes Ivryens et de l'accueil de 15 résidences d'artistes locaux. »
+              </p>
+</div>
+</div>
+<!-- Legal Validation Badges (Manifest Verification) -->
+<div class="space-y-space-xs pt-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider block mb-1">
+              Visas préalables scellés (CMN-04)
+            </span>
+<div class="flex items-center justify-between p-space-xs bg-surface-container-low rounded text-on-surface font-label-sm text-label-sm">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-on-tertiary-container text-[16px]">check_circle</span>
+                Visa Financier &amp; Contrôle de Gestion
+              </span>
+<span class="font-mono text-on-surface-variant">01/10/2026</span>
+</div>
+<div class="flex items-center justify-between p-space-xs bg-surface-container-low rounded text-on-surface font-label-sm text-label-sm">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-on-tertiary-container text-[16px]">check_circle</span>
+                Visa Juridique &amp; Commande Publique
+              </span>
+<span class="font-mono text-on-surface-variant">02/10/2026</span>
+</div>
+<div class="flex items-center justify-between p-space-xs bg-surface-container-low rounded text-on-surface font-label-sm text-label-sm">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-on-tertiary-container text-[16px]">check_circle</span>
+                Arbitrage DGS (Déclenchement Commission)
+              </span>
+<span class="font-mono text-on-surface-variant">02/10/2026</span>
+</div>
+</div>
+<!-- Downloadable Associated Annexes -->
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider block mb-1">
+              Pièces Jointes &amp; Annexes Réglementaires (3)
+            </span>
+<div class="flex flex-col gap-1.5">
+<a class="flex items-center justify-between p-space-xs bg-surface-container-low hover:bg-surface-container rounded transition-colors group" href="#">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-secondary text-[18px]">picture_as_pdf</span>
+<span class="font-label-sm text-label-sm text-on-surface truncate group-hover:text-secondary">Projet_Convention_TQI_2026_2029.pdf</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant shrink-0">1.8 Mo</span>
+</a>
+<a class="flex items-center justify-between p-space-xs bg-surface-container-low hover:bg-surface-container rounded transition-colors group" href="#">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-secondary text-[18px]">picture_as_pdf</span>
+<span class="font-label-sm text-label-sm text-on-surface truncate group-hover:text-secondary">Bilan_Activite_2024_2025.pdf</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant shrink-0">3.4 Mo</span>
+</a>
+<a class="flex items-center justify-between p-space-xs bg-surface-container-low hover:bg-surface-container rounded transition-colors group" href="#">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-secondary text-[18px]">description</span>
+<span class="font-label-sm text-label-sm text-on-surface truncate group-hover:text-secondary">Avis_Commission_Culture_2023.pdf</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant shrink-0">410 Ko</span>
+</a>
+</div>
+</div>
+<!-- MANIFEST Rule Callout Box (CMN-07) -->
+<div class="bg-surface-container-low rounded-lg p-space-sm flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[18px] shrink-0 mt-0.5">gavel</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold text-primary">Gestion des suspensions (CMN-07)</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                En cas de refus d'avis ou de demande de report formulée par plus de 50% des commissaires, le dossier fait l'objet d'un renvoi immédiat au DGS pour arbitrage avant inscription au Conseil.
+              </p>
+</div>
+</div>
+</div>
+<!-- Municipal Officers Mini Directory in Session -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-headline-sm text-headline-sm text-primary">Commissaires Convoqués</span>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">12 élus membres</span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary-container text-[11px] font-bold flex items-center justify-center">SO</div>
+<span class="font-body-sm text-body-sm text-on-surface font-semibold">Sarah O.</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed px-1.5 py-0.2 rounded">Présente (Prés.)</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-surface-container text-on-surface text-[11px] font-bold flex items-center justify-center">JD</div>
+<span class="font-body-sm text-body-sm text-on-surface">Julien D.</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed px-1.5 py-0.2 rounded">Présent</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-surface-container text-on-surface text-[11px] font-bold flex items-center justify-center">EL</div>
+<span class="font-body-sm text-body-sm text-on-surface">Élodie L.</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed px-1.5 py-0.2 rounded">Présente</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-surface-container text-on-surface text-[11px] font-bold flex items-center justify-center">MC</div>
+<span class="font-body-sm text-body-sm text-on-surface">Michel C.</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed px-1.5 py-0.2 rounded">Procuration à Sarah O.</span>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</section>
+<!-- Sticky Operational Status Banner at Bottom for Secretariat Security -->
+<div class="sticky bottom-0 w-full z-40 bg-surface-container-lowest/95 backdrop-blur-md shadow-xl py-space-sm px-gutter-desktop">
+<div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs text-on-surface">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span>
+<span class="font-label-md text-label-md font-semibold">Registre de séance ouvert</span>
+</div>
+<span class="hidden md:inline font-body-sm text-body-sm text-on-surface-variant">
+          Dernière sauvegarde automatique il y a 42 secondes • Clé de session : <code class="font-mono text-label-sm">CMN-IVRY-2026-10-08-T1</code>
+</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md transition-colors flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[16px]">pause_circle</span>
+          Suspendre la séance
+        </button>
+<button class="px-space-md py-1.5 rounded-lg bg-secondary text-on-secondary hover:bg-secondary-container font-label-md text-label-md transition-colors flex items-center gap-1.5 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">done_all</span>
+          Clôturer la Commission &amp; Transmettre au Conseil
+        </button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  // Simple client-side micro-interactions for the deliberation tab switches and vote counts
+  document.addEventListener('DOMContentLoaded', () => {
+    // Dynamic recalculation feedback or tab active styling can be hooked here seamlessly
+    const tallyInputs = document.querySelectorAll('input[type="number"]');
+    tallyInputs.forEach(input => {
+      input.addEventListener('input', () => {
+        // Keeps total bounded to quorum (12)
+        let val = parseInt(input.value) || 0;
+        if (val < 0) input.value = 0;
+        if (val > 12) input.value = 12;
+      });
+    });
+  });
+</script></main><footer class="w-full bg-surface-container-lowest border-t border-outline-variant/40 py-space-lg text-on-surface-variant mt-auto"><div class="w-full px-space-lg flex flex-col md:flex-row items-center justify-between gap-space-md"><div class="flex items-center gap-space-sm text-center md:text-left"><span class="font-label-md text-label-md text-on-surface font-semibold">IvryDélib</span><span class="text-on-surface-variant font-body-sm text-body-sm">— Direction des Affaires Juridiques &amp; Commande Publique • Mairie d'Ivry-sur-Seine</span></div><div class="flex items-center gap-space-lg font-label-sm text-label-sm"><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Nomenclature ACTES</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Règlement du Conseil</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Sécurité &amp; Traçabilité</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support SCC</a></div></div></footer>
+</body></html>

@@ -1,0 +1,24 @@
+# IvryDélib — Docker Compose (guide « Nouvelle app Ville » §1).
+# Ports par défaut décidés : backend 3021, frontend 5160, espace élus (DMZ) 5161.
+# Les secrets viennent du fichier .env (jamais versionné) ; aucune URL ni clé n'est écrite ici.
+services:
+  backend:
+    build: { context: ./backend }
+    restart: always
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3021
+    ports: ["3021:3021"]
+
+  # Le frontend sera ajouté quand les maquettes Stitch seront livrées (décision D35) :
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     args:
+  #       - VITE_API_URL=${APP_API_URL:-http://localhost:3021}
+  #   restart: always
+  #   ports: ["5160:80"]
+  #   depends_on: [backend]
+  #
+  # L'espace élus (DMZ) sera un conteneur distinct sur le modèle de appdsi/parapheur-dmz, port 5161 (voir MANIFEST §18).

@@ -1,0 +1,62 @@
+import { ReactNode, useEffect, useState } from 'react';
+import { Loader2, X } from 'lucide-react';
+import { STATUTS } from './format';
+
+export const Spinner = () => <Loader2 className="h-4 w-4 animate-spin" aria-label="Chargement" />;
+export const Loading = () => <div className="flex items-center gap-2 p-6 text-mute"><Spinner /> Chargement…</div>;
+export const ErrorBox = ({ msg }: { msg: string | null }) => (msg ? <div role="alert" className="rounded border border-ko/30 bg-ko-bg px-3 py-2 text-ko">{msg}</div> : null);
+export const Empty = ({ children }: { children: ReactNode }) => <div className="p-8 text-center text-mute">{children}</div>;
+
+const TONES: Record<string, string> = {
+  gray: 'bg-slate-100 text-slate-700', blue: 'bg-action/10 text-action', ok: 'bg-ok-bg text-ok-text', warn: 'bg-warn-bg text-warn', ko: 'bg-ko-bg text-ko',
+};
+export const Badge = ({ tone = 'gray', children }: { tone?: keyof typeof TONES; children: ReactNode }) => <span className={`badge ${TONES[tone]}`}>{children}</span>;
+export const StatutBadge = ({ statut }: { statut: string }) => { const s = STATUTS[statut] ?? { label: statut, tone: 'gray' as const }; return <Badge tone={s.tone}>{s.label}</Badge>; };
+
+export function PageTitle({ title, sub, actions }: { title: string; sub?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div><h1>{title}</h1>{sub && <p className="mt-1 text-mute">{sub}</p>}</div>
+      <div className="flex gap-2">{actions}</div>
+    </div>
+  );
+}
+
+export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+  return <label className="block"><span className="label">{label}</span>{children}{hint && <span className="mt-1 block text-[12px] text-mute">{hint}</span>}</label>;
+}
+
+export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  useEffect(() => { const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-primary/40 p-4 pt-16" onMouseDown={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={`card w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} shadow-float`} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-line px-5 py-3"><h3>{title}</h3><button className="text-mute hover:text-ink" onClick={onClose} aria-label="Fermer"><X className="h-5 w-5" /></button></div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Petit hook de chargement : recharge quand `deps` change ; `reload()` force. */
+export function useLoad<T>(fn: () => Promise<T>, deps: any[]) {
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let live = true; setLoading(true);
+    fn().then((d) => { if (live) { setData(d); setError(null); } }).catch((e) => { if (live) setError(e?.response?.data?.error || e.message); }).finally(() => live && setLoading(false));
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, n]);
+  return { data, error, loading, reload: () => setN((x) => x + 1), setData };
+}
+
+/** Notification éphémère. */
+export function useToast() {
+  const [msg, setMsg] = useState<{ text: string; kind: 'ok' | 'ko' } | null>(null);
+  useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(null), 4500); return () => clearTimeout(t); }, [msg]);
+  const node = msg && <div role="status" className={`fixed bottom-20 right-6 z-50 rounded px-4 py-3 shadow-float ${msg.kind === 'ok' ? 'bg-ok text-white' : 'bg-ko text-white'}`}>{msg.text}</div>;
+  return { toast: (text: string, kind: 'ok' | 'ko' = 'ok') => setMsg({ text, kind }), node };
+}

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+
+<html lang="fr" style=""><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"on-surface":"#0d1c2f","secondary-fixed-dim":"#b4c5ff","error-container":"#ffdad6","surface-container-lowest":"#ffffff","secondary":"#0051d5","background":"#f8f9ff","on-secondary":"#ffffff","primary-fixed":"#d1e4ff","on-tertiary-fixed-variant":"#005137","surface-dim":"#ccdbf4","surface-variant":"#d5e3fd","tertiary-fixed":"#85f8c4","inverse-primary":"#b0c9e8","secondary-fixed":"#dbe1ff","on-background":"#0d1c2f","primary-container":"#0f2942","surface-container-low":"#eff4ff","on-secondary-fixed":"#00174b","on-secondary-fixed-variant":"#003ea8","on-primary-container":"#7991af","on-secondary-container":"#fefcff","primary":"#001428","secondary-container":"#316bf3","surface-container-high":"#dde9ff","surface-bright":"#f8f9ff","on-tertiary-container":"#21a173","inverse-surface":"#233144","inverse-on-surface":"#ebf1ff","error":"#ba1a1a","outline":"#74777e","tertiary-fixed-dim":"#68dba9","on-primary-fixed-variant":"#314863","surface-tint":"#49607c","surface-container":"#e6eeff","tertiary-container":"#002e1d","on-tertiary":"#ffffff","on-error":"#ffffff","on-primary-fixed":"#011d35","on-primary":"#ffffff","surface-container-highest":"#d5e3fd","on-tertiary-fixed":"#002114","outline-variant":"#c3c6ce","primary-fixed-dim":"#b0c9e8","surface":"#f8f9ff","on-error-container":"#93000a","tertiary":"#00170d","on-surface-variant":"#43474d"},borderRadius:{DEFAULT:"0.125rem",lg:"0.25rem",xl:"0.5rem",full:"0.75rem"},spacing:{"space-lg":"1.5rem",margin:"1rem",gutter:"1rem","space-xs":"0.25rem","margin-desktop":"2rem","space-xl":"2.5rem","space-md":"1rem","space-sm":"0.5rem","gutter-desktop":"1.5rem"},fontFamily:{"body-sm":["\"Source Sans 3\""],"headline-xl-mobile":["\"Source Sans 3\""],"headline-md":["\"Source Sans 3\""],"label-md":["\"Source Sans 3\""],"headline-lg-mobile":["\"Source Sans 3\""],"label-sm":["\"Source Sans 3\""],"body-md":["\"Source Sans 3\""],"headline-lg":["\"Source Sans 3\""],"label-lg":["\"Source Sans 3\""],"body-lg":["\"Source Sans 3\""],"headline-sm":["\"Source Sans 3\""],"headline-xl":["\"Source Sans 3\""]},fontSize:{"body-sm":["12px",{lineHeight:"18px",fontWeight:"400"}],"headline-xl-mobile":["26px",{lineHeight:"34px",fontWeight:"700"}],"headline-md":["19px",{lineHeight:"26px",fontWeight:"600"}],"label-md":["12px",{lineHeight:"16px",fontWeight:"600"}],"headline-lg-mobile":["20px",{lineHeight:"28px",fontWeight:"700"}],"label-sm":["11px",{lineHeight:"14px",fontWeight:"700"}],"body-md":["14px",{lineHeight:"22px",fontWeight:"400"}],"headline-lg":["24px",{lineHeight:"32px",fontWeight:"700"}],"label-lg":["14px",{lineHeight:"20px",fontWeight:"600"}],"body-lg":["16px",{lineHeight:"26px",fontWeight:"400"}],"headline-sm":["16px",{lineHeight:"24px",fontWeight:"600"}],"headline-xl":["32px",{lineHeight:"40px",fontWeight:"700"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest shadow-[0_1px_8px_rgba(15,23,42,0.04)]"><div class="h-16 w-full px-gutter-desktop flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md flex-shrink-0"><a class="flex items-center gap-space-sm" href="#"><img alt="Brand logo. - Primary color: #0f2942
+- Font: sourceSans3
+- Mode: light
+- Roundness: rounded-sm
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U6Txvyk_obVczAHEyoJgRYmflszhnvftalfZ2FeHWE8HTAoMTH3QWtOWVtLE3pa9B8-5PuyzYPVNgvVcS1X53X-Ckp9UO_gcIoY8p0ulpvYt-94yYZlCNWSfNEtn9Pyc_DWSmBAEUiamsEBFgJBqnrQ7kyUpU9tuBD6Ljz75hTCzYWCqHwtS-nD9giQXtWC4xy3IcYBFkqOt-vkrEcjuTu7AhHn0lzzcfXq3OjL452"/><span class="flex flex-col"><span class="font-headline-sm text-headline-sm text-primary tracking-tight leading-none">IvryDélib</span><span class="font-label-sm text-label-sm text-on-surface-variant leading-tight">Direction de l'Urbanisme</span></span></a></div><nav class="hidden sm:flex items-center gap-space-sm" data-active-classes="bg-primary-container text-on-primary-container font-headline-sm"><a class="flex items-center gap-space-xs px-space-md py-space-sm rounded text-on-surface-variant font-label-lg text-label-lg hover:bg-surface-container hover:text-on-surface transition-colors" data-path="mes-dossiers" href="#">Mes dossiers<span class="inline-flex items-center justify-center px-1.5 py-0.5 font-label-sm text-label-sm rounded-full bg-secondary text-on-secondary">2</span></a><a class="flex items-center gap-space-xs px-space-md py-space-sm rounded text-on-surface-variant font-label-lg text-label-lg hover:bg-surface-container hover:text-on-surface transition-colors" data-path="nouveau-dossier" href="#">Nouveau dossier (+)</a></nav><div class="flex items-center gap-space-md"><div class="relative hidden md:flex items-center"><span class="material-symbols-outlined absolute left-2.5 text-outline pointer-events-none text-[18px]">search</span><input class="w-60 lg:w-72 pl-8 pr-space-md py-1 bg-surface-container-low rounded font-body-sm text-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:bg-surface-container-lowest transition-colors" placeholder="Rechercher un acte, mot-clé..." type="search"/></div><button class="flex items-center justify-center w-8 h-8 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" title="Assistance et guide de rédaction" type="button"><span class="material-symbols-outlined text-[20px]">help</span></button><div class="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXtzPREXXjoa_2A7zIUGxL2xPmY-DiHjS0QHRysJzGWtiSzD3_GqDHl88Of85eZ8G_9pHyvb9IA9gZUpQD9ykhpXjeFAZ7EPezsn_EFrQKxXfjejy4F2tOix2bSwW4wuV0jxjnpNS8Sx5kfik1_OCiHG-zaNSu3MPH_5UIXigeK-DwnrS_d0uecvjNaQ5zYsDYyCu8Y2rh4JZZ7t27ltRCoShp6fNFi_rzXzGXfmA"/><div class="hidden xl:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface leading-tight">Marc Vasseur</span><span class="font-label-sm text-label-sm text-on-surface-variant leading-tight">Rédacteur Urbanisme</span></div></div></div></div></header><main class="w-full pt-16 bg-surface flex-1"><div class="flex flex-col w-full">
+<!-- BANDEAU D'ACCUEIL PERSONNALISÉ & RASSURANT -->
+<section class="w-full px-gutter-desktop py-space-xl">
+<div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-space-lg items-stretch justify-between">
+<!-- Carte principale de bienvenue -->
+<div class="flex-1 bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col justify-between relative overflow-hidden">
+<!-- Accent discret en fond -->
+<div class="absolute -right-16 -top-16 w-64 h-64 bg-primary-fixed/20 rounded-full blur-2xl pointer-events-none"></div>
+<div class="relative z-10 flex flex-col gap-space-md">
+<div class="flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs bg-surface-container px-space-sm py-1 rounded-full">
+<span class="w-2 h-2 rounded-full bg-on-tertiary-container animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Session active • Ville d'Ivry-sur-Seine</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">schedule</span>
+                Guide interactif • ~3 min
+              </span>
+<button class="font-label-sm text-label-sm text-outline hover:text-on-surface transition-colors flex items-center gap-1" id="toggle-optout">
+<span class="material-symbols-outlined text-[16px]">check_box_outline_blank</span>
+                Ne plus afficher au démarrage
+              </button>
+</div>
+</div>
+<div class="space-y-space-xs">
+<div class="flex items-center gap-space-sm">
+<h1 class="font-headline-xl text-headline-xl text-primary tracking-tight">
+                Bonjour Marc, bienvenue sur votre espace de rédaction.
+              </h1>
+</div>
+<div class="flex flex-wrap items-center gap-space-sm text-on-surface-variant">
+<span class="inline-flex items-center gap-1 bg-surface-container-high px-space-sm py-0.5 rounded font-label-md text-label-md text-primary">
+<span class="material-symbols-outlined text-[15px] text-secondary">domain</span>
+                Direction de l'Urbanisme
+              </span>
+<span class="text-outline">•</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Profil Agent Rédacteur synchronisé avec le SIRH municipal</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-space-md rounded-lg flex items-start gap-space-md">
+<div class="w-9 h-9 rounded-full bg-secondary-container text-on-secondary flex items-center justify-center flex-shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[20px]">verified_user</span>
+</div>
+<div class="flex-1 space-y-1">
+<p class="font-headline-sm text-headline-sm text-primary">
+                Zéro stress, zéro jargon : vous n'avez besoin d'aucune formation.
+              </p>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Que vous rédigiez 1 ou 10 délibérations par an, IvryDélib élimine les allers-retours de fichiers Word et les risques juridiques. Suivez ces 4 étapes simples : notre assistant et le circuit de visa prennent automatiquement le relais.
+              </p>
+</div>
+</div>
+</div>
+<!-- Raccourcis immédiats d'action -->
+<div class="relative z-10 pt-space-md flex flex-wrap items-center gap-space-md justify-between">
+<div class="flex flex-wrap items-center gap-space-sm">
+<button class="bg-primary text-on-primary hover:bg-primary-container font-label-lg text-label-lg px-space-md py-2.5 rounded shadow-sm flex items-center gap-space-xs transition-all">
+<span class="material-symbols-outlined text-[20px]">edit_square</span>
+              Commencer ma première délibération (+)
+            </button>
+<button class="bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-lg text-label-lg px-space-md py-2.5 rounded shadow-sm flex items-center gap-space-xs transition-colors">
+<span class="material-symbols-outlined text-[20px] text-secondary">visibility</span>
+              Consulter un exemple validé
+            </button>
+</div>
+<a class="font-label-md text-label-md text-secondary hover:underline flex items-center gap-1" href="#demo-section">
+            Voir la démo interactive
+            <span class="material-symbols-outlined text-[16px]">arrow_downward</span>
+</a>
+</div>
+</div>
+<!-- Badge agent & Rétro-planning actif (prochaine séance) -->
+<div class="w-full lg:w-80 bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col justify-between">
+<div class="space-y-space-md">
+<div class="flex items-center gap-space-md">
+<img alt="Portrait Marc Vasseur" class="w-14 h-14 rounded-full object-cover shadow-sm" data-alt="Close up portrait photograph of Marc Vasseur, a 32-year old warm smiling French municipal agent wearing a light blue dress shirt and navy jacket in a modern airy public administration office with soft daylight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBW09_9mLcA6csM_JRkYpbUT_Dy6Qwv04XYrJcWyQ4b4WSDgYRJTkxsaO0rDHczdHNx_pQr1Qry--kuZpiqk64S5ge54u-8QgF4LbTqIfxGKtnuskdSfEy_QGm0lJrZzU60hAxA6boDAW39uGNrVxGxa8iAf7s0bG5szLorfWui-Jd-M3WcyeQ96KdytfTG-l2U6kqdCl60WcDvM8Um2AnrlLawnDFzBZ-5Lv0FnD953hJ4yI3C4_9s"/>
+<div>
+<div class="font-headline-sm text-headline-sm text-primary">Marc Vasseur</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Rédacteur Urbanisme</div>
+<div class="font-body-sm text-body-sm text-outline">Poste 4812 • Bâtiment B</div>
+</div>
+</div>
+<div class="bg-surface-container-low p-space-md rounded-lg space-y-space-xs">
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span class="uppercase">Prochain Conseil Municipal</span>
+<span class="font-bold text-primary">27 Mars 2025</span>
+</div>
+<div class="flex items-center gap-2 text-primary font-headline-md text-headline-md">
+<span class="material-symbols-outlined text-secondary text-[24px]">event</span>
+              J-18 avant séance
+            </div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-2/3 rounded-full"></div>
+</div>
+<div class="flex justify-between items-center font-body-sm text-body-sm text-on-surface-variant pt-1">
+<span>Clôture dépôts service :</span>
+<span class="font-label-sm text-label-sm text-primary bg-surface-container px-1.5 py-0.5 rounded">J-5 (14 Mars)</span>
+</div>
+</div>
+</div>
+<div class="pt-space-md flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant">
+<span>Besoin d'un coup de main ?</span>
+<span class="font-label-md text-label-md text-secondary cursor-pointer hover:underline flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[16px]">call</span>
+            SCC ext. 4208
+          </span>
+</div>
+</div>
+</div>
+</section>
+<!-- PARCOURS EN 4 ÉTAPES CLAIRES -->
+<section class="w-full px-gutter-desktop pb-space-xl">
+<div class="max-w-7xl mx-auto space-y-space-lg">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-space-sm">
+<div>
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest font-bold">Méthode IvryDélib</span>
+<h2 class="font-headline-xl text-headline-xl text-primary tracking-tight">
+            Rédiger un acte officiel en 4 étapes fluides
+          </h2>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md">
+          Chaque étape a été pensée pour décharger l'agent des corvées de mise en page, de numérotation et de transmission.
+        </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Étape 1 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow group">
+<div class="space-y-space-sm">
+<div class="flex items-center justify-between">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary font-headline-md text-headline-md flex items-center justify-center">
+                01
+              </div>
+<span class="font-label-sm text-label-sm bg-surface-container text-secondary px-2 py-0.5 rounded-full font-bold">
+                1 min
+              </span>
+</div>
+<div class="space-y-1">
+<h3 class="font-headline-sm text-headline-sm text-primary group-hover:text-secondary transition-colors">
+                La Fiche Essentielle
+              </h3>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Seulement 4 questions directes. Votre nom et votre direction sont pré-remplis automatiquement.
+              </p>
+</div>
+<div class="bg-surface-container-low p-space-sm rounded-lg space-y-2 text-on-surface">
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">check_circle</span>
+<span>Titre simple et explicite</span>
+</div>
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">check_circle</span>
+<span>Matière ACTES déduite</span>
+</div>
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">check_circle</span>
+<span>Impact budgétaire (Oui / Non)</span>
+</div>
+</div>
+</div>
+<div class="pt-space-md font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">bolt</span>
+            Automatisation SIRH active
+          </div>
+</div>
+<!-- Étape 2 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow group">
+<div class="space-y-space-sm">
+<div class="flex items-center justify-between">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary font-headline-md text-headline-md flex items-center justify-center">
+                02
+              </div>
+<span class="font-label-sm text-label-sm bg-surface-container text-secondary px-2 py-0.5 rounded-full font-bold">
+                Rédaction
+              </span>
+</div>
+<div class="space-y-1">
+<h3 class="font-headline-sm text-headline-sm text-primary group-hover:text-secondary transition-colors">
+                Clarté &amp; Assistance IA
+              </h3>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Deux blocs clairs : l'exposé des motifs pour les citoyens, et la décision formelle pour le Conseil.
+              </p>
+</div>
+<div class="bg-surface-container-low p-space-sm rounded-lg space-y-2 text-on-surface">
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-on-tertiary-container text-[16px]">auto_awesome</span>
+<span>Vérification CGCT en temps réel</span>
+</div>
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">format_align_left</span>
+<span>Exposé en français limpide</span>
+</div>
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">attach_file</span>
+<span>Annexes PDF par glisser-déposer</span>
+</div>
+</div>
+</div>
+<div class="pt-space-md font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">spellcheck</span>
+            Correcteur juridique bienveillant
+          </div>
+</div>
+<!-- Étape 3 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow group">
+<div class="space-y-space-sm">
+<div class="flex items-center justify-between">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary font-headline-md text-headline-md flex items-center justify-center">
+                03
+              </div>
+<span class="font-label-sm text-label-sm bg-surface-container text-secondary px-2 py-0.5 rounded-full font-bold">
+                Jalons
+              </span>
+</div>
+<div class="space-y-1">
+<h3 class="font-headline-sm text-headline-sm text-primary group-hover:text-secondary transition-colors">
+                Délais &amp; Sérénité
+              </h3>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Des jalons visuels limpides. Vous savez toujours combien de jours il vous reste avant la séance.
+              </p>
+</div>
+<div class="bg-surface-container-low p-space-sm rounded-lg space-y-2 text-on-surface">
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">timer</span>
+<span>Compte à rebours J-3 de service</span>
+</div>
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">notifications_none</span>
+<span>Rappels sans spam par mail</span>
+</div>
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-on-tertiary-container text-[16px]">shield</span>
+<span>Garantie d'inscription au conseil</span>
+</div>
+</div>
+</div>
+<div class="pt-space-md font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">history_edu</span>
+            Respect légal des convocations
+          </div>
+</div>
+<!-- Étape 4 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow group">
+<div class="space-y-space-sm">
+<div class="flex items-center justify-between">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary font-headline-md text-headline-md flex items-center justify-center">
+                04
+              </div>
+<span class="font-label-sm text-label-sm bg-surface-container text-on-tertiary-container px-2 py-0.5 rounded-full font-bold">
+                1 Clic
+              </span>
+</div>
+<div class="space-y-1">
+<h3 class="font-headline-sm text-headline-sm text-primary group-hover:text-secondary transition-colors">
+                Le Circuit Transparent
+              </h3>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Un simple clic sur « Envoyer » transmet l'acte à votre responsable Claire Moreau.
+              </p>
+</div>
+<div class="bg-surface-container-low p-space-sm rounded-lg space-y-2 text-on-surface">
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">linear_scale</span>
+<span>Frise 8 étapes en direct</span>
+</div>
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">draw</span>
+<span>Suivi couleur des relectures</span>
+</div>
+<div class="flex items-center gap-2 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-[16px]">cloud_done</span>
+<span>Télétransmission Préfecture</span>
+</div>
+</div>
+</div>
+<div class="pt-space-md font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">lock</span>
+            Traçabilité intégrale garantie
+          </div>
+</div>
+</div>
+</div>
+</section>
+<!-- MODULE DE SIMULATION / DÉMO GUIDÉE INTERACTIVE -->
+<section class="w-full px-gutter-desktop pb-space-xl" id="demo-section">
+<div class="max-w-7xl mx-auto space-y-space-md">
+<div class="bg-surface-container-low rounded-xl p-space-lg shadow-sm space-y-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div>
+<span class="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-wider">Simulateur sans risque</span>
+<h3 class="font-headline-lg text-headline-lg text-primary tracking-tight">
+              Entraînez-vous sur un exemple interactif
+            </h3>
+<p class="font-body-md text-body-md text-on-surface-variant">
+              Survolez ou cliquez sur les pastilles numérotées pour découvrir les mécanismes de protection d'IvryDélib.
+            </p>
+</div>
+<div class="flex items-center gap-space-xs bg-surface-container-lowest px-space-sm py-1 rounded shadow-sm">
+<span class="material-symbols-outlined text-secondary text-[18px]">lightbulb</span>
+<span class="font-label-md text-label-md text-primary">Exemple : Cession de parcelle communale</span>
+</div>
+</div>
+<!-- Fausse fenêtre d'éditeur avec pastilles interactives -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md overflow-hidden relative">
+<!-- Barre d'outils factice -->
+<div class="bg-surface-container-high px-space-md py-space-sm flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-md">
+<span class="font-headline-sm text-headline-sm text-primary">Dossier URB-2025-042</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">Brouillon de service</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Dernière sauvegarde : Il y a 30 sec</span>
+<button class="bg-primary text-on-primary font-label-sm text-label-sm px-3 py-1 rounded">Sauvegardé auto</button>
+</div>
+</div>
+<!-- Contenu interactif avec hotspots -->
+<div class="p-space-lg grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+<!-- Colonne gauche : Éditeur -->
+<div class="lg:col-span-8 space-y-space-md relative">
+<!-- Zone 1 : Entête & RH -->
+<div class="relative bg-surface-container-low p-space-md rounded-lg space-y-space-xs group hover:bg-surface-container transition-colors">
+<button class="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center shadow-md animate-bounce">
+                  1
+                </button>
+<div class="flex flex-wrap items-center gap-space-md font-body-sm text-body-sm text-on-surface-variant">
+<span><strong>Direction :</strong> Urbanisme et Aménagement Durable</span>
+<span><strong>Rédacteur :</strong> Marc Vasseur</span>
+</div>
+<div class="font-headline-sm text-headline-sm text-primary">
+                  Cession d'une emprise parcellaire située rue Gabriel Péri au profit du bailleur social municipal
+                </div>
+</div>
+<!-- Zone 2 : Exposé des motifs & IA -->
+<div class="relative bg-surface-container-low p-space-md rounded-lg space-y-space-xs group hover:bg-surface-container transition-colors">
+<button class="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center shadow-md animate-bounce">
+                  2
+                </button>
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase text-secondary font-bold">1. Exposé des motifs (Clair et argumenté)</span>
+<span class="font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed/30 px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check</span>
+                    Conforme charte Ivry
+                  </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface">
+                  Dans le cadre du renouvellement urbain du quartier Centre-Ville, la Ville d’Ivry-sur-Seine souhaite faciliter la réalisation de 18 logements familiaux très sociaux. La présente délibération autorise le déclassement préalable et la vente à l’euro symbolique de la parcelle cadastrée AB 112.
+                </p>
+<div class="p-2 rounded bg-surface-container-lowest font-body-sm text-body-sm text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[16px]">info</span>
+<span>Suggestion IA intégrée : L’avis des Domaines (DGFIP) du 12 janvier 2025 est référencé avec succès.</span>
+</div>
+</div>
+<!-- Zone 3 : Pièces jointes PDF -->
+<div class="relative bg-surface-container-low p-space-md rounded-lg space-y-space-xs group hover:bg-surface-container transition-colors">
+<button class="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center shadow-md animate-bounce">
+                  3
+                </button>
+<div class="font-label-sm text-label-sm uppercase text-secondary font-bold">Pièces jointes obligatoires (PDF)</div>
+<div class="flex flex-wrap gap-space-sm pt-1">
+<div class="bg-surface-container-lowest px-space-sm py-1.5 rounded flex items-center gap-space-xs shadow-sm font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-error text-[18px]">picture_as_pdf</span>
+<span>plan_cadastral_AB112.pdf</span>
+<span class="text-outline">(1.2 Mo)</span>
+</div>
+<div class="bg-surface-container-lowest px-space-sm py-1.5 rounded flex items-center gap-space-xs shadow-sm font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-error text-[18px]">picture_as_pdf</span>
+<span>avis_domaines_dgfip.pdf</span>
+<span class="text-outline">(450 Ko)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Colonne droite : Circuit et action -->
+<div class="lg:col-span-4 bg-surface-container-low p-space-md rounded-lg flex flex-col justify-between space-y-space-md relative">
+<button class="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center shadow-md animate-bounce">
+                4
+              </button>
+<div class="space-y-space-md">
+<div>
+<span class="font-label-sm text-label-sm text-secondary uppercase font-bold">Circuit de visa prévu</span>
+<div class="font-headline-sm text-headline-sm text-primary">8 étapes prédéfinies</div>
+</div>
+<div class="space-y-space-sm">
+<div class="flex items-center gap-space-sm font-body-sm text-body-sm">
+<div class="w-6 h-6 rounded-full bg-on-tertiary-container text-on-tertiary flex items-center justify-center text-xs">✓</div>
+<span class="text-on-surface">1. Rédaction Urbanisme (Marc V.)</span>
+</div>
+<div class="flex items-center gap-space-sm font-body-sm text-body-sm">
+<div class="w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-xs">2</div>
+<span class="font-bold text-primary">Claire Moreau (Chef de Service)</span>
+</div>
+<div class="flex items-center gap-space-sm font-body-sm text-body-sm opacity-60">
+<div class="w-6 h-6 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center text-xs">3</div>
+<span>Direction des Affaires Juridiques</span>
+</div>
+<div class="flex items-center gap-space-sm font-body-sm text-body-sm opacity-60">
+<div class="w-6 h-6 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center text-xs">4</div>
+<span>Directeur Général des Services (DGS)</span>
+</div>
+<div class="flex items-center gap-space-sm font-body-sm text-body-sm opacity-60">
+<div class="w-6 h-6 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center text-xs">5</div>
+<span>Commission Aménagement &amp; Cadre de vie</span>
+</div>
+</div>
+</div>
+<!-- Bouton d'envoi simulé -->
+<div class="pt-space-md border-t border-surface-container">
+<button class="w-full bg-on-tertiary-container text-on-tertiary font-label-md text-label-md py-2.5 px-space-md rounded flex items-center justify-center gap-2 shadow hover:opacity-95">
+<span class="material-symbols-outlined text-[18px]">send</span>
+                  Envoyer à Claire Moreau
+                </button>
+<div class="text-center font-body-sm text-body-sm text-outline pt-1">
+                  Notification automatique par mail
+                </div>
+</div>
+</div>
+</div>
+<!-- Guide des légendes interactives -->
+<div class="bg-surface-container-high px-space-md py-space-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm font-body-sm text-body-sm">
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-xs font-bold">1</span>
+<span>Direction &amp; Rédacteur déduits</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-xs font-bold">2</span>
+<span>Suggestions IA bienveillantes</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-xs font-bold">3</span>
+<span>Vos annexes PDF en 1 glisser-déposer</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-xs font-bold">4</span>
+<span>Votre chef de service notifié en 1 clic</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- FOIRE AUX QUESTIONS DES AGENTS DÉBUTANTS -->
+<section class="w-full px-gutter-desktop pb-space-xl">
+<div class="max-w-7xl mx-auto space-y-space-lg">
+<div class="space-y-space-xs text-center max-w-2xl mx-auto">
+<span class="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-widest">Questions fréquentes</span>
+<h2 class="font-headline-xl text-headline-xl text-primary tracking-tight">
+          Tout ce que vous n'osez pas demander sur le circuit
+        </h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+          Des réponses concrètes rédigées par la Direction Juridique et le Secrétariat du Conseil Municipal.
+        </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- FAQ 1 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-space-xs">
+<div class="flex items-center gap-space-sm text-primary">
+<span class="material-symbols-outlined text-secondary text-[24px]">alarm_off</span>
+<h3 class="font-headline-sm text-headline-sm">Que faire si je dépasse la date limite de dépôt de mon service ?</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant pl-8">
+            Pas de panique ! L’outil vous propose automatiquement de solliciter une dérogation exceptionnelle auprès du Secrétariat du Conseil ou du DGS en 1 clic, en indiquant simplement le motif de l’urgence.
+          </p>
+</div>
+<!-- FAQ 2 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-space-xs">
+<div class="flex items-center gap-space-sm text-primary">
+<span class="material-symbols-outlined text-secondary text-[24px]">history</span>
+<h3 class="font-headline-sm text-headline-sm">Mon responsable ou le service juridique peuvent-ils modifier mon texte ?</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant pl-8">
+            Oui, mais en toute transparence. Chaque modification s'affiche avec le nom, la date et la couleur du relecteur (ex: vert pour les ajouts, rouge barré pour les suppressions). Rien n'est écrasé sans trace.
+          </p>
+</div>
+<!-- FAQ 3 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-space-xs">
+<div class="flex items-center gap-space-sm text-primary">
+<span class="material-symbols-outlined text-secondary text-[24px]">file_present</span>
+<h3 class="font-headline-sm text-headline-sm">Quels documents puis-je joindre à ma délibération ?</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant pl-8">
+            Uniquement des documents au format PDF (conventions signées, plans de masse, devis, budgets prévisionnels). L'application vérifie la lisibilité et fusionne le tout aux normes de la Préfecture du Val-de-Marne.
+          </p>
+</div>
+<!-- FAQ 4 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-space-xs">
+<div class="flex items-center gap-space-sm text-primary">
+<span class="material-symbols-outlined text-secondary text-[24px]">support_agent</span>
+<h3 class="font-headline-sm text-headline-sm">Qui puis-je appeler si j'ai un doute pendant ma rédaction ?</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant pl-8">
+            Le Secrétariat du Conseil des Collectivités (SCC) assure une permanence quotidienne au poste interne <strong>4208</strong> ou par messagerie instantanée via le bouton d’aide (?) en haut à droite.
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- BANDEAU DE DÉMARRAGE RAPIDE / APPEL À L'ACTION -->
+<section class="w-full px-gutter-desktop pb-space-xl">
+<div class="max-w-7xl mx-auto bg-primary-container text-on-primary rounded-xl p-space-lg shadow-md flex flex-col md:flex-row items-center justify-between gap-space-lg">
+<div class="space-y-space-xs text-center md:text-left">
+<h3 class="font-headline-lg text-headline-lg text-surface-bright tracking-tight">
+          Prêt à vous lancer, Marc ?
+        </h3>
+<p class="font-body-md text-body-md text-on-primary-container max-w-xl">
+          Créez votre premier projet en 2 minutes. Vous pourrez le sauvegarder en brouillon et y revenir quand vous le souhaitez.
+        </p>
+</div>
+<div class="flex flex-col sm:flex-row items-center gap-space-sm flex-shrink-0">
+<button class="w-full sm:w-auto bg-secondary text-on-secondary hover:bg-secondary-container font-label-lg text-label-lg px-space-lg py-3 rounded shadow-sm flex items-center justify-center gap-space-xs transition-colors">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+          Rédiger ma première délibération
+        </button>
+<button class="w-full sm:w-auto text-on-primary-container hover:text-surface-bright font-label-md text-label-md px-space-md py-3 rounded transition-colors">
+          Passer et aller au tableau de bord
+        </button>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Gestion de la case "Ne plus afficher au démarrage"
+  const toggleBtn = document.getElementById('toggle-optout');
+  if (toggleBtn) {
+    let checked = false;
+    toggleBtn.addEventListener('click', () => {
+      checked = !checked;
+      const icon = toggleBtn.querySelector('.material-symbols-outlined');
+      if (icon) {
+        icon.textContent = checked ? 'check_box' : 'check_box_outline_blank';
+        if (checked) {
+          toggleBtn.classList.add('text-secondary');
+          toggleBtn.classList.remove('text-outline');
+        } else {
+          toggleBtn.classList.remove('text-secondary');
+          toggleBtn.classList.add('text-outline');
+        }
+      }
+    });
+  }
+</script></main><footer class="w-full bg-surface-container-lowest shadow-[0_-1px_8px_rgba(15,23,42,0.02)] py-space-md"><div class="w-full px-gutter-desktop flex flex-col sm:flex-row items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm"><span class="font-label-md text-label-md text-primary">Ville d'Ivry-sur-Seine</span><span class="">•</span><span class="">Direction Générale des Services Juridiques et de la Démocratie Locale</span></div><div class="flex items-center gap-space-md font-body-sm text-body-sm text-on-surface-variant"><span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">Circuit Actes v2.4</span><span class="">Guide légal de rédaction</span><span class="">Support interne : ext. 4208</span></div></div></footer>
+</body></html>

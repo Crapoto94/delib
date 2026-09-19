@@ -1,0 +1,45 @@
+{
+  "name": "ivrydelib-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IvryDélib — gestion des délibérations (backend)",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "migrate": "node src/db/migrate-cli.js",
+    "spike": "node scripts/spike-lot0.js",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "check": "npm run lint && npm test"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "diff": "^9.0.0",
+    "dotenv": "^18.0.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "fast-xml-parser": "^5.11.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
+    "pdf-lib": "^1.17.1",
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "supertest": "^7.2.2",
+    "vitest": "^5.0.1"
+  }
+}

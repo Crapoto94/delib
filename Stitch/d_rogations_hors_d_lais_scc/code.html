@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300..900;1,300..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"tertiary-fixed-dim":"#68dba9","on-error":"#ffffff","inverse-primary":"#b0c9e8","surface-dim":"#ccdbf4","secondary-fixed-dim":"#b4c5ff","surface-container-low":"#eff4ff","on-secondary":"#ffffff","on-primary":"#ffffff","on-tertiary-fixed-variant":"#005137","primary":"#001428","on-primary-container":"#7991af","primary-fixed-dim":"#b0c9e8","surface":"#f8f9ff","error-container":"#ffdad6","on-tertiary":"#ffffff","secondary":"#0051d5","outline":"#74777e","inverse-surface":"#233144","primary-container":"#0f2942","surface-container":"#e6eeff","on-surface-variant":"#43474d","tertiary":"#00170d","surface-container-highest":"#d5e3fd","tertiary-fixed":"#85f8c4","on-primary-fixed":"#011d35","surface-tint":"#49607c","surface-container-lowest":"#ffffff","on-tertiary-fixed":"#002114","surface-container-high":"#dde9ff","secondary-fixed":"#dbe1ff","background":"#f8f9ff","outline-variant":"#c3c6ce","on-background":"#0d1c2f","tertiary-container":"#002e1d","on-secondary-fixed":"#00174b","on-secondary-fixed-variant":"#003ea8","on-surface":"#0d1c2f","error":"#ba1a1a","on-primary-fixed-variant":"#314863","secondary-container":"#316bf3","on-secondary-container":"#fefcff","primary-fixed":"#d1e4ff","on-error-container":"#93000a","inverse-on-surface":"#ebf1ff","surface-bright":"#f8f9ff","surface-variant":"#d5e3fd","on-tertiary-container":"#21a173"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"gutter":"1rem","space-md":"1rem","space-xs":"0.25rem","margin-desktop":"2rem","space-lg":"1.5rem","gutter-desktop":"1.5rem","space-sm":"0.5rem","space-xl":"2.5rem","margin":"1rem"},"fontFamily":{"body-sm":["\"Source Sans 3\""],"headline-lg-mobile":["\"Source Sans 3\""],"headline-sm":["\"Source Sans 3\""],"body-lg":["\"Source Sans 3\""],"label-md":["\"Source Sans 3\""],"label-lg":["\"Source Sans 3\""],"headline-md":["\"Source Sans 3\""],"headline-xl-mobile":["\"Source Sans 3\""],"headline-lg":["\"Source Sans 3\""],"label-sm":["\"Source Sans 3\""],"body-md":["\"Source Sans 3\""],"headline-xl":["\"Source Sans 3\""]},"fontSize":{"body-sm":["12px",{"lineHeight":"18px","fontWeight":"400"}],"headline-lg-mobile":["20px",{"lineHeight":"28px","fontWeight":"700"}],"headline-sm":["16px",{"lineHeight":"24px","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"label-md":["12px",{"lineHeight":"16px","fontWeight":"600"}],"label-lg":["14px",{"lineHeight":"20px","fontWeight":"600"}],"headline-md":["19px",{"lineHeight":"26px","fontWeight":"600"}],"headline-xl-mobile":["26px",{"lineHeight":"34px","fontWeight":"700"}],"headline-lg":["24px",{"lineHeight":"32px","fontWeight":"700"}],"label-sm":["11px",{"lineHeight":"14px","fontWeight":"700"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"headline-xl":["32px",{"lineHeight":"40px","fontWeight":"700"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/40 shadow-[0_1px_4px_rgba(13,28,47,0.05)]"><div class="h-20 w-full px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg shrink-0"><div class="flex items-center gap-space-sm"><img alt="Logo IvryDélib" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U6Txvyk_obVczAHEyoJgRYmflszhnvftalfZ2FeHWE8HTAoMTH3QWtOWVtLE3pa9B8-5PuyzYPVNgvVcS1X53X-Ckp9UO_gcIoY8p0ulpvYt-94yYZlCNWSfNEtn9Pyc_DWSmBAEUiamsEBFgJBqnrQ7kyUpU9tuBD6Ljz75hTCzYWCqHwtS-nD9giQXtWC4xy3IcYBFkqOt-vkrEcjuTu7AhHn0lzzcfXq3OjL452"/><div class="flex flex-col pl-space-xs border-l border-outline-variant/50"><span class="font-headline-sm text-headline-sm text-primary leading-tight tracking-tight">IvryDélib</span><span class="font-label-sm text-label-sm text-on-surface-variant font-medium tracking-wide uppercase">Ville d'Ivry-sur-Seine</span></div></div><div class="h-7 w-[1px] bg-outline-variant/40 hidden lg:block"></div><nav class="hidden xl:flex items-center gap-space-xs" data-active-classes="bg-primary text-on-primary font-label-md rounded-lg shadow-sm"><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="tableau-de-bord" href="#">Tableau de bord</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="commissions-et-avis-elus" href="#">Commissions &amp; Avis</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="derogations-et-hors-delais-scc" href="#">Dérogations SCC</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="titulaires-et-droits-redaction" href="#">Titulaires &amp; Droits</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="regles-notifications-relances" href="#">Notifications &amp; Relances</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="gabarits-edition-referentiels" href="#">Gabarits &amp; Référentiels</a></nav></div><div class="flex-1 max-w-md hidden 2xl:block"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px] pointer-events-none">search</span><input class="w-full pl-10 pr-16 py-1.5 bg-surface-container-low border border-outline-variant/60 rounded-lg text-on-surface font-body-sm text-body-sm placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-1 focus:ring-secondary focus:border-secondary transition-all" placeholder="Rechercher actes, visas, titulaires..." type="text"/><div class="absolute right-2 flex items-center gap-1 pointer-events-none"><kbd class="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/60 rounded font-label-sm text-label-sm text-on-surface-variant shadow-xs">⌘K</kbd></div></div></div><div class="flex items-center gap-space-md shrink-0"><div class="flex items-center gap-1"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Aide réglementaire &amp; guides" type="button"><span class="material-symbols-outlined text-[22px]">help</span></button><button class="relative p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Notifications et alertes" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-4 h-4 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-tight flex items-center justify-center font-bold">4</span></button></div><div class="h-7 w-[1px] bg-outline-variant/40"></div><div class="relative flex items-center gap-space-sm pl-space-xs bg-surface-container-low/70 hover:bg-surface-container-high/60 px-space-sm py-1.5 rounded-lg border border-outline-variant/40 transition-colors"><div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-md text-label-md font-bold ring-1 ring-outline-variant/50">MV</div><div class="flex flex-col text-left"><div class="flex items-center gap-1"><select aria-label="Sélecteur d'opérateur actif" class="bg-transparent font-label-md text-label-md text-on-surface font-semibold focus:outline-none cursor-pointer pr-4"><option selected="" value="vasseur">Marc Vasseur</option><option value="moreau">Claire Moreau</option><option value="admin-scc">Admin SCC</option></select></div><span class="font-label-sm text-label-sm text-on-surface-variant">Direction Juridique / SCC</span></div></div></div></div></header><main class="w-full pt-20 bg-surface flex-1"><div class="flex flex-col w-full">
+<div class="w-full px-space-lg py-space-md flex flex-col gap-space-lg">
+<!-- En-tête Institutionnel & Échéancier Réglementaire -->
+<div class="w-full bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col xl:flex-row xl:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-1 max-w-3xl">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="px-2.5 py-0.5 rounded-full bg-primary text-on-primary font-label-sm text-label-sm uppercase tracking-wider">Arbitrage Exclusif SCC • DGS</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">Procédure NOT-04 / NOT-08</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold">Jalon D8 • Q34</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight mt-1">
+          Console des Dérogations &amp; Actes Hors-Délais
+        </h1>
+<p class="font-body-md text-body-md text-on-surface-variant">
+          Séance du Conseil Municipal du <strong class="text-on-surface">22 Octobre 2026</strong> — Verrouillage automatique inter-services appliqué le 25 Septembre à 17h00. Tout versement complémentaire requiert un arbitrage d'autorité.
+        </p>
+</div>
+<!-- Compte à rebours légal & jauge convocation -->
+<div class="flex items-center gap-space-md bg-surface-container-low rounded-xl p-space-md shrink-0 shadow-xs">
+<div class="relative w-16 h-16 flex items-center justify-center">
+<svg class="w-16 h-16 -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-container-highest" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3"></path>
+<path class="text-secondary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="78, 100" stroke-linecap="round" stroke-width="3"></path>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="font-label-md text-label-md font-bold text-primary">J-27</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">Envoi Convocations</span>
+<span class="font-headline-sm text-headline-sm text-primary">09 Octobre 2026</span>
+<span class="font-body-sm text-body-sm text-secondary font-medium">Délai franc préfectoral respecté</span>
+</div>
+</div>
+</div>
+<!-- Métriques d'alerte en bandeau (Bento Metrics) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Carte Métrique 1: Délais respectés -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider">Actes Déposés à Temps</span>
+<span class="font-headline-xl text-headline-xl text-primary font-bold mt-1">42</span>
+<span class="font-body-sm text-body-sm text-on-tertiary-container font-medium flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">verified</span> Circuit normal validé
+          </span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-[26px]">fact_check</span>
+</div>
+</div>
+<!-- Carte Métrique 2: En arbitrage -->
+<div class="bg-primary text-on-primary p-space-md rounded-xl shadow-md flex items-center justify-between relative overflow-hidden">
+<div class="flex flex-col relative z-10">
+<span class="font-label-sm text-label-sm text-primary-fixed uppercase tracking-wider font-bold">Arbitrage SCC/DGS Requis</span>
+<span class="font-headline-xl text-headline-xl text-on-primary font-bold mt-1">4</span>
+<span class="font-body-sm text-body-sm text-secondary-fixed font-medium flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">hourglass_top</span> File prioritaire urgente
+          </span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-primary-container text-primary-fixed flex items-center justify-center relative z-10">
+<span class="material-symbols-outlined text-[26px]">gavel</span>
+</div>
+<div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-secondary/20 pointer-events-none"></div>
+</div>
+<!-- Carte Métrique 3: Bloqués / Dépassement brut -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider">Actes Bloqués Sans Demande</span>
+<span class="font-headline-xl text-headline-xl text-error font-bold mt-1">2</span>
+<span class="font-body-sm text-body-sm text-error font-medium flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">lock</span> Dépôt verrouillé à J-3
+          </span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-error-container text-on-error-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[26px]">lock_clock</span>
+</div>
+</div>
+<!-- Carte Métrique 4: Sous condition -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider">Accord Sous Condition</span>
+<span class="font-headline-xl text-headline-xl text-secondary font-bold mt-1">1</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant font-medium flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">schedule</span> Butoir 26/09 14h00
+          </span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-high text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[26px]">assignment_late</span>
+</div>
+</div>
+</div>
+<!-- Layout Asymétrique Principal : File prioritaire + Outil de Report -->
+<div class="grid grid-cols-1 2xl:grid-cols-12 gap-space-lg">
+<!-- Colonne Gauche : File Prioritaire des 4 Demandes en Attente (8 Cols) -->
+<section class="2xl:col-span-8 flex flex-col gap-space-md">
+<div class="flex items-center justify-between flex-wrap gap-2">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[24px]">pending_actions</span>
+<h2 class="font-headline-md text-headline-md text-primary">File Prioritaire d'Arbitrage (4)</h2>
+<span class="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-bold">Séance 22/10/2026</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Filtrer par degré d'urgence :</span>
+<button class="px-2.5 py-1 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm hover:bg-surface-container-highest transition-colors">Tous (4)</button>
+<button class="px-2.5 py-1 rounded bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-high transition-colors">Impératif Légal (1)</button>
+</div>
+</div>
+<!-- Dossier Prioritaire 1 : Marché Bio -->
+<article class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md transition-all">
+<div class="flex flex-col lg:flex-row lg:items-start justify-between gap-space-sm">
+<div class="flex items-start gap-space-md">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high text-primary flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[24px]">restaurant</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-label-md text-label-md font-bold text-secondary">ACTE #7889</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">Marchés Publics • 1.1</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm font-semibold">Direction Enfance &amp; Éducation</span>
+<span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm">Délai sollicité : +19h</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-primary mt-1">
+                  Avenant n°2 Marché de restauration scolaire approvisionnement 100% bio &amp; circuits courts
+                </h3>
+</div>
+</div>
+<div class="flex items-center gap-1.5 self-start shrink-0 px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-secondary animate-ping"></span>
+<span class="font-label-sm text-label-sm font-bold">En attente DGS</span>
+</div>
+</div>
+<!-- Détails de la requête -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md bg-surface-container-low p-space-md rounded-xl">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">Auteur de la requête</span>
+<span class="font-body-md text-body-md text-primary font-semibold mt-0.5">Marc Vasseur</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Pour Claire Moreau (Directrice Enfance)</span>
+</div>
+<div class="flex flex-col md:col-span-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">Motif invoqué &amp; Justification</span>
+<p class="font-body-md text-body-md text-primary mt-0.5 italic">
+                “Retard de transmission des bordereaux de prix actualisés du délégataire reçu ce matin (25/09 à 11h15). Analyse financière finalisée, visa DGST prêt.”
+              </p>
+</div>
+</div>
+<!-- Date limite demandée & Conséquence de report -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md py-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[18px] text-secondary">update</span>
+<span>Délai d'échéance proposé : <strong class="text-on-surface">Vendredi 26 Septembre 2026 à 12h00</strong></span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">info</span>
+<span>Impact commission : Commission Enfance prévue le 02/10</span>
+</div>
+</div>
+<!-- Barre d'Actions Décisionnelles SCC / DGS -->
+<div class="pt-space-sm flex flex-wrap items-center justify-between gap-space-md bg-surface-container-lowest">
+<div class="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+<span>Signature exécutoire requise</span>
+</div>
+<div class="flex items-center gap-space-sm flex-wrap">
+<button class="px-space-md py-2 rounded-lg bg-error-container text-on-error-container font-label-md text-label-md hover:bg-error hover:text-on-error transition-all flex items-center gap-1.5" onclick="arbitrerDossier('7889', 'refuse')" type="button">
+<span class="material-symbols-outlined text-[18px]">block</span>
+                Refuser le dépôt
+              </button>
+<button class="px-space-md py-2 rounded-lg bg-surface-container-high text-on-surface font-label-md text-label-md hover:bg-surface-container-highest transition-all flex items-center gap-1.5" onclick="arbitrerDossier('7889', 'report')" type="button">
+<span class="material-symbols-outlined text-[18px]">event_repeat</span>
+                Reporter au 17 Déc. 2026
+              </button>
+<button class="px-space-md py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-all shadow-sm flex items-center gap-1.5" onclick="ouvrirModalDerogation('7889', 'Avenant Marché Bio', '26/09/2026 12:00')" type="button">
+<span class="material-symbols-outlined text-[18px] text-tertiary-fixed">rule</span>
+                Accorder la Dérogation
+              </button>
+</div>
+</div>
+</article>
+<!-- Dossier Prioritaire 2 : Acquisition Foncier Urgente -->
+<article class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md transition-all">
+<div class="flex flex-col lg:flex-row lg:items-start justify-between gap-space-sm">
+<div class="flex items-start gap-space-md">
+<div class="w-12 h-12 rounded-xl bg-error-container text-on-error-container flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[24px]">priority_high</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-label-md text-label-md font-bold text-secondary">ACTE #7892</span>
+<span class="px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold uppercase">Urgence Juridique Avérée</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">Urbanisme • 3.2</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm font-semibold">Direction du Patrimoine &amp; Aménagement</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-primary mt-1">
+                  Acquisition foncière d'urgence — Droit de préemption urbain au 42-44 Rue Jean Le Galleu
+                </h3>
+</div>
+</div>
+<div class="flex items-center gap-1.5 self-start shrink-0 px-2.5 py-1 rounded-full bg-error-container text-on-error-container">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+<span class="font-label-sm text-label-sm font-bold">Forclusion à J+14</span>
+</div>
+</div>
+<!-- Détails de la requête -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md bg-surface-container-low p-space-md rounded-xl">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">Demandeur officiel</span>
+<span class="font-body-md text-body-md text-primary font-semibold mt-0.5">Sébastien Roche</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Direction du Foncier &amp; Urbanisme</span>
+</div>
+<div class="flex flex-col md:col-span-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">Fondement légal &amp; Conséquence de forclusion</span>
+<p class="font-body-md text-body-md text-primary mt-0.5">
+<strong class="text-error">Notification DIA reçue le 24 Juillet 2026.</strong> Exercice du droit de préemption urbain sous astreinte de délai strict de 2 mois (art. L. 213-2 CU). Un report au Conseil de Décembre emporterait renonciation tacite irrémédiable de la commune.
+              </p>
+</div>
+</div>
+<!-- Action d'urgence immédiate -->
+<div class="pt-space-sm flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex items-center gap-2 text-on-surface font-label-sm text-label-sm">
+<span class="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-bold">Avis Juridique SCC Favorable</span>
+<span class="text-on-surface-variant font-body-sm text-body-sm">Projet délibération finalisé à 95%</span>
+</div>
+<div class="flex items-center gap-space-sm flex-wrap">
+<button class="px-space-md py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-all shadow-sm flex items-center gap-1.5" onclick="ouvrirModalDerogation('7892', 'Préemption Foncier Rue Jean Le Galleu', '26/09/2026 18:00')" type="button">
+<span class="material-symbols-outlined text-[18px] text-tertiary-fixed">verified</span>
+                Accorder Dérogation Prioritaire Immédiate (DGS)
+              </button>
+</div>
+</div>
+</article>
+<!-- Dossiers 3 & 4 en format compact -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between gap-space-sm">
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-bold text-secondary">ACTE #7895</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">Finances</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-primary">Admission en non-valeur de créances eau</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+                Demande transmise par Trésorerie Principale. Absence d'incidence critique sur le vote du BP.
+              </p>
+</div>
+<div class="flex items-center justify-between pt-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Demandé : +48h</span>
+<button class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm hover:bg-surface-container-highest transition-colors" onclick="arbitrerDossier('7895', 'report')">
+                Reporter au 17/12
+              </button>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between gap-space-sm">
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-bold text-secondary">ACTE #7899</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">RH • Personnel</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-primary">Création de postes non-permanents saisonniers</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+                Avis CST rendu avec réserve le 24/09. En attente reformulation de l'article 3.
+              </p>
+</div>
+<div class="flex items-center justify-between pt-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Demandé : +24h</span>
+<button class="px-space-sm py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:bg-primary-container transition-colors" onclick="ouvrirModalDerogation('7899', 'Création Postes RH', '26/09/2026 17:00')">
+                Arbitrer
+              </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Colonne Droite : Actes Bloqués & Report Automatique vers 17 Décembre (4 Cols) -->
+<section class="2xl:col-span-4 flex flex-col gap-space-md">
+<!-- Panneau Traitement Actes Bloqués sans demande -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-error text-[22px]">gpp_bad</span>
+<h3 class="font-headline-sm text-headline-sm text-primary">Dépôts Verrouillés (2)</h3>
+</div>
+<span class="px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">Hors-Délais</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Dossiers dont la rédaction n'a pas été clôturée au 25/09 17h00 et sans sollicitation de dérogation formelle.
+          </p>
+<div class="flex flex-col gap-space-sm">
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm font-bold text-primary">ACTE #7870 • Voirie</span>
+<span class="text-error font-label-sm text-label-sm font-semibold">Bloqué (+16h)</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface line-clamp-1">Convention de voirie avec le Territoire Grand-Orly Seine Bièvre</span>
+<div class="flex items-center justify-end gap-2 pt-1">
+<button class="text-secondary font-label-sm text-label-sm hover:underline flex items-center gap-1" onclick="notifierDirection('Direction Voirie', '#7870')">
+<span class="material-symbols-outlined text-[14px]">send</span> Relancer rédacteur (NOT-08)
+                </button>
+</div>
+</div>
+<div class="bg-surface-container-low p-space-sm rounded-lg flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm font-bold text-primary">ACTE #7864 • Culture</span>
+<span class="text-error font-label-sm text-label-sm font-semibold">Bloqué (+22h)</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface line-clamp-1">Tarification des ateliers du Conservatoire de Musique</span>
+<div class="flex items-center justify-end gap-2 pt-1">
+<button class="text-secondary font-label-sm text-label-sm hover:underline flex items-center gap-1" onclick="notifierDirection('Direction Culture', '#7864')">
+<span class="material-symbols-outlined text-[14px]">send</span> Relancer rédacteur (NOT-08)
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Outil de Report Automatique vers Séance du 17 Décembre 2026 (Section 16 MANIFEST) -->
+<div class="bg-surface-container rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[22px]">save_as</span>
+<h3 class="font-headline-sm text-headline-sm text-primary">Report de Séance Automatisé</h3>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface">
+            Les actes ajournés sont re-basculés instantanément dans le calendrier du prochain Conseil avec <strong class="font-semibold text-primary">recalcul automatique des rétro-plannings de validation inter-services</strong>.
+          </p>
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-xs flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">Séance cible</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">Jeudi 17 Décembre 2026</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Nouveau verrouillage (J-3)</span>
+<span class="font-label-sm text-label-sm text-on-surface">20 Nov. 2026 • 17h00</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Passage en Commissions</span>
+<span class="font-label-sm text-label-sm text-on-surface">01 au 04 Décembre 2026</span>
+</div>
+</div>
+<!-- Liste des dossiers en attente de transfert direct -->
+<div class="flex flex-col gap-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">Dossiers rejetés / non recevables (2)</span>
+<div class="flex items-center justify-between p-2 rounded bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-primary">#7851 • Subvention Club Nautique</span>
+<span class="font-body-sm text-[11px] text-on-surface-variant">Refus DGS le 24/09 (Pièce comptable manquante)</span>
+</div>
+<input checked="" class="w-4 h-4 rounded text-secondary focus:ring-secondary cursor-pointer" type="checkbox"/>
+</div>
+<div class="flex items-center justify-between p-2 rounded bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-primary">#7858 • Cession véhicule de service</span>
+<span class="font-body-sm text-[11px] text-on-surface-variant">Hors délais sans dérogation sollicitée</span>
+</div>
+<input checked="" class="w-4 h-4 rounded text-secondary focus:ring-secondary cursor-pointer" type="checkbox"/>
+</div>
+</div>
+<button class="w-full py-2.5 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md hover:bg-secondary/90 transition-all shadow-sm flex items-center justify-center gap-2 mt-1" onclick="executerReportMasse()">
+<span class="material-symbols-outlined text-[18px]">forward</span>
+            Transférer vers Conseil du 17 Décembre 2026 (2)
+          </button>
+</div>
+</section>
+</div>
+<!-- Section 2 : Historique d'Arbitrage et Traçabilité Réglementaire (Audit NOT-06) -->
+<section class="w-full bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[22px]">history_edu</span>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary">Registre &amp; Traçabilité des Dérogations Accordées (Audit NOT-06)</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Horodatage certifié, motifs de dérogation et traçabilité nominative des arbitres habilités.</p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-[16px]">file_download</span>
+            Exporter PV d'Arbitrage SCC (PDF/A)
+          </button>
+</div>
+</div>
+<!-- Tableau Récapitulatif Traçable -->
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left font-body-md text-body-md">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-3 px-4 rounded-l-lg">ID Acte</th>
+<th class="py-3 px-4">Direction Requérante</th>
+<th class="py-3 px-4">Objet &amp; Motif Validé</th>
+<th class="py-3 px-4">Arbitre Habilité</th>
+<th class="py-3 px-4">Décision &amp; Date</th>
+<th class="py-3 px-4">Condition d'Échéance</th>
+<th class="py-3 px-4 rounded-r-lg text-right">Statut Clôture</th>
+</tr>
+</thead>
+<tbody class="divide-y-0 space-y-1">
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-3 px-4 font-bold text-secondary">#7879</td>
+<td class="py-3 px-4">
+<span class="font-semibold text-primary">Transition Écologique</span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Rapporteur : M. Belkacem</div>
+</td>
+<td class="py-3 px-4 max-w-xs">
+<span class="text-on-surface font-medium block truncate">Convention Ademe Réseau de Chaleur</span>
+<span class="text-on-surface-variant font-body-sm text-body-sm italic">Validation tardive du plan de subventions</span>
+</td>
+<td class="py-3 px-4">
+<span class="font-semibold text-primary">Jean-Marc B.</span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Directeur Général des Services (DGS)</div>
+</td>
+<td class="py-3 px-4">
+<span class="text-on-surface">25/09/2026 à 18h20</span>
+<div class="text-tertiary-container font-label-sm text-[11px] font-bold">AVIS FAVORABLE</div>
+</td>
+<td class="py-3 px-4">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm font-semibold">
+                  Jusqu'au 26/09 à 14h00
+                </span>
+</td>
+<td class="py-3 px-4 text-right">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> Accordée
+                </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-3 px-4 font-bold text-secondary">#7851</td>
+<td class="py-3 px-4">
+<span class="font-semibold text-primary">Sports &amp; Jeunesse</span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Rapporteur : Mme. Perez</div>
+</td>
+<td class="py-3 px-4 max-w-xs">
+<span class="text-on-surface font-medium block truncate">Subvention exceptionnelle Club Nautique</span>
+<span class="text-on-surface-variant font-body-sm text-body-sm italic">Pièces justificatives incomplètes au 24/09</span>
+</td>
+<td class="py-3 px-4">
+<span class="font-semibold text-primary">Françoise D.</span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Resp. Secrétariat Conseil (SCC)</div>
+</td>
+<td class="py-3 px-4">
+<span class="text-on-surface">24/09/2026 à 16h45</span>
+<div class="text-on-surface-variant font-label-sm text-[11px] font-bold">AJOURNEMENT SÉANCE</div>
+</td>
+<td class="py-3 px-4">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
+                  Séance du 17/12/2026
+                </span>
+</td>
+<td class="py-3 px-4 text-right">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm font-bold">
+<span class="material-symbols-outlined text-[14px]">schedule</span> Reportée
+                </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-3 px-4 font-bold text-secondary">#7840</td>
+<td class="py-3 px-4">
+<span class="font-semibold text-primary">Affaires Générales</span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Rapporteur : M. Laurent</div>
+</td>
+<td class="py-3 px-4 max-w-xs">
+<span class="text-on-surface font-medium block truncate">Protocole transactionnel d'assurance sinistre</span>
+<span class="text-on-surface-variant font-body-sm text-body-sm italic">Dossier non validé par le DGA Ressources</span>
+</td>
+<td class="py-3 px-4">
+<span class="font-semibold text-primary">Jean-Marc B.</span>
+<div class="text-on-surface-variant font-body-sm text-body-sm">Directeur Général des Services (DGS)</div>
+</td>
+<td class="py-3 px-4">
+<span class="text-on-surface">24/09/2026 à 11h10</span>
+<div class="text-error font-label-sm text-[11px] font-bold">REJET DÉFINITIF</div>
+</td>
+<td class="py-3 px-4">
+<span class="text-on-surface-variant font-body-sm text-body-sm">Sans objet (Irrégularité)</span>
+</td>
+<td class="py-3 px-4 text-right">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">
+<span class="material-symbols-outlined text-[14px]">cancel</span> Refusée
+                </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<!-- Modal Contextuelle : Octroi de Dérogation Formelle (Cachée par défaut) -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 backdrop-blur-xs hidden p-space-md" id="modal-derogation">
+<div class="bg-surface-container-lowest rounded-xl shadow-xl max-w-xl w-full p-space-lg flex flex-col gap-space-md">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-xs">
+<div class="w-10 h-10 rounded-lg bg-primary text-on-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[22px]">verified</span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-headline-sm text-headline-sm text-primary">Accorder une Dérogation Dérogatoire</h3>
+<span class="font-body-sm text-body-sm text-on-surface-variant" id="modal-dossier-titre">Dossier #7889</span>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded-lg" onclick="fermerModalDerogation()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<div class="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-1 text-on-surface font-body-sm text-body-sm">
+<span class="font-bold text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">gavel</span>
+          Engagement Réglementaire SCC / DGS
+        </span>
+<p class="text-on-surface-variant">
+          L'octroi d'une dérogation débloque immédiatement les droits d'édition pour la direction concernée et notifie les relecteurs obligatoires (Juridique &amp; Finances).
+        </p>
+</div>
+<div class="flex flex-col gap-space-sm">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold" for="date-butoir">
+          Nouvelle Date &amp; Heure Butoir Stricte
+        </label>
+<div class="flex items-center gap-2">
+<input class="flex-1 bg-surface-container-low rounded-lg p-2.5 text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-high" id="date-butoir" type="text" value="26/09/2026 à 12:00"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant px-2 py-1 rounded bg-surface-container">Max J-3 avant envoi</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-sm">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold" for="motif-decision">
+          Motivation Officielle de l'Autorité Arbitrale
+        </label>
+<textarea class="w-full bg-surface-container-low rounded-lg p-2.5 text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-high" id="motif-decision" placeholder="Précisez la justification d'intérêt public communal ou l'urgence financière..." rows="3"></textarea>
+</div>
+<div class="flex items-center justify-between pt-space-xs">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">fingerprint</span>
+<span>Signataire : Marc Vasseur (SCC)</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="px-space-md py-2 rounded-lg bg-surface-container-high text-on-surface font-label-md text-label-md hover:bg-surface-container-highest transition-colors" onclick="fermerModalDerogation()" type="button">
+            Annuler
+          </button>
+<button class="px-space-md py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm" onclick="validerDerogationModal()" type="button">
+<span class="material-symbols-outlined text-[18px] text-tertiary-fixed">done_all</span>
+            Signer &amp; Débloquer le dossier
+          </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Notification Toast Dynamique -->
+<div class="fixed bottom-6 right-6 z-50 bg-primary text-on-primary px-space-md py- space-sm rounded-xl shadow-xl flex items-center gap-3 transition-all transform translate-y-24 opacity-0 pointer-events-none" id="action-toast">
+<span class="material-symbols-outlined text-tertiary-fixed text-[22px]" id="toast-icon">check_circle</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-on-primary" id="toast-title">Arbitrage enregistré</span>
+<span class="font-body-sm text-body-sm text-on-primary-container" id="toast-msg">Le dossier #7889 a été mis à jour avec succès.</span>
+</div>
+</div>
+<!-- Script d'Interactions Métier SCC/DGS -->
+<script>
+    let dossierActif = null;
+
+    function ouvrirModalDerogation(idDossier, titre, echeanceDefaut) {
+      dossierActif = idDossier;
+      const modal = document.getElementById('modal-derogation');
+      const titreEl = document.getElementById('modal-dossier-titre');
+      const inputEcheance = document.getElementById('date-butoir');
+      
+      titreEl.textContent = `Acte #${idDossier} — ${titre}`;
+      inputEcheance.value = echeanceDefaut;
+      modal.classList.remove('hidden');
+    }
+
+    function fermerModalDerogation() {
+      const modal = document.getElementById('modal-derogation');
+      modal.classList.add('hidden');
+    }
+
+    function validerDerogationModal() {
+      fermerModalDerogation();
+      afficherToast('Dérogation Accordée', `Dossier #${dossierActif} : droits d'édition rouverts jusqu'au créneau butoir.`, 'verified');
+    }
+
+    function arbitrerDossier(idDossier, action) {
+      if (action === 'refuse') {
+        afficherToast('Dépôt Refusé', `Dossier #${idDossier} rejeté pour la séance du 22 Octobre 2026.`, 'cancel');
+      } else if (action === 'report') {
+        afficherToast('Ajournement Acté', `Dossier #${idDossier} transféré pour examen au Conseil du 17 Décembre 2026.`, 'event_repeat');
+      }
+    }
+
+    function executerReportMasse() {
+      afficherToast('Transferts Exécutés', '2 actes reportés à la séance du 17 Décembre 2026 avec jalons recalculés.', 'calendar_sync');
+    }
+
+    function notifierDirection(direction, idActe) {
+      afficherToast('Notification Émise (NOT-08)', `Alerte de forclusion et relance automatique adressées à la ${direction} (${idActe}).`, 'send');
+    }
+
+    function afficherToast(titre, message, icone) {
+      const toast = document.getElementById('action-toast');
+      const titleEl = document.getElementById('toast-title');
+      const msgEl = document.getElementById('toast-msg');
+      const iconEl = document.getElementById('toast-icon');
+
+      titleEl.textContent = titre;
+      msgEl.textContent = message;
+      iconEl.textContent = icone || 'check_circle';
+
+      toast.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 4000);
+    }
+  </script>
+</div></main><footer class="w-full bg-surface-container-lowest border-t border-outline-variant/40 py-space-lg text-on-surface-variant mt-auto"><div class="w-full px-space-lg flex flex-col md:flex-row items-center justify-between gap-space-md"><div class="flex items-center gap-space-sm text-center md:text-left"><span class="font-label-md text-label-md text-on-surface font-semibold">IvryDélib</span><span class="text-on-surface-variant font-body-sm text-body-sm">— Direction des Affaires Juridiques &amp; Commande Publique • Mairie d'Ivry-sur-Seine</span></div><div class="flex items-center gap-space-lg font-label-sm text-label-sm"><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Nomenclature ACTES</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Règlement du Conseil</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Sécurité &amp; Traçabilité</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support SCC</a></div></div></footer>
+</body></html>

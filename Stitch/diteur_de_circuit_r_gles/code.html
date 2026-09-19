@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300..900;1,300..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"inverse-surface":"#233144","on-error-container":"#93000a","on-error":"#ffffff","primary-fixed":"#d1e4ff","secondary-fixed-dim":"#b4c5ff","primary":"#001428","tertiary-container":"#002e1d","secondary":"#0051d5","tertiary-fixed":"#85f8c4","surface-dim":"#ccdbf4","outline":"#74777e","surface-container-lowest":"#ffffff","on-primary-fixed-variant":"#314863","surface-container-high":"#dde9ff","on-tertiary-fixed":"#002114","on-secondary":"#ffffff","surface-variant":"#d5e3fd","on-tertiary-container":"#21a173","secondary-container":"#316bf3","surface-tint":"#49607c","on-background":"#0d1c2f","surface":"#f8f9ff","surface-bright":"#f8f9ff","primary-fixed-dim":"#b0c9e8","on-primary":"#ffffff","on-primary-fixed":"#011d35","on-surface-variant":"#43474d","surface-container-low":"#eff4ff","primary-container":"#0f2942","secondary-fixed":"#dbe1ff","on-tertiary-fixed-variant":"#005137","tertiary-fixed-dim":"#68dba9","on-secondary-container":"#fefcff","surface-container":"#e6eeff","on-surface":"#0d1c2f","background":"#f8f9ff","inverse-on-surface":"#ebf1ff","tertiary":"#00170d","on-primary-container":"#7991af","outline-variant":"#c3c6ce","on-secondary-fixed":"#00174b","error-container":"#ffdad6","inverse-primary":"#b0c9e8","on-tertiary":"#ffffff","surface-container-highest":"#d5e3fd","error":"#ba1a1a","on-secondary-fixed-variant":"#003ea8"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"margin-desktop":"2rem","space-xs":"0.25rem","margin":"1rem","space-lg":"1.5rem","space-xl":"2.5rem","gutter":"1rem","gutter-desktop":"1.5rem","space-sm":"0.5rem","space-md":"1rem"},"fontFamily":{"headline-xl-mobile":["\"Source Sans 3\""],"label-sm":["\"Source Sans 3\""],"body-md":["\"Source Sans 3\""],"body-sm":["\"Source Sans 3\""],"body-lg":["\"Source Sans 3\""],"label-md":["\"Source Sans 3\""],"headline-lg-mobile":["\"Source Sans 3\""],"headline-sm":["\"Source Sans 3\""],"headline-lg":["\"Source Sans 3\""],"headline-md":["\"Source Sans 3\""],"headline-xl":["\"Source Sans 3\""],"label-lg":["\"Source Sans 3\""],"body":["\"Source Sans 3\""],"headline":["\"Source Sans 3\""]},"fontSize":{"headline-xl-mobile":["26px",{"lineHeight":"34px","fontWeight":"700"}],"label-sm":["11px",{"lineHeight":"14px","fontWeight":"700"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"body-sm":["12px",{"lineHeight":"18px","fontWeight":"400"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"label-md":["12px",{"lineHeight":"16px","fontWeight":"600"}],"headline-lg-mobile":["20px",{"lineHeight":"28px","fontWeight":"700"}],"headline-sm":["16px",{"lineHeight":"24px","fontWeight":"600"}],"headline-lg":["24px",{"lineHeight":"32px","fontWeight":"700"}],"headline-md":["19px",{"lineHeight":"26px","fontWeight":"600"}],"headline-xl":["32px",{"lineHeight":"40px","fontWeight":"700"}],"label-lg":["14px",{"lineHeight":"20px","fontWeight":"600"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/40 shadow-[0_1px_4px_rgba(13,28,47,0.05)]"><div class="h-20 w-full px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg shrink-0"><div class="flex items-center gap-space-sm"><img alt="Logo IvryDélib" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U6Txvyk_obVczAHEyoJgRYmflszhnvftalfZ2FeHWE8HTAoMTH3QWtOWVtLE3pa9B8-5PuyzYPVNgvVcS1X53X-Ckp9UO_gcIoY8p0ulpvYt-94yYZlCNWSfNEtn9Pyc_DWSmBAEUiamsEBFgJBqnrQ7kyUpU9tuBD6Ljz75hTCzYWCqHwtS-nD9giQXtWC4xy3IcYBFkqOt-vkrEcjuTu7AhHn0lzzcfXq3OjL452"/><div class="flex flex-col pl-space-xs border-l border-outline-variant/50"><span class="font-headline-sm text-headline-sm text-primary leading-tight tracking-tight">IvryDélib</span><span class="font-label-sm text-label-sm text-on-surface-variant font-medium tracking-wide uppercase">Ville d'Ivry-sur-Seine</span></div></div><div class="h-7 w-[1px] bg-outline-variant/40 hidden lg:block"></div><nav class="hidden xl:flex items-center gap-space-xs" data-active-classes="bg-primary text-on-primary font-label-md rounded-lg shadow-sm"><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all flex items-center gap-1.5" data-path="tableau-de-bord" href="#"><span>Tableau de bord</span><span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full font-label-sm text-label-sm bg-error-container text-on-error-container">3</span></a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="actes-et-dossiers" href="#">Actes &amp; Dossiers</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="seances-et-ordre-du-jour" href="#">Séances &amp; Ordre du jour</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="commissions-thematiques" href="#">Commissions</a><a aria-current="page" class="px-space-md py-space-sm transition-all bg-primary text-on-primary font-label-md rounded-lg shadow-sm" data-path="circuits-et-administration" href="#">Administration</a></nav></div><div class="flex-1 max-w-lg hidden md:block"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px] pointer-events-none">search</span><input class="w-full pl-10 pr-20 py-1.5 bg-surface-container-low border border-outline-variant/60 rounded-lg text-on-surface font-body-sm text-body-sm placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-1 focus:ring-secondary focus:border-secondary transition-all" placeholder="Recherche rapide d'actes, rapports, délibérations..." type="text"/><div class="absolute right-2 flex items-center gap-1 pointer-events-none"><kbd class="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/60 rounded font-label-sm text-label-sm text-on-surface-variant shadow-xs">⌘K</kbd></div></div></div><div class="flex items-center gap-space-md shrink-0"><div class="hidden 2xl:flex items-center gap-space-xs px-space-md py-1.5 bg-surface-container-low border border-outline-variant/50 rounded-full"><span class="w-2 h-2 rounded-full bg-error animate-pulse"></span><span class="font-label-sm text-label-sm text-on-surface font-medium">Prochain Conseil : 22 Oct. 2026</span><span class="font-label-sm text-label-sm text-on-surface-variant">•</span><span class="font-label-sm text-label-sm text-error font-semibold">Date limite rédaction : J-4</span></div><div class="flex items-center gap-1"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Guide réglementaire et assistance" type="button"><span class="material-symbols-outlined text-[22px]">help</span></button><button class="relative p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Notifications actives" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-4 h-4 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-tight flex items-center justify-center font-bold">4</span></button></div><div class="h-7 w-[1px] bg-outline-variant/40"></div><div class="flex items-center gap-space-sm pl-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant/60" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjrwtFCCSWX4-2F_rVBReceR-SIqIHjaBy_2Lea389JHlwGKXF9DqHBUld2lX_tHXVqz9esHRvz3SYRad4jmrN77fyXIHF8agUE4K3plLe_ysWuct8dwHmV_TthtV94q282Ag1dQYLBX_P3FP2LkEJpUUOIF6mMNnGVpOd0wI9VBQo_fumZe2N-vAveUX-rXHZcGgqEpWRVdH9K7C5ZWVgf1sEc1dz2hWB5vuR9S0"/><div class="hidden lg:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface leading-tight">Armelle Dubois</span><span class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-[170px]">Directrice Générale des Services</span></div><button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Changer de rôle" type="button"><span class="material-symbols-outlined text-[18px]">expand_more</span></button></div></div></div></header><main class="w-full pt-20 bg-surface flex-1"><div class="flex flex-col w-full">
+<!-- En-tête de Configuration du Circuit (CIR-60 / §8.2 / §19) -->
+<section class="w-full px-space-lg py-space-md bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex flex-col gap-1 min-w-0">
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary-container text-on-primary">
+<span class="material-symbols-outlined text-[20px]">account_tree</span>
+</span>
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">CIR-60 • Administration Système</span>
+<span class="font-label-sm text-label-sm text-outline">•</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Ville d'Ivry-sur-Seine</span>
+</div>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">Configuration des Circuits de Validation documentaire</h1>
+</div>
+<!-- Actions globales -->
+<div class="flex flex-wrap items-center gap-space-sm">
+<button class="px-space-md py-2 rounded-lg bg-surface-container-high text-on-surface font-label-md text-label-md hover:bg-surface-container-highest transition-all flex items-center gap-1.5 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">file_upload</span>
+<span>Importer gabarit</span>
+</button>
+<button class="px-space-md py-2 rounded-lg bg-surface-container-high text-on-surface font-label-md text-label-md hover:bg-surface-container-highest transition-all flex items-center gap-1.5 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">data_object</span>
+<span>Exporter JSON (CIR-67)</span>
+</button>
+<button class="px-space-md py-2 rounded-lg bg-surface-container text-primary font-label-md text-label-md hover:bg-secondary/10 transition-all flex items-center gap-1.5 shadow-sm" id="btn-toggle-sim" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">play_arrow</span>
+<span>Simuler le circuit (CIR-62)</span>
+</button>
+<button class="px-space-md py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>Créer version brouillon v3.3</span>
+</button>
+</div>
+</div>
+<!-- Barre d'état métadonnées et sélecteur de version -->
+<div class="flex flex-wrap items-center justify-between gap-space-md pt-2 border-t border-surface-container">
+<div class="flex flex-wrap items-center gap-space-md min-w-0">
+<!-- Sélecteur interactif -->
+<div class="flex items-center gap-2 bg-surface-container-low px-space-md py-1.5 rounded-lg shadow-xs">
+<span class="material-symbols-outlined text-secondary text-[18px]">verified</span>
+<select class="bg-transparent font-label-md text-label-md text-on-surface focus:outline-none cursor-pointer">
+<option selected="">Circuit Délibérations standard — Version 3.2 (Active en production • 8 étapes)</option>
+<option>Circuit Arrêtés réglementaires — Version 2.1 (Production)</option>
+<option>Circuit Décisions du Maire — Version 1.4 (Archive)</option>
+<option>Brouillon d'automne v3.3 — En cours de modélisation</option>
+</select>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-on-tertiary-container animate-pulse"></span>
+            En production
+          </span>
+<span>Publié le 01/09/2026 par Admin Système</span>
+<span>•</span>
+<span class="font-semibold text-primary">32 actes en cours sur cette version</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm text-on-surface-variant font-label-sm text-label-sm">
+<span class="inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-tertiary">lock</span>
+          Gouvernance stricte CIR-69
+        </span>
+<span>•</span>
+<span>Audit révision #REV-4821</span>
+</div>
+</div>
+</section>
+<!-- Zone de travail : Workflow Canvas (Gauche 68%) + Volet Inspecteur Latéral (Droite 32%) -->
+<div class="w-full flex-1 flex flex-col lg:flex-row min-h-[780px] bg-surface">
+<!-- Canvas visuel interactif du Workflow (CIR-60) -->
+<div class="flex-1 flex flex-col min-w-0 relative overflow-hidden bg-gradient-to-b from-surface via-surface-container-lowest to-surface">
+<!-- Barre d'outils du canvas -->
+<div class="h-12 px-space-lg flex items-center justify-between bg-surface-container-lowest/80 backdrop-blur-sm z-10">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px] text-secondary">hub</span>
+            Topologie séquentielle &amp; dérivations
+          </span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">8 étapes effectives</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm">1 bifurcation conditionnelle</span>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" title="Centrer la vue" type="button">
+<span class="material-symbols-outlined text-[18px]">filter_center_focus</span>
+</button>
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" title="Zoom avant" type="button">
+<span class="material-symbols-outlined text-[18px]">zoom_in</span>
+</button>
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" title="Zoom arrière" type="button">
+<span class="material-symbols-outlined text-[18px]">zoom_out</span>
+</button>
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" title="Vue plein écran" type="button">
+<span class="material-symbols-outlined text-[18px]">fullscreen</span>
+</button>
+</div>
+</div>
+<!-- Espace du schéma avec fond millimétré subtil -->
+<div class="flex-1 overflow-auto p-space-lg flex flex-col gap-space-lg relative" style="background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px); background-size: 24px 24px;">
+<!-- Légende flottante interactive CIR-11 / CIR-15 -->
+<div class="absolute top-space-md right-space-md z-20 bg-surface-container-lowest/90 backdrop-blur-md rounded-xl p-space-sm shadow-md flex flex-col gap-1 text-on-surface">
+<span class="font-label-sm text-label-sm font-semibold text-primary">Convention de flux</span>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
+<span class="w-4 h-0.5 bg-secondary inline-block"></span>
+<span>Transmission descendante (Validation)</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-error">
+<span class="w-4 h-0.5 border-b border-dashed border-error inline-block"></span>
+<span>Refus &amp; reprise CIR-11 (Directe ou rétroactive)</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm text-tertiary-container">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary-container inline-block"></span>
+<span>Règle conditionnelle CIR-15 (Incidence financière)</span>
+</div>
+</div>
+<!-- Séquence des Étapes du Circuit (CIR-60) -->
+<div class="max-w-4xl mx-auto w-full flex flex-col items-center gap-space-md pb-space-xl">
+<!-- BLOC 1 : Étape 0 - Rédaction initiale -->
+<div class="w-full group cursor-pointer transition-all duration-200" onclick="selectStep('step-0')">
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-space-md" id="step-card-0">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-md text-label-md font-bold shrink-0">
+                  0
+                </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">Rédaction initiale du projet d'acte</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm">Départ</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Rôle : Rédacteur • Agent de la direction porteuse</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">TRK-01 Création</span>
+<span class="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Connecteur vers Étape 1 -->
+<div class="flex flex-col items-center gap-0.5 my-[-4px]">
+<div class="w-0.5 h-6 bg-secondary"></div>
+<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">arrow_downward</span>
+<span>Envoyer au circuit</span>
+</div>
+<div class="w-0.5 h-6 bg-secondary"></div>
+</div>
+<!-- BLOC 2 : Étape 1 - Responsable intermédiaire -->
+<div class="w-full group cursor-pointer transition-all duration-200" onclick="selectStep('step-1')">
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-space-md" id="step-card-1">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center font-label-md text-label-md font-bold shrink-0">
+                  1
+                </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-on-surface font-bold">Responsable Intermédiaire</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm">Optionnelle CIR-16</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Règle dynamique : Sautée si aucun responsable configuré sur l'organigramme</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">SLA 48h</span>
+<span class="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Connecteur vers Étape 2 -->
+<div class="flex flex-col items-center gap-0.5 my-[-4px]">
+<div class="w-0.5 h-6 bg-secondary"></div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Valider visa</span>
+<div class="w-0.5 h-6 bg-secondary"></div>
+</div>
+<!-- BLOC 3 : Étape 2 - Chef de service -->
+<div class="w-full group cursor-pointer transition-all duration-200" onclick="selectStep('step-2')">
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-space-md" id="step-card-2">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-md text-label-md font-bold shrink-0">
+                  2
+                </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">Chef de Service Porteur</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-label-sm text-label-sm">Requis</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Résolveur : <code class="px-1 py-0.5 rounded bg-surface-container font-mono text-[11px]">responsable_service(service_porteur)</code></span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">SLA 3j ouvrés</span>
+<span class="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Connecteur vers Étape 3 -->
+<div class="flex flex-col items-center gap-0.5 my-[-4px]">
+<div class="w-0.5 h-6 bg-secondary"></div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Valider visa</span>
+<div class="w-0.5 h-6 bg-secondary"></div>
+</div>
+<!-- BLOC 4 : Étape 3 - Directeur de Direction (Actif par défaut dans l'inspecteur) -->
+<div class="w-full group cursor-pointer transition-all duration-200" onclick="selectStep('step-3')">
+<div class="w-full bg-surface-container-high rounded-xl p-space-md shadow-md ring-2 ring-secondary transition-all flex items-center justify-between gap-space-md" id="step-card-3">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-label-md text-label-md font-bold shrink-0 shadow-sm">
+                  3
+                </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">Directeur de la Direction Porteuse</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">Sélectionnée</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Résolveur : <code class="px-1 py-0.5 rounded bg-surface-container-lowest font-mono text-[11px]">directeur(direction_porteuse)</code> • Droit de modif. TRK-04 actif</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-on-secondary-fixed bg-secondary-fixed px-2 py-1 rounded">3j ouvrés • R1/R2</span>
+<span class="material-symbols-outlined text-secondary text-[24px]">edit_note</span>
+</div>
+</div>
+</div>
+<!-- BLOC BIFURCATION CONDITIONNELLE (CIR-15) -->
+<div class="w-full my-2 flex flex-col items-center">
+<!-- Nœud losange de décision -->
+<div class="flex flex-col items-center gap-1">
+<div class="w-0.5 h-6 bg-secondary"></div>
+<div class="px-space-md py-1.5 rounded-xl bg-inverse-surface text-inverse-on-surface shadow-md flex items-center gap-2 text-center">
+<span class="material-symbols-outlined text-[18px] text-tertiary-fixed">alt_route</span>
+<span class="font-label-md text-label-md font-semibold">Bifurcation CIR-15 : incidence_financiere == OUI ?</span>
+</div>
+</div>
+<!-- Deux branches : OUI et NON -->
+<div class="w-full grid grid-cols-1 md:grid-cols-2 gap-space-md mt-4 relative">
+<!-- Branche GAUCHE : OUI -> Service Financier -->
+<div class="flex flex-col items-center bg-surface-container-low rounded-xl p-space-sm gap-2">
+<div class="flex items-center gap-1 text-on-tertiary-container font-label-sm text-label-sm font-bold bg-tertiary-fixed px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[14px]">check</span>
+<span>OUI (Incidence financière)</span>
+</div>
+<!-- Bloc 5 : Étape 4 - Service Financier -->
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-sm shadow-sm hover:shadow-md transition-all cursor-pointer" onclick="selectStep('step-4')">
+<div class="flex items-center justify-between gap-2">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-7 h-7 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-label-sm text-label-sm font-bold">4</span>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-primary font-bold truncate">Service Financier</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Groupe 'Finances' • Contrôle budgétaire</span>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm shrink-0">SLA 5j</span>
+</div>
+</div>
+<div class="w-0.5 h-6 bg-secondary"></div>
+<span class="font-label-sm text-label-sm text-secondary">Visa financier apposé</span>
+</div>
+<!-- Branche DROITE : NON -> Dérivation directe vers Affaires Juridiques -->
+<div class="flex flex-col items-center justify-center bg-surface-container-low rounded-xl p-space-sm gap-2">
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm font-semibold bg-surface-container px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[14px]">close</span>
+<span>NON (Sans incidence)</span>
+</div>
+<div class="p-space-sm text-center flex flex-col items-center">
+<span class="material-symbols-outlined text-outline text-[22px]">turn_right</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant italic">Dérivation directe • Étape 4 sautée</span>
+</div>
+<div class="w-0.5 h-6 bg-outline-variant"></div>
+</div>
+</div>
+<div class="w-0.5 h-6 bg-secondary mt-2"></div>
+</div>
+<!-- BLOC 6 : Étape 5 - Service Juridique (Convergence) -->
+<div class="w-full group cursor-pointer transition-all duration-200" onclick="selectStep('step-5')">
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-space-md" id="step-card-5">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-md text-label-md font-bold shrink-0">
+                  5
+                </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">Direction des Affaires Juridiques &amp; Commande Publique</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-label-sm text-label-sm">Obligatoire</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Groupe : 'Affaires Juridiques' • Contrôle de légalité préalable</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">SLA 5j ouvrés</span>
+<span class="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Connecteur vers Étape 6 -->
+<div class="flex flex-col items-center gap-0.5 my-[-4px]">
+<div class="w-0.5 h-6 bg-secondary"></div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Conformité juridique certifiée</span>
+<div class="w-0.5 h-6 bg-secondary"></div>
+</div>
+<!-- BLOC 7 : Étape 6 - DGA de tutelle -->
+<div class="w-full group cursor-pointer transition-all duration-200" onclick="selectStep('step-6')">
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-space-md" id="step-card-6">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-md text-label-md font-bold shrink-0">
+                  6
+                </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">DGA de Tutelle du Pôle</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm">CIR-25</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Résolveur : <code class="px-1 py-0.5 rounded bg-surface-container font-mono text-[11px]">dga_de(direction)</code> selon table de rattachement pôles</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">SLA 3j ouvrés</span>
+<span class="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Connecteur vers Étape 7 -->
+<div class="flex flex-col items-center gap-0.5 my-[-4px]">
+<div class="w-0.5 h-6 bg-secondary"></div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Visa hiérarchique apposé</span>
+<div class="w-0.5 h-6 bg-secondary"></div>
+</div>
+<!-- BLOC 8 : Étape 7 - DGS Titulaire nommé -->
+<div class="w-full group cursor-pointer transition-all duration-200" onclick="selectStep('step-7')">
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-space-md" id="step-card-7">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-full bg-inverse-surface text-inverse-on-surface flex items-center justify-center font-label-md text-label-md font-bold shrink-0">
+                  7
+                </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">Direction Générale des Services (Arbitrage DGS)</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-label-sm text-label-sm">Arbitrage final</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Titulaire nommé : <strong>Armelle Dubois</strong> • Délégation automatique si congés</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">SLA 5j ouvrés</span>
+<span class="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Connecteur vers Étape 8 -->
+<div class="flex flex-col items-center gap-0.5 my-[-4px]">
+<div class="w-0.5 h-6 bg-secondary"></div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Dossier autorisé pour séance</span>
+<div class="w-0.5 h-6 bg-secondary"></div>
+</div>
+<!-- BLOC 9 : Étape 8 - SCC (Programmation de la séance) -->
+<div class="w-full group cursor-pointer transition-all duration-200" onclick="selectStep('step-8')">
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-space-md" id="step-card-8">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md text-label-md font-bold shrink-0">
+                  8
+                </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">SCC — Service Conseil et Contentieux</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm">Inscription ODJ</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Groupe 'SCC' • Clôture de l'ordre du jour &amp; transmission convocation élus</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed px-2 py-1 rounded font-semibold">Prêt pour vote</span>
+<span class="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Flèche de retour en pointillés (CIR-11 Refus & Reprise) -->
+<div class="w-full bg-error-container/40 rounded-xl p-space-md mt-4 flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<span class="w-8 h-8 rounded-full bg-error text-on-error flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">undo</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-error-container font-bold">Procédure de Refus / Demande de modification (CIR-11)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Routage de reprise direct sans repasser par les étapes déjà validées • Suivi TRK-07</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-1 rounded bg-surface-container-lowest text-on-surface-variant">Actif sur tout le cycle</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Volet Inspecteur Latéral d'Étape (Droite 32% - CIR-15 / CIR-21 / TRK-04) -->
+<aside class="w-full lg:w-[440px] bg-surface-container-lowest shadow-lg flex flex-col z-20">
+<!-- En-tête de l'inspecteur -->
+<div class="p-space-md bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[22px]">tune</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Inspecteur de propriétés</span>
+<span class="font-headline-sm text-headline-sm text-primary font-bold" id="inspector-step-title">Étape 3 : Directeur de Direction</span>
+</div>
+</div>
+<span class="px-2 py-1 rounded bg-secondary text-on-secondary font-label-sm text-label-sm font-semibold">Actif</span>
+</div>
+<!-- Corps défilant de configuration -->
+<div class="flex-1 overflow-y-auto p-space-md flex flex-col gap-space-lg">
+<!-- Bloc Identité de l'étape -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase">Nom affiché de l'étape</label>
+<input class="w-full px-space-md py-2 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container transition-all" type="text" value="Directeur de la Direction Porteuse"/>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Ce libellé apparaît sur le visa officiel et l'historique d'approbation.</span>
+</div>
+<!-- Résolveur de titulaire -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase">Résolveur de titulaire</label>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Organigramme dynamique</span>
+</div>
+<select class="w-full px-space-md py-2 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none cursor-pointer">
+<option>Supérieur hiérarchique direct</option>
+<option>Chef de service porteur</option>
+<option selected="">Directeur de direction porteuse (directeur(direction))</option>
+<option>DGA de tutelle</option>
+<option>Groupe prédéfini (ex: Finances, Juridique)</option>
+<option>Titulaire nominatif désigné</option>
+</select>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Résolution calculée selon la direction initiatrice de la délibération.</span>
+</div>
+<!-- Mode de validation & Quorum -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase">Mode de validation</label>
+<div class="grid grid-cols-3 gap-2">
+<button class="py-2 px-1 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm text-center font-semibold shadow-xs" type="button">
+              Un seul valide
+            </button>
+<button class="py-2 px-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm text-center hover:bg-surface-container-highest transition-colors" type="button">
+              Tous (Unanimité)
+            </button>
+<button class="py-2 px-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm text-center hover:bg-surface-container-highest transition-colors" type="button">
+              Quorum
+            </button>
+</div>
+</div>
+<!-- Options avancées & SLA -->
+<div class="flex flex-col gap-space-sm p-space-md bg-surface-container-low rounded-xl">
+<span class="font-label-sm text-label-sm font-bold text-primary uppercase">Délais &amp; Règles de franchissement</span>
+<!-- SLA en jours ouvrés -->
+<div class="flex items-center justify-between py-1">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Délai d'étape maximal (SLA)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Déclenche les alertes NOT-09 (J-2, J-1)</span>
+</div>
+<div class="flex items-center gap-1">
+<input class="w-14 px-2 py-1 rounded bg-surface-container-lowest text-center font-bold text-on-surface focus:outline-none" max="15" min="1" type="number" value="3"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant">jours</span>
+</div>
+</div>
+<!-- Droit de modification TRK-04 -->
+<div class="flex items-center justify-between py-1 border-t border-surface-container">
+<div class="flex flex-col pr-2">
+<span class="font-label-md text-label-md text-on-surface">Droit de modification du texte</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Active le versioning TRK-04 couleur dédiée</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<!-- Étape sautée si titulaire non pourvu CIR-21 -->
+<div class="flex items-center justify-between py-1 border-t border-surface-container">
+<div class="flex flex-col pr-2">
+<span class="font-label-md text-label-md text-on-surface">Sauter si titulaire non pourvu</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">CIR-21 : évite le blocage d'un dossier</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+</div>
+<!-- Constructeur de règles de bifurcation conditionnelle no-code (CIR-15) -->
+<div class="flex flex-col gap-space-xs p-space-md bg-secondary-fixed/30 rounded-xl">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[18px]">rule</span>
+<span class="font-label-md text-label-md font-bold text-on-secondary-fixed">Bifurcation No-Code (CIR-15)</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">1 règle active</span>
+</div>
+<div class="p-space-sm bg-surface-container-lowest rounded-lg shadow-xs flex flex-col gap-2 mt-1">
+<div class="flex items-center gap-1 font-mono text-[11px] text-primary">
+<span class="px-1.5 py-0.5 rounded bg-surface-container font-bold text-secondary">SI</span>
+<span>incidence_financiere == OUI</span>
+</div>
+<div class="flex items-center gap-1 font-mono text-[11px] text-on-tertiary-container">
+<span class="px-1.5 py-0.5 rounded bg-tertiary-container font-bold text-on-tertiary-container">ALORS</span>
+<span>Router vers 'Étape 4 — Finances' (SLA 5j)</span>
+</div>
+<div class="flex items-center gap-1 font-mono text-[11px] text-on-surface-variant">
+<span class="px-1.5 py-0.5 rounded bg-surface-container font-bold">SINON</span>
+<span>Dérivation vers 'Étape 5 — Juridique'</span>
+</div>
+</div>
+<button class="mt-1 text-left font-label-sm text-label-sm text-secondary hover:underline flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Ajouter une condition sur montant (&gt; 200 000 €)</span>
+</button>
+</div>
+<!-- Règles de Refus & Reprise (CIR-11 / TRK-07) -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase">Règles de Refus &amp; Reprise (CIR-11)</label>
+<div class="space-y-2">
+<div class="flex items-start gap-2 p-2 rounded-lg bg-surface-container-low">
+<input checked="" class="mt-1 text-secondary" id="ret-prev" name="refusal-target" type="radio"/>
+<label class="flex flex-col cursor-pointer" for="ret-prev">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Étape précédente réelle OU Rédacteur initial</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">L'approbateur choisit la cible du renvoi lors de la saisie de son motif.</span>
+</label>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-high/60 flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface font-medium">Reprise directe à l'étape ayant refusé</span>
+<span class="px-2 py-0.5 rounded bg-primary text-on-primary font-label-sm text-label-sm">TRK-07 Actif</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Pied de l'inspecteur : Actions sauvegarder / annuler -->
+<div class="p-space-md bg-surface-container-low flex items-center justify-between gap-space-sm border-t border-surface-container">
+<button class="px-space-md py-2 rounded-lg bg-surface-container-highest text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors" type="button">
+          Réinitialiser
+        </button>
+<button class="px-space-md py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-all shadow-sm flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[18px]">save</span>
+<span>Enregistrer les paramètres</span>
+</button>
+</div>
+</aside>
+</div>
+<!-- Console de Simulation en temps réel CIR-62 (Volet Inférieur déployable) -->
+<section class="w-full bg-surface-container-lowest shadow-md border-t-2 border-secondary transition-all" id="simulation-console">
+<div class="px-space-lg py-space-sm bg-surface-container-high flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">terminal</span>
+</span>
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Console de Simulation de Routage Dynamique (CIR-62)</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-tertiary-container text-on-tertiary-container font-semibold">Test d'éligibilité instantané</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Résolution conforme à l'organigramme au 22/10/2026</span>
+<button class="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" id="btn-minimize-sim" type="button">
+<span class="material-symbols-outlined text-[20px]">expand_less</span>
+</button>
+</div>
+</div>
+<!-- Contenu de la simulation : Formulaire test + Résultat résolu instantané -->
+<div class="p-space-lg flex flex-col xl:flex-row items-stretch gap-space-lg" id="sim-body">
+<!-- Formulaire de test de métadonnées d'acte -->
+<div class="w-full xl:w-1/3 bg-surface-container-low rounded-xl p-space-md flex flex-col gap-space-sm shadow-xs">
+<span class="font-label-md text-label-md font-bold text-primary flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[18px]">tune</span>
+          Variables d'entrée du test
+        </span>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-medium">Direction porteuse</label>
+<select class="px-2.5 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm focus:outline-none cursor-pointer" id="sim-dept" onchange="runSimulation()">
+<option selected="" value="urb">DGST • Urbanisme &amp; Aménagement</option>
+<option value="fin">DGA • Finances &amp; Commande Publique</option>
+<option value="edu">DGA • Éducation, Enfance &amp; Jeunesse</option>
+<option value="cad">DGST • Cadre de Vie &amp; Espaces Verts</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-medium">Incidence financière ?</label>
+<select class="px-2.5 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm focus:outline-none cursor-pointer" id="sim-financial" onchange="runSimulation()">
+<option selected="" value="oui">OUI (Dépense ou recette)</option>
+<option value="non">NON (Sans incidence)</option>
+</select>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-medium">Montant engagé (€ TTC)</label>
+<input class="px-2.5 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm focus:outline-none" id="sim-amount" oninput="runSimulation()" type="text" value="1 450 000 €"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-medium">Typologie d'acte</label>
+<select class="px-2.5 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface font-body-sm text-body-sm focus:outline-none cursor-pointer">
+<option>Délibération de Conseil Municipal</option>
+<option>Décision du Maire (Art. L2122-22)</option>
+</select>
+</div>
+</div>
+<button class="mt-2 w-full py-2 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md hover:bg-secondary-container transition-all flex items-center justify-center gap-1.5 shadow-sm" onclick="runSimulation()" type="button">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+<span>Recalculer le graphe de validation</span>
+</button>
+</div>
+<!-- Résultat résolu en temps réel -->
+<div class="flex-1 bg-surface-container-low rounded-xl p-space-md flex flex-col justify-between shadow-xs">
+<div>
+<div class="flex flex-wrap items-center justify-between gap-space-sm pb-2 border-b border-surface-container">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-on-tertiary-container animate-ping"></span>
+<span class="font-label-md text-label-md text-primary font-bold" id="sim-status-title">Circuit résolu en 8 étapes effectives</span>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-bold">
+              Aucun titulaire manquant • Prêt pour exécution
+            </span>
+</div>
+<!-- Visualisation du fil d'Ariane des personnes désignées -->
+<div class="mt-4 flex flex-col gap-2">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-semibold">Chaîne nominative résolue :</span>
+<div class="flex flex-wrap items-center gap-2 p-3 bg-surface-container-lowest rounded-xl" id="sim-chain-container">
+<!-- Acteurs résolus -->
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">person</span>
+<strong>M. Vasseur</strong> (Rédacteur Urb.)
+              </span>
+<span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">person</span>
+<strong>C. Moreau</strong> (Resp. Foncier)
+              </span>
+<span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">person</span>
+<strong>D. Chen</strong> (Chef Service)
+              </span>
+<span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">person</span>
+<strong>S. Leroy</strong> (Dir. Aménagement)
+              </span>
+<span class="material-symbols-outlined text-[16px] text-secondary font-bold">arrow_forward</span>
+<!-- Branche financière conditionnelle -->
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm" id="sim-fin-actor">
+<span class="material-symbols-outlined text-[14px]">attach_money</span>
+<strong>P. Lambert</strong> (Dir. Finances)
+              </span>
+<span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">balance</span>
+<strong>S. Bernard</strong> (Affaires Juridiques)
+              </span>
+<span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">person_shield</span>
+<strong>N. Roux</strong> (DGST de tutelle)
+              </span>
+<span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-inverse-surface text-inverse-on-surface font-label-sm text-label-sm font-bold">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+<strong>Armelle Dubois</strong> (DGS)
+              </span>
+<span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm font-bold">
+<span class="material-symbols-outlined text-[14px]">how_to_reg</span>
+<strong>SCC • ODJ Conseil</strong>
+</span>
+</div>
+</div>
+</div>
+<!-- Rétro-planning global estimé -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-3 mt-3 border-t border-surface-container">
+<div class="flex items-center gap-space-md text-on-surface-variant font-label-sm text-label-sm">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">schedule</span>
+              Délai cumulé estimé : <strong>19 jours ouvrés</strong>
+</span>
+<span>•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-tertiary">calendar_month</span>
+              Date limite de dépôt conseillée : <strong>01/10/2026</strong> pour séance du 22/10
+            </span>
+</div>
+<button class="px-space-md py-1 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm hover:bg-surface-container-highest transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">download</span>
+<span>Exporter rapport de test</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Script interactif d'émulation des sélections d'étape et simulation CIR-62 -->
+<script>
+    function selectStep(stepId) {
+      // Met à jour l'intitulé dans l'inspecteur
+      const titleEl = document.getElementById('inspector-step-title');
+      const stepNames = {
+        'step-0': 'Étape 0 : Rédaction initiale',
+        'step-1': 'Étape 1 : Responsable Intermédiaire',
+        'step-2': 'Étape 2 : Chef de Service Porteur',
+        'step-3': 'Étape 3 : Directeur de Direction',
+        'step-4': 'Étape 4 : Service Financier',
+        'step-5': 'Étape 5 : Affaires Juridiques',
+        'step-6': 'Étape 6 : DGA de Tutelle',
+        'step-7': 'Étape 7 : Arbitrage DGS (A. Dubois)',
+        'step-8': 'Étape 8 : SCC (Inscription Séance)'
+      };
+
+      if (titleEl && stepNames[stepId]) {
+        titleEl.textContent = stepNames[stepId];
+      }
+
+      // Retire l'anneau actif sur tous les blocs
+      for (let i = 0; i <= 8; i++) {
+        const card = document.getElementById('step-card-' + i);
+        if (card) {
+          card.classList.remove('ring-2', 'ring-secondary', 'bg-surface-container-high');
+          card.classList.add('bg-surface-container-lowest');
+        }
+      }
+
+      // Active le bloc ciblé
+      const targetCard = document.getElementById('step-card-' + stepId.replace('step-', ''));
+      if (targetCard) {
+        targetCard.classList.add('ring-2', 'ring-secondary', 'bg-surface-container-high');
+        targetCard.classList.remove('bg-surface-container-lowest');
+      }
+    }
+
+    function runSimulation() {
+      const isFin = document.getElementById('sim-financial').value === 'oui';
+      const finActorEl = document.getElementById('sim-fin-actor');
+      const titleEl = document.getElementById('sim-status-title');
+
+      if (isFin) {
+        if (finActorEl) finActorEl.style.display = 'inline-flex';
+        if (titleEl) titleEl.textContent = 'Circuit résolu en 8 étapes effectives (avec étape Finances)';
+      } else {
+        if (finActorEl) finActorEl.style.display = 'none';
+        if (titleEl) titleEl.textContent = 'Circuit résolu en 7 étapes effectives (dérivation directe vers Juridique)';
+      }
+    }
+
+    // Gestion du repli de la console de simulation
+    document.addEventListener('DOMContentLoaded', function() {
+      const toggleBtn = document.getElementById('btn-toggle-sim');
+      const minBtn = document.getElementById('btn-minimize-sim');
+      const consoleEl = document.getElementById('simulation-console');
+      const bodyEl = document.getElementById('sim-body');
+
+      if (toggleBtn && consoleEl) {
+        toggleBtn.addEventListener('click', function() {
+          consoleEl.scrollIntoView({ behavior: 'smooth' });
+          if (bodyEl.classList.contains('hidden')) {
+            bodyEl.classList.remove('hidden');
+          }
+        });
+      }
+
+      if (minBtn && bodyEl) {
+        minBtn.addEventListener('click', function() {
+          bodyEl.classList.toggle('hidden');
+          minBtn.querySelector('.material-symbols-outlined').textContent = 
+            bodyEl.classList.contains('hidden') ? 'expand_more' : 'expand_less';
+        });
+      }
+    });
+  </script>
+</div></main><footer class="w-full bg-surface-container-lowest border-t border-outline-variant/40 py-space-lg text-on-surface-variant mt-auto"><div class="w-full px-space-lg flex flex-col md:flex-row items-center justify-between gap-space-md"><div class="flex items-center gap-space-sm text-center md:text-left"><span class="font-label-md text-label-md text-on-surface font-semibold">IvryDélib</span><span class="text-on-surface-variant font-body-sm text-body-sm">— Direction des Affaires Juridiques &amp; de la Commande Publique • Mairie d'Ivry-sur-Seine</span></div><div class="flex items-center gap-space-lg font-label-sm text-label-sm"><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Mentions légales</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Nomenclature ACTES</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Règlement intérieur</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Assistance technique</a></div></div></footer></body></html>

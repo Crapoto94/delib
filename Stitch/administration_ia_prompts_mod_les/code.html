@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+
+<html lang="fr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300..900;1,300..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"tertiary-fixed-dim":"#68dba9","on-error":"#ffffff","inverse-primary":"#b0c9e8","surface-dim":"#ccdbf4","secondary-fixed-dim":"#b4c5ff","surface-container-low":"#eff4ff","on-secondary":"#ffffff","on-primary":"#ffffff","on-tertiary-fixed-variant":"#005137","primary":"#001428","on-primary-container":"#7991af","primary-fixed-dim":"#b0c9e8","surface":"#f8f9ff","error-container":"#ffdad6","on-tertiary":"#ffffff","secondary":"#0051d5","outline":"#74777e","inverse-surface":"#233144","primary-container":"#0f2942","surface-container":"#e6eeff","on-surface-variant":"#43474d","tertiary":"#00170d","surface-container-highest":"#d5e3fd","tertiary-fixed":"#85f8c4","on-primary-fixed":"#011d35","surface-tint":"#49607c","surface-container-lowest":"#ffffff","on-tertiary-fixed":"#002114","surface-container-high":"#dde9ff","secondary-fixed":"#dbe1ff","background":"#f8f9ff","outline-variant":"#c3c6ce","on-background":"#0d1c2f","tertiary-container":"#002e1d","on-secondary-fixed":"#00174b","on-secondary-fixed-variant":"#003ea8","on-surface":"#0d1c2f","error":"#ba1a1a","on-primary-fixed-variant":"#314863","secondary-container":"#316bf3","on-secondary-container":"#fefcff","primary-fixed":"#d1e4ff","on-error-container":"#93000a","inverse-on-surface":"#ebf1ff","surface-bright":"#f8f9ff","surface-variant":"#d5e3fd","on-tertiary-container":"#21a173"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"gutter":"1rem","space-md":"1rem","space-xs":"0.25rem","margin-desktop":"2rem","space-lg":"1.5rem","gutter-desktop":"1.5rem","space-sm":"0.5rem","space-xl":"2.5rem","margin":"1rem"},"fontFamily":{"body-sm":["\"Source Sans 3\""],"headline-lg-mobile":["\"Source Sans 3\""],"headline-sm":["\"Source Sans 3\""],"body-lg":["\"Source Sans 3\""],"label-md":["\"Source Sans 3\""],"label-lg":["\"Source Sans 3\""],"headline-md":["\"Source Sans 3\""],"headline-xl-mobile":["\"Source Sans 3\""],"headline-lg":["\"Source Sans 3\""],"label-sm":["\"Source Sans 3\""],"body-md":["\"Source Sans 3\""],"headline-xl":["\"Source Sans 3\""]},"fontSize":{"body-sm":["12px",{"lineHeight":"18px","fontWeight":"400"}],"headline-lg-mobile":["20px",{"lineHeight":"28px","fontWeight":"700"}],"headline-sm":["16px",{"lineHeight":"24px","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"label-md":["12px",{"lineHeight":"16px","fontWeight":"600"}],"label-lg":["14px",{"lineHeight":"20px","fontWeight":"600"}],"headline-md":["19px",{"lineHeight":"26px","fontWeight":"600"}],"headline-xl-mobile":["26px",{"lineHeight":"34px","fontWeight":"700"}],"headline-lg":["24px",{"lineHeight":"32px","fontWeight":"700"}],"label-sm":["11px",{"lineHeight":"14px","fontWeight":"700"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"headline-xl":["32px",{"lineHeight":"40px","fontWeight":"700"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/40 shadow-[0_1px_4px_rgba(13,28,47,0.05)]"><div class="h-20 w-full px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg shrink-0"><div class="flex items-center gap-space-sm"><img alt="Logo IvryDélib" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U6Txvyk_obVczAHEyoJgRYmflszhnvftalfZ2FeHWE8HTAoMTH3QWtOWVtLE3pa9B8-5PuyzYPVNgvVcS1X53X-Ckp9UO_gcIoY8p0ulpvYt-94yYZlCNWSfNEtn9Pyc_DWSmBAEUiamsEBFgJBqnrQ7kyUpU9tuBD6Ljz75hTCzYWCqHwtS-nD9giQXtWC4xy3IcYBFkqOt-vkrEcjuTu7AhHn0lzzcfXq3OjL452"/><div class="flex flex-col pl-space-xs border-l border-outline-variant/50"><span class="font-headline-sm text-headline-sm text-primary leading-tight tracking-tight">IvryDélib</span><span class="font-label-sm text-label-sm text-on-surface-variant font-medium tracking-wide uppercase">Ville d'Ivry-sur-Seine</span></div></div><div class="h-7 w-[1px] bg-outline-variant/40 hidden lg:block"></div><nav class="hidden xl:flex items-center gap-space-xs" data-active-classes="bg-primary text-on-primary font-label-md rounded-lg shadow-sm"><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="tableau-de-bord" href="#">Tableau de bord</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="commissions-et-avis-elus" href="#">Commissions &amp; Avis</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="derogations-et-hors-delais-scc" href="#">Dérogations SCC</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="titulaires-et-droits-redaction" href="#">Titulaires &amp; Droits</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="regles-notifications-relances" href="#">Notifications &amp; Relances</a><a class="px-space-md py-space-sm rounded-lg font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="gabarits-edition-referentiels" href="#">Gabarits &amp; Référentiels</a></nav></div><div class="flex-1 max-w-md hidden 2xl:block"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px] pointer-events-none">search</span><input class="w-full pl-10 pr-16 py-1.5 bg-surface-container-low border border-outline-variant/60 rounded-lg text-on-surface font-body-sm text-body-sm placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-1 focus:ring-secondary focus:border-secondary transition-all" placeholder="Rechercher actes, visas, titulaires..." type="text"/><div class="absolute right-2 flex items-center gap-1 pointer-events-none"><kbd class="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/60 rounded font-label-sm text-label-sm text-on-surface-variant shadow-xs">⌘K</kbd></div></div></div><div class="flex items-center gap-space-md shrink-0"><div class="flex items-center gap-1"><button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Aide réglementaire &amp; guides" type="button"><span class="material-symbols-outlined text-[22px]">help</span></button><button class="relative p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors flex items-center justify-center" title="Notifications et alertes" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-4 h-4 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-tight flex items-center justify-center font-bold">4</span></button></div><div class="h-7 w-[1px] bg-outline-variant/40"></div><div class="relative flex items-center gap-space-sm pl-space-xs bg-surface-container-low/70 hover:bg-surface-container-high/60 px-space-sm py-1.5 rounded-lg border border-outline-variant/40 transition-colors"><div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-md text-label-md font-bold ring-1 ring-outline-variant/50">MV</div><div class="flex flex-col text-left"><div class="flex items-center gap-1"><select aria-label="Sélecteur d'opérateur actif" class="bg-transparent font-label-md text-label-md text-on-surface font-semibold focus:outline-none cursor-pointer pr-4"><option selected="" value="vasseur">Marc Vasseur</option><option value="moreau">Claire Moreau</option><option value="admin-scc">Admin SCC</option></select></div><span class="font-label-sm text-label-sm text-on-surface-variant">Direction Juridique / SCC</span></div></div></div></div></header><main class="w-full pt-20 bg-surface flex-1"><div class="flex flex-col w-full">
+<!-- Zone Contenu Principal -->
+<div class="w-full px-space-md lg:px-space-xl py-space-lg flex flex-col gap-space-lg">
+<!-- 1. En-tête de page institutionnel -->
+<div class="flex flex-col gap-space-sm bg-surface-container-lowest p-space-lg rounded-xl shadow-sm">
+<!-- Fil d'Ariane & Badges -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-2 font-label-md text-label-md text-on-surface-variant">
+<span class="flex items-center gap-1 hover:text-secondary cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+            Administration
+          </span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-primary font-bold">Intelligence Artificielle &amp; Modèles LLM</span>
+<span class="font-mono text-label-sm text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded">Réf. MANIFEST / Hub DSI &amp; APM</span>
+</div>
+<div class="flex flex-wrap items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm">
+<span class="w-2 h-2 rounded-full bg-on-tertiary-fixed-variant animate-pulse"></span>
+            Moteur IA : En ligne (Hub DSI APM v2.4)
+          </span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-secondary">verified_user</span>
+            Passerelle SecNumCloud active
+          </span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-on-tertiary-container">lock</span>
+            0 fuite de données (RGPD / Traitement local)
+          </span>
+</div>
+</div>
+<!-- Titre & Description -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md mt-1">
+<div class="max-w-4xl">
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">
+            Configuration des Assistants IA, Prompts Système &amp; Modèles
+          </h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">
+            Supervision des modèles de langage locaux et souverains (Mistral, Llama 3, Albert DINUM, passerelle souveraine Hub DSI), paramétrage fin des prompts d'aide à la rédaction, contrôles juridiques CGCT et détection proactive d'anomalies délibératives.
+          </p>
+</div>
+<!-- Actions Principales -->
+<div class="flex flex-wrap items-center gap-2 shrink-0">
+<button class="inline-flex items-center gap-1.5 px-space-md py-2 bg-surface-container-low text-primary hover:bg-surface-container-high font-label-md text-label-md rounded-lg transition-colors shadow-xs" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+            Historique des versions
+          </button>
+<button class="inline-flex items-center gap-1.5 px-space-md py-2 bg-secondary text-on-secondary hover:bg-secondary-container font-label-md text-label-md rounded-lg transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">play_circle</span>
+            Banc de test / Playground
+          </button>
+<button class="inline-flex items-center gap-1.5 px-space-md py-2 bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md rounded-lg transition-all shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">save</span>
+            Enregistrer &amp; Déployer en prod
+          </button>
+</div>
+</div>
+</div>
+<!-- 2. Bandeau Métriques & Consommation IA (KPIs) -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-space-md">
+<!-- KPI 1 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Taux d'acceptation suggestions</span>
+<span class="font-headline-xl text-headline-xl text-primary font-bold mt-1">88.4%</span>
+</div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[24px]">thumb_up</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 mt-3 text-on-tertiary-container font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span class="font-semibold">+4.2%</span>
+<span class="text-on-surface-variant font-normal">par rapport au mois précédent</span>
+</div>
+</div>
+<!-- KPI 2 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Latence moyenne d'inférence</span>
+<span class="font-headline-xl text-headline-xl text-primary font-bold mt-1">820 ms</span>
+</div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[24px]">speed</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 mt-3 text-on-surface-variant font-label-sm text-label-sm">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span>Modèle souverain Mistral Large 2</span>
+</div>
+</div>
+<!-- KPI 3 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Tokens consommés ce mois</span>
+<span class="font-headline-xl text-headline-xl text-primary font-bold mt-1">1.42M <span class="text-body-md text-on-surface-variant font-normal">/ 5M</span></span>
+</div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[24px]">memory</span>
+</div>
+</div>
+<!-- Progress bar -->
+<div class="mt-3 flex flex-col gap-1">
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 28.4%;"></div>
+</div>
+<span class="text-on-surface-variant font-label-sm text-label-sm">28.4% du quota Hub DSI alloué</span>
+</div>
+</div>
+<!-- KPI 4 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Alertes juridiques bloquées</span>
+<span class="font-headline-xl text-headline-xl text-primary font-bold mt-1">29</span>
+</div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-on-tertiary-container">
+<span class="material-symbols-outlined text-[24px]">gavel</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 mt-3 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px] text-on-tertiary-container">check_circle</span>
+<span>Délibérations sécurisées avant SCC</span>
+</div>
+</div>
+</div>
+<!-- 3 & 4 & 5. Corps de travail : Sélecteur de tâches + Éditeur Prompt + Bac d'Essai -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<!-- Sélecteur de Tâches / Cas d'Usage (3 colonnes) -->
+<div class="xl:col-span-3 flex flex-col gap-space-sm bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
+<div class="flex items-center justify-between pb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-primary">psychology</span>
+<h2 class="font-headline-sm text-headline-sm text-primary">Tâches &amp; Prompts</h2>
+</div>
+<span class="font-label-sm text-label-sm bg-surface-container text-on-surface-variant px-2 py-0.5 rounded-full">5 actifs</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-1">
+          Sélectionnez un prompt métier pour éditer les instructions système et réassigner le modèle LLM.
+        </p>
+<!-- Liste des Tâches -->
+<div class="flex flex-col gap-1.5">
+<!-- Tâche 1 : Active -->
+<div class="p-space-sm rounded-lg bg-primary text-on-primary cursor-pointer transition-all shadow-sm flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-bold flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-tertiary-fixed"></span>
+                Contrôle conformité CGCT
+              </span>
+<span class="text-label-sm font-mono bg-on-primary/20 px-1.5 py-0.2 rounded">v2.3.1</span>
+</div>
+<p class="font-body-sm text-body-sm text-primary-fixed leading-tight">Visas réglementaires, articles obligatoires, prévention de recours.</p>
+<div class="flex items-center justify-between pt-1 text-label-sm text-primary-fixed-dim">
+<span>Étape 05B Juridique</span>
+<span class="font-mono">Mistral L2</span>
+</div>
+</div>
+<!-- Tâche 2 -->
+<div class="p-space-sm rounded-lg bg-surface hover:bg-surface-container-low text-on-surface cursor-pointer transition-all flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-semibold text-primary">Vulgarisation citoyenne</span>
+<span class="text-label-sm font-mono bg-surface-container-high px-1.5 py-0.2 rounded text-on-surface-variant">v1.8.0</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Exposé des motifs accessible et synthèse pour le portail citoyen.</p>
+<div class="flex items-center justify-between pt-1 text-label-sm text-on-surface-variant">
+<span>Espace Rédacteur</span>
+<span class="font-mono">Albert 2</span>
+</div>
+</div>
+<!-- Tâche 3 -->
+<div class="p-space-sm rounded-lg bg-surface hover:bg-surface-container-low text-on-surface cursor-pointer transition-all flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-semibold text-primary">Cohérence financière</span>
+<span class="text-label-sm font-mono bg-surface-container-high px-1.5 py-0.2 rounded text-on-surface-variant">v2.0.4</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Vérification imputation M57, montants HT/TTC et crédits votés.</p>
+<div class="flex items-center justify-between pt-1 text-label-sm text-on-surface-variant">
+<span>Étape 05A Finances</span>
+<span class="font-mono">Llama 3.1</span>
+</div>
+</div>
+<!-- Tâche 4 -->
+<div class="p-space-sm rounded-lg bg-surface hover:bg-surface-container-low text-on-surface cursor-pointer transition-all flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-semibold text-primary">Audit des annexes PDF</span>
+<span class="text-label-sm font-mono bg-surface-container-high px-1.5 py-0.2 rounded text-on-surface-variant">v1.4.2</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Extraction clauses sensibles des conventions, baux et marchés.</p>
+<div class="flex items-center justify-between pt-1 text-label-sm text-on-surface-variant">
+<span>Dépôt d'annexe</span>
+<span class="font-mono">Mistral L2</span>
+</div>
+</div>
+<!-- Tâche 5 -->
+<div class="p-space-sm rounded-lg bg-surface hover:bg-surface-container-low text-on-surface cursor-pointer transition-all flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-semibold text-primary">Nomenclature ACTES</span>
+<span class="text-label-sm font-mono bg-surface-container-high px-1.5 py-0.2 rounded text-on-surface-variant">v3.1.0</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Classification automatique dans l'arborescence ministérielle.</p>
+<div class="flex items-center justify-between pt-1 text-label-sm text-on-surface-variant">
+<span>Création acte</span>
+<span class="font-mono">Albert 2</span>
+</div>
+</div>
+</div>
+<!-- Règle de gouvernance -->
+<div class="mt-2 p-space-sm bg-surface-container-low rounded-lg flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-primary font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">policy</span>
+            Gouvernance Souveraine
+          </span>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-[11px] leading-snug">
+            Toute modification de prompt juridique est signée cryptographiquement et auditée dans le registre SCC.
+          </p>
+</div>
+</div>
+<!-- Panneau Central : Éditeur de Configuration du Prompt (5 colonnes) -->
+<div class="xl:col-span-5 flex flex-col gap-space-md bg-surface-container-lowest p-space-lg rounded-xl shadow-sm">
+<!-- En-tête de la tâche sélectionnée -->
+<div class="flex flex-col gap-2 pb-space-sm">
+<div class="flex flex-wrap items-center justify-between gap-2">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-primary">Contrôle de conformité juridique CGCT</span>
+<span class="font-mono text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-primary font-semibold">v2.3.1</span>
+</div>
+<div class="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">person</span>
+<span>Marc Vasseur (SCC) • 18/09/2026</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Ce prompt inspecte l'intégralité du projet de délibération, vérifie les visas légaux obligatoires au regard du Code Général des Collectivités Territoriales et signale les incohérences de compétence du Conseil Municipal.
+          </p>
+</div>
+<!-- Routage du Modèle LLM -->
+<div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-primary font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-secondary">hub</span>
+              Modèle d'Inférence Assigné (Model Routing)
+            </label>
+<span class="font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed/30 px-2 py-0.5 rounded font-semibold">Certifié SecNumCloud</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm">
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Fournisseur &amp; Poids</span>
+<select class="w-full bg-surface-container-lowest px-space-sm py-2 rounded-lg font-body-md text-body-md text-primary focus:outline-none focus:ring-2 focus:ring-secondary cursor-pointer shadow-xs">
+<option selected="" value="mistral-large-2">Mistral Large 2 (Hébergé OVHcloud SecNumCloud)</option>
+<option value="albert-2">Albert 2 (DINUM souverain État français)</option>
+<option value="llama-3-70b">Llama 3.1 70B (Serveur Ville d'Ivry GPU Local)</option>
+<option value="azure-secnum">GPT-4o (Microsoft Azure France Défense)</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Déclenchement dans le flux</span>
+<input class="w-full bg-surface-container px-space-sm py-2 rounded-lg font-body-md text-body-md text-on-surface-variant focus:outline-none shadow-xs" readonly="" type="text" value="Étape 05B Juridique &amp; Espace Rédacteur"/>
+</div>
+</div>
+<!-- Hyperparamètres d'Inférence -->
+<div class="grid grid-cols-3 gap-space-sm pt-2">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center text-label-sm">
+<span class="text-on-surface-variant">Température</span>
+<span class="font-mono text-primary font-bold">0.1</span>
+</div>
+<input class="accent-secondary w-full cursor-pointer h-1.5 bg-surface-container rounded-lg" max="1" min="0" step="0.05" type="range" value="0.1"/>
+<span class="text-[10px] text-on-surface-variant">Déterministe (Droit)</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center text-label-sm">
+<span class="text-on-surface-variant">Top-P</span>
+<span class="font-mono text-primary font-bold">0.90</span>
+</div>
+<input class="accent-secondary w-full cursor-pointer h-1.5 bg-surface-container rounded-lg" max="1" min="0" step="0.05" type="range" value="0.9"/>
+<span class="text-[10px] text-on-surface-variant">Échantillonnage noyau</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex justify-between items-center text-label-sm">
+<span class="text-on-surface-variant">Max Tokens</span>
+<span class="font-mono text-primary font-bold">2048</span>
+</div>
+<input class="accent-secondary w-full cursor-pointer h-1.5 bg-surface-container rounded-lg" max="4096" min="512" step="128" type="range" value="2048"/>
+<span class="text-[10px] text-on-surface-variant">Longueur de réponse</span>
+</div>
+</div>
+</div>
+<!-- Variables Dynamiques Disponibles -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-primary font-semibold">Variables d'injection dynamique (cliquez pour insérer)</span>
+<span class="text-label-sm text-on-surface-variant font-mono">Payload JSON de l'acte</span>
+</div>
+<div class="flex flex-wrap gap-1.5">
+<button class="font-mono text-label-sm px-2 py-1 rounded bg-surface-container text-secondary hover:bg-secondary-fixed transition-colors" type="button">
+              {titre}
+            </button>
+<button class="font-mono text-label-sm px-2 py-1 rounded bg-surface-container text-secondary hover:bg-secondary-fixed transition-colors" type="button">
+              {expose_motifs}
+            </button>
+<button class="font-mono text-label-sm px-2 py-1 rounded bg-surface-container text-secondary hover:bg-secondary-fixed transition-colors" type="button">
+              {delibere}
+            </button>
+<button class="font-mono text-label-sm px-2 py-1 rounded bg-surface-container text-secondary hover:bg-secondary-fixed transition-colors" type="button">
+              {nomenclature_actes}
+            </button>
+<button class="font-mono text-label-sm px-2 py-1 rounded bg-surface-container text-secondary hover:bg-secondary-fixed transition-colors" type="button">
+              {montant}
+            </button>
+<button class="font-mono text-label-sm px-2 py-1 rounded bg-surface-container text-secondary hover:bg-secondary-fixed transition-colors" type="button">
+              {commission_avis}
+            </button>
+<button class="font-mono text-label-sm px-2 py-1 rounded bg-surface-container text-secondary hover:bg-secondary-fixed transition-colors" type="button">
+              {historique_modifs}
+            </button>
+</div>
+</div>
+<!-- Éditeur de Prompt Système -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-primary font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-primary">terminal</span>
+              Prompt Système (Directives institutionnelles)
+            </label>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">1 420 caractères</span>
+<button class="text-secondary hover:underline font-label-sm text-label-sm" type="button">Réinitialiser aux valeurs DSI</button>
+</div>
+</div>
+<div class="w-full rounded-xl bg-surface-container-low p-space-sm flex flex-col font-mono text-body-sm text-primary">
+<textarea class="w-full bg-transparent resize-y focus:outline-none leading-relaxed text-[13px] text-on-surface" rows="9" spellcheck="false">Tu es le vérificateur juridique certifié d'IvryDélib pour la Ville d'Ivry-sur-Seine.
+Ta mission est d'effectuer une relecture de légalité stricte du projet de délibération soumis avant transmission au Service du Conseil et du Contrôle de légalité (SCC).
+
+RÈGLES IMPÉRATIVES DE CONFORMITÉ :
+1. Vérifie la compétence du Conseil Municipal selon les articles L. 2121-29 et suivants du Code Général des Collectivités Territoriales (CGCT).
+2. Vérifie la présence des visas obligatoires : Code général de la propriété des personnes publiques, Code de la commande publique ou Code de l'urbanisme selon le cas {nomenclature_actes}.
+3. Si la délibération engage des fonds publics ou une subvention ({montant}), vérifie que l'article autorisant Monsieur le Maire ou son représentant à signer la convention est explicitement présent dans {delibere}.
+4. Si un avis de commission obligatoire est requis, vérifie sa mention formelle dans les considérants.
+5. Rejette toute formulation vague ("le conseil décide d'accorder...", exiger "DÉCIDE d'octroyer...").
+6. Neutralité républicaine absolue : aucun avis politique n'est toléré, uniquement la conformité au droit positif.</textarea>
+</div>
+</div>
+<!-- Format de Réponse / Schema JSON attendu -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-primary font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-secondary">data_object</span>
+            Schéma de Sortie Contraint (JSON Schema)
+          </label>
+<div class="w-full rounded-xl bg-surface-container p-space-sm font-mono text-[12px] text-on-surface leading-tight">
+<pre class="overflow-x-auto whitespace-pre">{
+  "statut": "CONFORME | RESERVE | BLOQUANT",
+  "score_legal": 0-100,
+  "articles_cgct_vises": ["L. 2121-29", ...],
+  "articles_manquants": [...],
+  "anomalies": [
+    { "type": "VISA_MANQUANT", "gravite": "MOYENNE", "description": "..." }
+  ],
+  "suggestions_redactionnelles": [...]
+}</pre>
+</div>
+</div>
+</div>
+<!-- Volet Latéral Droit : Banc d'Essai & Simulation (Playground) (4 colonnes) -->
+<div class="xl:col-span-4 flex flex-col gap-space-md bg-surface-container-lowest p-space-lg rounded-xl shadow-sm">
+<div class="flex items-center justify-between pb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-secondary">science</span>
+<h2 class="font-headline-sm text-headline-sm text-primary">Banc d'Essai (Playground)</h2>
+</div>
+<span class="font-label-sm text-label-sm bg-tertiary-fixed text-on-tertiary-fixed font-semibold px-2 py-0.5 rounded">En direct</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+          Simulez l'exécution du prompt sur un acte réel de la séance du Conseil en cours sans altérer la base de production.
+        </p>
+<!-- Sélecteur d'acte de test -->
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-semibold">Dossier de délibération de référence :</label>
+<select class="w-full bg-surface-container-low px-space-sm py-2 rounded-lg font-body-md text-body-md text-primary focus:outline-none focus:ring-2 focus:ring-secondary cursor-pointer shadow-xs">
+<option selected="" value="7842">Dossier #7842 — Subvention pluriannuelle Théâtre des Quartiers d'Ivry</option>
+<option value="7843">Dossier #7843 — Cession de parcelle cadastrée AK 112 rue Robespierre</option>
+<option value="7844">Dossier #7844 — Rénovation thermique du groupe scolaire Rosalind Franklin</option>
+<option value="7845">Dossier #7845 — Avenant n°2 Marché de restauration scolaire collective</option>
+</select>
+</div>
+<!-- Bouton de lancement -->
+<button class="w-full py-2.5 px-space-md bg-secondary text-on-secondary hover:bg-secondary-container font-label-md text-label-md rounded-lg transition-all shadow-sm flex items-center justify-center gap-2" type="button">
+<span class="material-symbols-outlined text-[20px]">bolt</span>
+          Lancer la simulation d'inférence
+        </button>
+<!-- Résultat de la simulation -->
+<div class="flex flex-col gap-space-sm bg-surface-container-low p-space-md rounded-xl">
+<!-- Métriques de la réponse -->
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed/40 px-2 py-0.5 rounded font-semibold">
+<span class="material-symbols-outlined text-[14px]">check</span>
+              Inférence réussie en 740 ms
+            </span>
+<span class="font-mono text-label-sm text-on-surface-variant font-semibold">680 tokens générés</span>
+</div>
+<!-- Jauge de conformité juridique -->
+<div class="flex flex-col gap-1 bg-surface-container-lowest p-space-sm rounded-lg shadow-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-primary font-bold">Indice de conformité légale</span>
+<span class="font-headline-sm text-headline-sm text-on-tertiary-container font-bold">96 / 100</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-on-tertiary-container h-full rounded-full" style="width: 96%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-tertiary-container flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[14px]">verified</span>
+              Statut estimé : APTE AU VISA SOUS RÉSERVE MINEURE
+            </span>
+</div>
+<!-- Analyse détaillée extraite du JSON -->
+<div class="flex flex-col gap-2 bg-surface-container-lowest p-space-sm rounded-lg shadow-xs">
+<span class="font-label-md text-label-md text-primary font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px] text-secondary">fact_check</span>
+              Visas &amp; Constats juridiques
+            </span>
+<div class="flex flex-col gap-1.5 text-body-sm text-body-sm">
+<div class="flex items-start gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-on-tertiary-container shrink-0 mt-0.5">check_circle</span>
+<span class="text-on-surface">Visa CGCT <strong>art. L. 2121-29</strong> (clause générale de compétence communale) validé.</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-on-tertiary-container shrink-0 mt-0.5">check_circle</span>
+<span class="text-on-surface">Autorisation de signature conventionnelle dûment insérée à l'article 3.</span>
+</div>
+<div class="flex items-start gap-1.5 p-1.5 bg-surface-container rounded text-on-surface">
+<span class="material-symbols-outlined text-[16px] text-secondary shrink-0 mt-0.5">info</span>
+<span><strong>Attention formelle :</strong> La mention de l'avis de la <em>Commission Culture &amp; Citoyenneté du 08/10</em> est recommandée dans le 2<sup>e</sup> considérant.</span>
+</div>
+</div>
+</div>
+<!-- Comparateur Multi-Modèles -->
+<button class="w-full py-2 px-space-sm bg-surface-container hover:bg-surface-container-high text-primary font-label-sm text-label-sm rounded-lg transition-colors flex items-center justify-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[16px]">compare_arrows</span>
+            Comparer Mistral Large vs Albert DINUM sur ce cas
+          </button>
+</div>
+<!-- Bloc Audit de sécurité -->
+<div class="flex items-center gap-2 p-space-sm rounded-lg bg-surface-container">
+<span class="material-symbols-outlined text-[20px] text-secondary">security</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-primary">Isolation d'exécution</span>
+<span class="text-[11px] text-on-surface-variant">Données chiffrées en transit (mTLS). Aucun apprentissage externe.</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 6. Journal d'Audit, Traçabilité & Mode Safe Fallback (Pied de page) -->
+<div class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm flex flex-col gap-space-md">
+<!-- En-tête Journal + Interrupteur d'urgence -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-primary">receipt_long</span>
+<h2 class="font-headline-sm text-headline-sm text-primary">Journal d'Audit des Inférences &amp; Traçabilité SCC</h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+            Registre légal et infalsifiable des 5 dernières requêtes IA envoyées depuis le circuit délibératif municipal.
+          </p>
+</div>
+<!-- Mode Safe Fallback -->
+<div class="flex items-center gap-space-sm p-space-sm bg-surface-container-low rounded-xl">
+<div class="flex flex-col text-right">
+<span class="font-label-md text-label-md text-primary font-bold">Mode Safe Fallback</span>
+<span class="text-[11px] text-on-surface-variant">Couper l'IA sans bloquer les visas</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-high peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-error"></div>
+</label>
+</div>
+</div>
+<!-- Table d'Audit -->
+<div class="overflow-x-auto">
+<table class="w-full text-left font-body-sm text-body-sm">
+<thead>
+<tr class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-2.5 px-space-md rounded-l-lg">Horodatage</th>
+<th class="py-2.5 px-space-md">Dossier / Acte ID</th>
+<th class="py-2.5 px-space-md">Tâche / Prompt</th>
+<th class="py-2.5 px-space-md">Modèle LLM</th>
+<th class="py-2.5 px-space-md">Latence / Tokens</th>
+<th class="py-2.5 px-space-md">Résultat / Score</th>
+<th class="py-2.5 px-space-md rounded-r-lg">Décision Juriste</th>
+</tr>
+</thead>
+<tbody class="divide-y-0 text-on-surface">
+<!-- Ligne 1 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-space-sm px-space-md font-mono text-label-sm text-on-surface-variant">Aujourd'hui 11:42:19</td>
+<td class="py-space-sm px-space-md font-semibold text-primary">#7842 (Théâtre Quartiers)</td>
+<td class="py-space-sm px-space-md">Contrôle conformité CGCT</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-mono text-label-sm bg-surface-container px-2 py-0.5 rounded">
+                  Mistral Large 2
+                </span>
+</td>
+<td class="py-space-sm px-space-md font-mono text-label-sm">740 ms / 680 tok</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed/30 px-2 py-0.5 rounded font-bold">
+                  96/100 (Conforme)
+                </span>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="text-secondary font-semibold font-label-sm text-label-sm">Accepté (Marc Vasseur)</span>
+</td>
+</tr>
+<!-- Ligne 2 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-space-sm px-space-md font-mono text-label-sm text-on-surface-variant">Aujourd'hui 11:15:04</td>
+<td class="py-space-sm px-space-md font-semibold text-primary">#7843 (Cession Robespierre)</td>
+<td class="py-space-sm px-space-md">Audit des annexes PDF</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-mono text-label-sm bg-surface-container px-2 py-0.5 rounded">
+                  Mistral Large 2
+                </span>
+</td>
+<td class="py-space-sm px-space-md font-mono text-label-sm">1 120 ms / 1 450 tok</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-0.5 rounded font-bold">
+                  88/100 (Avis Domaines ok)
+                </span>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="text-secondary font-semibold font-label-sm text-label-sm">Accepté (Claire Moreau)</span>
+</td>
+</tr>
+<!-- Ligne 3 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-space-sm px-space-md font-mono text-label-sm text-on-surface-variant">Aujourd'hui 10:58:32</td>
+<td class="py-space-sm px-space-md font-semibold text-primary">#7844 (École R. Franklin)</td>
+<td class="py-space-sm px-space-md">Cohérence financière M57</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-mono text-label-sm bg-surface-container px-2 py-0.5 rounded">
+                  Llama 3.1 70B
+                </span>
+</td>
+<td class="py-space-sm px-space-md font-mono text-label-sm">910 ms / 890 tok</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-error bg-error-container/40 px-2 py-0.5 rounded font-bold">
+                  Bloquant (Écart 4 200€)
+                </span>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="text-error font-semibold font-label-sm text-label-sm">Alerte confirmée (DGA Fin)</span>
+</td>
+</tr>
+<!-- Ligne 4 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-space-sm px-space-md font-mono text-label-sm text-on-surface-variant">Aujourd'hui 09:30:11</td>
+<td class="py-space-sm px-space-md font-semibold text-primary">#7840 (Règlement parcs)</td>
+<td class="py-space-sm px-space-md">Vulgarisation citoyenne</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-mono text-label-sm bg-surface-container px-2 py-0.5 rounded">
+                  Albert 2 DINUM
+                </span>
+</td>
+<td class="py-space-sm px-space-md font-mono text-label-sm">620 ms / 410 tok</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed/30 px-2 py-0.5 rounded font-bold">
+                  98/100 (Clarté optimale)
+                </span>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="text-secondary font-semibold font-label-sm text-label-sm">Publié portail citoyen</span>
+</td>
+</tr>
+<!-- Ligne 5 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-space-sm px-space-md font-mono text-label-sm text-on-surface-variant">Hier 17:45:00</td>
+<td class="py-space-sm px-space-md font-semibold text-primary">#7839 (Convention CAF)</td>
+<td class="py-space-sm px-space-md">Nomenclature ACTES</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-mono text-label-sm bg-surface-container px-2 py-0.5 rounded">
+                  Albert 2 DINUM
+                </span>
+</td>
+<td class="py-space-sm px-space-md font-mono text-label-sm">480 ms / 210 tok</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-on-tertiary-container bg-tertiary-fixed/30 px-2 py-0.5 rounded font-bold">
+                  100% (Rubrique 4.2)
+                </span>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="text-secondary font-semibold font-label-sm text-label-sm">Validé auto SCC</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Métadonnées & Exportation du registre -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-2 text-on-surface-variant font-label-sm text-label-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-secondary">verified</span>
+<span>Registre scellé SHA-256 conformément aux directives ANSSI &amp; RGPD.</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="hover:text-primary font-semibold transition-colors" type="button">Télécharger le log complet (JSON)</button>
+<span>•</span>
+<button class="hover:text-primary font-semibold transition-colors" type="button">Rapport trimestriel CNIL</button>
+</div>
+</div>
+</div>
+</div>
+</div></main><footer class="w-full bg-surface-container-lowest border-t border-outline-variant/40 py-space-lg text-on-surface-variant mt-auto"><div class="w-full px-space-lg flex flex-col md:flex-row items-center justify-between gap-space-md"><div class="flex items-center gap-space-sm text-center md:text-left"><span class="font-label-md text-label-md text-on-surface font-semibold">IvryDélib</span><span class="text-on-surface-variant font-body-sm text-body-sm">— Direction des Affaires Juridiques &amp; Commande Publique • Mairie d'Ivry-sur-Seine</span></div><div class="flex items-center gap-space-lg font-label-sm text-label-sm"><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Nomenclature ACTES</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Règlement du Conseil</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Sécurité &amp; Traçabilité</a><a class="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support SCC</a></div></div></footer>
+</body></html>

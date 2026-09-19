@@ -1,0 +1,105 @@
+/**
+ * Jeu de règles fourni (section 22.3 et 22.3 bis). Il est copié au premier démarrage comme règles « plateforme »
+ * (organisme_id NULL) ; chaque organisme peut le surcharger règle par règle (NOT-25) sans toucher aux autres.
+ * Variables de gabarit : {titre} {numero} {etape} {lien} {redacteur} {acteur} {motif} {organisme} {jours_restants} {echeance} {retard}.
+ */
+const FAMILIES = {
+  validation: { label: 'Actes à valider et renvois', mandatory: true },
+  suivi: { label: 'Suivi de mes actes', mandatory: false },
+  discussion: { label: 'Discussion et mentions', mandatory: false },
+  delegation: { label: 'Délégations et droits', mandatory: true },
+  echeances: { label: 'Échéances et dates limites', mandatory: false },
+  admin: { label: 'Administration', mandatory: true },
+  synthese: { label: 'Synthèses', mandatory: false },
+};
+
+const HOLD = ['holders', 'delegues'];
+
+const RULES = [
+  // ---- événementielles -------------------------------------------------------------------------------------------
+  { code: 'etape.arrivee', nom: 'Un acte arrive à mon étape', family: 'validation', kind: 'event', mandatory: true,
+    trigger: { event: 'step.entered' }, recipients: HOLD,
+    subject: 'À valider : {titre}', body: "L'acte n° {numero} « {titre} » est arrivé à l'étape « {etape} ».\nRédacteur : {redacteur}.\nÉchéance : {echeance}.\n{lien}" },
+  { code: 'acte.refuse', nom: 'Modification demandée', family: 'validation', kind: 'event', mandatory: true,
+    trigger: { event: 'acte.refused' }, recipients: ['redacteur'],
+    subject: 'Modification demandée : {titre}', body: "{acteur} demande une modification de l'acte n° {numero} « {titre} ».\nMotif : {motif}\n{lien}" },
+  { code: 'circuit.termine', nom: 'Circuit terminé', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'circuit.completed' }, recipients: ['redacteur', 'circuit'],
+    subject: 'Circuit terminé : {titre}', body: "L'acte n° {numero} « {titre} » a terminé son circuit de validation.\n{lien}" },
+  { code: 'circuit.recalcule', nom: 'Le parcours a changé', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'circuit.recalculated' }, recipients: ['redacteur', 'holders'],
+    subject: 'Parcours modifié : {titre}', body: "Le parcours de l'acte n° {numero} « {titre} » a été recalculé (étapes ajoutées : {ajoutees}).\n{lien}" },
+  { code: 'commentaire.mention', nom: 'Je suis mentionné(e) dans la discussion', family: 'discussion', kind: 'event', mandatory: false,
+    trigger: { event: 'comment.added' }, recipients: ['mentions'],
+    subject: '{acteur} vous a mentionné : {titre}', body: "{acteur} vous a mentionné dans la discussion de l'acte n° {numero} « {titre} » :\n{motif}\n{lien}" },
+  { code: 'delegation.creee', nom: 'Une délégation me concerne', family: 'delegation', kind: 'event', mandatory: true,
+    trigger: { event: 'delegation.created' }, recipients: ['delegue'],
+    subject: '{acteur} vous délègue ses validations', body: "{acteur} vous a délégué ses décisions ({portee}).\nVous recevrez les actes correspondants dans votre file de travail." },
+  { code: 'redaction.accordee', nom: 'Autorisation de rédaction accordée', family: 'delegation', kind: 'event', mandatory: true,
+    trigger: { event: 'redaction.granted' }, recipients: ['grantee'],
+    subject: 'Vous pouvez rédiger pour la direction {direction}', body: '{acteur} vous autorise à rédiger des actes pour la direction {direction}.' },
+  { code: 'circuit.sans_titulaire', nom: 'Étape sans titulaire', family: 'admin', kind: 'event', mandatory: true,
+    trigger: { event: 'circuit.blocked' }, recipients: ['admins'],
+    subject: 'Étape sans titulaire : {etape}', body: "L'acte n° {numero} « {titre} » est bloqué : l'étape « {etape} » n'a aucun titulaire. Désignez-en un.\n{lien}" },
+  { code: 'circuit.publie', nom: 'Circuit modifié ou publié', family: 'admin', kind: 'event', mandatory: false,
+    trigger: { event: 'circuit.published' }, recipients: ['admins'],
+    subject: 'Circuit publié (version {version})', body: '{acteur} a publié la version {version} du circuit « {circuit} ».' },
+  { code: 'derogation.demandee', nom: 'Demande de dérogation à la date limite', family: 'echeances', kind: 'event', mandatory: true,
+    trigger: { event: 'derogation.requested' }, recipients: ['deciders'],
+    subject: 'Dérogation demandée : {titre}', body: "{acteur} demande une dérogation à la date limite de rédaction pour l'acte n° {numero} « {titre} ».\nMotif : {motif}\n{lien}" },
+  { code: 'derogation.decidee', nom: 'Décision sur une dérogation', family: 'echeances', kind: 'event', mandatory: true,
+    trigger: { event: 'derogation.decided' }, recipients: ['demandeur'],
+    subject: 'Dérogation {decision} : {titre}', body: "{acteur} a {decision} votre demande de dérogation pour l'acte n° {numero} « {titre} ».\n{motif}\n{lien}" },
+  { code: 'commission.mise_a_disposition', nom: 'Projet mis à disposition de la commission', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'commission.mise_a_disposition' }, recipients: ['commission_membres', 'commission_secretaires'],
+    subject: 'Projet mis à disposition — {commission}', body: "Le projet n° {numero} « {titre} » est mis à disposition de la commission « {commission} ».\n{lien}" },
+  { code: 'commission.suspendue', nom: 'Mise à disposition suspendue', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'commission.suspendue' }, recipients: ['commission_membres', 'commission_secretaires'],
+    subject: 'Mise à disposition suspendue — {commission}', body: "Le projet n° {numero} « {titre} » est renvoyé à son rédacteur : sa mise à disposition à la commission « {commission} » est suspendue.\nMotif : {motif}" },
+  { code: 'commission.retiree', nom: 'Commission retirée du projet', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'commission.retiree' }, recipients: ['commission_membres', 'commission_secretaires'],
+    subject: 'Projet retiré de la commission — {commission}', body: "Le projet n° {numero} « {titre} » n'est plus soumis à la commission « {commission} ».\nMotif : {motif}" },
+  { code: 'commission.avis', nom: 'Avis de commission rendu', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'commission.avis' }, recipients: ['redacteur', 'circuit'],
+    subject: 'Avis de commission ({commission}) : {titre}', body: "La commission « {commission} » a rendu son avis sur l'acte n° {numero} « {titre} » : {motif}.\n{lien}" },
+  { code: 'seance.affectation', nom: 'Séance visée modifiée ou acte reporté', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'acte.seance_changed' }, recipients: ['redacteur', 'rapporteur'],
+    subject: 'Séance modifiée : {titre}', body: "La séance visée pour l'acte n° {numero} « {titre} » a changé.\n{motif}\n{lien}" },
+
+  // ---- temporelles : relances (paliers par défaut de la section 22.3 bis, jours ouvrés) ------------------------------
+  { code: 'relance.etape', nom: "Relance d'un acte qui attend un valideur", family: 'validation', kind: 'temporal', mandatory: true,
+    trigger: { type: 'step_pending' }, recipients: HOLD,
+    palliers: [
+      { id: 'R1', at: { base: 'arrival', slaFactor: 0.5 }, recipients: HOLD },
+      { id: 'R2', at: { base: 'due' }, recipients: [...HOLD, 'superieur'] },
+      { id: 'R3', at: { base: 'due', days: 2 }, recipients: [...HOLD, 'superieur', 'directeur', 'scc'] },
+      { id: 'R4', at: { base: 'due', days: 5 }, recipients: [...HOLD, 'superieur', 'directeur', 'scc', 'dgs'] },
+    ],
+    subject: 'Rappel — à valider : {titre}', body: "L'acte n° {numero} « {titre} » attend votre validation à l'étape « {etape} » depuis le {arrivee}.\nÉchéance : {echeance} ({retard}).\n{lien}" },
+  { code: 'relance.retour_redacteur', nom: 'Relance du rédacteur après demande de modification', family: 'validation', kind: 'temporal', mandatory: true,
+    trigger: { type: 'returned' }, recipients: ['redacteur'],
+    palliers: [
+      { id: 'J2', at: { base: 'arrival', days: 2 }, recipients: ['redacteur'] },
+      { id: 'J5', at: { base: 'arrival', days: 5 }, recipients: ['redacteur', 'chef_service'] },
+      { id: 'J8', at: { base: 'arrival', days: 8 }, recipients: ['redacteur', 'chef_service', 'directeur'] },
+      { id: 'HEB', at: { base: 'arrival', days: 13 }, repeat: { everyDays: 5, max: 12 }, recipients: ['redacteur'] },
+    ],
+    subject: 'Rappel — modification demandée : {titre}', body: "L'acte n° {numero} « {titre} » vous a été renvoyé le {arrivee} et attend vos corrections.\n{lien}" },
+  { code: 'relance.brouillon', nom: 'Brouillon non envoyé', family: 'echeances', kind: 'temporal', mandatory: false,
+    trigger: { type: 'draft_idle' }, recipients: ['redacteur'],
+    palliers: [{ id: 'B', at: { base: 'updated', days: 10 }, repeat: { everyDays: 7, max: 12 }, recipients: ['redacteur'] }],
+    subject: 'Brouillon en attente : {titre}', body: "Votre brouillon n° {numero} « {titre} » n'a pas été modifié depuis le {arrivee}. Pensez à l'envoyer au circuit ou à l'abandonner.\n{lien}" },
+  { code: 'relance.date_limite', nom: 'Date limite de rédaction de la séance visée', family: 'echeances', kind: 'temporal', mandatory: false,
+    trigger: { type: 'draft_deadline' }, recipients: ['redacteur'],
+    palliers: [
+      { id: 'J-14', at: { base: 'deadline', days: -14 }, recipients: ['redacteur'] },
+      { id: 'J-7', at: { base: 'deadline', days: -7 }, recipients: ['redacteur', 'chef_service'] },
+      { id: 'J-3', at: { base: 'deadline', days: -3 }, recipients: ['redacteur', 'chef_service'] },
+      { id: 'J-1', at: { base: 'deadline', days: -1 }, recipients: ['redacteur', 'chef_service', 'directeur'] },
+      { id: 'J', at: { base: 'deadline' }, recipients: ['redacteur', 'chef_service', 'directeur'] },
+      { id: 'RETARD', at: { base: 'deadline', days: 1 }, repeat: { everyDays: 1, max: 60 }, recipients: ['redacteur', 'directeur', 'scc'] },
+    ],
+    subject: 'Date limite de rédaction — {titre}', body: "L'acte n° {numero} « {titre} » n'est pas encore envoyé au circuit ; la date limite de rédaction de la séance visée est le {echeance} ({retard}).\n{lien}" },
+];
+
+module.exports = { FAMILIES, RULES };
