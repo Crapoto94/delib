@@ -31,6 +31,8 @@ const { createElus } = require('./modules/elus/elus.service');
 const { createCommissions } = require('./modules/commissions/commissions.service');
 const { createSeances } = require('./modules/seances/seances.service');
 const { createDeadlines } = require('./modules/seances/deadlines.service');
+const { createOdj } = require('./modules/seances/odj.service');
+const { createUsers } = require('./modules/users/users.service');
 
 function buildContainer({ config, log, db, ad, directoryAdapter, mail, guard }) {
   assertAuthPort(ad);
@@ -65,12 +67,15 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, guard }) 
   late.seances = seances;
   const deadlines = createDeadlines({ db, audit, actes, acl, titulaires, settings, bus });
   late.deadlines = deadlines;
+  const odj = createOdj({ db, audit, actes, acl, titulaires, settings, bus, late });
+  late.odj = odj;
+  const users = createUsers({ db, audit, dir, organismes, access, log });
   const delegations = createDelegations({ db, audit, access, titulaires, dir, bus });
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
   const scheduler = createScheduler({ db, notifications, config, log });
-  return { config, log, db, ad, directoryAdapter, mail, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines };
+  return { config, log, db, ad, directoryAdapter, mail, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, users };
 }
 
 module.exports = { buildContainer };

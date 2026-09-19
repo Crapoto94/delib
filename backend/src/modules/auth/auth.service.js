@@ -7,6 +7,7 @@
  */
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const safeEqual = (a, b) => { const x = Buffer.from(String(a)); const y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 const bcrypt = require('bcryptjs');
 const { E } = require('../../shared/errors');
 
@@ -39,7 +40,11 @@ function createAuthService({ db, config, log, ad, dir, sessions, audit, guard })
     async loginAd({ username, password, ip }) {
       const name = normalize(username);
       guard.assertNotLocked(name);
-      const auth = await ad.authenticate(name, password); // 502 si l'AD est indisponible : ce n'est pas un échec de mot de passe
+      // Connexion de DÉVELOPPEMENT : un mot de passe commun (DEV_LOGIN_PASSWORD, jamais en production) valide n'importe quel
+      // identifiant sans interroger l'AD. Chaque usage est journalisé et audité.
+      const dev = !!config.devLoginPassword && config.env !== 'production' && safeEqual(password, config.devLoginPassword);
+      const auth = dev ? { ok: true } : await ad.authenticate(name, password); // 502 si l'AD est indisponible : ce n'est pas un échec de mot de passe
+      if (dev) { log.warn({ username: name }, 'connexion de développement (sans AD)'); await audit.log({ username: name, ip }, { action: 'auth.login_dev', entity: 'session', entityId: name }); }
       if (!auth.ok) {
         guard.recordFailure(name);
         await audit.log({ username: name, ip }, { action: 'auth.login_failed', entity: 'session', entityId: name });

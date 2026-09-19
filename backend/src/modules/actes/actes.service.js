@@ -99,7 +99,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const a = await svc.load(ctx, organismeId, id);
       const [delibs, editable] = await Promise.all([svc.deliberations(a.id), acl.canEdit(ctx, a)]);
       const comp = await svc.completeness(a);
-      return { ...toActe(a), deliberations: delibs, droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp };
+      return { ...toActe(a), deliberations: delibs, droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp, odj: late.odj ? await late.odj.positionsOf(a.id) : [] };
     },
 
     async list(ctx, organismeId, f = {}) {

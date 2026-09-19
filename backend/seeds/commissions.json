@@ -1,0 +1,85 @@
+[
+ {
+  "nom": "La Ville qui débat",
+  "sieges": 13,
+  "siegesOpposition": 3,
+  "thematiques": [
+   "Personnel communal et dialogue social",
+   "Relation avec les services publics nationaux",
+   "Affaires civiles et juridiques",
+   "Actions mémorielles, archives, patrimoine historique",
+   "Propreté et entretien de l'espace public",
+   "Politique de stationnement",
+   "Droits et citoyenneté des résident·es étranger·ères",
+   "Vie associative",
+   "Politique de la ville",
+   "Finances",
+   "Tranquillité de l'espace public et prévention de la délinquance, relations avec la Police Nationale",
+   "Communication, information, et événements publics",
+   "Évolutions de la relation usager",
+   "Ville numérique",
+   "Coordination des maisons municipales de quartier",
+   "Solidarité internationale",
+   "Lutte contre les discriminations",
+   "Impulsion de la participation citoyenne et démocratie locale",
+   "Droits des personnes en situation de handicap, lutte contre le validisme",
+   "Égalité de genres et lutte contre les violences sexistes et sexuelles",
+   "Délégations de quartier"
+  ]
+ },
+ {
+  "nom": "La Ville en transition",
+  "sieges": 13,
+  "siegesOpposition": 3,
+  "thematiques": [
+   "Développement démographique et urbain",
+   "Observatoire de la Ville",
+   "Entretien et transition du patrimoine communal",
+   "Développement du commerce de proximité et marchés aux comestibles",
+   "Activité économique, emploi, attractivité de la ville",
+   "Tourisme",
+   "Développement et entretien des espaces verts publics, végétalisation et biodiversité",
+   "Sobriété et biens communs énergétiques",
+   "Déplacements, mobilités alternatives",
+   "Réemploi, économie circulaire, prévention et gestion des déchets",
+   "Animation de l'observatoire éco-citoyen de connaissance des pollutions",
+   "Transports en commun",
+   "Bien-être animal et gestion des liminaires",
+   "Lutte contre l'habitat indigne, liens aux syndics de copropriété et conseils syndicaux",
+   "Sécurité des établissements recevant du public",
+   "Économie sociale et solidaire, alternatives à l'économie libérale"
+  ]
+ },
+ {
+  "nom": "La Ville solidaire",
+  "sieges": 12,
+  "siegesOpposition": 2,
+  "thematiques": [
+   "Coordination des politiques d’attribution du logement social",
+   "Relations avec les bailleurs sociaux",
+   "Politique tarifaire des activités au quotient familial",
+   "Action sociale",
+   "Lutte contre la précarité",
+   "logement d’urgence et résidences sociales",
+   "accès au droit",
+   "Bien-vieillir à Ivry",
+   "Santé, accès aux soins"
+  ]
+ },
+ {
+  "nom": "La Ville qui émancipe",
+  "sieges": 11,
+  "siegesOpposition": 2,
+  "thematiques": [
+   "Politiques culturelles",
+   "Petite enfance",
+   "Vie étudiante, enseignement supérieur",
+   "Culture scientifique",
+   "Politique éducative en direction des enfants et des adolescent·es",
+   "Politiques sportives",
+   "Politiques publiques en direction des jeunes",
+   "Accompagnement aux parentalités",
+   "Droit à une alimentation de qualité pour toutes et tous, agriculture urbaine et jardins partagés"
+  ]
+ }
+]

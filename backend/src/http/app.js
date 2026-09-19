@@ -33,6 +33,8 @@ const MODULES = [
   require('../modules/elus/elus.routes'),
   require('../modules/commissions/commissions.routes'),
   require('../modules/seances/seances.routes'),
+  require('../modules/seances/odj.routes'),
+  require('../modules/users/users.routes'),
 ];
 
 function createApp(c) {

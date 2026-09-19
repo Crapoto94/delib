@@ -50,6 +50,8 @@ const EnvSchema = z.object({
   STORAGE_DIR: z.string().default('./storage'),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(50),
   MAIL_REDIRECT_TO: z.string().optional(),
+  EMAIL_DOMAIN: z.string().default('ivry94.fr'),
+  DEV_LOGIN_PASSWORD: z.string().optional(),
   SCHEDULER_ENABLED: flag('false'),
   PUBLIC_BASE_URL: z.string().default('http://localhost:5160'),
   ANNOTATIONS_KEY: z.string().optional(),
@@ -71,6 +73,7 @@ function buildConfig(env = process.env) {
   const e = parsed.data;
   const ttlSeconds = parseDuration(e.JWT_TTL);
   const prod = e.NODE_ENV === 'production';
+  if (prod && e.DEV_LOGIN_PASSWORD) throw new Error('DEV_LOGIN_PASSWORD (connexion de développement sans AD) est interdit en production.');
   if (prod && !e.CORS_ORIGINS) throw new Error('CORS_ORIGINS est obligatoire en production (jamais « * »).');
   return Object.freeze({
     env: e.NODE_ENV,
@@ -99,6 +102,8 @@ function buildConfig(env = process.env) {
     directoryCacheMs: Math.round(e.DIRECTORY_CACHE_TTL_MIN * 60 * 1000),
     storage: Object.freeze({ dir: path.resolve(e.STORAGE_DIR), maxUploadBytes: Math.round(e.MAX_UPLOAD_MB * 1024 * 1024) }),
     mailRedirectTo: e.MAIL_REDIRECT_TO || null,
+    devLoginPassword: e.DEV_LOGIN_PASSWORD || null,
+    emailDomain: e.EMAIL_DOMAIN.replace(/^@/, ''),
     schedulerEnabled: e.SCHEDULER_ENABLED,
     publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
     annotationsKey: e.ANNOTATIONS_KEY || null,

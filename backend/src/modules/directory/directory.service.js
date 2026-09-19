@@ -86,15 +86,30 @@ function createDirectoryService({ db, adapter, config, log }) {
      * À la connexion : fusionne l'identité AD et la fiche RH (direction, service, poste) dans agent_ref.
      * Si l'annuaire RH est indisponible, la connexion aboutit avec ce qui est déjà connu.
      */
+    /**
+     * Fiche RH à la connexion. L'AD ne renvoie pas toujours l'adresse e-mail : à défaut on essaie `<identifiant>@<domaine>`
+     * (EMAIL_DOMAIN) puis une recherche dans l'annuaire RH, pour retrouver nom, prénom, direction et service.
+     */
     async syncOnLogin(adUser) {
-      let card = null;
-      if (adUser.email) {
-        try { card = await adapter.getAgentByEmail(adUser.email); } catch (e) { log.warn({ err: e.message }, 'fiche RH indisponible à la connexion'); }
+      let card = null; let email = adUser.email || null;
+      const tryEmail = async (addr) => {
+        try { const c = await adapter.getAgentByEmail(addr); if (c) { card = c; email = c.email || addr; } } catch (e) { log.warn({ err: e.message }, 'fiche RH indisponible à la connexion'); }
+      };
+      if (email) await tryEmail(email);
+      if (!card && config.emailDomain) await tryEmail(`${adUser.username}@${config.emailDomain}`);
+      if (!card) {
+        try {
+          const hit = (await adapter.searchAgents(adUser.username)).find((a) => (a.email || '').split('@')[0].toLowerCase() === adUser.username);
+          if (hit?.email) await tryEmail(hit.email);
+        } catch { /* annuaire indisponible : on continue sans fiche */ }
       }
       const dir = await resolveDirection(card?.direction);
       const svcHit = await resolveService(dir?.code, card?.service);
+      const cap = (s) => String(s || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+      const fromCard = card && (card.prenom || card.nom) ? `${cap(card.prenom)} ${cap(card.nom)}`.trim() : null;
+      const displayName = adUser.displayName && adUser.displayName !== adUser.username ? adUser.displayName : (fromCard || adUser.displayName);
       return upsertAgent({
-        username: adUser.username, displayName: adUser.displayName, email: adUser.email,
+        username: adUser.username, displayName, email,
         nom: card?.nom ?? adUser.surname, prenom: card?.prenom ?? adUser.givenName, matricule: card?.matricule,
         directionCode: dir?.code, directionLabel: dir?.label || card?.direction, serviceLabel: svcHit?.label || card?.service, serviceCode: svcHit?.code, poste: card?.fonction,
         actif: card ? card.present : true, loginAt: new Date(),

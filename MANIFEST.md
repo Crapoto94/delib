@@ -1,6 +1,6 @@
 # MANIFEST — IvryDélib : gestion des délibérations
 
-> **Statut : v1.0 — validée le 2026-09-19.** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.2 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -192,6 +192,14 @@ Lu dans le tutoriel de formation (18 pages).
 | **Secrétaire de séance** | Élu désigné pour la séance | saisi par le SCC |
 | **Télétransmission** | Prépare et confirme l'envoi au contrôle de légalité | rôle par organisme |
 
+### Administration des utilisateurs et des rôles (D41)
+
+- **USR-01** — Écran **Utilisateurs** (administrateur d'organisme ; administrateur de plateforme pour les rôles de plateforme) : recherche d'un agent (annuaire commun + agents déjà connectés), fiche (identité RH, direction, service, dernière connexion), **rôles par organisme** avec ajout / retrait.
+- **USR-02** — Rôles gérables : **administrateur de plateforme**, **administrateur d'organisme**, **SCC**, **télétransmission**, **lecteur** ; les fonctions de validation (chef de service, directeur, DGA, DGS) et les groupes restent gérés par l'écran **Titulaires** (D31).
+- **USR-03** — Vue **« Accès d'un utilisateur »** : organismes accessibles et pourquoi (rôle, direction rattachée), titulaires et groupes dont il fait partie, autorisations de rédaction, délégations actives.
+- **USR-04** — Un administrateur d'organisme ne peut **ni retirer son dernier rôle d'administrateur, ni attribuer** un rôle de plateforme ; l'administrateur de plateforme est protégé contre l'auto-suppression ; toute modification est **auditée** (avant / après).
+- **USR-05** — Désactiver un agent (départ) retire ses accès et **déclenche la réaffectation** de ses étapes en cours (CIR-32) ; aucune donnée n'est supprimée.
+
 ---
 
 ## 5. Multi-organismes (Ville, CCAS…)
@@ -336,6 +344,14 @@ Le fichier reprend la **nomenclature ministérielle des matières** utilisée po
 - **REF-05** — Import/export CSV de tous les référentiels.
 
 ---
+
+### 7.5 Copie d'une délibération assistée par l'IA (D40)
+
+- **CPY-01** — Depuis un acte existant (de n'importe quelle séance passée, y compris archivé), « **Copier pour un nouveau dossier** » crée un **brouillon** (fiche, exposé, visas, dispositif ; annexes en option) : c'est la copie simple, sans IA.
+- **CPY-02** — Option « **Adapter au nouveau contexte avec l'IA** » : l'agent décrit le contexte (nouvel objet, bénéficiaire, montant, dates, différences) ; l'IA renvoie une **liste de propositions** (texte à remplacer → texte proposé, avec la raison), par texte du dossier.
+- **CPY-03** — **L'IA propose, l'agent valide** (D21) : chaque proposition s'accepte, se refuse ou s'édite ; l'acceptation applique le remplacement dans le texte du brouillon ; **rien n'est appliqué automatiquement**. Les propositions et décisions sont conservées (`ai_suggestions`).
+- **CPY-04** — L'IA signale aussi les **éléments à vérifier** (montants, dates, noms propres, références de textes, séance) qu'elle n'a pas pu adapter ; ils s'affichent comme alertes, jamais comme modification.
+- **CPY-05** — Le contenu envoyé à l'IA passe par le **port `AiPort`** (API IA interne de l'APM) ; aucune donnée ne quitte l'infrastructure de la Ville ; si l'IA est indisponible, la copie simple reste possible.
 
 ## 8. Droits de rédaction (règle validée)
 
@@ -540,6 +556,14 @@ Un texte de délibération a une **valeur juridique** : on garde le principe, on
 - **TRK-13** — **Concurrence** : verrou souple + numéro de version ; une sauvegarde sur version périmée est refusée avec fusion assistée.
 - **TRK-14** — Les modifications de **champs de la fiche** (titre, matière, incidence…) sont aussi journalisées (avant/après) dans l'historique de l'acte, sans coloration.
 - **TRK-15** — Les **annexes** ne sont pas différenciées mot à mot : elles sont **versionnées** (remplacement = nouvelle version, ancienne conservée et visible).
+
+### 11.2 bis Éditeur en modale (D39)
+
+- **EDI-01** — Un clic sur un texte (exposé, « Vu et considérant », « Délibéré ») ouvre une **modale plein écran** WYSIWYG ; la page du dossier n'affiche que l'aperçu du texte. Enregistrement automatique, indicateur d'état, version et auteur visibles, fermeture sans perte.
+- **EDI-02** — Dans le **dispositif (« Délibéré »)** : chaque article est un bloc ; **« Article N »** (le mot et le numéro) est **saisi automatiquement**, **en gras**, et se renumérote quand on insère ou supprime un article ; **Entrée** = nouvel article, **Maj + Entrée** = simple retour à la ligne dans l'article.
+- **EDI-03** — Les « Vu » et « Considérant » sont des paragraphes distincts (Entrée = nouveau paragraphe, préfixe « Vu » / « Considérant » proposé) ; l'exposé accepte gras, italique, listes.
+- **EDI-04** — Le texte est **stocké en Markdown** (le suivi des modifications et le PDF en dépendent) ; le gras des articles s'écrit `**Article N :**`. La mise en page PDF reproduit le gras.
+- **EDI-05** — En circuit, la modale affiche les modifications suivies en couleur (une couleur par auteur), avec accepter / rejeter modification par modification.
 
 ### 11.3 Décision d'éditeur (à trancher par un court prototype)
 
@@ -1456,6 +1480,14 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | Q53 | **Vote** : boîtiers de vote existants à intégrer ? **PV** : compte rendu succinct ou intégral, enregistrement audio autorisé ? |
 
 **À cadrer plus tard** : Q21 (sens de « type de pièces complémentaires »), Q22 (périmètre AirsDelib complet et **migration de l'historique**), Q24 (React 18 ou 19), Q25 (nom commercial de l'application ; le schéma est `ivrydelib`), Q40 (niveau et format de signature, à la reprise de la signature), Q52 (DMZ : domaine, port, pare-feu).
+| **D39** | **Éditeur de textes en modale plein écran, WYSIWYG** : exposé des motifs, « Vu et considérant » et « Délibéré » s'ouvrent dans une modale complète (pas dans un petit cadre) ; dans le dispositif, **« Article N » est saisi automatiquement et mis en gras**, **Entrée** crée l'article suivant, **Maj + Entrée** fait un simple retour à la ligne. | 11, 12, 23 |
+| **D40** | **Copie de délibération assistée par IA** : on copie une délibération existante (ex. l'an passé) ; l'IA **propose** les modifications à faire pour l'adapter au nouveau contexte ; l'agent accepte ou refuse **chacune** (D21). | 7, 21 |
+| **D41** | **Administration des utilisateurs et des rôles** : écran (et API) pour rechercher un agent, lui attribuer ou retirer les rôles de plateforme et d'organisme, voir ses accès et son activité. | 4, 25 |
+| **D42** | **Connexion de développement** : un mot de passe commun (`DEV_LOGIN_PASSWORD`, uniquement dans `.env`, **jamais en production**) valide n'importe quel identifiant sans interroger l'AD ; chaque usage est journalisé et audité. | 24, 29 |
+| **D43** | **Jeu de démonstration** (`scripts/seed-demo.js`) : agents fictifs `demo.*` sur l'organigramme réel du Hub, titulaires, élus, commissions, séances et dossiers à tous les stades du circuit, pour tester à la main. | 28 |
+| **D44** | **Commissions réelles** : « La Ville qui débat » (13 sièges dont 3 d'opposition), « La Ville en transition » (13 dont 3), « La Ville solidaire » (12 dont 2), « La Ville qui émancipe » (11 dont 2), avec leurs **thématiques** (délibération de création, `commissions.txt`) ; sièges et thématiques sont des champs de la commission. | 15 |
+| **D45** | **L'AD ne fournit pas toujours l'adresse e-mail** : la fiche RH est alors cherchée par `<identifiant>@<domaine>` (`EMAIL_DOMAIN`, défaut `ivry94.fr`) puis par recherche dans l'annuaire ; nom, prénom, direction, service et poste en sont déduits. | 5, 24 |
+| **D46** | **Date limite de rédaction dépassée → erreur 423** `DEADLINE_PASSED` avec l'identifiant de la séance suivante ; dérogation, report ou alerte seule selon le paramètre `seances.blocage_date_limite`. | 22.1 |
 
 ---
 
@@ -1476,3 +1508,4 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.2** | 2026-09-19 | **lots 1 à 4a réalisés** (actes, textes suivis, PDF, circuit, délégations, notifications et relances, élus, commissions, séances, dérogations) ; **premier frontend** d'après Stitch ; décisions **D39 à D46** : éditeur en modale WYSIWYG (articles automatiques), copie de délibération assistée par IA, administration des utilisateurs et des rôles, connexion de développement, jeu de démonstration, commissions réelles (sièges, thématiques), fiche RH sans e-mail AD, erreur 423 de date limite |

@@ -8,7 +8,7 @@ const { requireOrg } = require('../../db/pool');
 
 const AVIS = ['favorable', 'defavorable', 'reserve', 'sans_avis'];
 const FONCTIONS = ['president', 'vice_president', 'membre'];
-const toC = (r) => ({ id: r.id, organismeId: r.organisme_id, nom: r.nom, description: r.description, couleur: r.couleur, ordre: r.ordre, matieres: r.matieres, directions: r.directions, actif: r.actif });
+const toC = (r) => ({ id: r.id, organismeId: r.organisme_id, nom: r.nom, description: r.description, couleur: r.couleur, ordre: r.ordre, matieres: r.matieres, directions: r.directions, thematiques: r.thematiques, sieges: r.sieges, siegesOpposition: r.sieges_opposition, actif: r.actif });
 const toAc = (r) => ({
   id: r.id, acteId: r.acte_id, commissionId: r.commission_id, commission: r.commission_nom, avis: r.avis, commentaire: r.avis_commentaire, datePassage: r.avis_date, avisPar: r.avis_par, avisAt: r.avis_at,
   misADispositionAt: r.mis_a_disposition_at, suspendue: r.suspendue, retireeAt: r.retiree_at, retireeMotif: r.retiree_motif,
@@ -41,8 +41,8 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log }) {
     async create(ctx, organismeId, b) {
       const org = requireOrg(organismeId);
       try {
-        const r = await db.get('INSERT INTO commissions (organisme_id, nom, description, couleur, ordre, matieres, directions) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb) RETURNING *',
-          [org, b.nom, b.description ?? null, b.couleur ?? null, b.ordre ?? 0, JSON.stringify(b.matieres || []), JSON.stringify(b.directions || [])]);
+        const r = await db.get('INSERT INTO commissions (organisme_id, nom, description, couleur, ordre, matieres, directions, thematiques, sieges, sieges_opposition) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10) RETURNING *',
+          [org, b.nom, b.description ?? null, b.couleur ?? null, b.ordre ?? 0, JSON.stringify(b.matieres || []), JSON.stringify(b.directions || []), JSON.stringify(b.thematiques || []), b.sieges ?? null, b.siegesOpposition ?? null]);
         await audit.log(ctx, { organismeId: org, action: 'commission.create', entity: 'commissions', entityId: r.id, after: toC(r) });
         return svc.get(org, r.id);
       } catch (e) { if (e.code === '23505') throw E.conflict('Une commission porte déjà ce nom'); throw e; }
@@ -52,7 +52,7 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log }) {
       const org = requireOrg(organismeId);
       const before = await svc.get(org, id);
       const set = []; const p = [id, org];
-      for (const [k, col, j] of [['nom', 'nom'], ['description', 'description'], ['couleur', 'couleur'], ['ordre', 'ordre'], ['actif', 'actif'], ['matieres', 'matieres', true], ['directions', 'directions', true]]) {
+      for (const [k, col, j] of [['nom', 'nom'], ['description', 'description'], ['couleur', 'couleur'], ['ordre', 'ordre'], ['actif', 'actif'], ['matieres', 'matieres', true], ['directions', 'directions', true], ['thematiques', 'thematiques', true], ['sieges', 'sieges'], ['siegesOpposition', 'sieges_opposition']]) {
         if (b[k] !== undefined) { p.push(j ? JSON.stringify(b[k]) : b[k]); set.push(`${col} = $${p.length}${j ? '::jsonb' : ''}`); }
       }
       if (set.length) await db.run(`UPDATE commissions SET ${set.join(', ')} WHERE id = $1 AND organisme_id = $2`, p);

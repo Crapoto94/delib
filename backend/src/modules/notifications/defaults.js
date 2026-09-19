@@ -65,6 +65,12 @@ const RULES = [
   { code: 'seance.affectation', nom: 'Séance visée modifiée ou acte reporté', family: 'suivi', kind: 'event', mandatory: false,
     trigger: { event: 'acte.seance_changed' }, recipients: ['redacteur', 'rapporteur'],
     subject: 'Séance modifiée : {titre}', body: "La séance visée pour l'acte n° {numero} « {titre} » a changé.\n{motif}\n{lien}" },
+  { code: 'odj.arrete', nom: "Ordre du jour arrêté : numéro et rang de l'acte", family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'odj.arrete' }, recipients: ['redacteur', 'rapporteur'],
+    subject: 'Ordre du jour arrêté : {titre}', body: "L'acte n° {numero} « {titre} » est inscrit à l'ordre du jour sous le numéro {numero_odj} (point {ordre_odj}).\n{lien}" },
+  { code: 'odj.modifie', nom: "Modification de l'ordre du jour après son arrêt", family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'odj.modifie' }, recipients: ['redacteur', 'rapporteur', 'scc'],
+    subject: "Ordre du jour modifié : {titre}", body: "L'ordre du jour a été modifié après son arrêt pour l'acte n° {numero} « {titre} » ({motif}).\n{lien}" },
 
   // ---- temporelles : relances (paliers par défaut de la section 22.3 bis, jours ouvrés) ------------------------------
   { code: 'relance.etape', nom: "Relance d'un acte qui attend un valideur", family: 'validation', kind: 'temporal', mandatory: true,
