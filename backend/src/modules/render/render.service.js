@@ -16,8 +16,8 @@ const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const A4_TOL = 6; // points
 
 function createRender({ db, audit, storage, refs, actes, textes, config }) {
-  let measurePromise = null;
-  const measure = () => (measurePromise ||= T.createMeasure());
+  const measures = new Map();
+  const measure = (family = 'interstate') => { if (!measures.has(family)) measures.set(family, T.createMeasure(family, config.fontsDir)); return measures.get(family); };
   const cache = new Map();
   const remember = (k, v) => { cache.set(k, v); if (cache.size > 60) cache.delete(cache.keys().next().value); return v; };
 
@@ -122,8 +122,8 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
       const wm = watermark === undefined ? cfg.filigrane : watermark;
       const key = sha(JSON.stringify({ docType, content, cfg, vars, wm, bf: bf?.sha256, bn: bn?.sha256, v: tpl.version }));
       if (cache.has(key)) return cache.get(key);
-      const layout = T.layoutDocument({ content, cfg, vars, measure: await measure() });
-      const out = await T.paintDocument({ layout, cfg, vars, bgFirst: bf?.bytes, bgNext: bn?.bytes, watermark: wm || null, title });
+      const layout = T.layoutDocument({ content, cfg, vars, measure: await measure(cfg.police?.famille) });
+      const out = await T.paintDocument({ layout, cfg, vars, bgFirst: bf?.bytes, bgNext: bn?.bytes, watermark: wm || null, title, fontsDir: config.fontsDir });
       return remember(key, { ...out, layout, key });
     },
 

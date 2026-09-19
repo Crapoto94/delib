@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Route, Routes } from 'react-router-dom';
+import Odj from './Odj';
 import { CalendarDays, Plus } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -57,7 +58,7 @@ function HorsDelai() {
   );
 }
 
-export default function Seances() {
+function SeancesList() {
   const { org, isScc } = useAuth(); const o = org!.id;
   const [tab, setTab] = useState<'seances' | 'hors'>('seances'); const [creating, setCreating] = useState(false);
   const list = useLoad(async () => (await api.get(orgPath(o, '/seances'), { params: { limit: 100 } })).data.items as any[], [o]);
@@ -70,7 +71,7 @@ export default function Seances() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{list.data.map((s) => {
           const j = daysUntil(s.dateSeance); const lim = daysUntil(s.dateLimiteRedaction);
           return (
-            <article key={s.id} className="card p-5">
+            <Link key={s.id} to={`/seances/${s.id}`} className="card block p-5 hover:shadow-lift" aria-label={`Ordre du jour du ${d(s.dateSeance)}`}>
               <div className="flex items-start justify-between"><div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-action" /><h3>{s.instance}</h3></div><Badge tone={s.statut === 'planifiee' ? 'blue' : 'gray'}>{s.statut}</Badge></div>
               <div className="mt-2 text-[18px] font-bold">{dt(s.dateSeance, { dateStyle: 'full', timeStyle: 'short' })}</div>
               <div className="text-mute">{s.lieu || 'Lieu à définir'}{j !== null && j >= 0 ? ` · dans ${j} jour(s)` : ''}</div>
@@ -79,9 +80,13 @@ export default function Seances() {
                 <div className="flex justify-between"><dt>Actes en attente d'affectation</dt><dd className="font-bold">{s.actesEnAttente ?? 0}</dd></div>
                 <div className="flex justify-between"><dt>Ordre du jour</dt><dd>{s.odjStatut.replace('_', ' ')}</dd></div>
               </dl>
-            </article>);
+            </Link>);
         })}</div>)}
       {creating && <NewSeance onClose={() => setCreating(false)} onDone={list.reload} />}
     </div>
   );
+}
+
+export default function Seances() {
+  return <Routes><Route index element={<SeancesList />} /><Route path=":id" element={<Odj />} /></Routes>;
 }

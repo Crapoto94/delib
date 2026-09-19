@@ -36,7 +36,7 @@ function formatNumero(pattern, vars) {
   });
 }
 
-function createOdj({ db, audit, actes, acl, titulaires, settings, bus, late }) {
+function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
   const seanceOf = async (q, org, id, lock = false) => {
     const s = await q.get(`SELECT s.*, i.nom AS instance_nom, i.numbering AS instance_numbering FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2${lock ? ' FOR UPDATE OF s' : ''}`, [id, requireOrg(org)]);
     if (!s) throw E.notFound('Séance introuvable');
@@ -176,7 +176,7 @@ function createOdj({ db, audit, actes, acl, titulaires, settings, bus, late }) {
 
     async affecter(ctx, organismeId, seanceId, { acteIds, motif }) {
       const org = requireOrg(organismeId);
-      const res = await mutate(ctx, org, seanceId, { motif }, async (q, s, after) => {
+      await mutate(ctx, org, seanceId, { motif }, async (q, s, after) => {
         const changed = []; const added = [];
         for (const acteId of acteIds) {
           const a = await q.get('SELECT * FROM actes WHERE id = $1 AND organisme_id = $2 FOR UPDATE', [acteId, org]);
@@ -419,7 +419,7 @@ function createOdj({ db, audit, actes, acl, titulaires, settings, bus, late }) {
       const esc = (v) => { const s = String(v ?? ''); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
       const head = ['Ordre', 'Numéro', 'Type', 'Titre', 'N° suivi', 'Rubrique', 'Rapporteur', 'Direction', 'Statut acte', 'Statut point'];
       const lines = o.items.map((it, i) => [i + 1, it.numero || '', it.kind, it.titre, it.acte?.numeroSuivi, it.acte?.rubrique, it.acte?.rapporteur, it.acte?.direction, it.acte?.statut, it.statut === 'retire' ? `retiré (${it.retireMotif})` : it.provisoire ? 'provisoire' : 'figé'].map(esc).join(';'));
-      return `﻿${head.join(';')}\n${lines.join('\n')}\n`;
+      return '﻿' + `${head.join(';')}\n${lines.join('\n')}\n`;
     },
 
     /** Position d'un acte dans les ordres du jour (champ « Classement ODJ » calculé, en lecture seule — ODJ-07). */

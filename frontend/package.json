@@ -10,11 +10,16 @@
   },
   "dependencies": {
     "@fontsource/source-sans-3": "^5.1.0",
+    "@tiptap/extension-placeholder": "^2.27.3",
+    "@tiptap/pm": "^2.27.3",
+    "@tiptap/react": "^2.27.3",
+    "@tiptap/starter-kit": "^2.27.3",
     "axios": "^1.7.9",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0"
+    "react-router-dom": "^6.28.0",
+    "tiptap-markdown": "^0.8.10"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

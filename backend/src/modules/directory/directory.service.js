@@ -80,6 +80,28 @@ function createDirectoryService({ db, adapter, config, log }) {
     directions,
     organisationChart: () => adapter.getOrganisationChart(),
     searchAgents: (q) => adapter.searchAgents(q),
+
+    /**
+     * Autocomplétion d'un agent (« @nom ») : identifiant de connexion, nom, direction. Les agents déjà connectés d'abord, puis
+     * l'annuaire RH. L'identifiant AD est la partie locale de l'e-mail (l'identifiant interne du Hub n'est pas un login).
+     */
+    async searchLogins(q, limit = 12) {
+      const text = String(q || '').trim().replace(/^@/, '');
+      if (text.length < 2) return [];
+      const like = `%${text.replace(/[%_]/g, '\\$&')}%`;
+      const local = (await db.all(
+        `SELECT username, display_name, email, direction_label, service_label, poste FROM agent_ref
+         WHERE actif AND (username ILIKE $1 OR display_name ILIKE $1 OR email ILIKE $1 OR nom ILIKE $1 OR prenom ILIKE $1)
+         ORDER BY (username ILIKE $2) DESC, display_name NULLS LAST LIMIT $3`, [like, `${text.replace(/[%_]/g, '')}%`, limit]))
+        .map((r) => ({ username: r.username, displayName: r.display_name || r.username, email: r.email, direction: r.direction_label, service: r.service_label, poste: r.poste, knownLocally: true }));
+      const seen = new Set(local.map((a) => a.username));
+      let remote = [];
+      try {
+        remote = (await adapter.searchAgents(text)).map((a) => ({ a, login: ((a.email || '').split('@')[0] || '').toLowerCase() })).filter(({ login }) => login && !seen.has(login))
+          .map(({ a, login }) => ({ username: login, displayName: a.displayName, email: a.email, direction: a.direction, service: a.service, poste: a.poste, knownLocally: false }));
+      } catch (e) { log.warn({ err: e.message }, 'autocomplétion : annuaire RH indisponible, résultats locaux seulement'); }
+      return [...local, ...remote].slice(0, limit);
+    },
     toAgent,
 
     /**
@@ -121,7 +143,7 @@ function createDirectoryService({ db, adapter, config, log }) {
     async agentExists(username) {
       const u = String(username).toLowerCase();
       if (await db.get('SELECT 1 AS x FROM agent_ref WHERE username = $1 AND actif', [u])) return true;
-      try { return (await adapter.searchAgents(u)).some((a) => a.username === u); } catch { return false; }
+      try { return (await adapter.searchAgents(u)).some((a) => a.username === u || (a.email || '').split('@')[0].toLowerCase() === u); } catch { return false; }
     },
     resolveDirection,
     resolveService,

@@ -35,6 +35,7 @@ const MODULES = [
   require('../modules/seances/seances.routes'),
   require('../modules/seances/odj.routes'),
   require('../modules/users/users.routes'),
+  require('../modules/ai/ai.routes'),
 ];
 
 function createApp(c) {

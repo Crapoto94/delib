@@ -14,7 +14,7 @@ module.exports = ({ makeRouter, dir, onboarding }) => {
     summary: "Profil de l'utilisateur connecté", tags: ['me'],
     description: "Identité, fiche agent (direction, service, poste), organismes accessibles avec leurs rôles, et tutoriels à proposer (`onboarding.toShow`, dont la visite de première connexion).",
   }, async (req, res) => {
-    const c = req.ctx;
+    const c = req.ctx; const real = req.realCtx || req.ctx;
     const def = c.organismes.find((o) => o.isDefault) || c.organismes[0] || null;
     res.json({
       username: c.username, displayName: c.displayName, email: c.email, kind: c.kind, isPlatformAdmin: c.isPlatformAdmin,
@@ -22,6 +22,8 @@ module.exports = ({ makeRouter, dir, onboarding }) => {
       organismes: c.organismes.map((o) => ({ id: o.id, code: o.code, nom: o.nom, type: o.type, isDefault: o.isDefault, roles: o.roles, via: o.via, vocabulaire: o.vocabulaire })),
       defaultOrganismeId: def?.id ?? null,
       onboarding: { toShow: await onboarding.toShow(c.username) },
+      impersonation: c.impersonatedBy ? { by: c.impersonatedBy } : null,
+      canImpersonate: real.isPlatformAdmin || real.roles.some((r) => ['org_admin', 'scc'].includes(r.role)),
     });
   });
 

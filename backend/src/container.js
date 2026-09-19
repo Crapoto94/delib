@@ -2,7 +2,7 @@
  * Composition de l'application : assemble adaptateurs (ports), services et routes.
  * Les adaptateurs sont injectés : production = APM + Hub DSI ; tests = faux adaptateurs (aucun réseau).
  */
-const { assertAuthPort, assertDirectoryPort, assertMailPort } = require('./ports');
+const { assertAuthPort, assertDirectoryPort, assertMailPort, assertAiPort } = require('./ports');
 const { createAudit } = require('./modules/audit/audit.service');
 const { createAccess } = require('./modules/auth/access');
 const { createSessions } = require('./modules/auth/sessions.repository');
@@ -33,10 +33,12 @@ const { createSeances } = require('./modules/seances/seances.service');
 const { createDeadlines } = require('./modules/seances/deadlines.service');
 const { createOdj } = require('./modules/seances/odj.service');
 const { createUsers } = require('./modules/users/users.service');
+const { createAi } = require('./modules/ai/ai.service');
 
-function buildContainer({ config, log, db, ad, directoryAdapter, mail, guard }) {
+function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, guard }) {
   assertAuthPort(ad);
   assertMailPort(mail);
+  assertAiPort(aiAdapter);
   assertDirectoryPort(directoryAdapter);
   const audit = createAudit(db);
   const access = createAccess(db);
@@ -69,13 +71,14 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, guard }) 
   late.deadlines = deadlines;
   const odj = createOdj({ db, audit, actes, acl, titulaires, settings, bus, late });
   late.odj = odj;
+  const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log });
   const users = createUsers({ db, audit, dir, organismes, access, log });
   const delegations = createDelegations({ db, audit, access, titulaires, dir, bus });
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
   const scheduler = createScheduler({ db, notifications, config, log });
-  return { config, log, db, ad, directoryAdapter, mail, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, users };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, users, ai };
 }
 
 module.exports = { buildContainer };

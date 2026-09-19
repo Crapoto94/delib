@@ -16,7 +16,7 @@ function createAudit(db) {
       await db.withCtx({ isPlatformAdmin: true }, (q) => q.run(
         `INSERT INTO audit_log (organisme_id, actor, on_behalf_of, action, entity, entity_id, before, after, ip)
          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9)`,
-        [organismeId, ctx?.username || 'system', ctx?.onBehalfOf || null, action, entity,
+        [organismeId, ctx?.impersonatedBy || ctx?.username || 'system', ctx?.impersonatedBy ? (ctx.onBehalfOf || ctx.username) : (ctx?.onBehalfOf || null), action, entity,
           entityId === null || entityId === undefined ? null : String(entityId), json(before), json(after), ctx?.ip || null],
       ));
     },

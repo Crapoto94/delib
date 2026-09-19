@@ -1,3 +1,4 @@
+const { E } = require('../../shared/errors');
 /**
  * Contexte d'accès d'un utilisateur : ses rôles, son agent (cache d'annuaire) et les organismes auxquels il a accès.
  *
@@ -55,6 +56,25 @@ function createAccess(db) {
         orgIds: organismes.map((o) => o.id),
       };
     },
+  /**
+   * Qui peut se faire passer pour qui (audité, D47) :
+   *  - administrateur de plateforme : tout agent ;
+   *  - administrateur d'organisme : tout agent qui a accès à l'un de SES organismes, sauf administrateur de plateforme ;
+   *  - SCC : les agents ordinaires de ses organismes (ni administrateur, ni SCC, ni administrateur de plateforme).
+   */
+    async actAsTarget(real, username) {
+    const adminOrgs = real.roles.filter((r) => ['org_admin', 'scc'].includes(r.role)).map((r) => r.organismeId);
+    if (!real.isPlatformAdmin && !adminOrgs.length) throw E.forbidden("« Afficher en tant que » est réservé aux administrateurs et au SCC");
+    const target = await this.loadContext(username);
+    if (!target.agent && !target.roles.length) throw E.notFound('Utilisateur inconnu');
+    if (real.isPlatformAdmin) return target;
+    if (target.isPlatformAdmin) throw E.forbidden("Vous ne pouvez pas agir en tant qu'administrateur de plateforme");
+    const shared = target.orgIds.filter((id) => real.roles.some((r) => r.organismeId === id && ['org_admin', 'scc'].includes(r.role)));
+    if (!shared.length) throw E.forbidden("Cet utilisateur n'appartient à aucun de vos organismes");
+    const isOrgAdmin = real.roles.some((r) => r.role === 'org_admin');
+    if (!isOrgAdmin && target.roles.some((r) => ['org_admin', 'scc'].includes(r.role))) throw E.forbidden("Le SCC ne peut pas agir en tant qu'administrateur ou que SCC");
+    return target;
+  },
     canAccess: (ctx, organismeId) => ctx.orgIds.includes(Number(organismeId)),
     /** Rôles détenus dans un organisme (l'administrateur de plateforme est implicitement admin partout). */
     rolesIn: (ctx, organismeId) => [

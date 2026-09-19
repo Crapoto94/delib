@@ -1,7 +1,7 @@
 /** Gabarits de mise en page par défaut (PRE-04) : utilisés tant qu'un organisme n'a pas défini les siens. */
 const BASE = {
   marges: { haut: 25, bas: 25, gauche: 22, droite: 22 },
-  police: { taille: 11, interligne: 1.35, justifie: true },
+  police: { famille: 'interstate', taille: 11, interligne: 1.35, justifie: true },
   pied: { texte: '', pagination: true },
   entete: [],
   filigrane: 'PROJET — non définitif',

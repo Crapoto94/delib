@@ -19,6 +19,7 @@ const AUTH_METHODS = ['authenticate', 'getUser', 'searchUsers', 'ping'];
 const DIRECTORY_METHODS = ['listDirections', 'getOrganisationChart', 'searchAgents', 'getAgentByEmail', 'ping'];
 
 const MAIL_METHODS = ['send'];
+const AI_METHODS = ['query'];
 
 function assertPort(name, impl, methods) {
   const missing = methods.filter((m) => typeof impl?.[m] !== 'function');
@@ -29,5 +30,6 @@ function assertPort(name, impl, methods) {
 module.exports = {
   assertAuthPort: (impl) => assertPort('AuthPort', impl, AUTH_METHODS),
   assertDirectoryPort: (impl) => assertPort('DirectoryPort', impl, DIRECTORY_METHODS),
+  assertAiPort: (impl) => assertPort('AiPort', impl, AI_METHODS),
   assertMailPort: (impl) => assertPort('MailPort', impl, MAIL_METHODS),
 };

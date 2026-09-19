@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const multer = require('multer');
 const { DOC_TYPES } = require('./render.service');
+const { available } = require('./fonts');
 
 const Id = z.coerce.number().int().positive();
 const Doc = z.enum(DOC_TYPES);
@@ -14,7 +15,7 @@ const Block = z.object({
 });
 const Config = z.object({
   marges: z.object({ haut: num(0, 80), bas: num(0, 80), gauche: num(0, 80), droite: num(0, 80) }).partial().optional(),
-  police: z.object({ taille: num(7, 18), interligne: num(1, 2.5), justifie: z.boolean() }).partial().optional(),
+  police: z.object({ famille: z.enum(['times', 'helvetica', 'interstate']), taille: num(7, 18), interligne: num(1, 2.5), justifie: z.boolean() }).partial().optional(),
   pied: z.object({ texte: z.string().max(200), pagination: z.boolean() }).partial().optional(),
   entete: z.array(Block).max(12).optional(),
   filigrane: z.string().max(60).optional(),
@@ -36,6 +37,10 @@ module.exports = ({ makeRouter, render, config }) => {
 
   r.get('/gabarits', { summary: 'Gabarits de mise en page (avec valeurs par défaut)', tags: ['mise en page'], org: true, params: z.object({ orgId: Id }) },
     async (req, res) => res.json({ items: await render.listTemplates(req.org.id) }));
+
+  r.get('/gabarits-polices', { summary: 'Polices disponibles pour les PDF', tags: ['mise en page'], org: true, params: z.object({ orgId: Id }),
+    description: 'Interstate (police de la Ville) n’est proposée que si ses fichiers sont présents sur le serveur (FONTS_DIR).' },
+  async (req, res) => res.json({ items: available(config.fontsDir) }));
 
   r.put('/gabarits/:docType', {
     summary: 'Définit un gabarit (marges, police, en-tête à variables, pied de page, filigrane)', tags: ['mise en page'], org: true, roles: ['org_admin'], params: P, body: Config,

@@ -5,6 +5,7 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
+import { Gabarits, Utilisateurs } from './AdminExtra';
 
 const FONCTIONS: Record<string, string> = { responsable_intermediaire: 'Responsable intermédiaire', chef_service: 'Chef de service', directeur: 'Directeur', dga: 'DGA', dgs: 'DGS' };
 
@@ -156,14 +157,15 @@ function Calendrier() {
 
 export default function Admin() {
   const { isAdmin } = useAuth();
-  const tabs = [['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['notifications', 'Notifications & relances'], ['elus', 'Élus'], ['calendrier', 'Jours fériés']];
+  const tabs = [['utilisateurs', 'Utilisateurs & rôles'], ['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['gabarits', 'Gabarits PDF'], ['notifications', 'Notifications & relances'], ['elus', 'Élus'], ['calendrier', 'Jours fériés']];
   return (
     <div>
       <PageTitle title="Administration" sub={isAdmin ? "Paramétrage de l'organisme." : "Paramétrage accessible au SCC."} />
       <nav className="mb-6 flex flex-wrap gap-1 border-b border-line" aria-label="Administration">{tabs.map(([k, l]) => (
         <NavLink key={k} to={`/admin/${k}`} className={({ isActive }) => `-mb-px border-b-2 px-4 py-2 text-[13px] font-semibold ${isActive ? 'border-primary text-primary' : 'border-transparent text-mute hover:text-ink'}`}>{l}</NavLink>))}</nav>
       <Routes>
-        <Route index element={<Navigate to="titulaires" replace />} />
+        <Route index element={<Navigate to="utilisateurs" replace />} />
+        <Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
         <Route path="elus" element={<Elus />} /><Route path="calendrier" element={<Calendrier />} />
       </Routes>

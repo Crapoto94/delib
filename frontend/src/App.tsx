@@ -11,6 +11,7 @@ import Seances from './pages/Seances';
 import Commissions from './pages/Commissions';
 import Delegations from './pages/Delegations';
 import Preferences from './pages/Preferences';
+import DevEditor from './pages/DevEditor';
 
 export default function App() {
   const { me, loading } = useAuth();
@@ -18,6 +19,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/connexion" element={<Login />} />
+      {import.meta.env.DEV && <Route path="/dev/editeur" element={<DevEditor />} />}
       <Route element={me ? <Layout /> : <Navigate to="/connexion" replace />}>
         <Route index element={<Dashboard />} />
         <Route path="dossiers" element={<Dossiers />} />

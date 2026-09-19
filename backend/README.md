@@ -66,3 +66,11 @@ Règles : aucun secret ni URL en dur · requêtes paramétrées · toute écritu
 ## Docker
 
 `docker-compose up -d --build` à la racine construit le backend (port 3021). Non testé sur le poste de développement (Docker absent).
+
+## Tester à la main (développement)
+
+1. `.env` (à la racine du dépôt) : `JWT_SECRET`, et pour le poste de développement `DEV_LOGIN_PASSWORD` — ce mot de passe commun valide **n'importe quel identifiant sans interroger l'AD** (refusé en production, chaque usage est audité).
+2. Backend : `node server.js` (port 3021) ; frontend : `npm --prefix ../frontend run dev` (port 5160, proxy `/api`).
+3. Jeu de démonstration : `node scripts/seed-demo.js` (`--reset` pour le recréer) — agents fictifs `demo.*` sur l'organigramme réel du Hub, titulaires, 39 élus, les 4 commissions, 3 séances et des dossiers à tous les stades. Aucun mail n'est envoyé.
+4. Police de la Ville (Interstate) : déposer les `.otf` dans `police/interstate-2/` à la racine (ou `FONTS_DIR`) ; jamais versionnée (licence). Sans elle, les PDF retombent sur Times.
+5. `SCHEDULER_ENABLED=true` active les relances et l'envoi des mails ; `MAIL_REDIRECT_TO=adresse` redirige tous les mails (mode recette).

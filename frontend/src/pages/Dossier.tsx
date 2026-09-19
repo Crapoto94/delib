@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Check, CheckCircle2, Download, Eye, FileText, Paperclip, RotateCcw, Send, Trash2, Upload, XCircle } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Check, CheckCircle2, Download, Eye, FileText, Copy, Paperclip, Pencil, RotateCcw, Send, Sparkles, Trash2, Upload } from 'lucide-react';
+import TexteModal, { KIND_LABEL } from '../TexteModal';
+import { mdToHtml } from '../mdconv';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { d, dt } from '../format';
@@ -91,106 +93,37 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
 }
 
 /* --------------------------------------------------------------------------------------------------------- textes */
-function SpanView({ spans }: { spans: any[] }) {
-  return <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{spans.map((s, i) => s.type === 'insert'
-    ? <ins key={i} style={{ color: s.color, background: `${s.color}1A`, textDecoration: 'none', fontWeight: 600 }} title={`${s.name || s.author}`}>{s.text}</ins>
-    : s.type === 'delete' ? <del key={i} style={{ color: s.color, opacity: 0.8 }} title={`${s.name || s.author}`}>{s.text}</del> : <span key={i}>{s.text}</span>)}</div>;
-}
-
-function TexteEditor({ acte, t, editable, onChanged, toast }: { acte: any; t: any; editable: boolean; onChanged: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
-  const { org } = useAuth(); const o = org!.id;
-  const base = orgPath(o, `/actes/${acte.id}/textes/${t.id}`);
-  const [mode, setMode] = useState<'suivi' | 'propre'>('suivi');
-  const [view, setView] = useState<any>(null);
-  const [text, setText] = useState(''); const [version, setVersion] = useState(1);
-  const [state, setState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved'); const [conflict, setConflict] = useState<string | null>(null);
-  const timer = useRef<any>(null); const latest = useRef({ text: '', version: 1 });
-
-  const load = useCallback(async () => {
-    const r = (await api.get(base, { params: { mode } })).data;
-    setView(r); setText(r.markdown); setVersion(r.version); latest.current = { text: r.markdown, version: r.version }; setState('saved');
-  }, [base, mode]);
-  useEffect(() => { load().catch(() => {}); }, [load]);
-
-  const commit = useCallback(async () => {
-    setState('saving');
-    try {
-      const r = (await api.put(base, { markdown: latest.current.text, baseVersion: latest.current.version })).data;
-      latest.current.version = r.version; setVersion(r.version); setState('saved'); setConflict(null);
-      if (r.changed) load().then(onChanged);
-    } catch (e: any) {
-      if (e.response?.status === 409 && e.response.data?.details?.currentVersion) setConflict('Ce texte a été modifié par quelqu\'un d\'autre. Rechargez pour voir sa version.');
-      else toast(errMsg(e), 'ko');
-      setState('error');
-    }
-  }, [base, load, onChanged, toast]);
-
-  const change = (v: string) => { setText(v); latest.current.text = v; setState('dirty'); clearTimeout(timer.current); timer.current = setTimeout(commit, 1500); };
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  const resolve = async (decision: 'accept' | 'reject', cid?: string) => {
-    try { await api.post(`${base}/modifications`, cid ? { decision, cids: [cid] } : { decision, all: true }); await load(); onChanged(); } catch (e) { toast(errMsg(e), 'ko'); }
-  };
-  const canResolve = editable && view?.tracking && view?.changes?.length;
-  const preview = async () => {
-    try {
-      await commit();
-      const r = await api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' });
-      window.open(URL.createObjectURL(r.data), '_blank');
-    } catch (e: any) { toast('Aperçu impossible : ' + (e?.response?.data instanceof Blob ? 'erreur serveur' : errMsg(e)), 'ko'); }
-  };
-  if (!view) return <Loading />;
-  const readOnly = !editable || !view.canEdit;
-  return (
-    <div className="mb-8">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h3>{t.label}{t.deliberationId ? '' : ''}</h3>
-        <div className="flex items-center gap-2 text-[12px]">
-          {view.tracking && <div className="flex rounded bg-soft p-0.5">{(['suivi', 'propre'] as const).map((m) => <button key={m} className={`rounded px-2 py-1 font-semibold ${mode === m ? 'bg-white shadow-card' : ''}`} onClick={() => setMode(m)}>{m === 'suivi' ? 'Suivi coloré' : 'Version propre'}</button>)}</div>}
-          {!readOnly && <span className={state === 'error' ? 'text-ko' : 'text-mute'}>{state === 'saving' ? 'Enregistrement…' : state === 'dirty' ? 'Modifications en attente…' : state === 'error' ? 'Non enregistré' : `Enregistré · v${version}`}</span>}
-          <button className="btn-secondary !py-1" onClick={preview}><Eye className="h-3.5 w-3.5" /> Aperçu mis en page</button>
-        </div>
-      </div>
-      {conflict && <div role="alert" className="mb-2 rounded border border-warn/30 bg-warn-bg p-2 text-warn">{conflict} <button className="underline" onClick={load}>Recharger</button></div>}
-      {readOnly || mode === 'propre'
-        ? <div className="rounded border border-line bg-white p-4">{view.markdown ? (mode === 'suivi' && view.tracking ? <SpanView spans={view.spans} /> : <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{view.markdown}</div>) : <span className="text-mute">Texte vide.</span>}</div>
-        : (
-          <>
-            {view.tracking && view.changes.length > 0 && <div className="mb-2 rounded border border-line bg-white p-3"><SpanView spans={view.spans} /></div>}
-            <textarea className="input min-h-[160px] text-[16px] leading-[26px]" value={text} onChange={(e) => change(e.target.value)} onBlur={() => { if (state === 'dirty') { clearTimeout(timer.current); commit(); } }}
-              aria-label={t.label} placeholder={t.kind === 'expose' ? "Résumez l'intérêt communal en quelques paragraphes simples…" : t.kind === 'visas' ? 'Vu le code général des collectivités territoriales…' : 'ARTICLE 1 : …'} />
-          </>
-        )}
-      {canResolve && mode === 'suivi' && (
-        <div className="mt-2 rounded border border-line bg-white">
-          <div className="flex items-center justify-between border-b border-line px-3 py-2"><b>{view.changes.length} modification(s) suivie(s)</b>
-            <span className="flex gap-2"><button className="btn-ok !py-1" onClick={() => resolve('accept')}>Tout accepter</button></span></div>
-          <ul>{view.changes.map((c: any) => (
-            <li key={c.cid} className="flex items-center gap-2 border-b border-line px-3 py-2 last:border-0">
-              <span className="h-3 w-3 rounded-full" style={{ background: c.color }} /><span className="text-[12px] font-semibold">{c.name || c.author}</span>
-              <span className="min-w-0 flex-1 truncate text-[12px]">{c.deleted && <del className="mr-2 text-ko">{c.deleted}</del>}{c.inserted && <ins className="text-ok-text no-underline">{c.inserted}</ins>}</span>
-              <button className="text-ok" aria-label="Accepter" onClick={() => resolve('accept', c.cid)}><CheckCircle2 className="h-5 w-5" /></button>
-              <button className="text-ko" aria-label="Rejeter" onClick={() => resolve('reject', c.cid)}><XCircle className="h-5 w-5" /></button>
-            </li>))}</ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
+/** Aperçu d'un texte dans la page ; un clic ouvre l'éditeur plein écran (D39). */
 function Textes({ acte, editable, onChanged, toast }: { acte: any; editable: boolean; onChanged: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth();
   const texts = useLoad(async () => (await api.get(orgPath(org!.id, `/actes/${acte.id}/textes`))).data.items as any[], [acte.id, acte.statut]);
-  if (texts.loading) return <Loading />;
+  const previews = useLoad(async () => {
+    const items = (await api.get(orgPath(org!.id, `/actes/${acte.id}/textes`))).data.items as any[];
+    const out: Record<number, string> = {};
+    await Promise.all(items.map(async (t) => { out[t.id] = (await api.get(orgPath(org!.id, `/actes/${acte.id}/textes/${t.id}`), { params: { mode: 'propre' } })).data.markdown; }));
+    return out;
+  }, [acte.id, acte.statut, acte.updatedAt]);
+  const [open, setOpen] = useState<number | null>(null);
+  if (texts.loading && !texts.data) return <Loading />;
   const dels = acte.deliberations || [];
+  const list = texts.data ?? [];
   return (
     <section className="card p-5" aria-labelledby="textes">
-      <h3 id="textes" className="mb-4">Textes de la délibération</h3>
-      {(texts.data ?? []).map((t) => (
-        <div key={t.id}>
-          {t.deliberationId && dels.length > 1 && t.kind === 'visas' && <h4 className="mb-2 mt-4 text-[15px] font-bold text-primary">Délibération {dels.find((x: any) => x.id === t.deliberationId)?.ordre} — {dels.find((x: any) => x.id === t.deliberationId)?.titre}</h4>}
-          <TexteEditor acte={acte} t={t} editable={editable} onChanged={onChanged} toast={toast} />
-        </div>))}
+      <div className="mb-4 flex items-center justify-between"><h3 id="textes">Textes de la délibération</h3>
+        {list.length > 0 && <button className="btn-primary" onClick={() => setOpen(list[0].id)}><Pencil className="h-4 w-4" /> {editable ? "Ouvrir l'éditeur" : 'Ouvrir en plein écran'}</button>}</div>
+      <div className="space-y-4">
+        {list.map((t) => {
+          const d = dels.find((x: any) => x.id === t.deliberationId);
+          const md = previews.data?.[t.id] ?? '';
+          return (
+            <button key={t.id} onClick={() => setOpen(t.id)} className="block w-full rounded-lg border border-line bg-white p-4 text-left hover:border-action hover:shadow-lift" aria-label={`Ouvrir ${KIND_LABEL[t.kind]}`}>
+              <div className="mb-1 flex items-center gap-2"><h4 className="text-[15px] font-bold text-primary">{KIND_LABEL[t.kind]}{d && dels.length > 1 ? ` — délibération ${d.ordre}` : ''}</h4>
+                {t.empty ? <Badge tone="warn">à rédiger</Badge> : <Badge tone="ok">v{t.version}</Badge>}{t.tracking && <Badge tone="blue">suivi actif</Badge>}<span className="ml-auto text-[12px] font-semibold text-action">{editable ? 'Modifier' : 'Ouvrir'} →</span></div>
+              {md ? <div className="line-clamp-4 text-[14px] leading-[22px] text-slate-700" dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} /> : <p className="text-mute">Cliquez pour rédiger ce texte.</p>}
+            </button>);
+        })}
+      </div>
+      {open !== null && <TexteModal acte={acte} texts={list} initialId={open} editable={editable} onClose={() => setOpen(null)} onChanged={() => { previews.reload(); onChanged(); }} toast={toast} />}
     </section>
   );
 }
@@ -349,6 +282,69 @@ function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolea
   );
 }
 
+/* ------------------------------------------------------------------------------- copie et assistant IA (D40) */
+function CopieModal({ acte, onClose, toast }: { acte: any; onClose: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
+  const { org } = useAuth(); const o = org!.id; const nav = useNavigate();
+  const [adapter, setAdapter] = useState(true); const [contexte, setContexte] = useState(''); const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setBusy(true);
+    try {
+      const r = (await api.post(orgPath(o, `/actes/${acte.id}/copie`), adapter ? { adapter: true, contexte } : {})).data;
+      if (r.iaError) toast(`Copie créée, mais l'IA n'a pas répondu : ${r.iaError}`, 'ko'); else toast(adapter ? `Copie créée : ${r.suggestions.filter((x: any) => x.kind === 'remplacement').length} proposition(s) à examiner` : 'Copie créée');
+      onClose(); nav(`/dossiers/${r.acte.id}`);
+    } catch (e) { toast(errMsg(e), 'ko'); setBusy(false); }
+  };
+  return (
+    <Modal title="Copier ce dossier" onClose={onClose} wide>
+      <div className="space-y-4">
+        <p className="text-mute">Un nouveau <b>brouillon</b> est créé avec la fiche et les textes de « {acte.titre} ».</p>
+        <label className="flex items-start gap-3 rounded border border-line p-3"><input type="radio" className="mt-1" checked={!adapter} onChange={() => setAdapter(false)} /><span><b>Copie simple</b><br /><span className="text-mute">Vous adaptez les textes à la main.</span></span></label>
+        <label className="flex items-start gap-3 rounded border border-action bg-soft p-3"><input type="radio" className="mt-1" checked={adapter} onChange={() => setAdapter(true)} /><span><Sparkles className="mr-1 inline h-4 w-4 text-action" /><b>Copie adaptée avec l'IA</b><br /><span className="text-mute">L'IA <b>propose</b> les modifications pour le nouveau contexte ; vous acceptez ou refusez chacune. Rien n'est appliqué sans vous.</span></span></label>
+        {adapter && <Field label="Décrivez le nouveau contexte" hint="Objet, bénéficiaire, montants, dates, ce qui change par rapport à ce dossier."><textarea className="input" rows={5} autoFocus value={contexte} onChange={(e) => setContexte(e.target.value)} placeholder="Ex. : subvention 2027 à l'association Ivry Théâtre, 8 000 €, versée en deux fois…" /></Field>}
+        <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || (adapter && contexte.trim().length < 10)} onClick={go}>{busy && <Spinner />} Créer la copie</button></div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Propositions de l'IA pour ce brouillon : l'agent accepte (en éditant si besoin) ou refuse, une par une. */
+function IaPanel({ acte, editable, onApplied, toast }: { acte: any; editable: boolean; onApplied: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
+  const { org } = useAuth(); const o = org!.id;
+  const list = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/ia/propositions`))).data.items as any[], [acte.id]);
+  const [edit, setEdit] = useState<{ id: number; text: string } | null>(null);
+  const pending = (list.data ?? []).filter((x) => x.status === 'pending');
+  if (!pending.length) return null;
+  const KIND: Record<string, string> = { expose: 'Exposé', visas: 'Vu et considérant', dispositif: 'Délibéré' };
+  const decide = async (p: any, decision: 'accept' | 'reject', replacement?: string) => {
+    try { await api.post(orgPath(o, `/actes/${acte.id}/ia/propositions/${p.id}/decision`), { decision, replacement }); setEdit(null); list.reload(); if (decision === 'accept') onApplied(); }
+    catch (e) { toast(errMsg(e), 'ko'); list.reload(); }
+  };
+  return (
+    <div className="card border-action/40 p-5">
+      <h3 className="mb-1 flex items-center gap-2"><Sparkles className="h-5 w-5 text-action" /> Propositions de l'IA <Badge tone="blue">{pending.length}</Badge></h3>
+      <p className="mb-3 text-[12px] text-mute">L'IA propose, vous décidez : rien n'est appliqué sans votre accord.</p>
+      <ul className="space-y-3">{pending.map((p) => (
+        <li key={p.id} className="rounded border border-line p-3">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-mute">{KIND[p.textKind] ?? 'Texte'} {p.kind === 'alerte' && '· à vérifier'}</div>
+          {p.kind === 'alerte' ? <p className="mt-1 rounded bg-warn-bg p-2 text-warn">⚠ {p.reason}</p> : (
+            <>
+              <div className="mt-1 text-[13px]"><del className="text-ko">{p.find}</del><br />{edit?.id !== p.id && <ins className="text-ok-text no-underline">{p.replacement}</ins>}</div>
+              {edit?.id === p.id && <textarea className="input mt-1" rows={3} value={edit!.text} onChange={(e) => setEdit({ id: p.id, text: e.target.value })} />}
+              {p.reason && <p className="mt-1 text-[12px] italic text-mute">{p.reason}</p>}
+            </>)}
+          {editable && <div className="mt-2 flex flex-wrap gap-2">
+            {p.kind === 'alerte' ? <button className="btn-secondary !py-1" onClick={() => decide(p, 'reject')}>Écarter</button> : edit?.id === p.id ? (
+              <><button className="btn-ok !py-1" onClick={() => decide(p, 'accept', edit!.text)}>Appliquer ma version</button><button className="btn-secondary !py-1" onClick={() => setEdit(null)}>Annuler</button></>
+            ) : (
+              <><button className="btn-ok !py-1" onClick={() => decide(p, 'accept')}><Check className="h-3.5 w-3.5" /> Accepter</button>
+                <button className="btn-secondary !py-1" onClick={() => setEdit({ id: p.id, text: p.replacement })}><Pencil className="h-3.5 w-3.5" /> Modifier</button>
+                <button className="btn-ko !py-1" onClick={() => decide(p, 'reject')}>Refuser</button></>)}
+          </div>}
+        </li>))}</ul>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------------------------------------------- la page */
 export default function Dossier() {
   const { id } = useParams();
@@ -357,6 +353,7 @@ export default function Dossier() {
   const acte = useLoad(async () => (await api.get(orgPath(o, `/actes/${id}`))).data, [o, id]);
   const circuit = useLoad(async () => (await api.get(orgPath(o, `/actes/${id}/circuit`))).data, [o, id]);
   const reloadAll = useCallback(() => { acte.reload(); circuit.reload(); }, [acte, circuit]);
+  const [copying, setCopying] = useState(false);
   if (acte.loading && !acte.data) return <Loading />;
   if (acte.error || !acte.data) return <div><ErrorBox msg={acte.error || 'Dossier introuvable'} /><Link className="mt-4 inline-block text-action" to="/dossiers">← Retour aux dossiers</Link></div>;
   const a = acte.data; const c = circuit.data;
@@ -366,6 +363,7 @@ export default function Dossier() {
       <div>
         <div className="mb-1 text-[12px] text-mute"><Link to="/dossiers" className="hover:underline">Actes & Dossiers</Link> › Dossier #{a.numeroSuivi}</div>
         <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><StatutBadge statut={a.statut} />
+          <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
           <button className="btn-secondary" onClick={async () => { try { const r = await api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }); window.open(URL.createObjectURL(r.data), '_blank'); } catch { toast('Aperçu du dossier impossible (textes ou fond de page manquants ?)', 'ko'); } }}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button></div>
       </div>
       {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
@@ -378,6 +376,7 @@ export default function Dossier() {
         </div>
         <aside className="space-y-4">
           <Actions acte={a} circuit={c} reload={reloadAll} toast={toast} />
+          <IaPanel acte={a} editable={editable} onApplied={acte.reload} toast={toast} />
           {a.statut === 'brouillon' || a.statut === 'modification_demandee' ? <Completude c={a.completude} /> : null}
           <CommissionsBox acte={a} editable={editable} toast={toast} />
           {c?.events?.length > 0 && (
@@ -385,6 +384,7 @@ export default function Dossier() {
               <li key={e.id}><b>{e.actor}</b>{e.onBehalfOf ? ` (pour ${e.onBehalfOf})` : ''} · {e.action}{e.to ? ` → ${e.to}` : ''}<div className="text-mute">{dt(e.at)}</div></li>))}</ul></div>)}
         </aside>
       </div>
+      {copying && <CopieModal acte={a} onClose={() => setCopying(false)} toast={toast} />}
       {node}
     </div>
   );

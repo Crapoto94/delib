@@ -6,7 +6,9 @@ const Credentials = z.object({
 });
 
 /** Routes d'authentification. Le mot de passe n'est jamais journalisé ni stocké. */
-module.exports = ({ makeRouter, auth, limiter }) => {
+const ActAs = z.object({ username: z.string().trim().min(1).max(128) });
+
+module.exports = ({ makeRouter, auth, limiter, access, audit }) => {
   const r = makeRouter('/api/v1/auth');
 
   r.post('/login', {
@@ -26,6 +28,17 @@ module.exports = ({ makeRouter, auth, limiter }) => {
 
   r.post('/logout', { summary: 'Ferme la session courante (révocation du jeton)', tags: ['auth'], responses: { 204: 'Session fermée' } },
     async (req, res) => { await auth.logout(req.ctx, req.ip); res.status(204).end(); });
+
+  r.post('/act-as', {
+    summary: '« Afficher en tant que » : vérifie et journalise le début du changement d’identité', tags: ['auth'], body: ActAs,
+    description: "Administrateur de plateforme : tout agent ; administrateur d'organisme : les agents de ses organismes (pas les administrateurs de plateforme) ; SCC : les agents ordinaires. Ensuite, chaque requête envoie l'en-tête `X-Act-As: <identifiant>` et a EXACTEMENT les droits de cet utilisateur ; l'audit garde le vrai acteur.",
+  }, async (req, res) => {
+    const target = await access.actAsTarget(req.ctx, req.valid.body.username.toLowerCase());
+    await audit.log(req.ctx, { action: 'auth.act_as', entity: 'user', entityId: target.username, after: { roles: target.roles } });
+    res.json({ username: target.username, displayName: target.displayName, organismes: target.organismes.map((o) => ({ id: o.id, nom: o.nom, roles: o.roles })) });
+  });
+  r.delete('/act-as', { summary: 'Fin du « Afficher en tant que » (journalisée)', tags: ['auth'], responses: { 204: 'Terminé' } },
+    async (req, res) => { await audit.log(req.ctx, { action: 'auth.act_as_end', entity: 'user', entityId: String(req.query.username || '') }); res.status(204).end(); });
 
   return [r];
 };

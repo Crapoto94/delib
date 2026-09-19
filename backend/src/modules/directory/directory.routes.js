@@ -21,6 +21,10 @@ module.exports = ({ makeRouter, dir }) => {
   r.get('/agents/search', { summary: 'Recherche un agent (nom, prénom, matricule, e-mail)', tags: ['annuaire'], query: SearchQuery },
     async (req, res) => res.json({ items: await dir.searchAgents(req.valid.query.q) }));
 
+  r.get('/agents/autocompletion', { summary: 'Autocomplétion « @nom » : identifiant de connexion, nom, direction', tags: ['annuaire'], query: SearchQuery,
+    description: 'Deux lettres au moins. Renvoie l\'identifiant à utiliser partout où un agent doit être désigné (titulaires, groupes, délégations, rôles, mentions).' },
+  async (req, res) => res.json({ items: await dir.searchLogins(req.valid.query.q) }));
+
   r.get('/agents/:username', {
     summary: "Fiche d'un agent connu de l'application (cache)", tags: ['annuaire'], params: UserParams,
     description: "Un agent n'apparaît qu'après sa première connexion ; pour un agent jamais connecté, utiliser la recherche.",

@@ -22,8 +22,8 @@ function createUsers({ db, audit, dir, organismes, access, log }) {
       const seen = new Set(local.map((a) => a.username));
       let remote = [];
       try {
-        remote = (await dir.searchAgents(q)).filter((a) => a.username && !seen.has(a.username)).slice(0, 20)
-          .map((a) => ({ username: a.username, displayName: a.displayName, email: a.email, matricule: a.matricule, direction: a.direction ? { code: null, label: a.direction } : null, service: a.service ? { code: null, label: a.service } : null, poste: a.poste, source: 'rh', actif: true, lastLoginAt: null, knownLocally: false }));
+        remote = (await dir.searchLogins(q, 20)).filter((a) => !seen.has(a.username))
+          .map((a) => ({ username: a.username, displayName: a.displayName, email: a.email, matricule: null, direction: a.direction ? { code: null, label: a.direction } : null, service: a.service ? { code: null, label: a.service } : null, poste: a.poste, source: 'rh', actif: true, lastLoginAt: null, knownLocally: false }));
       } catch (e) { log.warn({ err: e.message }, 'recherche annuaire indisponible : résultats locaux seulement'); }
       const list = [...local, ...remote];
       const roles = list.length ? await db.all('SELECT * FROM user_org_roles WHERE username = ANY($1::text[]) AND (organisme_id = $2 OR organisme_id IS NULL)', [list.map((a) => a.username), org]) : [];

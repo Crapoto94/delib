@@ -8,6 +8,7 @@ const { migrate } = require('./src/db/migrate');
 const { createApmAd } = require('./src/adapters/apm-ad');
 const { createHubDirectory } = require('./src/adapters/hub-directory');
 const { createApmMail } = require('./src/adapters/apm-mail');
+const { createApmAi } = require('./src/adapters/apm-ai');
 const { buildContainer } = require('./src/container');
 const { createApp } = require('./src/http/app');
 const { bootstrap } = require('./src/bootstrap');
@@ -18,7 +19,7 @@ async function main() {
   const db = createDb(config, log);
 
   if (config.autoMigrate) await migrate(db, log);
-  const c = buildContainer({ config, log, db, ad: createApmAd(config), directoryAdapter: createHubDirectory(config), mail: createApmMail(config) });
+  const c = buildContainer({ config, log, db, ad: createApmAd(config), directoryAdapter: createHubDirectory(config), mail: createApmMail(config), ai: createApmAi(config) });
   await bootstrap(c);
 
   const app = createApp(c);

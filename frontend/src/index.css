@@ -25,3 +25,11 @@
   th { @apply text-left text-[11px] font-bold uppercase tracking-wider text-mute px-3 py-2 border-b border-line; }
   td { @apply px-3 py-2 border-b border-line align-top; }
 }
+
+/* Éditeur de textes (TipTap) : rendu proche du document final */
+.prose-doc { outline: none; min-height: 60vh; font-size: 16px; line-height: 26px; }
+.prose-doc p { margin: 0 0 0.85em; }
+.prose-doc ul { list-style: disc; padding-left: 1.4em; margin: 0 0 0.85em; }
+.prose-doc ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.85em; }
+.prose-doc p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #94a3b8; float: left; height: 0; pointer-events: none; white-space: pre-line; }
+.prose-doc strong { font-weight: 700; }

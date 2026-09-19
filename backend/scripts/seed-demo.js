@@ -17,7 +17,7 @@ const { createLogger } = require('../src/shared/logger');
 const { createDb } = require('../src/db/pool');
 const { migrate } = require('../src/db/migrate');
 const { createHubDirectory } = require('../src/adapters/hub-directory');
-const { createFakeAuth, createFakeMail } = require('../src/adapters/fake-directory');
+const { createFakeAuth, createFakeMail, createFakeAi } = require('../src/adapters/fake-directory');
 const { buildContainer } = require('../src/container');
 const { bootstrap } = require('../src/bootstrap');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
@@ -52,7 +52,7 @@ async function main() {
   const log = createLogger('warn');
   const db = createDb(config, log);
   await migrate(db, log);
-  const c = buildContainer({ config, log, db, ad: createFakeAuth({}), directoryAdapter: createHubDirectory(config), mail: createFakeMail() });
+  const c = buildContainer({ config, log, db, ad: createFakeAuth({}), directoryAdapter: createHubDirectory(config), mail: createFakeMail(), ai: createFakeAi() });
   const org = await bootstrap(c);
   const O = org.id;
   const sys = { username: 'seed', isPlatformAdmin: true, organismes: [], roles: [], orgIds: [O], agent: null, displayName: 'seed' };

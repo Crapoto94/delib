@@ -19,6 +19,13 @@ function createAuthMiddleware({ config, sessions, access, organismes }) {
     if (!s || s.revoked_at || s.username !== claims.sub || new Date(s.expires_at) <= new Date()) throw E.unauthorized('Session expirée ou révoquée');
     const ctx = await access.loadContext(claims.sub, s.kind);
     req.ctx = { ...ctx, jti: claims.jti, ip: req.ip };
+    // « Afficher en tant que » : mêmes droits que l'utilisateur choisi (jamais sur les routes d'authentification)
+    const actAs = String(req.headers['x-act-as'] || '').trim().toLowerCase();
+    if (actAs && actAs !== ctx.username && !req.originalUrl.startsWith('/api/v1/auth')) {
+      const target = await access.actAsTarget(ctx, actAs);
+      req.realCtx = req.ctx;
+      req.ctx = { ...target, jti: claims.jti, ip: req.ip, impersonatedBy: ctx.username, realRoles: ctx.roles };
+    }
     next();
   };
 

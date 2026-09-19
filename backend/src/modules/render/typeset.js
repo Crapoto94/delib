@@ -5,7 +5,8 @@
  *  - suivi des modifications : ajout souligné et coloré, suppression barrée et colorée (couleur de l'auteur) ;
  *  - en-tête à variables, pied de page « Page x / y », filigrane diagonal, fond première page / pages suivantes.
  */
-const { PDFDocument, StandardFonts, rgb, degrees } = require('pdf-lib');
+const { PDFDocument, rgb, degrees } = require('pdf-lib');
+const { embedFamily } = require('./fonts');
 
 const MM = 72 / 25.4;
 const A4 = { w: 595.28, h: 841.89 };
@@ -173,10 +174,10 @@ function layoutDocument({ content, cfg, vars, measure }) {
 }
 
 /** Dessine les pages composées (fond, contenu, pied de page, filigrane). Renvoie { buffer, pageCount }. */
-async function paintDocument({ layout, cfg, vars, bgFirst, bgNext, watermark, title }) {
+async function paintDocument({ layout, cfg, vars, bgFirst, bgNext, watermark, title, fontsDir }) {
   const doc = await PDFDocument.create();
   doc.setTitle(title || 'Document'); doc.setProducer('IvryDélib'); doc.setCreator('IvryDélib');
-  const fonts = { text: await doc.embedFont(StandardFonts.TimesRoman), bold: await doc.embedFont(StandardFonts.TimesRomanBold) };
+  const fonts = await embedFamily(doc, cfg.police?.famille, fontsDir);
   const bg = async (bytes) => (bytes ? (await doc.embedPdf(bytes, [0]))[0] : null);
   const first = await bg(bgFirst); const next = (await bg(bgNext)) || first;
   const total = layout.pages.length;
@@ -212,9 +213,9 @@ async function paintDocument({ layout, cfg, vars, bgFirst, bgNext, watermark, ti
 }
 
 /** Mesure réelle (polices standard) pour le rendu de production. */
-async function createMeasure() {
+async function createMeasure(family, fontsDir) {
   const doc = await PDFDocument.create();
-  const fonts = { text: await doc.embedFont(StandardFonts.TimesRoman), bold: await doc.embedFont(StandardFonts.TimesRomanBold) };
+  const fonts = await embedFamily(doc, family, fontsDir);
   return (token, size) => { const f = token.bold ? fonts.bold : fonts.text; return f.widthOfTextAtSize(winAnsi(f, token.text), size); };
 }
 

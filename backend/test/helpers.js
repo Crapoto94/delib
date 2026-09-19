@@ -16,7 +16,7 @@ const { migrate } = require('../src/db/migrate');
 const { buildContainer } = require('../src/container');
 const { createApp } = require('../src/http/app');
 const { bootstrap } = require('../src/bootstrap');
-const { createFakeAuth, createFakeDirectory, createFakeMail } = require('../src/adapters/fake-directory');
+const { createFakeAuth, createFakeDirectory, createFakeMail, createFakeAi } = require('../src/adapters/fake-directory');
 
 const PREFIX = 'ivrydelib_test_';
 
@@ -75,13 +75,14 @@ async function createTestEnv({ users = USERS, agents = AGENTS, directions = DIRE
   const ad = createFakeAuth({ users });
   const directoryAdapter = createFakeDirectory({ directions, agents, elus });
   const mail = createFakeMail();
-  const c = buildContainer({ config, log, db, ad, directoryAdapter, mail, guard });
+  const ai = createFakeAi();
+  const c = buildContainer({ config, log, db, ad, directoryAdapter, mail, ai, guard });
   const boot = await bootstrap(c);
   // un élu (id 1) rapporteur par défaut des actes de test
   await db.query("INSERT INTO elus (organisme_id, source, nom, prenom, email, role) VALUES ($1, 'manual', 'Rapporteur', 'Martine', 'martine.rapporteur@ivry.test', 'Adjointe')", [boot.id]);
   const app = createApp(c);
   return {
-    app, c, db, config, ad, directoryAdapter, mail, schema,
+    app, c, db, config, ad, directoryAdapter, mail, ai, schema,
     http: () => request(app),
     async close() {
       if (!schema.startsWith(PREFIX)) throw new Error('refus de supprimer un schéma hors préfixe de test');

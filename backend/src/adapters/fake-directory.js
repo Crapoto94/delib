@@ -69,3 +69,18 @@ function createFakeMail() {
   };
 }
 module.exports.createFakeMail = createFakeMail;
+
+/** AiPort de remplacement : `handler({ system, prompt })` renvoie le texte de la réponse (tests, développement sans IA). */
+function createFakeAi(handler = () => '{"propositions":[],"alertes":[]}') {
+  const state = { calls: [], failing: false, handler };
+  return {
+    state,
+    async query(req) {
+      state.calls.push(req);
+      if (state.failing) { const { E } = require('../shared/errors'); throw E.upstream('IA indisponible (simulée)'); }
+      return { text: await state.handler(req), model: 'fake-ia' };
+    },
+    async ping() { return 1; },
+  };
+}
+module.exports.createFakeAi = createFakeAi;
