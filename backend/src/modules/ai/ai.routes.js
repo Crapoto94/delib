@@ -7,7 +7,9 @@ const Contexte = z.string().trim().min(10).max(3000).describe("Nouveau contexte 
 const Copie = z.object({ adapter: z.boolean().default(false).describe("Demander à l'IA de proposer les adaptations"), contexte: Contexte.optional() })
   .refine((d) => !d.adapter || !!d.contexte, { message: 'Le contexte est obligatoire pour une copie assistée par IA', path: ['contexte'] });
 const Adapt = z.object({ contexte: Contexte });
-const ListQ = z.object({ statut: z.enum(['pending', 'accepted', 'edited', 'rejected', 'obsolete']).optional() });
+const Analyse = z.object({ type: z.enum(['orthographe', 'style', 'visas', 'complet']), textId: Id.optional().describe('Texte à analyser (par défaut : tous les textes du dossier)') });
+const AllSpelling = z.object({ textId: Id });
+const ListQ = z.object({ statut: z.enum(['pending', 'accepted', 'edited', 'rejected', 'obsolete']).optional(), textId: Id.optional() });
 const Decision = z.object({ decision: z.enum(['accept', 'reject']), replacement: z.string().max(5000).optional().describe('Remplacement édité par l\'agent (facultatif)') });
 const T = ['assistant IA'];
 
@@ -28,11 +30,19 @@ module.exports = ({ makeRouter, ai, aiQueue }) => {
     description: 'Renvoie 202 et la tâche ; les propositions en attente seront remplacées à la fin de la tâche, les décisions déjà prises sont conservées. 429 si la file ou votre quota est plein.' },
   async (req, res) => res.status(202).json(await ai.requestAdaptation(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
 
+  r.post('/ia/analyse', { summary: "Demande une analyse de l'éditeur : orthographe, style, visas et considérants, ou contrôle complet — en arrière plan", tags: T, org: true, params: P, body: Analyse, responses: { 202: 'Tâche déposée dans la file' },
+    description: "Le rédacteur (ou celui qui a la main sur l'étape) obtient des cartes de suggestions (catégorie, extrait, proposition, raison) ; rien n'est appliqué sans action explicite (IA-01, IA-09). Les références juridiques sont toujours renvoyées « à vérifier » (IA-05). 429 si la file ou votre quota est plein." },
+  async (req, res) => res.status(202).json(await ai.requestAnalyse(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
+  r.post('/ia/propositions/accepter-orthographe', { summary: "« Tout accepter (orthographe seule) » sur un texte", tags: T, org: true, params: P, body: AllSpelling,
+    description: "Applique une à une, comme modifications attribuées à l'utilisateur, les corrections d'orthographe et de typographie encore en attente. Les autres catégories (style, visas, cohérence) ne sont jamais acceptées en bloc (IA-13)." },
+  async (req, res) => res.json(await ai.acceptAllSpelling(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
   r.get('/ia/propositions', { summary: 'Propositions et alertes de l\'IA pour ce dossier', tags: T, org: true, params: P, query: ListQ },
     async (req, res) => res.json({ items: await ai.list(req.ctx, req.org.id, req.valid.params.id, req.valid.query) }));
 
   r.post('/ia/propositions/:sid/decision', { summary: 'Accepte (avec ou sans édition) ou refuse une proposition', tags: T, org: true, params: PS, body: Decision,
-    description: "Accepter applique le remplacement dans le texte (nouvelle version, suivi des modifications si le dossier est en circuit). Une alerte ne peut qu'être écartée. Il n'existe volontairement pas de « tout accepter »." },
+    description: "Accepter applique le remplacement dans le texte (nouvelle version, suivi des modifications si le dossier est en circuit). Une alerte ne peut qu'être écartée. Le seul « tout accepter » est celui de l'orthographe seule (route dédiée)." },
   async (req, res) => res.json(await ai.decide(req.ctx, req.org.id, req.valid.params.id, req.valid.params.sid, req.valid.body)));
 
   // ---- file d'attente

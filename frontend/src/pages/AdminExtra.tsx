@@ -109,7 +109,7 @@ export function Gabarits() {
   const upload = async (which: 'first' | 'next', file: File) => {
     try { const fd = new FormData(); fd.append('file', file); await api.post(orgPath(o, `/gabarits/${sel}/fond/${which}`), fd); toast('Fond déposé'); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
-  const calibrate = async () => { const m = await openPdf(() => api.get(orgPath(o, `/gabarits/${sel}/etalonnage`), { responseType: 'blob' })); if (m) toast(`Étalonnage impossible : ${m}`, 'ko'); };
+  const calibrate = async () => { const m = await openPdf(() => api.get(orgPath(o, `/gabarits/${sel}/etalonnage`), { responseType: 'blob' }), `Étalonnage du gabarit « ${sel} »`); if (m) toast(`Étalonnage impossible : ${m}`, 'ko'); };
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
       <nav aria-label="Gabarits" className="card h-fit p-2">

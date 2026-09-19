@@ -13,6 +13,9 @@ const FAMILIES = {
   interstate: { label: 'Interstate (police de la Ville)', dir: 'interstate-2', files: { text: 'InterstateRegular.otf', bold: 'InterstateBold.otf' } },
 };
 
+// Pas de ligatures (fi, fl, ffi…) : le glyphe de ligature d'un sous-ensemble OpenType s'affichait « # » dans certains lecteurs PDF
+const NO_LIGATURES = { liga: false, clig: false, dlig: false, rlig: false, calt: false };
+
 const bytesCache = new Map();
 function readFont(dir, file) {
   const p = path.join(dir, file);
@@ -33,7 +36,7 @@ async function embedFamily(doc, family, fontsDir) {
     const t = readFont(dir, def.files.text); const b = readFont(dir, def.files.bold);
     if (t && b) {
       doc.registerFontkit(fontkit);
-      return { text: await doc.embedFont(t, { subset: true }), bold: await doc.embedFont(b, { subset: true }), family };
+      return { text: await doc.embedFont(t, { subset: true, features: NO_LIGATURES }), bold: await doc.embedFont(b, { subset: true, features: NO_LIGATURES }), family };
     }
     return embedFamily(doc, 'times', fontsDir);
   }

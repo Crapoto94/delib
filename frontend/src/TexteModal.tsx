@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Eye, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Eye, Sparkles, X, XCircle } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { dt } from './format';
 import { Loading } from './ui';
 import RichEditor, { EditorMode } from './RichEditor';
+import AssistantPanel from './AssistantPanel';
 
 export const KIND_LABEL: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispositif: 'Délibéré' };
 const PLACEHOLDER: Record<string, string> = {
@@ -30,6 +31,8 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const [text, setText] = useState('');
   const [state, setState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
   const [conflict, setConflict] = useState(false);
+  const [side, setSide] = useState<'suivi' | 'assistant'>('assistant');
+  const [drawer, setDrawer] = useState(false); // écran étroit : le panneau latéral s'ouvre en tiroir
   const timer = useRef<any>(null); const latest = useRef({ text: '', version: 1, dirty: false });
 
   const load = useCallback(async () => {
@@ -62,7 +65,7 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   };
   const preview = async () => {
     await commit();
-    const m = await openPdf(() => api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' }));
+    const m = await openPdf(() => api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' }), `${KIND_LABEL[t.kind]} — dossier #${acte.numeroSuivi}`);
     if (m) toast(`Aperçu impossible : ${m}`, 'ko');
   };
   if (!view) return <Loading />;
@@ -71,14 +74,15 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const editing = canEdit && mode === 'edition';
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="relative flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center gap-3 border-b border-line bg-white px-4 py-2 text-[12px]">
           {view.tracking && <div className="flex rounded bg-soft p-0.5">{([['edition', canEdit ? 'Éditer' : 'Lire'], ['suivi', 'Modifications suivies'], ['propre', 'Version propre']] as const).map(([k, l]) =>
             <button key={k} className={`rounded px-2 py-1 font-semibold ${mode === k ? 'bg-white shadow-card' : ''}`} onClick={async () => { await commit(); setMode(k); }}>{l}</button>)}</div>}
           {canEdit && <span className={state === 'error' ? 'font-semibold text-ko' : 'text-mute'}>{state === 'saving' ? 'Enregistrement…' : state === 'dirty' ? 'Modifications en attente…' : state === 'error' ? 'Non enregistré' : `✓ Enregistré · version ${view.version}`}</span>}
           {!canEdit && <span className="text-mute">Lecture seule à ce stade du circuit.</span>}
-          <button className="btn-secondary ml-auto !py-1" onClick={preview}><Eye className="h-3.5 w-3.5" /> Aperçu mis en page</button>
+          <span className="ml-auto flex gap-2"><button className="btn-secondary !py-1 lg:!hidden" onClick={() => setDrawer(!drawer)} aria-expanded={drawer}><Sparkles className="h-3.5 w-3.5" /> Assistant IA</button>
+          <button className="btn-secondary !py-1" onClick={preview}><Eye className="h-3.5 w-3.5" /> Aperçu mis en page</button></span>
         </div>
         {conflict && <div role="alert" className="border-b border-warn/30 bg-warn-bg px-4 py-2 text-warn">Ce texte a été modifié par quelqu'un d'autre. <button className="font-semibold underline" onClick={async () => { latest.current.dirty = false; setConflict(false); await load(); }}>Recharger sa version</button> (vos dernières frappes seront perdues).</div>}
         <div className="min-h-0 flex-1">
@@ -87,8 +91,13 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
               {view.markdown ? (mode === 'suivi' && view.tracking ? <SpanView spans={view.spans} /> : <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{mode === 'propre' ? view.markdown : view.markdown}</div>) : <span className="text-mute">Texte vide.</span>}</div></div>}
         </div>
       </div>
-      {view.tracking && (
-        <aside className="hidden w-80 shrink-0 overflow-auto border-l border-line bg-white lg:block" aria-label="Modifications suivies">
+      <aside className={`${drawer ? 'absolute inset-y-0 right-0 z-10 flex shadow-float' : 'hidden'} w-80 shrink-0 flex-col overflow-hidden border-l border-line bg-white lg:static lg:flex lg:shadow-none`} aria-label="Assistant et modifications suivies">
+        {view.tracking && <div className="flex shrink-0 border-b border-line" role="tablist">{([['assistant', 'Assistant IA'], ['suivi', `Modifications${tracking ? ` (${view.changes.length})` : ''}`]] as const).map(([k, l]) =>
+          <button key={k} role="tab" aria-selected={side === k} onClick={() => setSide(k)} className={`flex-1 px-3 py-2 text-[12px] font-semibold ${side === k ? 'border-b-2 border-action text-action' : 'text-mute'}`}>{l}</button>)}</div>}
+        {(side === 'assistant' || !view.tracking) && (
+          <div className="min-h-0 flex-1"><AssistantPanel acte={acte} t={t} canEdit={canEdit} toast={toast} beforeApply={commit} afterApply={async () => { latest.current.dirty = false; await load(); onChanged(); }} /></div>)}
+        {view.tracking && side === 'suivi' && (
+        <div className="min-h-0 flex-1 overflow-auto" aria-label="Modifications suivies">
           <div className="border-b border-line px-4 py-3"><h3 className="text-[14px]">Modifications suivies</h3><p className="text-[12px] text-mute">Une couleur par auteur.</p></div>
           {view.authors?.length > 0 && <ul className="flex flex-wrap gap-2 border-b border-line px-4 py-2">{view.authors.map((a: any) => <li key={a.username} className="flex items-center gap-1 text-[12px]"><span className="h-3 w-3 rounded-full" style={{ background: a.color }} />{a.name || a.username}</li>)}</ul>}
           {!tracking ? <p className="p-4 text-[12px] text-mute">Aucune modification en attente de décision.</p> : (
@@ -102,7 +111,8 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
                     <button className="flex items-center gap-1 text-[12px] font-semibold text-ko" onClick={() => resolve('reject', c.cid)}><XCircle className="h-4 w-4" /> Rejeter</button></div>}
                 </li>))}</ul>
             </>)}
-        </aside>)}
+        </div>)}
+      </aside>
     </div>
   );
 }
@@ -111,6 +121,13 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
 export default function TexteModal({ acte, texts, initialId, editable, onClose, onChanged, toast }: { acte: any; texts: any[]; initialId: number; editable: boolean; onClose: () => void; onChanged: () => void; toast: Toast }) {
   const [id, setId] = useState(initialId);
   const flush = useRef<(() => Promise<void>) | null>(null);
+  // l'en-tête de l'application (logo, menus, pastille IA) reste visible : la modale se place sous lui
+  const [top, setTop] = useState(0);
+  useEffect(() => {
+    const measure = () => { const h = document.querySelector('header'); setTop(h ? Math.max(0, Math.round(h.getBoundingClientRect().bottom)) : 0); };
+    measure(); window.addEventListener('resize', measure); window.addEventListener('scroll', measure);
+    return () => { window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure); };
+  }, []);
   const register = useCallback((fn: (() => Promise<void>) | null) => { flush.current = fn; }, []);
   const close = async () => { try { await flush.current?.(); } catch { /* signalé dans le panneau */ } onClose(); onChanged(); };
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); });
@@ -122,7 +139,7 @@ export default function TexteModal({ acte, texts, initialId, editable, onClose, 
   };
   const cur = texts.find((t) => t.id === id) ?? texts[0];
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-page" role="dialog" aria-modal="true" aria-label="Rédaction du dossier">
+    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-col bg-page" style={{ top }} role="dialog" aria-modal="true" aria-label="Rédaction du dossier">
       <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-2">
         <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase tracking-wider text-mute">Dossier #{acte.numeroSuivi}</div><div className="truncate font-bold text-primary">{acte.titre}</div></div>
         <nav className="ml-4 flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="Textes du dossier">

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { showPdf } from './PdfViewer';
 
 const TOKEN_KEY = 'ivrydelib.token';
 const ORG_KEY = 'ivrydelib.org';
@@ -45,13 +46,11 @@ export async function blobErrMsg(e: any): Promise<string> {
   return errMsg(e);
 }
 
-/** Ouvre un PDF dans un nouvel onglet (fenêtre ouverte tout de suite pour ne pas être bloquée) ; renvoie null ou le message d'erreur. */
-export async function openPdf(request: () => Promise<{ data: Blob }>): Promise<string | null> {
-  const w = window.open('', '_blank');
+/** Affiche un PDF dans la visionneuse de l'application (modale avec zoom) ; renvoie null ou le message d'erreur. */
+export async function openPdf(request: () => Promise<{ data: Blob }>, title?: string): Promise<string | null> {
   try {
     const r = await request();
-    const url = URL.createObjectURL(r.data);
-    if (w) w.location.href = url; else window.open(url, '_blank');
+    showPdf(r.data, title);
     return null;
-  } catch (e) { w?.close(); return blobErrMsg(e); }
+  } catch (e) { return blobErrMsg(e); }
 }

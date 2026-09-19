@@ -144,12 +144,14 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
 
   // ------------------------------------------------------------------------------------------- événements
   const EVENT_MAP = ['step.entered', 'acte.refused', 'circuit.completed', 'circuit.recalculated', 'comment.added', 'delegation.created', 'redaction.granted', 'circuit.blocked', 'circuit.published', 'circuit.missing_holders',
-  'derogation.requested', 'derogation.decided', 'commission.mise_a_disposition', 'commission.suspendue', 'commission.retiree', 'commission.avis', 'acte.seance_changed', 'odj.arrete', 'odj.modifie', 'ai.done', 'ai.failed'];
+  'derogation.requested', 'derogation.decided', 'commission.mise_a_disposition', 'commission.suspendue', 'commission.retiree', 'commission.avis', 'acte.seance_changed', 'odj.arrete', 'odj.modifie', 'ai.done', 'ai.failed', 'commission.reunion'];
 
-  async function onEvent(type, p) {
+  async function onEvent(type, p0) {
+    let p = p0;
     const orgId = p.organismeId; if (!orgId) return;
     const evt = type === 'circuit.missing_holders' ? 'circuit.blocked' : type;
     const rules = (await effectiveRules(orgId)).filter((r) => r.kind === 'event' && r.enabled && r.trigger.event === evt);
+    if (evt === 'commission.reunion') p = { ...p, changement: { creee: 'convocation', modifiee: 'modifiée', annulee: 'annulée' }[p.change] || p.change };
     if (!rules.length) return;
     const acte = p.acteId ? await db.get('SELECT * FROM actes WHERE id = $1', [p.acteId]) : null;
     const inst = acte ? await db.get("SELECT * FROM step_instances WHERE acte_id = $1 AND status = 'current' ORDER BY id DESC LIMIT 1", [acte.id]) : null;
@@ -163,7 +165,8 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
       const vars = acte ? await varsOf(acte, { inst, etape: p.label || p.steps?.map((s) => s.label).join(', '), dueAt: p.dueAt, vars: {
         acteur: actorName, motif: p.error || p.motif || p.derogation?.decisionMotif || p.derogation?.motif || p.comment?.body || (p.avis ? `avis ${p.avis}` : ''), ajoutees: (p.labels || []).join(', '),
         commission: p.commissionNom || '', numero_odj: p.numero || '', ordre_odj: p.ordre || '', decision: p.derogation?.statut === 'accordee' ? 'accordé' : p.derogation?.statut === 'refusee' ? 'refusé' : '',
-      } }) : { acteur: actorName, version: p.version, circuit: p.circuitName || '', portee: p.delegation?.scope || '', direction: p.grant?.directionCode || '' };
+      } }) : { acteur: actorName, version: p.version, circuit: p.circuitName || '', portee: p.delegation?.scope || '', direction: p.grant?.directionCode || '',
+        commission: p.commissionNom || '', changement: p.changement || '', date_reunion: p.dateSeance ? new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'full', timeStyle: 'short' }).format(new Date(p.dateSeance)) : '', lieu: p.lieu || 'à préciser', lien_teams: p.teamsUrl || 'aucune' };
       if (p.circuitName === undefined && type === 'circuit.published') vars.circuit = (await db.get('SELECT nom FROM circuit_definitions WHERE id = $1', [p.definitionId]))?.nom || '';
       await deliver({ orgId, rule, acte, usernames: users, vars, keyBase: null, actor, immediate: true });
     }
@@ -178,7 +181,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
     if (at.base === 'arrival') base = arrival ? addBusinessDays(new Date(arrival), sla && at.slaFactor ? sla * at.slaFactor : 0, holidays) : null;
     else if (at.base === 'due') base = due ? new Date(due) : null;
     else if (at.base === 'updated') base = updated ? new Date(updated) : null;
-    else if (at.base === 'deadline') base = deadline ? new Date(deadline) : null;
+    else if (at.base === 'deadline' || at.base === 'meeting') base = deadline ? new Date(deadline) : null;
     if (!base) return null;
     const t0 = at.days ? addBusinessDays(base, at.days, holidays) : base;
     if (!p.repeat) return { t: t0, n: 0 };
@@ -208,6 +211,23 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
       for (const it of items) planned.push({ ...it, pallier: due.p.id, occurrence: due.at.n });
     };
     for (const rule of cfg) {
+      if (rule.trigger.type === 'commission_meeting') {
+        // rappel J-2 (jours ouvrés) avant chaque réunion de commission à venir, aux membres et secrétaires
+        const meets = await db.all(
+          `SELECT s.*, c.nom AS commission_nom, i.commission_id,
+                  (SELECT count(*)::int FROM seance_items it WHERE it.seance_id = s.id AND it.kind = 'deliberation' AND it.statut = 'a_traiter') AS nb
+           FROM seances s JOIN instances i ON i.id = s.instance_id JOIN commissions c ON c.id = i.commission_id
+           WHERE s.organisme_id = $1 AND s.statut IN ('planifiee', 'convoquee') AND s.date_seance > $2`, [orgId, now]);
+        for (const m of meets) {
+          const due = rule.palliers.map((p) => ({ p, at: palierTimes(p, { deadline: m.date_seance }, holidays, now) })).filter((x) => x.at && x.at.t <= now)[0];
+          if (!due) continue;
+          const rec = await late.commissions.recipients(m.commission_id);
+          const vars = { commission: m.commission_nom, date_reunion: new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'full', timeStyle: 'short' }).format(new Date(m.date_seance)), lieu: m.lieu || 'à préciser', lien_teams: m.teams_join_url || 'aucune', projets: m.nb };
+          const items = await deliver({ orgId, rule, acte: null, usernames: new Set([...rec.elus, ...rec.secretaires]), vars, keyBase: `${rule.code}:s${m.id}:${new Date(m.date_seance).getTime()}:${due.p.id}`, immediate: false, dryRun, at: now });
+          for (const it of items) planned.push({ ...it, pallier: due.p.id, occurrence: 0 });
+        }
+        continue;
+      }
       if (rule.trigger.type === 'draft_deadline') {
         const rows = await db.all(`SELECT a.*, s.date_limite_redaction AS dl, s.id AS sid FROM actes a JOIN seances s ON s.id = a.seance_visee_id
           WHERE a.organisme_id = $1 AND a.statut = 'brouillon' AND s.date_limite_redaction IS NOT NULL AND s.statut IN ('planifiee','convoquee')`, [orgId]);

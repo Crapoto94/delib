@@ -2,10 +2,11 @@ import { FormEvent, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
+import { ReunionsSection } from '../Reunions';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad } from '../ui';
 
 function Detail({ id, onClose }: { id: number; onClose: () => void }) {
-  const { org } = useAuth();
+  const { org, isScc } = useAuth();
   const c = useLoad(async () => (await api.get(orgPath(org!.id, `/commissions/${id}`))).data, [id]);
   return (
     <Modal title={c.data?.nom ?? 'Commission'} onClose={onClose} wide>
@@ -15,6 +16,7 @@ function Detail({ id, onClose }: { id: number; onClose: () => void }) {
           {c.data.thematiques?.length > 0 && <div><h3 className="mb-1">Thématiques</h3><ul className="flex flex-wrap gap-1">{c.data.thematiques.map((t: string) => <li key={t} className="rounded bg-soft px-2 py-0.5 text-[12px]">{t}</li>)}</ul></div>}
           <div><h3 className="mb-1">Membres ({c.data.membres.length})</h3>
             {c.data.membres.length === 0 ? <p className="text-mute">Aucun membre.</p> : <ul className="grid gap-1 md:grid-cols-2">{c.data.membres.map((m: any) => <li key={m.eluId} className="rounded bg-soft px-3 py-2">{m.prenom} {m.nom} {m.fonction !== 'membre' && <Badge tone="blue">{m.fonction.replace('_', '-')}</Badge>} <span className="text-mute">{m.groupe}</span></li>)}</ul>}</div>
+          <ReunionsSection commissionId={id} canEdit={isScc} />
           <div><h3 className="mb-1">Secrétaires</h3>{c.data.secretaires.length ? c.data.secretaires.join(', ') : <span className="text-mute">Aucun</span>}</div>
         </div>)}
     </Modal>

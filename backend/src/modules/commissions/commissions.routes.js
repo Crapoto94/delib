@@ -21,7 +21,12 @@ const Del = z.object({ motif: z.string().trim().min(3).max(500).optional() });
 const Avis = z.object({ avis: z.enum(AVIS), commentaire: z.string().trim().max(2000).optional(), datePassage: z.iso.date().optional() });
 const ListQ = z.object({ actif: z.enum(['true', 'false']).transform((v) => v === 'true').optional() });
 
-module.exports = ({ makeRouter, commissions }) => {
+const Reunion = z.object({
+  dateSeance: z.iso.datetime(), dureeMinutes: z.number().int().min(15).max(720).optional(), lieu: z.string().max(200).optional(),
+  teams: z.object({ mode: z.enum(['auto', 'lien', 'aucun']), joinUrl: z.string().url().optional(), inviter: z.boolean().default(false) }).optional(),
+}).refine((d) => d.teams?.mode !== 'lien' || !!d.teams.joinUrl, { message: 'Le lien Teams est obligatoire', path: ['teams', 'joinUrl'] });
+
+module.exports = ({ makeRouter, commissions, seances }) => {
   const r = makeRouter('/api/v1/organismes/:orgId');
   const T = ['commissions'];
 
@@ -38,6 +43,12 @@ module.exports = ({ makeRouter, commissions }) => {
     async (req, res) => res.json(await commissions.setMembres(req.ctx, req.org.id, req.valid.params.id, req.valid.body.membres)));
   r.put('/commissions/:id/secretaires', { summary: 'Remplace les secrétaires (agents)', tags: T, org: true, roles: ADMIN, params: PC, body: Secretaires },
     async (req, res) => res.json(await commissions.setSecretaires(req.ctx, req.org.id, req.valid.params.id, req.valid.body.usernames)));
+
+  r.get('/commissions/:id/reunions', { summary: "Réunions d'une commission (passées et à venir), avec le nombre de projets présentés", tags: T, org: true, params: PC },
+    async (req, res) => res.json({ items: await seances.reunions(req.org.id, req.valid.params.id) }));
+  r.post('/commissions/:id/reunions', { summary: 'Planifie une réunion de commission (avec Teams facultatif)', tags: T, org: true, roles: ADMIN, params: PC, body: Reunion, responses: { 201: 'Créé' },
+    description: "Une réunion est une séance de l'instance de la commission : son ordre du jour (`/seances/:id/odj`) liste les PROJETS PRÉSENTÉS. Teams : `auto` crée la réunion via Microsoft Graph (si configuré), `lien` enregistre un lien Teams collé à la main, `aucun`. `inviter: true` envoie les invitations Teams aux membres et secrétaires ; sinon seul le lien est communiqué par IvryDélib. Les membres et secrétaires sont prévenus par mail." },
+  async (req, res) => res.status(201).json(await seances.createReunion(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
 
   r.get('/actes/:id/commissions', { summary: "Commissions d'un acte et leurs avis (vide = hors commission)", tags: T, org: true, params: PA },
     async (req, res) => res.json(await commissions.forActe(req.ctx, req.org.id, req.valid.params.id)));

@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
 import Odj from './Odj';
+import { TeamsLink } from '../Reunions';
 import { CalendarDays, Plus } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -60,17 +61,18 @@ function HorsDelai() {
 
 function SeancesList() {
   const { org, isScc } = useAuth(); const o = org!.id;
-  const [tab, setTab] = useState<'avenir' | 'passees' | 'hors'>('avenir'); const [creating, setCreating] = useState(false);
+  const [tab, setTab] = useState<'avenir' | 'passees' | 'hors'>('avenir'); const [creating, setCreating] = useState(false); const [kind, setKind] = useState<'' | 'conseil' | 'commission'>('');
   const list = useLoad(async () => {
     const now = new Date().toISOString();
-    const items = (await api.get(orgPath(o, '/seances'), { params: tab === 'passees' ? { to: now, limit: 200 } : { from: now, limit: 200 } })).data.items as any[];
+    const items = (await api.get(orgPath(o, '/seances'), { params: { ...(tab === 'passees' ? { to: now } : { from: now }), limit: 200, kind: kind || undefined } })).data.items as any[];
     return tab === 'passees' ? items : [...items].sort((a, b) => +new Date(a.dateSeance) - +new Date(b.dateSeance)); // les prochaines d'abord ; les passées, la plus récente d'abord
-  }, [o, tab]);
+  }, [o, tab, kind]);
   return (
     <div>
       <PageTitle title="Séances & Ordre du jour" sub="Calendrier des instances, dates clés et actes en attente." actions={isScc && <button className="btn-primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nouvelle séance</button>} />
       <div className="mb-4 flex w-fit rounded bg-white p-1 shadow-card" role="tablist">{([['avenir', 'À venir'], ['passees', 'Séances passées'], ...(isScc ? [['hors', 'Hors délai & dérogations']] : [])] as [string, string][]).map(([k, l]) => (
         <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k as any)} className={`rounded px-3 py-2 text-[13px] font-semibold ${tab === k ? 'bg-primary text-white' : ''}`}>{l}</button>))}</div>
+      {tab !== 'hors' && <div className="mb-4 flex gap-2" role="group" aria-label="Nature de l'instance">{([['', 'Toutes'], ['conseil', 'Conseil municipal'], ['commission', 'Commissions']] as const).map(([k, l]) => <button key={k} onClick={() => setKind(k)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${kind === k ? 'border-primary bg-primary text-white' : 'border-line bg-white'}`}>{l}</button>)}</div>}
       {tab === 'hors' ? <HorsDelai /> : list.loading ? <Loading /> : !list.data?.length ? <div className="card"><Empty>{tab === 'passees' ? 'Aucune séance passée.' : 'Aucune séance à venir.'}</Empty></div> : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{list.data.map((s) => {
           const j = daysUntil(s.dateSeance); const lim = daysUntil(s.dateLimiteRedaction);
@@ -79,11 +81,13 @@ function SeancesList() {
               <div className="flex items-start justify-between"><div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-action" /><h3>{s.instance}</h3></div><Badge tone={s.statut === 'planifiee' ? 'blue' : 'gray'}>{s.statut}</Badge></div>
               <div className="mt-2 text-[18px] font-bold">{dt(s.dateSeance, { dateStyle: 'full', timeStyle: 'short' })}</div>
               <div className="text-mute">{s.lieu || 'Lieu à définir'}{j !== null && j >= 0 ? ` · dans ${j} jour(s)` : ''}</div>
+              {s.teams && <div className="mt-2" onClick={(e) => e.stopPropagation()}><TeamsLink teams={s.teams} /></div>}
+              {s.kind === 'commission' ? <p className="mt-3 text-[12px] text-mute">Réunion de commission — <b>{s.actesEnAttente ?? 0}</b> projet(s) visé(s) · ordre du jour : projets présentés</p> : (
               <dl className="mt-3 space-y-1 text-[12px]">
                 <div className="flex justify-between"><dt>Date limite de rédaction</dt><dd><Badge tone={lim !== null && lim < 0 ? 'ko' : lim !== null && lim < 7 ? 'warn' : 'ok'}>{d(s.dateLimiteRedaction)}</Badge></dd></div>
                 <div className="flex justify-between"><dt>Actes en attente d'affectation</dt><dd className="font-bold">{s.actesEnAttente ?? 0}</dd></div>
                 <div className="flex justify-between"><dt>Ordre du jour</dt><dd>{s.odjStatut.replace('_', ' ')}</dd></div>
-              </dl>
+              </dl>)}
             </Link>);
         })}</div>)}
       {creating && <NewSeance onClose={() => setCreating(false)} onDone={list.reload} />}

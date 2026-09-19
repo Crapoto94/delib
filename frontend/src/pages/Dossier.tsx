@@ -140,7 +140,7 @@ function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toas
     try { const fd = new FormData(); fd.append('titre', file.name.replace(/\.pdf$/i, '')); fd.append('communicable', 'true'); fd.append('file', file); await api.post(orgPath(o, `/actes/${acte.id}/annexes`), fd); list.reload(); }
     catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
   };
-  const download = async (a: any) => { const r = await api.get(orgPath(o, `/actes/${acte.id}/annexes/${a.id}/file`), { responseType: 'blob' }); window.open(URL.createObjectURL(r.data), '_blank'); };
+  const download = async (a: any) => { const m = await openPdf(() => api.get(orgPath(o, `/actes/${acte.id}/annexes/${a.id}/file`), { responseType: 'blob' }), a.titre); if (m) toast(m, 'ko'); };
   return (
     <section className="card p-5" aria-labelledby="annexes">
       <h3 id="annexes" className="mb-3 flex items-center gap-2"><Paperclip className="h-5 w-5 text-action" /> Pièces jointes au dossier</h3>
@@ -379,7 +379,7 @@ export default function Dossier() {
         <div className="mb-1 text-[12px] text-mute"><Link to="/dossiers" className="hover:underline">Actes & Dossiers</Link> › Dossier #{a.numeroSuivi}</div>
         <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><StatutBadge statut={a.statut} />
           <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
-          <button className="btn-secondary" onClick={async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' })); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); }}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button></div>
+          <button className="btn-secondary" onClick={async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }), `Dossier #${a.numeroSuivi} — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); }}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button></div>
       </div>
       {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">

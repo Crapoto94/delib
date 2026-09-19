@@ -77,6 +77,9 @@ const RULES = [
   { code: 'ia.echec', nom: 'L\u2019IA n\u2019a pas pu répondre', family: 'suivi', kind: 'event', mandatory: false, channels: ['inapp'],
     trigger: { event: 'ai.failed' }, recipients: ['requester'],
     subject: 'L\u2019IA n\u2019a pas pu analyser : {titre}', body: "L\u2019analyse du dossier n° {numero} « {titre} » a échoué ({motif}). Vous pouvez réessayer ou adapter les textes à la main.\n{lien}" },
+  { code: 'commission.reunion', nom: 'Réunion de commission (convocation, modification, annulation)', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'commission.reunion' }, recipients: ['commission_membres', 'commission_secretaires'],
+    subject: 'Réunion {commission} — {changement}', body: "Réunion de la commission « {commission} » ({changement}).\nDate : {date_reunion}\nLieu : {lieu}\nVisioconférence Teams : {lien_teams}" },
 
   // ---- temporelles : relances (paliers par défaut de la section 22.3 bis, jours ouvrés) ------------------------------
   { code: 'relance.etape', nom: "Relance d'un acte qui attend un valideur", family: 'validation', kind: 'temporal', mandatory: true,
@@ -101,6 +104,10 @@ const RULES = [
     trigger: { type: 'draft_idle' }, recipients: ['redacteur'],
     palliers: [{ id: 'B', at: { base: 'updated', days: 10 }, repeat: { everyDays: 7, max: 12 }, recipients: ['redacteur'] }],
     subject: 'Brouillon en attente : {titre}', body: "Votre brouillon n° {numero} « {titre} » n'a pas été modifié depuis le {arrivee}. Pensez à l'envoyer au circuit ou à l'abandonner.\n{lien}" },
+  { code: 'relance.reunion_commission', nom: 'Rappel de réunion de commission', family: 'echeances', kind: 'temporal', mandatory: false,
+    trigger: { type: 'commission_meeting' }, recipients: ['commission_membres', 'commission_secretaires'],
+    palliers: [{ id: 'J-2', at: { base: 'meeting', days: -2 }, recipients: ['commission_membres', 'commission_secretaires'] }],
+    subject: 'Rappel — réunion {commission} le {date_reunion}', body: "La commission « {commission} » se réunit le {date_reunion}.\nLieu : {lieu}\nVisioconférence Teams : {lien_teams}\nProjets présentés : {projets}" },
   { code: 'relance.date_limite', nom: 'Date limite de rédaction de la séance visée', family: 'echeances', kind: 'temporal', mandatory: false,
     trigger: { type: 'draft_deadline' }, recipients: ['redacteur'],
     palliers: [

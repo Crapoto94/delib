@@ -163,6 +163,8 @@ describe('relances temporelles (paliers, jours ouvrés)', () => {
   let a; let arrival;
   beforeAll(async () => {
     a = await submit({ titre: 'Relances temporelles' });
+    // heure d'arrivée figée à 9 h UTC : les tests de paliers ne dépendent plus de l'heure à laquelle ils tournent
+    await env.db.query("UPDATE step_instances SET arrived_at = date_trunc('day', arrived_at) + interval '9 hours', due_at = date_trunc('day', due_at) + interval '9 hours' WHERE acte_id = $1 AND status = 'current'", [a.id]);
     arrival = new Date((await env.db.get("SELECT arrived_at FROM step_instances WHERE acte_id = $1 AND status = 'current'", [a.id])).arrived_at);
   });
   const only = (items) => items.filter((i) => i.acteId === a.id);
@@ -195,7 +197,7 @@ describe('relances temporelles (paliers, jours ouvrés)', () => {
   });
 
   it('émet la relance une seule fois (idempotence), différée dans la plage 8 h – 18 h ouvrée', async () => {
-    const at = addBusinessDays(arrival, 2); at.setUTCHours(20, 0, 0, 0); // soir : hors plage
+    const at = addBusinessDays(arrival, 2); at.setUTCHours(20, 0, 0, 0); // soir : hors plage (R1 est dû, R2 pas encore)
     const first = await N.runTemporal(ville.id, { now: at });
     expect(first.filter((i) => i.acteId === a.id)).toHaveLength(1);
     const again = await N.runTemporal(ville.id, { now: new Date(at.getTime() + 3600e3) });

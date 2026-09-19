@@ -13,11 +13,13 @@ const InstancePatch = z.object({ nom: z.string().trim().min(2).max(160), actif: 
 const Jalon = z.object({ code: z.string().regex(/^[a-z0-9_-]{2,40}$/), label: z.string().max(120), date: Dt });
 const SeanceIn = z.object({
   instanceId: Id, type: z.enum(SEANCE_TYPES).optional(), dateSeance: z.iso.datetime(), lieu: z.string().max(200).optional(),
-  dateLimiteRedaction: Dt.nullable().optional(), dateLimiteDgs: Dt.nullable().optional(), dateLimiteMadCommissions: Dt.nullable().optional(), dateEnvoiConvocation: Dt.nullable().optional(),
+  dureeMinutes: z.number().int().min(15).max(720).optional(), dateLimiteRedaction: Dt.nullable().optional(), dateLimiteDgs: Dt.nullable().optional(), dateLimiteMadCommissions: Dt.nullable().optional(), dateEnvoiConvocation: Dt.nullable().optional(),
   jalonsExtra: z.array(Jalon).max(20).optional(), numbering: Numbering.optional(),
 });
 const SeancePatch = SeanceIn.omit({ instanceId: true }).partial().extend({ statut: z.enum(STATUTS).optional(), numbering: Numbering.nullable().optional() });
-const ListQ = z.object({ instanceId: Id.optional(), statut: z.enum(STATUTS).optional(), from: z.iso.datetime().optional(), to: z.iso.datetime().optional(), limit: z.coerce.number().int().min(1).max(200).default(100), offset: z.coerce.number().int().min(0).default(0) });
+const TeamsB = z.object({ mode: z.enum(['auto', 'lien', 'aucun']), joinUrl: z.string().url().optional(), inviter: z.boolean().default(false) })
+  .refine((d) => d.mode !== 'lien' || !!d.joinUrl, { message: 'Le lien Teams est obligatoire', path: ['joinUrl'] });
+const ListQ = z.object({ kind: z.enum(['conseil', 'commission', 'autre']).optional(), commissionId: Id.optional(), instanceId: Id.optional(), statut: z.enum(STATUTS).optional(), from: z.iso.datetime().optional(), to: z.iso.datetime().optional(), limit: z.coerce.number().int().min(1).max(200).default(100), offset: z.coerce.number().int().min(0).default(0) });
 const ProposeQ = z.object({ dateSeance: z.iso.datetime() });
 const Report = z.object({ motif: z.string().trim().min(3).max(500), toSeanceId: Id.optional() });
 const DerReq = z.object({ motif: z.string().trim().min(5).max(1000), nouvelleDateLimite: z.iso.datetime().optional() });
@@ -48,6 +50,10 @@ module.exports = ({ makeRouter, seances, deadlines }) => {
   r.put('/seances/:id', { summary: 'Modifie une séance, ses dates clés ou son statut', tags: T, org: true, roles: ADMIN, params: PI, body: SeancePatch,
     description: 'Un changement de date limite recalcule d\'office les rappels (ils sont calculés à chaque passage du planificateur).' },
   async (req, res) => res.json(await seances.update(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+  r.put('/seances/:id/teams', { summary: 'Associe (ou retire) une réunion Microsoft Teams à la séance', tags: T, org: true, roles: ADMIN, params: PI, body: TeamsB,
+    description: "`auto` : crée la réunion Teams via Microsoft Graph (organisateur configuré côté serveur) ; `lien` : enregistre un lien de réunion Teams (https://teams.microsoft.com/…) ; `aucun` : retire le lien (et annule la réunion créée automatiquement). `inviter: true` envoie les invitations Teams aux membres." },
+  async (req, res) => res.json(await seances.setTeams(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
   r.get('/seances/:id/non-traites', { summary: 'Actes non traités d\'une séance (candidats au report)', tags: T, org: true, roles: ADMIN, params: PI },
     async (req, res) => res.json(await seances.nonTraites(req.org.id, req.valid.params.id)));
 

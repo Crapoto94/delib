@@ -18,6 +18,8 @@ function Titulaires() {
   const tit = useLoad(async () => (await api.get(orgPath(o, '/titulaires'))).data.items as any[], [o]);
   const grp = useLoad(async () => (await api.get(orgPath(o, '/groupes'))).data.items as any[], [o]);
   const aut = useLoad(async () => (await api.get(orgPath(o, '/redaction/autorisations'))).data.items as any[], [o]);
+  const cfg = useLoad(async () => (await api.get(orgPath(o, '/settings'))).data.settings as Record<string, { value: any }>, [o]);
+  const riOn = cfg.data?.['circuit.resp_intermediaire']?.value === true;
   const [f, setF] = useState({ fonction: 'chef_service', username: '', directionCode: '', serviceCode: '' }); const [err, setErr] = useState<string | null>(null);
   const [a, setA] = useState({ username: '', directionCode: '', serviceCode: '' });
   const services = dirs.data?.find((x) => x.code === f.directionCode)?.services ?? [];
@@ -32,6 +34,10 @@ function Titulaires() {
   const label = (code?: string) => dirs.data?.find((x) => x.code === code)?.label ?? code ?? 'Toute la collectivité';
   return (
     <div className="space-y-6">
+      <section className="card p-5"><h3 className="mb-2">Responsable intermédiaire</h3>
+        <label className="flex items-start gap-3"><input type="checkbox" className="mt-1" checked={riOn} disabled={cfg.loading} onChange={async (e) => { try { await api.put(orgPath(o, '/settings/circuit.resp_intermediaire'), { value: e.target.checked, scope: 'organisme' }); cfg.reload(); toast(e.target.checked ? 'Étape « Responsable intermédiaire » activée' : 'Étape « Responsable intermédiaire » désactivée'); } catch (x) { toast(errMsg(x), 'ko'); } }} />
+          <span><b>Activer l’étape « Responsable intermédiaire » dans les circuits</b><br /><span className="text-[12px] text-mute">Facultative et décochée par défaut : tant qu’elle est décochée, l’étape est ignorée même si des titulaires sont saisis ci-dessous. Une fois activée, elle n’est déclenchée que si un titulaire est désigné pour le service.</span></span></label>
+      </section>
       <section className="card p-5"><h3 className="mb-3">Titulaires des fonctions de validation</h3>
         <form onSubmit={add} className="mb-4 grid gap-3 md:grid-cols-5 md:items-end"><ErrorBox msg={err} />
           <Field label="Fonction"><select className="input" value={f.fonction} onChange={(e) => setF({ ...f, fonction: e.target.value })}>{Object.entries(FONCTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>

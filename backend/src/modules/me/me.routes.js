@@ -19,7 +19,7 @@ module.exports = ({ makeRouter, dir, onboarding }) => {
     res.json({
       username: c.username, displayName: c.displayName, email: c.email, kind: c.kind, isPlatformAdmin: c.isPlatformAdmin,
       agent: dir.toAgent(c.agent) || null,
-      organismes: c.organismes.map((o) => ({ id: o.id, code: o.code, nom: o.nom, type: o.type, isDefault: o.isDefault, roles: o.roles, via: o.via, vocabulaire: o.vocabulaire })),
+      organismes: c.organismes.map((o) => ({ id: o.id, code: o.code, nom: o.nom, type: o.type, isDefault: o.isDefault, roles: o.roles, via: o.via, vocabulaire: o.vocabulaire, hasLogo: !!o.hasLogo, logoVersion: o.logoVersion ?? null })),
       defaultOrganismeId: def?.id ?? null,
       onboarding: { toShow: await onboarding.toShow(c.username) },
       impersonation: c.impersonatedBy ? { by: c.impersonatedBy } : null,

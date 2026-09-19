@@ -204,7 +204,7 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
           catch (e) {
             // fichier introuvable : le dossier reste imprimable, l'annexe est remplacée par une page d'avertissement
             const doc = await PDFDocument.create(); const pg = doc.addPage([T.A4.w, T.A4.h]);
-            pg.drawText(`Annexe ${i + 1} : ${String(a.titre).replace(/[^ -~ -ÿ]/g, '?')}`, { x: 56, y: 760, size: 14 });
+            pg.drawText(`Annexe ${i + 1} : ${String(a.titre).replace(/[^ -~00A0-00FF]/g, '?')}`, { x: 56, y: 760, size: 14 });
             pg.drawText('Fichier indisponible sur le serveur : redeposez cette annexe.', { x: 56, y: 730, size: 11 });
             parts.push({ titre: `Annexe ${i + 1} : ${a.titre} (indisponible)`, pdf: { buffer: Buffer.from(await doc.save()), pageCount: 1 } });
           }

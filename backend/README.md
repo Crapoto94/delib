@@ -74,3 +74,7 @@ Règles : aucun secret ni URL en dur · requêtes paramétrées · toute écritu
 3. Jeu de démonstration : `node scripts/seed-demo.js` (`--reset` pour le recréer) — agents fictifs `demo.*` sur l'organigramme réel du Hub, titulaires, 39 élus, les 4 commissions, 3 séances et des dossiers à tous les stades. Aucun mail n'est envoyé.
 4. Police de la Ville (Interstate) : déposer les `.otf` dans `police/interstate-2/` à la racine (ou `FONTS_DIR`) ; jamais versionnée (licence). Sans elle, les PDF retombent sur Times.
 5. `SCHEDULER_ENABLED=true` active les relances et l'envoi des mails ; `MAIL_REDIRECT_TO=adresse` redirige tous les mails (mode recette).
+
+## Docker
+
+`docker compose up -d --build` lance le **backend** (3021) et le **frontend** (5160, nginx qui relaie `/api`). PostgreSQL est celui du `.env` (serveur partagé) ; `--profile local-db` ajoute un PostgreSQL local (mettre `POSTGRES_HOST=postgres`). Volumes : `./backend/storage` (fichiers déposés : annexes, fonds de page, logo) et `./police` (polices, lecture seule). Variables utiles : `CORS_ORIGINS`, `PUBLIC_BASE_URL`, `SCHEDULER_ENABLED`, `GRAPH_TENANT_ID` / `GRAPH_CLIENT_ID` / `GRAPH_CLIENT_SECRET` / `TEAMS_ORGANIZER_UPN` (réunions Teams automatiques).

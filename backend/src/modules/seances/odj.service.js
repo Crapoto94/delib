@@ -14,7 +14,10 @@ const VARS = ['ANNEE', 'N_SEANCE', 'ORDRE', 'RUBRIQUE'];
 const DEFAULT_PATTERN = '{ANNEE}-{N_SEANCE}-{ORDRE:03}';
 const LOCK_MIN = 10;
 const ELIGIBLE_STATUT = 'en_attente_scc';
+/** Statuts d'un acte pouvant être inscrit à l'ordre du jour, circuit terminé ou non (D57). */
+const AFFECTABLE = ['brouillon', 'en_circuit', 'modification_demandee', 'valide_dgs', 'en_attente_scc'];
 const CLOSED = ['tenue', 'close', 'annulee'];
+const isCommission = (s) => s.instance_kind === 'commission';
 
 const strip = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
@@ -38,7 +41,7 @@ function formatNumero(pattern, vars) {
 
 function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
   const seanceOf = async (q, org, id, lock = false) => {
-    const s = await q.get(`SELECT s.*, i.nom AS instance_nom, i.numbering AS instance_numbering FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2${lock ? ' FOR UPDATE OF s' : ''}`, [id, requireOrg(org)]);
+    const s = await q.get(`SELECT s.*, i.nom AS instance_nom, i.numbering AS instance_numbering, i.kind AS instance_kind, i.commission_id AS instance_commission_id FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2${lock ? ' FOR UPDATE OF s' : ''}`, [id, requireOrg(org)]);
     if (!s) throw E.notFound('Séance introuvable');
     return s;
   };
@@ -60,9 +63,11 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
   }
 
   const rowsOf = (q, seanceId) => q.all(
-    `SELECT it.*, a.titre AS acte_titre, a.numero_suivi, a.statut AS acte_statut, a.direction_label, a.redacteur, a.rubrique_id, ru.libelle AS rubrique,
-            trim(e.prenom || ' ' || e.nom) AS rapporteur, d.titre AS delib_titre, d.ordre AS delib_ordre
+    `SELECT it.*, a.titre AS acte_titre, a.numero_suivi, a.statut AS acte_statut, a.current_step_key AS acte_step, a.direction_label, a.redacteur, a.rubrique_id, ru.libelle AS rubrique,
+            trim(e.prenom || ' ' || e.nom) AS rapporteur, d.titre AS delib_titre, d.ordre AS delib_ordre,
+            si.label AS etape, si.holders AS etape_holders
      FROM seance_items it LEFT JOIN actes a ON a.id = it.acte_id LEFT JOIN ref_items ru ON ru.id = a.rubrique_id
+          LEFT JOIN step_instances si ON si.acte_id = a.id AND si.status = 'current'
           LEFT JOIN elus e ON e.id = a.rapporteur_id LEFT JOIN deliberations d ON d.id = it.deliberation_id
      WHERE it.seance_id = $1 ORDER BY it.position, it.id`, [seanceId]);
 
@@ -81,10 +86,17 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
     return out;
   }
 
+  /** État de validation d'un acte à l'ordre du jour : prêt (circuit terminé), en circuit, à corriger, en rédaction. */
+  const etatOf = (statut, step) => {
+    if (statut === 'inscrit_odj' || (statut === 'en_attente_scc' && !step)) return 'pret';
+    if (statut === 'modification_demandee') return 'a_corriger';
+    if (statut === 'brouillon') return 'brouillon';
+    return 'en_circuit';
+  };
   const toItem = (r, numeros, i) => ({
     id: r.id, position: r.position, kind: r.kind, titre: r.kind === 'deliberation' ? (r.delib_titre || r.acte_titre) : r.titre, numerote: r.numerote,
     numero: numeros.get(r.id) ?? r.numero ?? null, provisoire: !r.numero, statut: r.statut, retireMotif: r.retire_motif, ajouteApresArret: r.ajoute_apres_arret,
-    acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: r.rapporteur } : null,
+    acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: r.rapporteur, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
     deliberationId: r.deliberation_id, groupe: r.acte_id ? `a${r.acte_id}` : null, ordreDeliberation: r.delib_ordre ?? null, index: i,
   });
 
@@ -149,7 +161,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
       const numeros = await displayNumbers(db, s, rows);
       const items = rows.map((r, i) => toItem(r, numeros, i));
       const warnings = [];
-      for (const it of items) if (it.kind === 'deliberation' && it.statut === 'a_traiter' && it.acte && it.acte.statut !== 'inscrit_odj') warnings.push({ itemId: it.id, message: `L'acte n° ${it.acte.numeroSuivi} est « ${it.acte.statut} » : à traiter` });
+      if (!isCommission(s)) for (const it of items) if (it.kind === 'deliberation' && it.statut === 'a_traiter' && it.acte && it.acte.statut !== 'inscrit_odj') warnings.push({ itemId: it.id, message: `L'acte n° ${it.acte.numeroSuivi} est « ${it.acte.statut} » : à traiter` });
       return {
         seance: { id: s.id, instance: s.instance_nom, dateSeance: s.date_seance, statut: s.statut }, statut: s.odj_statut, arreteAt: s.odj_arrete_at, arretePar: s.odj_arrete_par,
         pattern: patternOf(s), lock: await lockOf(db, s.id), canEdit: await canEdit(ctx, s.organisme_id), items, warnings,
@@ -160,6 +172,8 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
     /** Actes prêts à être affectés (circuit terminé, pas encore à l'ordre du jour), avec filtres (ODJ-01). */
     async pending(organismeId, seanceId, { visee = 'toutes', rubriqueId, rapporteurId, q } = {}) {
       const org = requireOrg(organismeId);
+      const sc = await seanceOf(db, org, seanceId);
+      if (isCommission(sc)) return svc.commissionProjects(org, sc, { onlyFree: true });
       const p = [org, ELIGIBLE_STATUT, seanceId]; const w = ['a.organisme_id = $1', 'a.statut = $2', 'a.current_step_key IS NULL', 'a.seance_id IS NULL'];
       if (visee === 'cette') w.push('a.seance_visee_id = $3'); else if (visee === 'aucune') w.push('a.seance_visee_id IS NULL'); else w.push('($3::int IS NOT NULL)');
       if (rubriqueId) { p.push(rubriqueId); w.push(`a.rubrique_id = $${p.length}`); }
@@ -175,11 +189,32 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
     },
 
     /**
+     * Réunion de commission (D51) : les projets « présentés » sont ceux mis à disposition de CETTE commission (après validation DGS) ;
+     * l'acte reste en route vers le Conseil : ni son statut ni sa séance ne changent.
+     */
+    async commissionProjects(org, sc, { onlyFree = false } = {}) {
+      const rows = await db.all(
+        `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.redacteur, a.direction_label, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
+                ac.avis, ac.mis_a_disposition_at, ac.suspendue,
+                (SELECT count(*)::int FROM deliberations d WHERE d.acte_id = a.id) AS nb_delib,
+                EXISTS (SELECT 1 FROM seance_items it WHERE it.seance_id = $2 AND it.acte_id = a.id AND it.statut = 'a_traiter') AS dans_odj
+         FROM acte_commissions ac JOIN actes a ON a.id = ac.acte_id LEFT JOIN ref_items ru ON ru.id = a.rubrique_id LEFT JOIN elus e ON e.id = a.rapporteur_id
+         WHERE a.organisme_id = $1 AND ac.commission_id = $3 AND ac.retiree_at IS NULL AND ac.mis_a_disposition_at IS NOT NULL AND a.statut NOT IN ('abandonne', 'retire', 'archive')
+         ORDER BY a.numero_suivi`, [org, sc.id, sc.instance_commission_id]);
+      return rows.filter((r) => !onlyFree || !r.dans_odj).map((r) => ({
+        id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, redacteur: r.redacteur, direction: r.direction_label, direction_label: r.direction_label, rubrique: r.rubrique, rapporteur: r.rapporteur,
+        deliberations: r.nb_delib, commissions: 1, avisRendus: r.avis ? 1 : 0, avis: r.avis, suspendue: r.suspendue, dansOdj: r.dans_odj, eligible: !r.dans_odj && !r.suspendue, etape: null, holders: [], seanceViseeId: null,
+      }));
+    },
+
+    /**
      * Tous les dossiers qui VISENT cette séance (séance visée), quel que soit leur avancement : ceux dont le circuit est terminé
      * peuvent être affectés ; les autres montrent où ils en sont (brouillon, étape du circuit, date limite).
      */
     async visant(organismeId, seanceId) {
       const org = requireOrg(organismeId);
+      const sc0 = await seanceOf(db, org, seanceId);
+      if (isCommission(sc0)) return svc.commissionProjects(org, sc0);
       const rows = await db.all(
         `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.redacteur, a.direction_label, a.current_step_key, a.seance_id, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
                 i.label AS etape, i.holders AS etape_holders, i.due_at AS etape_due
@@ -191,7 +226,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
       return rows.map((r) => ({
         id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, redacteur: r.redacteur, direction: r.direction_label, rubrique: r.rubrique, rapporteur: r.rapporteur,
         etape: r.etape || null, holders: r.etape_holders || [], dueAt: r.etape_due || null, dansOdj: inOdj.has(r.id) || r.statut === 'inscrit_odj',
-        eligible: r.statut === ELIGIBLE_STATUT && !r.current_step_key && !r.seance_id,
+        etat: etatOf(r.statut, r.current_step_key), eligible: AFFECTABLE.includes(r.statut) && !r.seance_id,
       }));
     },
 
@@ -202,7 +237,13 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
         for (const acteId of acteIds) {
           const a = await q.get('SELECT * FROM actes WHERE id = $1 AND organisme_id = $2 FOR UPDATE', [acteId, org]);
           if (!a) throw E.notFound(`Acte ${acteId} introuvable`);
-          if (a.statut !== ELIGIBLE_STATUT || a.current_step_key || a.seance_id) throw E.conflict(`L'acte n° ${a.numero_suivi} n'est pas prêt à être affecté (circuit terminé et non encore inscrit)`);
+          const com = isCommission(s);
+          if (com) {
+            const ac = await q.get('SELECT * FROM acte_commissions WHERE acte_id = $1 AND commission_id = $2 AND retiree_at IS NULL', [a.id, s.instance_commission_id]);
+            if (!ac || !ac.mis_a_disposition_at) throw E.conflict(`Le projet n° ${a.numero_suivi} n'est pas mis à disposition de cette commission`);
+            if (ac.suspendue) throw E.conflict(`La mise à disposition du projet n° ${a.numero_suivi} est suspendue (renvoyé au rédacteur)`);
+            if (await q.get("SELECT 1 AS x FROM seance_items WHERE seance_id = $1 AND acte_id = $2 AND statut = 'a_traiter'", [s.id, a.id])) throw E.conflict(`Le projet n° ${a.numero_suivi} est déjà à l'ordre du jour de cette réunion`);
+          } else if (!AFFECTABLE.includes(a.statut) || a.seance_id) throw E.conflict(`L'acte n° ${a.numero_suivi} ne peut pas être inscrit à l'ordre du jour (${a.seance_id ? 'déjà inscrit' : `statut « ${a.statut} »`})`);
           const delibs = await q.all('SELECT * FROM deliberations WHERE acte_id = $1 ORDER BY ordre, id', [a.id]);
           const rub = await rubriqueOf(q, a.id);
           for (const d of delibs) {
@@ -215,14 +256,18 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
             added.push(it.id);
             await hist(q, s.id, ctx, 'ajout', { itemId: it.id, after: { acteId: a.id, deliberationId: d.id, numero }, motif });
           }
-          await q.run("UPDATE actes SET statut = 'inscrit_odj', seance_id = $2, seance_visee_id = COALESCE(seance_visee_id, $2) WHERE id = $1", [a.id, s.id]);
-          await q.run("INSERT INTO acte_seance_history (acte_id, kind, from_seance, to_seance, motif, actor) VALUES ($1,'affectation',$2,$3,$4,$5)", [a.id, a.seance_visee_id, s.id, motif ?? null, ctx.username]);
-          changed.push({ acteId: a.id, change: 'ajout' });
+          if (!com) {
+            // circuit terminé : « inscrit à l'ordre du jour » ; sinon le statut ne change pas et l'inscription est confirmée à la fin du circuit (D57)
+            const done = a.statut === ELIGIBLE_STATUT && !a.current_step_key;
+            await q.run("UPDATE actes SET statut = CASE WHEN $3 THEN 'inscrit_odj' ELSE statut END, seance_id = $2, seance_visee_id = COALESCE(seance_visee_id, $2) WHERE id = $1", [a.id, s.id, done]);
+            await q.run("INSERT INTO acte_seance_history (acte_id, kind, from_seance, to_seance, motif, actor) VALUES ($1,'affectation',$2,$3,$4,$5)", [a.id, a.seance_visee_id, s.id, motif ?? null, ctx.username]);
+            changed.push({ acteId: a.id, change: 'ajout' });
+          }
         }
         return { added, changed };
       });
       await audit.log(ctx, { organismeId: org, action: 'odj.affecter', entity: 'seances', entityId: seanceId, after: { acteIds, motif } });
-      for (const id of acteIds) await bus.emit('acte.seance_changed', { organismeId: org, acteId: id, from: null, to: seanceId, ctx, motif: 'Inscrit à l\'ordre du jour' });
+      if (!isCommission(await seanceOf(db, org, seanceId))) for (const id of acteIds) await bus.emit('acte.seance_changed', { organismeId: org, acteId: id, from: null, to: seanceId, ctx, motif: 'Inscrit à l\'ordre du jour' });
       return svc.get(ctx, org, seanceId);
     },
 
@@ -237,7 +282,8 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
           else await q.run('DELETE FROM seance_items WHERE id = $1', [it.id]);
           await hist(q, s.id, ctx, 'retrait', { itemId: it.id, before: { numero: it.numero, position: it.position }, motif });
         }
-        await q.run("UPDATE actes SET statut = 'en_attente_scc', seance_id = NULL WHERE id = $1 AND statut = 'inscrit_odj'", [acteId]);
+        if (isCommission(s)) return { changed: [] };
+        await q.run("UPDATE actes SET statut = CASE WHEN statut = 'inscrit_odj' THEN 'en_attente_scc' ELSE statut END, seance_id = NULL WHERE id = $1", [acteId]);
         await q.run("INSERT INTO acte_seance_history (acte_id, kind, from_seance, motif, actor) VALUES ($1,'retrait',$2,$3,$4)", [acteId, s.id, motif ?? null, ctx.username]);
         return { changed: [{ acteId, change: 'retrait' }] };
       });
@@ -255,7 +301,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
         else await db.run('DELETE FROM seance_items WHERE id = $1', [it.id]);
         await hist(db, s.id, ctx, 'retrait', { itemId: it.id, motif: motif || 'report' });
       }
-      await db.run("UPDATE actes SET statut = 'en_attente_scc' WHERE id = $1 AND statut = 'inscrit_odj'", [acte.id]);
+      await db.run("UPDATE actes SET statut = CASE WHEN statut = 'inscrit_odj' THEN 'en_attente_scc' ELSE statut END WHERE id = $1", [acte.id]);
     },
 
     async addPoint(ctx, organismeId, seanceId, { kind = 'libre', titre, numerote = false, afterItemId, motif }) {
@@ -351,7 +397,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
       const seen = new Set();
       for (const r of rows) {
         if (r.kind === 'libre' && !r.titre?.trim()) problems.push({ code: 'sans_titre', itemId: r.id, message: 'Un point libre n\'a pas de titre' });
-        if (r.kind !== 'deliberation' || seen.has(r.acte_id)) continue;
+        if (r.kind !== 'deliberation' || seen.has(r.acte_id) || isCommission(s)) continue;
         seen.add(r.acte_id);
         if (r.acte_statut !== 'inscrit_odj') problems.push({ code: 'acte_non_pret', itemId: r.id, acteId: r.acte_id, message: `L'acte n° ${r.numero_suivi} est « ${r.acte_statut} »` });
         const a = await db.get('SELECT * FROM actes WHERE id = $1', [r.acte_id]);
@@ -387,7 +433,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
         return acteNums;
       });
       await audit.log(ctx, { organismeId: org, action: 'odj.arret', entity: 'seances', entityId: seanceId, after: { forcer, anomalies: c.problems } });
-      for (const [acteId, v] of notified) await bus.emit('odj.arrete', { organismeId: org, acteId, seanceId, numero: v.numero, ordre: v.ordre, ctx });
+      if (!isCommission(before)) for (const [acteId, v] of notified) await bus.emit('odj.arrete', { organismeId: org, acteId, seanceId, numero: v.numero, ordre: v.ordre, ctx });
       return svc.get(ctx, org, seanceId);
     },
 

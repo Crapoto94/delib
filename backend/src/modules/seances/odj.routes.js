@@ -32,7 +32,7 @@ module.exports = ({ makeRouter, odj }) => {
     async (req, res) => res.json({ items: await odj.pending(req.org.id, req.valid.params.id, req.valid.query) }));
 
   r.get('/seances/:id/odj/visant', { summary: "Tous les dossiers qui visent cette séance, quel que soit leur avancement", tags: T, org: true, roles: ADMIN, params: PS,
-    description: "Brouillons, dossiers en circuit (avec l'étape et les valideurs), dossiers terminés. `eligible` : circuit terminé, prêt à être affecté à l'ordre du jour ; `dansOdj` : déjà inscrit." },
+    description: "Brouillons, dossiers en circuit (avec l'étape et les valideurs), dossiers terminés. `etat` : pret (circuit terminé) | en_circuit | a_corriger | brouillon ; `eligible` : peut être inscrit à l'ordre du jour même si le circuit n'est pas terminé ; `dansOdj` : déjà inscrit." },
   async (req, res) => res.json({ items: await odj.visant(req.org.id, req.valid.params.id) }));
 
   r.post('/seances/:id/odj/affectations', { summary: 'Affecte des actes à l\'ordre du jour', tags: T, org: true, params: PS, body: Affecter,

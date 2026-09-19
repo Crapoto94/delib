@@ -13,3 +13,6 @@ design/*/node_modules/
 storage/
 # polices sous licence : fournies localement, jamais publiées
 police/
+
+# ressources pdf.js copiees au build (frontend/scripts/copy-pdfjs-assets.mjs)
+frontend/public/pdfjs/

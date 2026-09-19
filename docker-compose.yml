@@ -1,6 +1,11 @@
-# IvryDélib — Docker Compose (guide « Nouvelle app Ville » §1).
-# Ports par défaut décidés : backend 3021, frontend 5160, espace élus (DMZ) 5161.
-# Les secrets viennent du fichier .env (jamais versionné) ; aucune URL ni clé n'est écrite ici.
+# IvryDélib — Docker Compose : backend + frontend (+ PostgreSQL local facultatif).
+# Ports : frontend 5160 (nginx, relaie /api), backend 3021, espace élus DMZ 5161 (à venir).
+# Les secrets viennent du fichier .env à la racine (jamais versionné) ; aucune URL ni clé n'est écrite ici.
+#
+#   docker compose up -d --build                  backend + frontend, PostgreSQL = celui du .env (serveur partagé)
+#   docker compose --profile local-db up -d --build   ajoute un PostgreSQL local (POSTGRES_HOST=postgres dans le .env)
+#
+# Fichiers persistants : ./backend/storage (annexes, fonds de page, logo). Polices de la Ville : ./police (lecture seule).
 services:
   backend:
     build: { context: ./backend }
@@ -9,16 +14,33 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3021
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5160}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:5160}
+      - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-false}
+    volumes:
+      - ./backend/storage:/app/storage
+      - ./police:/police:ro
     ports: ["3021:3021"]
 
-  # Le frontend sera ajouté quand les maquettes Stitch seront livrées (décision D35) :
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     args:
-  #       - VITE_API_URL=${APP_API_URL:-http://localhost:3021}
-  #   restart: always
-  #   ports: ["5160:80"]
-  #   depends_on: [backend]
-  #
-  # L'espace élus (DMZ) sera un conteneur distinct sur le modèle de appdsi/parapheur-dmz, port 5161 (voir MANIFEST §18).
+  frontend:
+    build: { context: ./frontend }
+    restart: always
+    depends_on: [backend]
+    ports: ["5160:80"]
+
+  # PostgreSQL local : uniquement avec --profile local-db (en production on utilise le serveur partagé du .env).
+  postgres:
+    profiles: ["local-db"]
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-ivrydelib}
+      - POSTGRES_USER=${POSTGRES_USER:-ivrydelib}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?mot de passe requis}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    ports: ["5432:5432"]
+
+  # L'espace élus (DMZ) sera un conteneur distinct (front minimal + nginx à liste blanche), port 5161 — MANIFEST §18.
+
+volumes:
+  pgdata:

@@ -43,6 +43,27 @@ function createDirectoryService({ db, adapter, config, log }) {
     } catch { return null; }
   }
 
+  /**
+   * Intitulé de poste à afficher : si l'agent est le RESPONSABLE de sa direction ou de son service dans l'organigramme RH,
+   * on prend l'intitulé du poste d'organigramme (« Directeur des systèmes d'information »), plus parlant que la
+   * fonction de la fiche RH (« Directeur et expertise informatique »).
+   */
+  async function posteOrganigramme(card, dir, svc) {
+    if (!card || !dir?.code) return null;
+    try {
+      const chart = await adapter.getOrganisationChart();
+      const node = chart.find((d) => d.code === dir.code);
+      if (!node) return null;
+      const me = [normLabel(`${card.prenom} ${card.nom}`), normLabel(`${card.nom} ${card.prenom}`)];
+      const sn = svc?.code ? (node.services || []).find((x) => x.code === svc.code) : null;
+      for (const n of [sn, node]) {
+        if (n?.poste && n.responsable && me.includes(normLabel(n.responsable))) return sentence(n.poste);
+      }
+    } catch { /* organigramme indisponible : on garde la fonction de la fiche RH */ }
+    return null;
+  }
+  const sentence = (t) => { const s = String(t).toLowerCase().replace(/\s+/g, ' ').trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
+
   async function upsertAgent(a) {
     await db.run(
       `INSERT INTO agent_ref (username, matricule, nom, prenom, display_name, email, direction_code, direction_label,
@@ -133,7 +154,7 @@ function createDirectoryService({ db, adapter, config, log }) {
       return upsertAgent({
         username: adUser.username, displayName, email,
         nom: card?.nom ?? adUser.surname, prenom: card?.prenom ?? adUser.givenName, matricule: card?.matricule,
-        directionCode: dir?.code, directionLabel: dir?.label || card?.direction, serviceLabel: svcHit?.label || card?.service, serviceCode: svcHit?.code, poste: card?.fonction,
+        directionCode: dir?.code, directionLabel: dir?.label || card?.direction, serviceLabel: svcHit?.label || card?.service, serviceCode: svcHit?.code, poste: (await posteOrganigramme(card, dir, svcHit)) || card?.fonction,
         actif: card ? card.present : true, loginAt: new Date(),
       });
     },

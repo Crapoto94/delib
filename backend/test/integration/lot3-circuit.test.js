@@ -424,3 +424,20 @@ describe('documentation', () => {
     expect(paths.some((p) => p.includes('/delegations'))).toBe(true);
   });
 });
+
+describe('responsable intermédiaire facultatif (D56)', () => {
+  it('est ignoré par défaut même avec un titulaire, puis joué une fois activé', async () => {
+    expect((await as(admin).post(`${base()}/titulaires`, { fonction: 'responsable_intermediaire', username: 'moreau', directionCode: 'A1', serviceCode: 'A1a' })).status).toBe(201);
+    const off = await readyActe();
+    const v1 = await as(t.dupont).post(`${A(off.id)}/envoi`);
+    expect(v1.body.currentStepKey).toBe('chef_service');
+    expect(steps(v1.body)).not.toContain('resp_intermediaire');
+
+    const put = await as(admin).put(`${base()}/settings/circuit.resp_intermediaire`, { value: true, scope: 'organisme' });
+    expect(put.status).toBe(200);
+    const on = await readyActe();
+    const v2 = await as(t.dupont).post(`${A(on.id)}/envoi`);
+    expect(v2.body.currentStepKey).toBe('resp_intermediaire');
+    await as(admin).put(`${base()}/settings/circuit.resp_intermediaire`, { value: false, scope: 'organisme' });
+  });
+});

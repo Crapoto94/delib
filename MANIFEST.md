@@ -1,6 +1,6 @@
 # MANIFEST — IvryDélib : gestion des délibérations
 
-> **Statut : v1.3 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.5 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -191,6 +191,12 @@ Lu dans le tutoriel de formation (18 pages).
 | **Administrateur d'organisme** | Paramètre son organisme (circuits, référentiels, membres…) | rôle par organisme |
 | **Secrétaire de séance** | Élu désigné pour la séance | saisi par le SCC |
 | **Télétransmission** | Prépare et confirme l'envoi au contrôle de légalité | rôle par organisme |
+
+### Identité de l'organisme et logo (D50)
+
+- **IDT-01** — Écran **Identité & logo** (administrateur d'organisme) : nom, adresse, complément, code postal, ville, téléphone, e-mail, site web, SIREN, **signataire** et sa qualité.
+- **IDT-02** — **Logo** PNG ou JPEG (1,5 Mo au plus, signature vérifiée) : affiché dans l'en-tête de l'application, la page de connexion (avant authentification : point d'accès public ne renvoyant que le nom et le logo de l'organisme par défaut) et comme **icône de l'onglet**.
+- **IDT-03** — Dans les **PDF**, option de gabarit `logo` (`auto` par défaut : affiché seulement s'il n'y a pas de PDF de fond ; largeur et alignement réglables) ; les coordonnées sont des **variables de gabarit** (`{organisme}`, `{adresse}`, `{ville}`, `{code_postal}`, `{telephone}`, `{email}`, `{site_web}`, `{signataire}`).
 
 ### « Afficher en tant que » (D47)
 
@@ -688,6 +694,15 @@ Fusion page à page avec le PDF de fond (pdf-lib) : fond dessous, contenu dessus
 
 ---
 
+### 15.3 Réunions de commission et projets présentés (D51, D53)
+
+- **REU-01** — Une commission a un **calendrier de réunions** (date, heure, durée, lieu, visioconférence). Créer une commission crée son **instance de réunions** ; ses séances suivent le même moteur que le Conseil (ODJ-13).
+- **REU-02** — L'**ordre du jour** d'une réunion est la liste des **projets présentés** : peuvent y être inscrits les actes mis à disposition **de cette commission** (après validation DGS) ; l'inscription **ne change ni le statut de l'acte ni sa séance du Conseil** ; retirer un projet de la réunion n'a pas d'effet sur l'acte.
+- **REU-03** — Les **membres** (élus) et **secrétaires** sont **prévenus** par mail à la planification, à chaque modification (date, lieu, lien) et à l'annulation, avec le **lien Teams** ; un **rappel part à J−2 ouvrés**. Le nombre de **projets présentés** apparaît sur la réunion.
+- **REU-04** — L'**avis** de la commission saisi sans date prend la **date de la réunion** où le projet a été présenté.
+- **REU-05** — **Teams** : `auto` (création de l'évènement via Microsoft Graph, organisateur `TEAMS_ORGANIZER_UPN`), `lien` (lien `https://teams.microsoft.com/…` collé, contrôlé), `aucun`. Les **invitations Teams** ne sont envoyées qu'avec l'option explicite `inviter`. Un changement de date ou de lieu met la réunion Teams à jour ; l'annulation la supprime. Sans configuration Graph, seul le lien manuel est proposé.
+- **REU-06** — Une **commission** porte aussi son **nombre de sièges** (dont opposition) et ses **thématiques** (D44).
+
 ## 16. Conseils municipaux : séances, ordre du jour, cahier
 
 Le tuto montre un **calendrier de toutes les instances** (type *Conseil municipal*, séances *Ordinaire* de 2021 à 2024, « 13 séance(s) / 460 acte(s) en attente »).
@@ -1040,6 +1055,16 @@ Classement : **P1** = fort gain, faible risque ; **P2** = gain net, effort moyen
 - **IA-61** — **Avant l'envoi au circuit** : proposition (non bloquante par défaut, **obligatoire selon paramétrage**) de lancer les vérifications recommandées.
 - **IA-62** — Une suggestion acceptée devient une **modification suivie** (TRK-04) attribuée à l'utilisateur ; le motif « IA » est conservé dans l'historique.
 - **IA-63** — **Administration** : activation par fonction/rôle, choix du modèle, prompts, listes de contrôle, bibliothèque de visas, jeux d'évaluation, quotas, statistiques.
+
+**Réalisation (D59)** — Les analyses s'exécutent **en arrière plan** (file IAQ) sur le texte affiché (ou tout le dossier pour le contrôle complet) ; chaque suggestion est classée par **catégorie** (orthographe, typographie, style, visas, cohérence, complétude) et **gravité** (bloquant, à revoir, information). **IA-05** : toute référence juridique citée est renvoyée en alerte « à vérifier » et n'est jamais affirmée ; le **contrôle complet** ajoute des contrôles **faits par le code** (texte vide, montant de la fiche absent des textes, incidence financière sans montant au dispositif, annexes citées mais absentes ou non citées, visa du CGCT, dispositif sans « Article 1 »). Un passage proposé qui n'existe pas mot pour mot dans le texte est écarté.
+
+### 21.6 bis Interrogations en arrière plan et file d'attente (D52)
+
+- **IAQ-01** — **Aucun appel à l'IA dans la requête de l'utilisateur** : la demande dépose une **tâche** (réponse immédiate `202`) ; un exécutant en arrière plan la traite ; l'interface suit son avancement (statut, étape, position dans la file).
+- **IAQ-02** — **Indicateur visuel** : pastille « IA au travail / en attente » dans l'en-tête tant qu'une de mes demandes est active ; sur le dossier, barre d'avancement et texte (« exposé des motifs 1/3 », « file : n° 2 ») ; notification à la fin (ou à l'échec). L'utilisateur peut **annuler** sa demande.
+- **IAQ-03** — **Paramètres** (plateforme, puis organisme) : `ai.max_concurrent` (requêtes simultanées, 2), `ai.max_par_utilisateur` (1), `ai.file_max` (50), `ai.file_max_par_utilisateur` (3), `ai.intervalle_ms` (300), `ai.timeout_s` (120), `ai.tentatives` (2). File pleine ou quota atteint : `429` explicite.
+- **IAQ-04** — **Équité** : les utilisateurs sont servis « à tour de rôle » (celui qui a déjà une tâche en cours, ou qui a été servi le plus récemment, passe après les autres).
+- **IAQ-05** — **Robustesse** : file en base (survit à un redémarrage), nouvelle tentative avec temporisation croissante, reprise d'une tâche dont l'exécutant a disparu (5 minutes sans signe de vie), écran d'**administration** (état de la file, limites, tâches récentes, annulation).
 
 ### 21.7 Modèle technique
 
@@ -1506,6 +1531,16 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D47** | **« Afficher en tant que »** (administrateur, administrateur d'organisme, SCC) : on choisit un utilisateur et on a **exactement ses droits** (ce qu'il voit, ce qu'il peut faire) ; un bandeau permanent l'indique ; **l'audit conserve le vrai acteur** et l'utilisateur au nom duquel il a agi. Plafonds : la plateforme tout agent ; l'administrateur d'organisme les agents de ses organismes (jamais un administrateur de plateforme) ; le SCC les agents ordinaires (ni administrateur, ni SCC). | 4, 29 |
 | **D48** | **Autocomplétion des agents partout** : chaque fois qu'un agent doit être désigné — configuration (titulaires, groupes, autorisations de rédaction, délégations, rôles, « afficher en tant que ») ou discussion (mentions) — on tape **@nom** (ou un prénom) et la liste propose les agents, avec l'**identifiant de connexion** réel (partie locale de l'e-mail, pas l'identifiant interne du Hub). | 14, 23 |
 | **D49** | **Tableau de bord** : outre « à traiter » et « mes dossiers », il montre **les actes que mes collaborateurs (N-x) rédigent ou font valider** (d'après mes fonctions de directeur, chef de service, DGA, DGS) et **les actes que j'ai validés qui poursuivent leur circuit** (avec l'étape actuelle et l'échéance). | 9, 23 |
+| **D50** | **Identité de l'organisme paramétrable** : nom de la collectivité, adresse, coordonnées, signataire des convocations et **logo** sont des paramètres (écran « Identité & logo »). **Le logo est aussi celui de l'application** (en-tête, page de connexion, icône de l'onglet) **et des PDF** (option de gabarit, par défaut seulement sans papier à en-tête). | 5, 12, 23, 25 |
+| **D51** | **Réunions de commission** : une commission a ses **dates de réunion** ; chaque réunion est une séance de l'instance de la commission dont l'**ordre du jour = les projets présentés** (mis à disposition de cette commission) ; l'avis, sans date saisie, prend la date de la réunion ; membres et secrétaires sont **prévenus** (convocation, modification, annulation) et **rappelés à J−2**. | 15, 16 |
+| **D52** | **Toute interrogation de l'IA se fait en arrière plan**, avec **indicateur visuel** (pastille dans l'en-tête, barre d'avancement sur le dossier) et une **file d'attente paramétrable** pour ne pas surcharger l'IA : requêtes simultanées, quota par utilisateur, taille de la file, intervalle entre appels, délai d'un appel, nombre d'essais. | 21 |
+| **D53** | **Réunions Teams** : une séance ou une réunion de commission peut être associée à une **réunion Microsoft Teams** — création automatique via Microsoft Graph (si configuré) ou **lien collé** ; les invitations Teams ne partent que sur demande explicite (`inviter`), sinon le lien est communiqué par IvryDélib. | 15, 17, 24 |
+| **D54** | **Séances** : onglets **À venir / Passées / Hors délai** ; la fiche d'une séance liste **tous les dossiers qui la visent**, quel que soit leur avancement (brouillon, étape du circuit, prêt à affecter). | 16 |
+| **D55** | **Déploiement** : `docker compose` fournit **le backend, le frontend (nginx, relais `/api`) et, en option, un PostgreSQL local** ; les fichiers déposés et les polices sont des volumes ; les secrets restent dans `.env`. | 3, 30 |
+| **D56** | **Responsable intermédiaire facultatif, désactivé par défaut** : l'étape n'est jouée que si l'administrateur d'organisme l'a activée (paramètre `circuit.resp_intermediaire`, case à cocher dans « Titulaires & droits », décochée à l'installation) **et** qu'un titulaire est désigné pour le service ; sinon elle est sautée et tracée. | 9, 12 |
+| **D57** | **Ordre du jour et circuit non terminé** : un dossier qui vise une séance peut être **inscrit à l'ordre du jour avant la fin de son circuit** (brouillon, en validation, à corriger). Sa ligne est colorée selon son **état de validation** (vert = prêt, bleu = en validation avec l'étape et les valideurs, ambre = à corriger, gris = en rédaction) ; son statut ne change pas tant que le circuit n'est pas terminé, puis il devient « inscrit à l'ODJ » automatiquement. L'**arrêt** de l'ordre du jour reste bloqué (sauf forçage) tant qu'un dossier n'est pas prêt. | 16 |
+| **D58** | **Visionneuse PDF unique** : tout PDF de l'application (aperçu d'un texte, aperçu du dossier, annexes, étalonnage de gabarit) s'affiche dans la **visionneuse intégrée** — la même que celle d'AppDSI : modale avec zoom (± et « ajuster à la largeur »), lecteur natif du navigateur sur poste, rendu pdf.js sur mobile et Safari, bouton « ouvrir dans un onglet » — et **jamais dans un onglet vierge**. | 12, 16, 25 |
+| **D59** | **Éditeur** : l'**en-tête de l'application** (logo, navigation, recherche, pastille IA, profil) **reste visible** pendant la rédaction ; le **panneau « Assistant »** (IA-60) est réalisé avec ses quatre outils — *Vérifier l'orthographe*, *Améliorer le style*, *Contrôler les visas et considérants*, *Contrôle complet du dossier* — sous forme de cartes catégorisées [Accepter] [Ignorer] [Pourquoi ?], « Tout accepter » limité à l'orthographe (IA-13), acceptation = modification suivie attribuée à l'utilisateur (IA-62). | 9, 21 |
 
 ---
 
@@ -1526,5 +1561,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.5** | 2026-09-20 | décisions **D56 à D59** : responsable intermédiaire facultatif et désactivé par défaut, dossiers inscrits à l'ordre du jour avant la fin du circuit (fond coloré selon l'état de validation), visionneuse PDF unique (celle d'AppDSI), en-tête conservé dans l'éditeur, panneau Assistant IA réalisé (orthographe, style, visas, contrôle complet) ; corrections : espaces des titres en gras et ligatures « fi » dans les PDF, logo dans l'en-tête et intitulé de poste d'après l'organigramme RH |
+| **1.4** | 2026-09-19 | décisions **D50 à D55** : identité et logo de l'organisme (aussi logo de l'application et des PDF), réunions de commission avec projets présentés et Teams, IA en arrière plan avec file d'attente paramétrable, séances passées et dossiers visant une séance, `docker compose` complet ; **copie de délibération assistée par IA**, éditeur en modale et polices Interstate réalisés |
 | **1.3** | 2026-09-19 | décisions **D47 à D49** : « Afficher en tant que » (administrateur, SCC), autocomplétion des agents partout (`@nom`), tableau de bord avec l'équipe (N-x) et les actes validés en cours de circuit ; **ODJ et numérotation**, utilisateurs et rôles, gabarits PDF (police Interstate, choix du gabarit) réalisés |
 | **1.2** | 2026-09-19 | **lots 1 à 4a réalisés** (actes, textes suivis, PDF, circuit, délégations, notifications et relances, élus, commissions, séances, dérogations) ; **premier frontend** d'après Stitch ; décisions **D39 à D46** : éditeur en modale WYSIWYG (articles automatiques), copie de délibération assistée par IA, administration des utilisateurs et des rôles, connexion de développement, jeu de démonstration, commissions réelles (sièges, thématiques), fiche RH sans e-mail AD, erreur 423 de date limite |

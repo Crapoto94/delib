@@ -13,6 +13,7 @@ function createAccess(db) {
   const toOrg = (r) => ({
     id: r.id, code: r.code, nom: r.nom, type: r.type, siren: r.siren, actif: r.actif,
     isDefault: r.is_default, couleurs: r.couleurs, vocabulaire: r.vocabulaire,
+    hasLogo: !!r.logo_path, logoVersion: r.logo_sha256 ? r.logo_sha256.slice(0, 12) : null,
   });
   // lectures transverses du socle (organismes, rattachements) : hors périmètre d'isolation par organisme
   const sys = (fn) => db.withCtx({ isPlatformAdmin: true }, fn);

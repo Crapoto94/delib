@@ -7,7 +7,9 @@
  *  - avec RLS_ENABLED, withCtx() ouvre une transaction et renseigne app.organisme_ids / app.rls_bypass pour
  *    que les politiques Row-Level Security de la migration 0007 s'appliquent.
  */
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+// DATE (sans heure) : renvoyé tel quel « AAAA-MM-JJ », jamais converti en Date locale (sinon le jour se décale selon le fuseau)
+types.setTypeParser(1082, (v) => v);
 const { E } = require('../shared/errors');
 
 function createDb(config, log) {

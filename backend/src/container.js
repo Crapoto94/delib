@@ -2,7 +2,7 @@
  * Composition de l'application : assemble adaptateurs (ports), services et routes.
  * Les adaptateurs sont injectés : production = APM + Hub DSI ; tests = faux adaptateurs (aucun réseau).
  */
-const { assertAuthPort, assertDirectoryPort, assertMailPort, assertAiPort } = require('./ports');
+const { assertAuthPort, assertDirectoryPort, assertMailPort, assertAiPort, assertMeetingPort } = require('./ports');
 const { createAudit } = require('./modules/audit/audit.service');
 const { createAccess } = require('./modules/auth/access');
 const { createSessions } = require('./modules/auth/sessions.repository');
@@ -36,10 +36,11 @@ const { createUsers } = require('./modules/users/users.service');
 const { createAi } = require('./modules/ai/ai.service');
 const { createAiQueue } = require('./modules/ai/queue');
 
-function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, guard }) {
+function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, guard }) {
   assertAuthPort(ad);
   assertMailPort(mail);
   assertAiPort(aiAdapter);
+  assertMeetingPort(meeting);
   assertDirectoryPort(directoryAdapter);
   const audit = createAudit(db);
   const access = createAccess(db);
@@ -64,9 +65,9 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const textes = createTextes({ db, audit, actes, acl, bus });
   late.texts = textes;
   const render = createRender({ db, audit, storage, refs, actes, textes, config });
-  const commissions = createCommissions({ db, audit, actes, acl, settings, bus, log });
+  const commissions = createCommissions({ db, audit, actes, acl, settings, bus, log, late });
   late.commissions = commissions;
-  const seances = createSeances({ db, audit, actes, acl, settings, bus, late });
+  const seances = createSeances({ db, audit, actes, acl, settings, bus, late, meeting, log });
   late.seances = seances;
   const deadlines = createDeadlines({ db, audit, actes, acl, titulaires, settings, bus });
   late.deadlines = deadlines;
@@ -80,7 +81,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
   const scheduler = createScheduler({ db, notifications, config, log });
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, users, ai, aiQueue };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, users, ai, aiQueue };
 }
 
 module.exports = { buildContainer };

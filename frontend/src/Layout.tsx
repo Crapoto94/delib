@@ -5,6 +5,7 @@ import AgentPicker from './AgentPicker';
 import { Modal, useToast } from './ui';
 import { OrgLogo, useFavicon } from './Brand';
 import { AiChip } from './AiStatus';
+import { PdfViewerHost } from './PdfViewer';
 import { useAuth } from './auth';
 import { api, org as orgPath } from './api';
 import { dt } from './format';
@@ -103,6 +104,7 @@ export default function Layout() {
         </div>
       </header>
       <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8"><Outlet /></main>
+      <PdfViewerHost />
       {asOpen && (
         <Modal title="Afficher en tant que…" onClose={() => setAsOpen(false)}>
           <p className="mb-3 text-mute">Choisissez un utilisateur : vous aurez <b>exactement ses droits</b> (ce qu'il voit, ce qu'il peut faire). Chaque action est journalisée à votre nom.</p>

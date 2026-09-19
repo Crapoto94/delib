@@ -23,11 +23,13 @@ const toI = (r) => ({ id: r.id, organismeId: r.organisme_id, code: r.code, nom: 
 const toS = (r) => ({
   id: r.id, organismeId: r.organisme_id, instanceId: r.instance_id, instance: r.instance_nom, type: r.type, dateSeance: r.date_seance, lieu: r.lieu, statut: r.statut,
   dateLimiteRedaction: r.date_limite_redaction, dateLimiteDgs: r.date_limite_dgs, dateLimiteMadCommissions: r.date_limite_mad_commissions, dateEnvoiConvocation: r.date_envoi_convocation,
+  kind: r.instance_kind, commissionId: r.commission_id, commission: r.commission_nom, dureeMinutes: r.duree_minutes,
+  teams: r.teams_join_url ? { joinUrl: r.teams_join_url, auto: !!r.teams_event_id, invited: r.teams_invited } : null,
   jalonsExtra: r.jalons_extra, numbering: r.numbering, odjStatut: r.odj_statut, odjArreteAt: r.odj_arrete_at, odjArretePar: r.odj_arrete_par, createdAt: r.created_at,
   ...(r.nb_actes_attente !== undefined ? { actesEnAttente: r.nb_actes_attente } : {}),
 });
 
-function createSeances({ db, audit, actes, acl, settings, bus, late }) {
+function createSeances({ db, audit, actes, acl, settings, bus, late, meeting, log }) {
   const holidaysOf = async (orgId) => new Set((await db.all("SELECT to_char(day,'YYYY-MM-DD') AS d FROM holidays WHERE organisme_id IS NULL OR organisme_id = $1", [orgId])).map((r) => r.d));
 
   const svc = {
@@ -98,13 +100,14 @@ function createSeances({ db, audit, actes, acl, settings, bus, late }) {
 
     async get(organismeId, id) {
       const r = await db.get(
-        `SELECT s.*, i.nom AS instance_nom, (SELECT count(*)::int FROM actes a WHERE a.seance_visee_id = s.id AND a.seance_id IS NULL AND a.statut NOT IN ('abandonne','retire')) AS nb_actes_attente
-         FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2`, [id, requireOrg(organismeId)]);
+        `SELECT s.*, i.nom AS instance_nom, i.kind AS instance_kind, i.commission_id, c.nom AS commission_nom,
+                (SELECT count(*)::int FROM actes a WHERE a.seance_visee_id = s.id AND a.seance_id IS NULL AND a.statut NOT IN ('abandonne','retire')) AS nb_actes_attente
+         FROM seances s JOIN instances i ON i.id = s.instance_id LEFT JOIN commissions c ON c.id = i.commission_id WHERE s.id = $1 AND s.organisme_id = $2`, [id, requireOrg(organismeId)]);
       if (!r) throw E.notFound('Séance introuvable');
       return { ...toS(r), jalons: await svc.jalons(r) };
     },
 
-    async list(organismeId, { instanceId, statut, from, to, limit = 100, offset = 0 } = {}) {
+    async list(organismeId, { instanceId, statut, from, to, kind, commissionId, limit = 100, offset = 0 } = {}) {
       const org = requireOrg(organismeId);
       const p = [org]; const w = ['s.organisme_id = $1'];
       const add = (v) => { p.push(v); return `$${p.length}`; };
@@ -112,10 +115,13 @@ function createSeances({ db, audit, actes, acl, settings, bus, late }) {
       if (statut) w.push(`s.statut = ${add(statut)}`);
       if (from) w.push(`s.date_seance >= ${add(from)}`);
       if (to) w.push(`s.date_seance <= ${add(to)}`);
-      const total = (await db.get(`SELECT count(*)::int AS n FROM seances s WHERE ${w.join(' AND ')}`, p)).n;
+      if (kind) w.push(`i.kind = ${add(kind)}`);
+      if (commissionId) w.push(`i.commission_id = ${add(commissionId)}`);
+      const total = (await db.get(`SELECT count(*)::int AS n FROM seances s JOIN instances i ON i.id = s.instance_id WHERE ${w.join(' AND ')}`, p)).n;
       const rows = await db.all(
-        `SELECT s.*, i.nom AS instance_nom, (SELECT count(*)::int FROM actes a WHERE a.seance_visee_id = s.id AND a.seance_id IS NULL AND a.statut NOT IN ('abandonne','retire')) AS nb_actes_attente
-         FROM seances s JOIN instances i ON i.id = s.instance_id WHERE ${w.join(' AND ')} ORDER BY s.date_seance DESC LIMIT ${add(limit)} OFFSET ${add(offset)}`, p);
+        `SELECT s.*, i.nom AS instance_nom, i.kind AS instance_kind, i.commission_id, c.nom AS commission_nom,
+                (SELECT count(*)::int FROM actes a WHERE a.seance_visee_id = s.id AND a.seance_id IS NULL AND a.statut NOT IN ('abandonne','retire')) AS nb_actes_attente
+         FROM seances s JOIN instances i ON i.id = s.instance_id LEFT JOIN commissions c ON c.id = i.commission_id WHERE ${w.join(' AND ')} ORDER BY s.date_seance DESC LIMIT ${add(limit)} OFFSET ${add(offset)}`, p);
       return { total, items: rows.map(toS) };
     },
 
@@ -137,6 +143,7 @@ function createSeances({ db, audit, actes, acl, settings, bus, late }) {
       if (b.dateSeance !== undefined) add('date_seance', new Date(b.dateSeance));
       if (b.type !== undefined) add('type', b.type);
       if (b.lieu !== undefined) add('lieu', b.lieu);
+      if (b.dureeMinutes !== undefined) add('duree_minutes', b.dureeMinutes);
       for (const [k, col] of [['dateLimiteRedaction', 'date_limite_redaction'], ['dateLimiteDgs', 'date_limite_dgs'], ['dateLimiteMadCommissions', 'date_limite_mad_commissions'], ['dateEnvoiConvocation', 'date_envoi_convocation']]) {
         if (b[k] !== undefined) add(col, asDeadline(b[k]));
       }
@@ -151,9 +158,102 @@ function createSeances({ db, audit, actes, acl, settings, bus, late }) {
       await db.run(`UPDATE seances SET ${set.join(', ')} WHERE id = $1 AND organisme_id = $2`, p);
       const after = await svc.get(org, id);
       await audit.log(ctx, { organismeId: org, action: 'seance.update', entity: 'seances', entityId: id, before, after });
+      if (after.kind === 'commission') {
+        const dateChanged = b.dateSeance !== undefined || b.lieu !== undefined || b.dureeMinutes !== undefined;
+        const row = await db.get('SELECT teams_event_id, date_seance, duree_minutes, lieu FROM seances WHERE id = $1', [id]);
+        if (row?.teams_event_id && (dateChanged || b.statut === 'annulee')) {
+          try {
+            if (b.statut === 'annulee') await meeting.cancel(row.teams_event_id);
+            else { const st = new Date(row.date_seance); await meeting.update(row.teams_event_id, { subject: after.instance, start: st.toISOString().replace('Z', ''), end: new Date(st.getTime() + (row.duree_minutes || 120) * 60000).toISOString().replace('Z', ''), lieu: row.lieu }); }
+          } catch (e) { log.warn({ err: e.message }, 'synchronisation Teams : échec (la réunion Teams n\'a pas été mise à jour)'); }
+        }
+        if (dateChanged || b.statut === 'annulee') await svc.notifyReunion(id, b.statut === 'annulee' ? 'annulee' : 'modifiee', ctx);
+      }
       // la date limite a bougé : les rappels de tous les actes visant la séance sont recalculés d'eux-mêmes (NOT-05)
       await bus.emit('seance.updated', { organismeId: org, seanceId: id, before, after, ctx });
       return after;
+    },
+
+    // ------------------------------------------------------------------------------ réunions de commission
+    /** Instance propre à une commission (créée à la demande) : ses réunions sont des séances, avec ordre du jour = projets présentés. */
+    async ensureCommissionInstance(commissionId) {
+      const c = await db.get('SELECT * FROM commissions WHERE id = $1', [commissionId]);
+      if (!c) throw E.notFound('Commission introuvable');
+      const ex = await db.get('SELECT * FROM instances WHERE commission_id = $1', [commissionId]);
+      if (ex) return toI(ex);
+      const r = await db.get("INSERT INTO instances (organisme_id, code, nom, kind, commission_id, numbering) VALUES ($1,$2,$3,'commission',$4,'{\"pattern\":\"C{ANNEE}-{N_SEANCE}-{ORDRE:02}\"}'::jsonb) ON CONFLICT DO NOTHING RETURNING *",
+        [c.organisme_id, `commission-${c.id}`, `Réunions — ${c.nom}`, c.id]);
+      return toI(r || (await db.get('SELECT * FROM instances WHERE commission_id = $1', [commissionId])));
+    },
+    async ensureCommissionInstances(orgId) {
+      for (const c of await db.all('SELECT id FROM commissions WHERE organisme_id = $1', [orgId])) await svc.ensureCommissionInstance(c.id);
+    },
+
+    async reunions(organismeId, commissionId) {
+      const org = requireOrg(organismeId);
+      const inst = await db.get('SELECT id FROM instances WHERE commission_id = $1 AND organisme_id = $2', [commissionId, org]);
+      if (!inst) return [];
+      const rows = await db.all(
+        `SELECT s.*, i.nom AS instance_nom, i.kind AS instance_kind, i.commission_id, c.nom AS commission_nom,
+                (SELECT count(*)::int FROM seance_items it WHERE it.seance_id = s.id AND it.kind = 'deliberation' AND it.statut = 'a_traiter') AS nb_projets
+         FROM seances s JOIN instances i ON i.id = s.instance_id LEFT JOIN commissions c ON c.id = i.commission_id WHERE s.instance_id = $1 ORDER BY s.date_seance DESC`, [inst.id]);
+      return rows.map((r) => ({ ...toS(r), projets: r.nb_projets }));
+    },
+
+    /** Planifie une réunion de commission (dates clés sans objet), avec Teams facultatif ; prévient les membres. */
+    async createReunion(ctx, organismeId, commissionId, b) {
+      const org = requireOrg(organismeId);
+      const c = await db.get('SELECT * FROM commissions WHERE id = $1 AND organisme_id = $2 AND actif', [commissionId, org]);
+      if (!c) throw E.badRequest('Commission inconnue ou inactive dans cet organisme');
+      const inst = await svc.ensureCommissionInstance(commissionId);
+      const r = await db.get(
+        `INSERT INTO seances (organisme_id, instance_id, type, date_seance, lieu, duree_minutes, created_by) VALUES ($1,$2,'autre',$3,$4,$5,$6) RETURNING id`,
+        [org, inst.id, new Date(b.dateSeance), b.lieu ?? null, b.dureeMinutes ?? 120, ctx.username]);
+      await audit.log(ctx, { organismeId: org, action: 'reunion.create', entity: 'seances', entityId: r.id, after: { commission: c.nom, dateSeance: b.dateSeance, lieu: b.lieu } });
+      if (b.teams && b.teams.mode !== 'aucun') await svc.setTeams(ctx, org, r.id, b.teams, { silent: true });
+      await svc.notifyReunion(r.id, 'creee', ctx);
+      return svc.get(org, r.id);
+    },
+
+    /** Visioconférence Teams : `auto` (création via Graph), `lien` (lien collé à la main) ou `aucun` (retire). */
+    async setTeams(ctx, organismeId, seanceId, { mode, joinUrl, inviter = false }, { silent = false } = {}) {
+      const org = requireOrg(organismeId);
+      const s = await db.get('SELECT s.*, i.commission_id, i.nom AS instance_nom FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2', [seanceId, org]);
+      if (!s) throw E.notFound('Séance introuvable');
+      const wasAuto = s.teams_event_id;
+      if (mode === 'aucun') {
+        if (wasAuto) await meeting.cancel(wasAuto).catch((e) => log.warn({ err: e.message }, 'annulation Teams : échec (réunion laissée sur le calendrier)'));
+        await db.run('UPDATE seances SET teams_join_url = NULL, teams_event_id = NULL, teams_organizer = NULL, teams_invited = false WHERE id = $1', [seanceId]);
+      } else if (mode === 'lien') {
+        let u;
+        try { u = new URL(joinUrl); } catch { throw E.badRequest('Lien invalide'); }
+        if (u.protocol !== 'https:' || !/(^|\.)teams\.(microsoft|live)\.com$/.test(u.hostname)) throw E.badRequest('Le lien doit être un lien de réunion Microsoft Teams (https://teams.microsoft.com/…)');
+        if (wasAuto) await meeting.cancel(wasAuto).catch(() => {});
+        await db.run('UPDATE seances SET teams_join_url = $2, teams_event_id = NULL, teams_organizer = NULL, teams_invited = false WHERE id = $1', [seanceId, u.toString()]);
+      } else {
+        if (!meeting.available()) throw E.conflict("La création automatique de réunions Teams n'est pas configurée sur ce serveur : collez un lien Teams");
+        const start = new Date(s.date_seance); const end = new Date(start.getTime() + (s.duree_minutes || 120) * 60000);
+        let attendees = [];
+        if (inviter && s.commission_id) {
+          const rec = await late.commissions.recipients(s.commission_id);
+          const elus = rec.elus.length ? await db.all('SELECT nom, prenom, email FROM elus WHERE id = ANY($1::int[]) AND email IS NOT NULL', [rec.elus.map((x) => Number(x.slice(4)))]) : [];
+          const secs = rec.secretaires.length ? await db.all('SELECT display_name, email FROM agent_ref WHERE username = ANY($1::text[]) AND email IS NOT NULL', [rec.secretaires]) : [];
+          attendees = [...elus.map((e) => ({ email: e.email, name: `${e.prenom} ${e.nom}`.trim() })), ...secs.map((a) => ({ email: a.email, name: a.display_name }))];
+        }
+        const payload = { subject: s.instance_nom, start: start.toISOString().replace('Z', ''), end: end.toISOString().replace('Z', ''), lieu: s.lieu, attendees, body: `Réunion ${s.instance_nom}` };
+        const m = wasAuto ? (await meeting.update(wasAuto, payload), { id: wasAuto, joinUrl: s.teams_join_url, organizer: s.teams_organizer }) : await meeting.create(payload);
+        await db.run('UPDATE seances SET teams_join_url = $2, teams_event_id = $3, teams_organizer = $4, teams_invited = $5 WHERE id = $1', [seanceId, m.joinUrl, m.id, m.organizer, attendees.length > 0]);
+      }
+      await audit.log(ctx, { organismeId: org, action: 'seance.teams', entity: 'seances', entityId: seanceId, after: { mode, invites: inviter } });
+      if (!silent) await svc.notifyReunion(seanceId, 'modifiee', ctx);
+      return svc.get(org, seanceId);
+    },
+
+    /** Préviens les membres et secrétaires d'une réunion de commission créée, modifiée ou annulée (avec le lien Teams). */
+    async notifyReunion(seanceId, change, ctx) {
+      const s = await db.get('SELECT s.*, i.commission_id, c.nom AS commission_nom FROM seances s JOIN instances i ON i.id = s.instance_id LEFT JOIN commissions c ON c.id = i.commission_id WHERE s.id = $1', [seanceId]);
+      if (!s?.commission_id) return;
+      await bus.emit('commission.reunion', { organismeId: s.organisme_id, seanceId, commissionId: s.commission_id, commissionNom: s.commission_nom, change, dateSeance: s.date_seance, lieu: s.lieu, teamsUrl: s.teams_join_url, ctx });
     },
 
     // ----------------------------------------------------------------------------- séance visée, report

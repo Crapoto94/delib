@@ -84,3 +84,17 @@ function createFakeAi(handler = () => '{"propositions":[],"alertes":[]}') {
   };
 }
 module.exports.createFakeAi = createFakeAi;
+
+/** MeetingPort de remplacement : enregistre les réunions créées / modifiées / annulées (tests, développement sans Graph). */
+function createFakeMeeting({ available = true } = {}) {
+  const state = { available, meetings: new Map(), n: 0, calls: [] };
+  return {
+    state,
+    available: () => state.available,
+    organizer: () => 'organisateur@ivry.test',
+    async create(m) { if (!state.available) { const { E } = require('../shared/errors'); throw E.conflict('Création automatique non configurée'); } const id = `evt-${++state.n}`; state.meetings.set(id, { ...m }); state.calls.push(['create', id]); return { id, joinUrl: `https://teams.microsoft.com/l/meetup-join/${id}`, organizer: 'organisateur@ivry.test' }; },
+    async update(id, m) { state.meetings.set(id, { ...state.meetings.get(id), ...m }); state.calls.push(['update', id]); },
+    async cancel(id) { state.meetings.delete(id); state.calls.push(['cancel', id]); },
+  };
+}
+module.exports.createFakeMeeting = createFakeMeeting;

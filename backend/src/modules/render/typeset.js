@@ -99,7 +99,7 @@ function layoutDocument({ content, cfg, vars, measure, logo }) {
   const need = (h) => { if (y - h < bottom) newPage(); };
 
   const lineOps = (tokens, x, w, opts) => {
-    const widths = tokens.map((t) => measure(t, opts.size));
+    const widths = tokens.map((t) => measure({ ...t, bold: t.bold || opts.bold }, opts.size)); // même police que celle qui sera dessinée
     const words = tokens.filter((t) => !t.space).length;
     const total = widths.reduce((a, b) => a + b, 0);
     const spaces = tokens.filter((t) => t.space).length;

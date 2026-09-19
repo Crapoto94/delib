@@ -8,6 +8,7 @@
  *  - le contenu des textes est traité comme une DONNÉE : les consignes qu'il pourrait contenir sont ignorées.
  */
 const { E } = require('../../shared/errors');
+const A = require('./analyses');
 
 const MAX_CHARS = 30000;
 const MAX_CONTEXT = 3000;
@@ -25,7 +26,7 @@ Règles impératives :
 - Écris en français administratif clair. Pas de commentaire hors du JSON.`;
 
 const toS = (r) => ({
-  id: r.id, acteId: r.acte_id, textId: r.text_id, kind: r.kind, find: r.find, replacement: r.replacement, reason: r.reason, status: r.status,
+  id: r.id, acteId: r.acte_id, textId: r.text_id, kind: r.kind, categorie: r.categorie ?? null, gravite: r.gravite ?? null, analyse: r.fonction ?? null, find: r.find, replacement: r.replacement, reason: r.reason, status: r.status,
   decidedBy: r.decided_by, decidedAt: r.decided_at, appliedVersion: r.applied_version, createdAt: r.created_at,
 });
 
@@ -67,7 +68,7 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue }) {
       if (contexte.length > MAX_CONTEXT) throw E.badRequest(`Contexte trop long (maximum ${MAX_CONTEXT} caractères)`);
       const list = await textes.list(ctx, a.organisme_id, a.id);
       const run = await db.get("INSERT INTO ai_runs (organisme_id, acte_id, kind, requested_by, context) VALUES ($1,$2,'copie',$3,$4) RETURNING id", [a.organisme_id, a.id, ctx.username, contexte]);
-      await db.run("UPDATE ai_suggestions SET status = 'obsolete' WHERE acte_id = $1 AND status = 'pending'", [a.id]);
+      await db.run("UPDATE ai_suggestions SET status = 'obsolete' WHERE acte_id = $1 AND status = 'pending' AND fonction = 'copie'", [a.id]);
       let promptChars = 0; let responseChars = 0; let model = null; const out = [];
       const ask = (req) => (helpers ? helpers.query(() => ai.query(req)) : ai.query(req));
       try {
@@ -87,7 +88,7 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue }) {
             const find = typeof p?.find === 'string' ? p.find : ''; const rep = typeof p?.replace === 'string' ? p.replace : '';
             if (!find || find === rep || rep.length > 5000) continue;
             if (!md.includes(find)) { continue; } // passage inventé ou reformulé : écarté
-            const row = await db.get("INSERT INTO ai_suggestions (organisme_id, acte_id, text_id, run_id, kind, find, replacement, reason) VALUES ($1,$2,$3,$4,'remplacement',$5,$6,$7) RETURNING *",
+            const row = await db.get("INSERT INTO ai_suggestions (organisme_id, acte_id, text_id, run_id, kind, find, replacement, reason, categorie, fonction) VALUES ($1,$2,$3,$4,'remplacement',$5,$6,$7,'copie','copie') RETURNING *",
               [a.organisme_id, a.id, t.id, run.id, find, rep, String(p.raison || p.reason || '').slice(0, 500)]);
             out.push(row);
           }
@@ -102,13 +103,97 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue }) {
       return { runId: run.id, items: out.map(toS) };
     },
 
-    async addAlert(a, textId, runId, message) {
-      return db.get("INSERT INTO ai_suggestions (organisme_id, acte_id, text_id, run_id, kind, reason) VALUES ($1,$2,$3,$4,'alerte',$5) RETURNING *", [a.organisme_id, a.id, textId, runId, message]);
+
+    // ------------------------------------------------------------------------------------------ outils de l'éditeur (IA-60)
+    /** Demande une analyse (orthographe, style, visas, complet) : tâche déposée dans la file, exécutée en arrière plan. */
+    async requestAnalyse(ctx, organismeId, acteId, { type, textId }) {
+      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      if (!A.TYPES.includes(type)) throw E.badRequest(`Analyse inconnue : ${type}`);
+      if (textId) { const t = await db.get('SELECT 1 AS x FROM tracked_texts WHERE id = $1 AND acte_id = $2', [textId, a.id]); if (!t) throw E.notFound('Texte introuvable'); }
+      return queue.enqueue(ctx, { organismeId: a.organisme_id, acteId: a.id, kind: 'analyse', payload: { type, textId: textId ?? null } });
     },
 
-    async list(ctx, organismeId, acteId, { statut } = {}) {
+    /**
+     * Analyse d'un texte (ou de tous, pour `complet` sans textId). Les propositions en attente de la MÊME fonction sur les
+     * mêmes textes sont remplacées ; les décisions déjà prises sont conservées.
+     */
+    async analyse(ctx, organismeId, acteId, { type, textId = null }, helpers = null) {
+      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const all = await textes.list(ctx, a.organisme_id, a.id);
+      const list = textId ? all.filter((t) => t.id === textId) : all;
+      const passes = type === 'complet' ? ['orthographe', 'style', 'visas'] : [type];
+      const run = await db.get('INSERT INTO ai_runs (organisme_id, acte_id, kind, requested_by, context) VALUES ($1,$2,$3,$4,$5) RETURNING id', [a.organisme_id, a.id, `analyse:${type}`, ctx.username, A.LABEL[type]]);
+      const views = [];
+      for (const t of list) { const v = await textes.view(ctx, a.organisme_id, a.id, t.id, { mode: 'propre' }); views.push({ t, md: v.markdown || '' }); }
+      const ids = list.map((t) => t.id);
+      await db.run("UPDATE ai_suggestions SET status = 'obsolete' WHERE acte_id = $1 AND status = 'pending' AND fonction = ANY($2::text[]) AND (text_id = ANY($3::int[]) OR text_id IS NULL)", [a.id, type === 'complet' ? [...passes, 'complet'] : passes, ids]);
+      let promptChars = 0; let responseChars = 0; let model = null; const out = []; let alertes = 0;
+      const ask = (req) => (helpers ? helpers.query(() => ai.query(req)) : ai.query(req));
+      const total = views.length * passes.length; let n = 0;
+      const tag = type === 'complet' ? 'complet' : null;
+      try {
+        for (const pass of passes) {
+          for (const { t, md } of views) {
+            if (helpers) { if (await helpers.cancelled()) break; await helpers.progress(n, total, `${A.LABEL[pass]} — ${A.KIND_LABEL[t.kind]}`); }
+            n++;
+            if (!md.trim()) continue;
+            if (md.length > MAX_CHARS) { out.push(await svc.addAlert(a, t.id, run.id, `Texte « ${A.KIND_LABEL[t.kind]} » trop long pour l'analyse automatique : relisez-le entièrement.`, { categorie: 'completude', gravite: 'info', analyse: tag || pass })); continue; }
+            const fiche = `Fiche du dossier : titre « ${a.titre} »${a.montant ? `, montant ${Number(a.montant)} €` : ''}${a.incidence_financiere ? ', incidence financière' : ''}.`;
+            const autres = pass === 'visas' ? views.filter((v) => v.t.id !== t.id && v.md.trim()).map((v) => `--- ${A.KIND_LABEL[v.t.kind]} (pour cohérence) ---\n${v.md.slice(0, 6000)}`).join('\n') : '';
+            const prompt = `${fiche}\nType de texte à contrôler : ${A.KIND_LABEL[t.kind]}.\n${autres ? `${autres}\n` : ''}<TEXTE>\n${md}\n</TEXTE>`;
+            promptChars += prompt.length + A.SYSTEMS[pass].length;
+            const r = await ask({ system: A.SYSTEMS[pass], prompt });
+            model = r.model || model; responseChars += r.text.length;
+            const j = parseJson(r.text);
+            if (!j) { out.push(await svc.addAlert(a, t.id, run.id, `Réponse de l'IA illisible pour « ${A.KIND_LABEL[t.kind]} » (${A.LABEL[pass].toLowerCase()}) : aucune proposition retenue.`, { categorie: 'completude', gravite: 'info', analyse: tag || pass })); continue; }
+            for (const p of Array.isArray(j.propositions) ? j.propositions.slice(0, 60) : []) {
+              const find = typeof p?.find === 'string' ? p.find : ''; const rep = typeof p?.replace === 'string' ? p.replace : '';
+              if (!find || find === rep || rep.length > 5000 || !md.includes(find)) continue; // passage inventé ou reformulé : écarté
+              const cat = ['orthographe', 'typographie', 'style', 'visa', 'coherence'].includes(p.categorie) ? p.categorie : (pass === 'visas' ? 'visa' : pass);
+              const grav = ['a_revoir', 'info'].includes(p.gravite) ? p.gravite : 'info';
+              out.push(await db.get("INSERT INTO ai_suggestions (organisme_id, acte_id, text_id, run_id, kind, find, replacement, reason, categorie, gravite, fonction) VALUES ($1,$2,$3,$4,'remplacement',$5,$6,$7,$8,$9,$10) RETURNING *",
+                [a.organisme_id, a.id, t.id, run.id, find, rep, String(p.raison || p.reason || '').slice(0, 500), cat, grav, tag || pass]));
+            }
+            for (const al of Array.isArray(j.alertes) ? j.alertes.slice(0, 20) : []) {
+              const x = A.parseAlerte(al); if (!x.message.trim()) continue;
+              alertes++; out.push(await svc.addAlert(a, t.id, run.id, x.message.trim().slice(0, 500), { categorie: pass === 'visas' ? 'visa' : pass, gravite: x.gravite, analyse: tag || pass }));
+            }
+          }
+        }
+        if (type === 'complet') {
+          const nAnnexes = (await db.get('SELECT count(*)::int AS n FROM annexes WHERE acte_id = $1', [a.id])).n;
+          const mds = all.map((t) => ({ id: t.id, kind: t.kind, markdown: (views.find((v) => v.t.id === t.id) || {}).md ?? '' }));
+          for (const c of A.controlesDeterministes(a, mds, { annexes: nAnnexes })) {
+            alertes++; out.push(await svc.addAlert(a, c.textId, run.id, c.message, { categorie: c.categorie, gravite: c.gravite, analyse: 'complet' }));
+          }
+        }
+        await db.run('UPDATE ai_runs SET model = $2, prompt_chars = $3, response_chars = $4 WHERE id = $1', [run.id, model, promptChars, responseChars]);
+      } catch (e) {
+        await db.run("UPDATE ai_runs SET status = 'error', error = $2 WHERE id = $1", [run.id, e.message]);
+        throw e;
+      }
+      await audit.log(ctx, { organismeId: a.organisme_id, action: `ia.analyse.${type}`, entity: 'actes', entityId: a.id, after: { runId: run.id, propositions: out.filter((o) => o.kind === 'remplacement').length, alertes } });
+      return { runId: run.id, items: out.map(toS) };
+    },
+
+    /** « Tout accepter (orthographe seule) » (IA-13) : applique une à une les corrections d'orthographe et de typographie en attente. */
+    async acceptAllSpelling(ctx, organismeId, acteId, { textId }) {
+      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const rows = await db.all("SELECT id FROM ai_suggestions WHERE acte_id = $1 AND text_id = $2 AND status = 'pending' AND kind = 'remplacement' AND categorie IN ('orthographe', 'typographie') ORDER BY id", [a.id, textId]);
+      let accepted = 0; let skipped = 0;
+      for (const r of rows) {
+        try { await svc.decide(ctx, a.organisme_id, a.id, r.id, { decision: 'accept' }); accepted++; } catch (e) { if (e.status === 409) skipped++; else throw e; }
+      }
+      return { accepted, skipped };
+    },
+
+    async addAlert(a, textId, runId, message, { categorie, gravite, analyse } = {}) {
+      return db.get("INSERT INTO ai_suggestions (organisme_id, acte_id, text_id, run_id, kind, reason, categorie, gravite, fonction) VALUES ($1,$2,$3,$4,'alerte',$5,$6,$7,$8) RETURNING *", [a.organisme_id, a.id, textId, runId, message, categorie || 'copie', gravite || null, analyse || 'copie']);
+    },
+
+    async list(ctx, organismeId, acteId, { statut, textId } = {}) {
       const a = await actes.load(ctx, organismeId, acteId);
-      const rows = await db.all(`SELECT s.*, t.kind AS text_kind FROM ai_suggestions s LEFT JOIN tracked_texts t ON t.id = s.text_id WHERE s.acte_id = $1 ${statut ? 'AND s.status = $2' : "AND s.status <> 'obsolete'"} ORDER BY s.text_id, s.id`, statut ? [a.id, statut] : [a.id]);
+      const rows = await db.all(`SELECT s.*, t.kind AS text_kind FROM ai_suggestions s LEFT JOIN tracked_texts t ON t.id = s.text_id WHERE s.acte_id = $1 ${statut ? 'AND s.status = $2' : "AND s.status <> 'obsolete'"} ${textId ? `AND s.text_id = $${statut ? 3 : 2}` : ''} ORDER BY s.text_id, s.id`, [a.id, ...(statut ? [statut] : []), ...(textId ? [textId] : [])]);
       return rows.map((r) => ({ ...toS(r), textKind: r.text_kind }));
     },
 
@@ -143,6 +228,10 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue }) {
   queue.register('adaptation', async (job, ctx, helpers) => {
     const r = await svc.suggest(ctx, job.organisme_id, job.acte_id, job.payload, helpers);
     return { runId: r.runId, propositions: r.items.filter((i) => i.kind === 'remplacement').length, alertes: r.items.filter((i) => i.kind === 'alerte').length };
+  });
+  queue.register('analyse', async (job, ctx, helpers) => {
+    const r = await svc.analyse(ctx, job.organisme_id, job.acte_id, job.payload, helpers);
+    return { runId: r.runId, type: job.payload.type, propositions: r.items.filter((i) => i.kind === 'remplacement').length, alertes: r.items.filter((i) => i.kind === 'alerte').length };
   });
   return svc;
 }

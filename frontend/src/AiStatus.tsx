@@ -54,7 +54,7 @@ export function AiChip() {
         <div className="card absolute right-0 z-40 mt-2 w-80 p-3 shadow-float">
           <h3 className="mb-2 text-[14px]">Mes demandes à l'IA</h3>
           <ul className="space-y-3">{active.map((j) => (
-            <li key={j.id}><div className="flex justify-between text-[12px]"><b>Adaptation du dossier #{j.acteId}</b><span className="text-mute">{j.status === 'queued' ? `file : n° ${j.position}` : j.stepLabel}</span></div>
+            <li key={j.id}><div className="flex justify-between text-[12px]"><b>{j.kind === 'analyse' ? 'Analyse' : 'Adaptation'} du dossier #{j.acteId}</b><span className="text-mute">{j.status === 'queued' ? `file : n° ${j.position}` : j.stepLabel}</span></div>
               <Progress job={j} /></li>))}</ul>
           <p className="mt-2 text-[11px] text-mute">L'IA travaille en arrière plan : vous pouvez continuer à utiliser l'application. Vous serez prévenu(e) à la fin.</p>
         </div>)}

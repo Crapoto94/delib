@@ -5,6 +5,7 @@ async function bootstrap(c) {
   await c.circuits.ensureDefaults(org.id);
   await c.notifications.seedRules();
   await c.seances.ensureDefaultInstance(org.id);
+  await c.seances.ensureCommissionInstances(org.id);
   const created = await c.auth.ensureLocalAdmin();
   c.log.info({ organisme: org.code, compteDeSecoursCree: created, compteDeSecoursActif: c.config.localAdmin.enabled }, 'amorçage terminé');
   if (!c.config.bootstrapAdmins.length && !c.config.localAdmin.enabled) {

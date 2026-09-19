@@ -306,8 +306,8 @@ describe('utilisateurs et rôles (D41)', () => {
 });
 
 describe('dossiers proposés à une séance (visant), quel que soit leur avancement', () => {
-  it('liste brouillons, dossiers en circuit et dossiers prêts ; seuls les prêts sont affectables', async () => {
-    const s = (await as(admin).post(`${base()}/seances`, { instanceId: instance.id, dateSeance: '2028-03-09T18:00:00Z' })).body;
+  it('liste brouillons, dossiers en circuit et dossiers prêts ; tous sont affectables, avec leur état de validation (D57)', async () => {
+    const s = (await as(t.martin).post(`${base()}/seances`, { instanceId: instance.id, dateSeance: '2028-03-09T18:00:00Z' })).body; // (l'administrateur de plateforme a été retiré par le test précédent)
     const mk = async (titre, { submit = false, finish = false } = {}) => {
       const a = (await as(t.dupont).post(`${base()}/actes`, { typeId: typeDelib.id, titre })).body;
       await as(t.dupont).put(A(a.id), { matiereId: matiere.id, rubriqueId: rubriques[0].id, incidenceFinanciere: false, rapporteurId: 1, seanceViseeId: s.id });
@@ -321,12 +321,25 @@ describe('dossiers proposés à une séance (visant), quel que soit leur avancem
     const brouillon = await mk('Visant : brouillon'); const enCircuit = await mk('Visant : en circuit', { submit: true }); const pret = await mk('Visant : prêt', { finish: true });
     const r = (await as(t.martin).get(`${O(s.id)}/visant`)).body.items;
     const by = (a) => r.find((x) => x.id === a.id);
-    expect(by(brouillon)).toMatchObject({ statut: 'brouillon', eligible: false, dansOdj: false });
-    expect(by(enCircuit)).toMatchObject({ statut: 'en_circuit', eligible: false, etape: 'Chef de service', holders: ['durand'] });
-    expect(by(pret)).toMatchObject({ eligible: true, dansOdj: false });
+    expect(by(brouillon)).toMatchObject({ statut: 'brouillon', etat: 'brouillon', eligible: true, dansOdj: false });
+    expect(by(enCircuit)).toMatchObject({ statut: 'en_circuit', etat: 'en_circuit', eligible: true, etape: 'Chef de service', holders: ['durand'] });
+    expect(by(pret)).toMatchObject({ etat: 'pret', eligible: true, dansOdj: false });
     expect((await as(t.martin).get(`${base()}/seances/${s.id}`)).body.actesEnAttente).toBe(3); // le compteur de la carte = la liste affichée
     await as(t.martin).post(`${O(s.id)}/affectations`, { acteIds: [pret.id] });
     expect((await as(t.martin).get(`${O(s.id)}/visant`)).body.items.find((x) => x.id === pret.id)).toMatchObject({ dansOdj: true, eligible: false });
-    expect((await as(t.dupont).get(`${O(s.id)}/visant`)).status).toBe(403);
+    // un dossier encore en circuit s'inscrit aussi : son statut ne change pas, son état de validation est exposé sur la ligne
+    expect((await as(t.martin).post(`${O(s.id)}/affectations`, { acteIds: [enCircuit.id, brouillon.id] })).status).toBe(200);
+    const odj = (await as(t.martin).get(O(s.id))).body.items.filter((i) => i.acte);
+    expect(odj.find((i) => i.acte.id === enCircuit.id).acte).toMatchObject({ statut: 'en_circuit', etat: 'en_circuit', etape: 'Chef de service', holders: ['durand'] });
+    expect(odj.find((i) => i.acte.id === brouillon.id).acte).toMatchObject({ etat: 'brouillon' });
+    expect(odj.find((i) => i.acte.id === pret.id).acte).toMatchObject({ etat: 'pret' });
+    expect((await as(t.martin).post(`${O(s.id)}/affectations`, { acteIds: [enCircuit.id] })).status).toBe(409); // déjà inscrit
+    // à la fin du circuit, le dossier devient « inscrit à l'ODJ » tout seul
+    for (let i = 0; i < 10; i++) { const v = (await as(t.dupont).get(`${A(enCircuit.id)}/circuit`)).body; if (!v.currentStepKey) break; await as(t[WHO[v.currentStepKey]]).post(`${A(enCircuit.id)}/validation`, {}); }
+    expect((await as(t.martin).get(A(enCircuit.id))).body.statut).toBe('inscrit_odj');
+    // retirer un dossier non terminé le libère sans toucher à son statut
+    await as(t.martin).del(`${O(s.id)}/actes/${brouillon.id}`);
+    expect((await as(t.martin).get(A(brouillon.id))).body).toMatchObject({ statut: 'brouillon' });
+    expect((await as(t.durand).get(`${O(s.id)}/visant`)).status).toBe(403); // (dupont est devenu administrateur dans un test précédent)
   });
 });

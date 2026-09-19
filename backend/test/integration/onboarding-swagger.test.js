@@ -89,7 +89,7 @@ describe('documentation Swagger (critère d\'acceptation n°7)', () => {
   it("les routes publiques sont explicitement déclarées sans sécurité, toutes les autres exigent le jeton", async () => {
     const spec = (await env.http().get('/swagger.json')).body;
     const open = Object.entries(spec.paths).flatMap(([p, ops]) => Object.entries(ops).filter(([, o]) => o.security.length === 0).map(([m]) => `${m.toUpperCase()} ${p}`)).sort();
-    expect(open).toEqual(['GET /api/status', 'POST /api/v1/auth/login', 'POST /api/v1/auth/login-local']);
+    expect(open).toEqual(['GET /api/status', 'GET /api/v1/public/branding', 'GET /api/v1/public/organismes/{orgId}/logo', 'POST /api/v1/auth/login', 'POST /api/v1/auth/login-local']);
   });
 
   it("chaque route protégée refuse l'accès sans jeton (401)", async () => {

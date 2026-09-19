@@ -14,7 +14,7 @@ const toAc = (r) => ({
   misADispositionAt: r.mis_a_disposition_at, suspendue: r.suspendue, retireeAt: r.retiree_at, retireeMotif: r.retiree_motif,
 });
 
-function createCommissions({ db, audit, actes, acl, settings, bus, log }) {
+function createCommissions({ db, audit, actes, acl, settings, bus, log, late = {} }) {
   const svc = {
     AVIS,
 
@@ -44,6 +44,7 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log }) {
         const r = await db.get('INSERT INTO commissions (organisme_id, nom, description, couleur, ordre, matieres, directions, thematiques, sieges, sieges_opposition) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10) RETURNING *',
           [org, b.nom, b.description ?? null, b.couleur ?? null, b.ordre ?? 0, JSON.stringify(b.matieres || []), JSON.stringify(b.directions || []), JSON.stringify(b.thematiques || []), b.sieges ?? null, b.siegesOpposition ?? null]);
         await audit.log(ctx, { organismeId: org, action: 'commission.create', entity: 'commissions', entityId: r.id, after: toC(r) });
+        await late.seances?.ensureCommissionInstance(r.id);
         return svc.get(org, r.id);
       } catch (e) { if (e.code === '23505') throw E.conflict('Une commission porte déjà ce nom'); throw e; }
     },
@@ -148,7 +149,10 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log }) {
       const r = await db.get('SELECT ac.*, c.nom AS commission_nom FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id WHERE ac.acte_id = $1 AND ac.commission_id = $2 AND ac.retiree_at IS NULL', [a.id, commissionId]);
       if (!r) throw E.notFound('Cette commission n\'est pas rattachée à l\'acte');
       if (!r.mis_a_disposition_at) throw E.conflict("Le projet n'a pas encore été mis à disposition de cette commission");
-      const u = await db.get('UPDATE acte_commissions SET avis = $2, avis_commentaire = $3, avis_date = $4, avis_par = $5, avis_at = now() WHERE id = $1 RETURNING *', [r.id, avis, commentaire ?? null, datePassage ?? null, ctx.username]);
+      // sans date saisie : date de la réunion de la commission où le projet a été présenté
+      let date = datePassage ?? null;
+      if (!date) date = (await db.get("SELECT s.date_seance::date AS d FROM seance_items it JOIN seances s ON s.id = it.seance_id JOIN instances i ON i.id = s.instance_id WHERE it.acte_id = $1 AND i.commission_id = $2 AND it.statut = 'a_traiter' ORDER BY s.date_seance DESC LIMIT 1", [a.id, commissionId]))?.d ?? null;
+      const u = await db.get('UPDATE acte_commissions SET avis = $2, avis_commentaire = $3, avis_date = $4, avis_par = $5, avis_at = now() WHERE id = $1 RETURNING *', [r.id, avis, commentaire ?? null, date, ctx.username]);
       await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.commission.avis', entity: 'acte_commissions', entityId: r.id, before: { avis: r.avis }, after: { avis, commentaire } });
       await bus.emit('commission.avis', { organismeId: a.organisme_id, acteId: a.id, commissionId, commissionNom: r.commission_nom, avis, ctx });
       return toAc({ ...u, commission_nom: r.commission_nom });

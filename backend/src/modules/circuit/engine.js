@@ -41,6 +41,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
   /** Titulaires d'une étape (CIR-20). Le rédacteur ne valide jamais sa propre étape (CIR-24). */
   async function resolveStep(a, step, cfg) {
     const org = a.organisme_id; const r = step.resolver || {};
+    // Responsable intermédiaire : fonction facultative, désactivée par défaut (paramètre `circuit.resp_intermediaire`, D56)
+    if (r.kind === 'titulaire' && r.fonction === 'responsable_intermediaire' && cfg['circuit.resp_intermediaire']?.value !== true) return { holders: [], skipped: true, reason: 'desactive' };
     let holders = [];
     if (r.kind === 'redacteur') holders = [a.redacteur, ...(a.co_redacteurs || [])];
     else if (r.kind === 'titulaire') holders = (await titulaires.resolve(org, r.fonction, { directionCode: a.direction_code, serviceCode: a.service_code })).flatMap((t) => [t.username, t.suppleant].filter(Boolean));
@@ -142,7 +144,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       else if (resume && defOf(graph, a, resume) && !trail.includes(resume)) { key = resume; resume = null; }
       else key = G.nextKey(graph, baseKeyOf(a, cur), facts);
       if (!key) {
-        const end = ['en_circuit', 'modification_demandee'].includes(statut) ? 'en_attente_scc' : statut;
+        let end = ['en_circuit', 'modification_demandee'].includes(statut) ? 'en_attente_scc' : statut;
+        if (end === 'en_attente_scc' && a.seance_id) end = 'inscrit_odj'; // déjà inscrit à l'ordre du jour avant la fin du circuit (D57)
         await q.run('UPDATE actes SET current_step_key = NULL, statut = $2, trail = $3::jsonb, resume_step = NULL, return_from = NULL WHERE id = $1', [a.id, end, JSON.stringify(trail)]);
         await event(q, a, ctx, 'complete', { from: cur });
         events.push(['circuit.completed', { organismeId: a.organisme_id, acteId: a.id }]);
