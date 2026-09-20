@@ -201,6 +201,20 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts, visa
       return { runId: run.id, rapport, items: items.map(toS) };
     },
 
+    /**
+     * Pré-contrôle joint au dossier à l'entrée dans l'étape « Service juridique » (IA-37) : références vérifiées par le code, sans IA,
+     * non bloquant. Lancé par le circuit (pas de personne derrière) : les constats remplacent ceux de la vérification précédente.
+     */
+    async precontroleJuridique(organismeId, acteId) {
+      const a = await actes.raw(organismeId, acteId);
+      const rapport = await visas.rapportDe(a);
+      const run = await db.get('INSERT INTO ai_runs (organisme_id, acte_id, kind, requested_by, context) VALUES ($1,$2,$3,$4,$5) RETURNING id', [a.organisme_id, a.id, 'analyse:precontrole', 'systeme', 'Pré-contrôle du service juridique']);
+      await db.run("UPDATE ai_suggestions SET status = 'obsolete' WHERE acte_id = $1 AND status = 'pending' AND fonction = 'references'", [a.id]);
+      const items = await deposer(a, run.id, rapport, 'references');
+      await audit.log(null, { organismeId: a.organisme_id, action: 'ia.precontrole_juridique', entity: 'actes', entityId: a.id, after: { runId: run.id, constats: rapport.constats.length, bloquants: rapport.resume.bloquant } });
+      return { runId: run.id, constats: items.length, resume: rapport.resume };
+    },
+
     /** « Tout accepter (orthographe seule) » (IA-13) : applique une à une les corrections d'orthographe et de typographie en attente. */
     async acceptAllSpelling(ctx, organismeId, acteId, { textId }) {
       const a = await actes.load(ctx, organismeId, acteId, { edit: true });

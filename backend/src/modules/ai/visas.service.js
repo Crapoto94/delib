@@ -232,8 +232,11 @@ function createVisas({ db, audit, actes, settings, log }) {
      * Rapport de vérification des références d'un acte (IA-30, 31, 32, 35, 36). N'écrit rien.
      * Renvoie { dateReference, bibliotheque, references: [{..., etat, source}], constats: [{ gravite, categorie, message, extrait, textId, cle, etat }] }.
      */
-    async rapport(ctx, organismeId, acteId) {
-      const a = await actes.load(ctx, organismeId, acteId); const org = a.organisme_id;
+    async rapport(ctx, organismeId, acteId) { return svc.rapportDe(await actes.load(ctx, organismeId, acteId)); },
+
+    /** Le même rapport pour un acte déjà chargé (le contrôle des droits est fait par l'appelant : route ou événement du circuit). */
+    async rapportDe(a) {
+      const org = a.organisme_id;
       const textes = await db.all("SELECT id, kind, markdown FROM tracked_texts WHERE acte_id = $1 ORDER BY CASE kind WHEN 'visas' THEN 0 WHEN 'expose' THEN 1 ELSE 2 END, id", [a.id]);
       const seance = await db.get("SELECT (date_seance AT TIME ZONE 'Europe/Paris')::date AS d FROM seances WHERE id = COALESCE($1::int, $2::int)", [a.seance_id ?? null, a.seance_visee_id ?? null]);
       const ajd = new Date().toISOString().slice(0, 10); const ref = iso(seance?.d) || ajd;
@@ -294,6 +297,21 @@ function createVisas({ db, audit, actes, settings, log }) {
         } else {
           let present; try { present = c.est_regex ? new RegExp(c.motif, 'i').test(textes.map((t) => t.markdown).join('\n')) : tout.includes(R.norm(c.motif)); } catch { present = true; }
           if (!present) add({ gravite: c.gravite, message: c.message || `Mention attendue absente : « ${c.motif} » (${c.nom}).`, extrait: null, textId: null, cle: null, etat: 'mention_absente' });
+        }
+      }
+      // visas habituels des délibérations similaires déjà adoptées (IA-32) : même type d'acte, même matière ; il en faut au moins 3 (ai.similaires_min)
+      if (a.matiere_id) {
+        const min = Math.max(2, Number((await settings.resolve(org))['ai.similaires_min']?.value) || 3);
+        const autres = await db.all(`SELECT t.markdown FROM tracked_texts t JOIN actes x ON x.id = t.acte_id
+          WHERE x.organisme_id = $1 AND x.id <> $2 AND x.type_id = $3 AND x.matiere_id = $4::int AND t.kind = 'visas' AND x.statut IN ('adopte', 'executoire', 'publie', 'ar_recu', 'transmis', 'archive')`, [org, a.id, a.type_id, a.matiere_id]);
+        if (autres.length >= min) {
+          const compte = new Map();
+          for (const o of autres) for (const r of new Map(R.extraire({ id: null, kind: 'visas', markdown: o.markdown }).filter((r) => r.type !== 'delib' && r.type !== 'article').map((r) => [r.cle, r])).values()) {
+            const c = compte.get(r.cle) || { n: 0, libelle: r.libelle }; c.n++; compte.set(r.cle, c);
+          }
+          for (const [cle, c] of compte) {
+            if (c.n / autres.length >= 0.6 && !cles.has(cle)) add({ gravite: 'info', message: `Visa habituel absent : « ${lib.get(cle)?.intitule || c.libelle} » figure dans ${c.n} des ${autres.length} délibérations similaires adoptées (même type d'acte, même matière).`, extrait: null, textId: visasTxt?.id ?? null, cle, etat: 'habituel_absent' });
+          }
         }
       }
       const rang = { bloquant: 0, a_revoir: 1, info: 2 };

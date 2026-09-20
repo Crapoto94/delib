@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.33 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.34 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1168,6 +1168,7 @@ Appels à l'**IA interne** de la Ville (API). Elle est déjà consommée par app
 - **IA-35 (réalisée)** — **Ordre conventionnel** vérifié par le code : lois et codes, puis ordonnances et décrets, puis arrêtés, puis délibérations antérieures ; un visa hors ordre est signalé (information).
 - **IA-36 (réalisée)** — **Rapport structuré** : chaque constat a une gravité, un **extrait**, une explication, la **source** (entrée de la bibliothèque) et la date de dernière vérification. Il est produit par la nouvelle analyse **« Vérifier les références »** (immédiate, sans IA, disponible même si l'IA est désactivée), incluse dans le **contrôle complet**, et déposé dans les propositions du dossier comme alerte (à écarter, jamais appliquée automatiquement).
 - **IA-38 (veille, réalisée)** — Quand une entrée passe à *abrogé* ou *modifié*, les **rédacteurs des actes en cours qui la citent** sont notifiés ; la fiche de l'entrée liste ces **actes concernés**.
+- **IA-32 (complément) et IA-37 (réalisés)** — **Visas habituels** : quand au moins 3 délibérations similaires (même type d'acte, même matière) sont adoptées (paramètre `ai.similaires_min`), un visa présent dans **60 % ou plus** d'entre elles et absent du dossier est signalé (information). **Pré-contrôle juridique** : à l'entrée du dossier dans l'étape **Service juridique**, les références sont vérifiées **par le code** et les constats sont joints au dossier (mêmes alertes que « Vérifier les références », sans IA, non bloquant) ; désactivable par le paramètre `ai.precontrole_juridique` (`false`).
 
 ### 21.5 Niveau 4 — Autres propositions
 
@@ -1789,6 +1790,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.34** | 2026-09-20 | **D101** (complément) : visas habituels des délibérations similaires (IA-32), pré-contrôle à l'étape juridique (IA-37) |
 | **1.33** | 2026-09-20 | **D101** : lot 5c-1, références juridiques vérifiées par le code (IA-30, 31, 32, 35, 36, 38) |
 | **1.32** | 2026-09-20 | **D99** : thème coloré et mode sombre (UI-03, UI-04) ; **D100** : menu latéral des paramétrages (UI-05) |
 | **1.31** | 2026-09-20 | **D98** : alertes de recherche (REC-29) ; amendements dans l'espace élus (ELU-41) |

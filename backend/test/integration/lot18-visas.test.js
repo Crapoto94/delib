@@ -269,3 +269,43 @@ describe('veille (IA-38) : un texte abrogé ou modifié prévient les rédacteur
     expect((await as(admin).del(V(`/${e.id}`))).status).toBe(404);
   });
 });
+
+describe('visas habituels des délibérations similaires (IA-32)', () => {
+  it('signale un visa présent dans la majorité des délibérations similaires adoptées et absent du dossier', async () => {
+    const visa = "Vu l'article L. 1611-4 du code général des collectivités territoriales ;";
+    for (let i = 1; i <= 3; i++) { const p = await nouvelActe(`Subvention passée ${i}`, { visas: visa }); await env.db.run("UPDATE actes SET statut = 'adopte' WHERE id = $1", [p.id]); }
+    const sans = await nouvelActe('Subvention nouvelle', { visas: 'Vu le budget primitif ;' });
+    const c = constat(await rapport(sans.id), 'cgct:L1611-4');
+    expect(c).toMatchObject({ gravite: 'info', etat: 'habituel_absent' }); expect(c.message).toMatch(/3 des 3 délibérations similaires/);
+    const avec = await nouvelActe('Subvention conforme', { visas: visa });
+    expect(constat(await rapport(avec.id), 'cgct:L1611-4')?.etat).not.toBe('habituel_absent');
+  });
+  it('avec moins de 3 dossiers de référence, ne dit rien', async () => {
+    const autreMatiere = (await as(admin).get(`${base()}/referentiels/matiere`)).body.items.find((x) => x.id !== matiere.id && !x.parent_code);
+    const a = (await as(dupont).post(`${base()}/actes`, { typeId: typeDelib.id, titre: 'Autre matière' })).body;
+    await as(dupont).put(A(a.id), { matiereId: autreMatiere.id });
+    expect((await rapport(a.id)).constats.some((c) => c.etat === 'habituel_absent')).toBe(false);
+  });
+});
+
+describe('pré-contrôle à l\'entrée dans l\'étape juridique (IA-37)', () => {
+  const propositions = async (id) => (await as(dupont).get(A(id, '/ia/propositions'))).body.items.filter((i) => i.analyse === 'references');
+  it('dépose les constats quand le circuit entre dans l\'étape « Service juridique » — sans IA, sans bloquer', async () => {
+    env.ai.state.handler = () => { throw new Error('le modèle ne doit pas être appelé'); };
+    const a = await nouvelActe('Dossier au juridique', { visas: "Vu l'article L. 2121-29 du code général des collectivités territoriales ;" });
+    await env.c.bus.emit('step.entered', { organismeId: ville.id, acteId: a.id, stepKey: 'financier', holders: [] });
+    expect(await propositions(a.id)).toHaveLength(0); // une autre étape ne déclenche rien
+    await env.c.bus.emit('step.entered', { organismeId: ville.id, acteId: a.id, stepKey: 'juridique', holders: [] });
+    const p = await propositions(a.id);
+    expect(p.some((x) => x.gravite === 'bloquant' && /abrogé/.test(x.reason))).toBe(true);
+    const audit = await env.db.get("SELECT actor FROM audit_log WHERE action = 'ia.precontrole_juridique' AND entity_id = $1", [String(a.id)]);
+    expect(audit.actor).toBe('system');
+  });
+  it('désactivable par le paramètre ai.precontrole_juridique', async () => {
+    const r = await as(admin).put(`${base()}/settings/ai.precontrole_juridique`, { value: false, scope: 'organisme' });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const a = await nouvelActe('Dossier sans pré-contrôle', { visas: "Vu l'article L. 2121-29 du code général des collectivités territoriales ;" });
+    await env.c.bus.emit('step.entered', { organismeId: ville.id, acteId: a.id, stepKey: 'juridique', holders: [] });
+    expect(await propositions(a.id)).toHaveLength(0);
+  });
+});

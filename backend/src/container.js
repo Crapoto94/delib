@@ -126,6 +126,12 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   // GED : simulateur persistant par défaut, Alfresco (REST v1) choisi par organisme ; adaptateurs injectables pour les tests
   const ged = createGed({ db, audit, config, log, adapters: gedAdapters || { simulateur: createGedSimulateur({ db }), alfresco: createAlfresco({ tls: config.tls }) }, render, tenue, pv, tlt, storage, cahier });
   storage.attach({ cible: (org) => ged.cibleStockage(org), ad: (org) => ged.adapteurLecture(org), dossier: (org, cible) => ged.dossierStockage(org, cible) }); // Alfresco comme stockage (GED-09)
+  // pré-contrôle des références à l'entrée dans l'étape « Service juridique » (IA-37) : par le code, non bloquant, désactivable (ai.precontrole_juridique = false)
+  bus.on('step.entered', async (p) => {
+    if (p.stepKey !== 'juridique' || p.reassigned) return;
+    if ((await settings.resolve(p.organismeId))['ai.precontrole_juridique']?.value === false) return;
+    await ai.precontroleJuridique(p.organismeId, p.acteId);
+  });
   bus.on('tenue.close', (p) => ged.auto(p));
   bus.on('cahier.built', (p) => ged.auto(p)); // un cahier terminé part en GED sans attendre la clôture de la séance
   const sms = createSms({ db, config, settings, log, tls: config.tls, http: smsHttp });

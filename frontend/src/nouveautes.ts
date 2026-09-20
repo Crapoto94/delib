@@ -11,9 +11,16 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.33.0';
+export const VERSION = '0.34.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.34.0', type: 'minor', titre: 'Pré-contrôle juridique et visas habituels',
+    items: [
+      "Pré-contrôle automatique des références à l'entrée du dossier dans l'étape « Service juridique » (sans IA, non bloquant).",
+      "Visas habituels : l'assistant signale un visa présent dans la plupart des délibérations similaires adoptées et absent du dossier.",
+    ],
+  },
   {
     version: '0.33.0', type: 'minor', titre: 'Références juridiques vérifiées par le code',
     items: [
