@@ -4,6 +4,7 @@ import { api, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Loading, PageTitle, useLoad } from '../ui';
+import { AgentName, AgentNames } from '../AgentName';
 
 export default function Dashboard() {
   const { me, org } = useAuth();
@@ -46,7 +47,7 @@ export default function Dashboard() {
               <tr key={t.acte.id} className="hover:bg-soft">
                 <td className="w-20 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
                 <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link></td>
-                <td>{t.acte.redacteur}</td>
+                <td><AgentName u={t.acte.redacteur} /></td>
                 <td>{t.phase === 'redaction' ? <Badge>En rédaction</Badge> : t.phase === 'correction' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{t.step?.label ?? 'En validation'}</Badge>}{t.step?.holders?.length ? <div className="text-[11px] text-mute">chez {t.step.holders.join(', ')}</div> : null}</td>
                 <td>{t.step?.dueAt ? (t.step.late ? <Badge tone="ko">En retard · {dt(t.step.dueAt, { dateStyle: 'short' })}</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>
               </tr>))}
@@ -62,7 +63,7 @@ export default function Dashboard() {
                 <td className="w-20 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
                 <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link><div className="text-[12px] text-mute">{t.acte.direction?.label}</div></td>
                 <td>{t.validatedStep}<div className="text-[11px] text-mute">{dt(t.validatedAt, { dateStyle: 'short' })}</div></td>
-                <td>{t.step ? <><Badge tone="blue">{t.step.label}</Badge>{t.step.holders?.length ? <div className="text-[11px] text-mute">chez {t.step.holders.join(', ')}</div> : null}</> : '—'}</td>
+                <td>{t.step ? <><Badge tone="blue">{t.step.label}</Badge>{t.step.holders?.length ? <div className="text-[11px] text-mute">chez <AgentNames list={t.step.holders} /></div> : null}</> : '—'}</td>
                 <td>{t.step?.dueAt ? (t.step.late ? <Badge tone="ko">En retard</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>
               </tr>))}
           </tbody></table>
@@ -85,7 +86,7 @@ export default function Dashboard() {
           {late.loading ? <Loading /> : !late.data?.length ? <Empty>Aucun retard. Bravo !</Empty> : (
             <ul>{late.data.map((t) => (
               <li key={t.acte.id} className="border-b border-line px-5 py-3 last:border-0"><Link to={`/dossiers/${t.acte.id}`} className="font-semibold text-primary hover:underline">{t.acte.titre}</Link>
-                <div className="text-[12px] text-mute">Étape « {t.step.label} » · échue le {dt(t.step.dueAt, { dateStyle: 'medium' })} · chez {t.step.holders.join(', ')}</div></li>))}
+                <div className="text-[12px] text-mute">Étape « {t.step.label} » · échue le {dt(t.step.dueAt, { dateStyle: 'medium' })} · chez <AgentNames list={t.step.holders} /></div></li>))}
             </ul>
           )}
         </section>

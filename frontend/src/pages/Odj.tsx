@@ -8,6 +8,7 @@ import { TeamsForm, TeamsLink } from '../Reunions';
 import CahierModal from '../Cahier';
 import SeanceKpis from '../SeanceKpis';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
+import { AgentName, AgentNames } from '../AgentName';
 
 /** Ordre du jour d'une séance : classement par glisser-déposer (ou clavier), numérotation, affectation, arrêt (section 16.2). */
 /** Fond d'une ligne selon l'état de validation du dossier (D57). */
@@ -129,7 +130,7 @@ export default function Odj() {
                     <div className={`font-semibold ${retire ? 'line-through' : ''}`}>{it.acte ? <Link className="text-primary hover:underline" to={`/dossiers/${it.acte.id}`}>{it.titre}</Link> : it.titre}</div>
                     <div className="text-[12px] text-mute">{it.acte ? `Dossier #${it.acte.numeroSuivi} · ${it.acte.rubrique ?? '—'} · rapporteur : ${it.acte.rapporteur ?? '—'}` : 'Point libre'}{it.ordreDeliberation > 1 || (it.acte && order.filter((x) => x.acte?.id === it.acte.id).length > 1) ? ` · délibération ${it.ordreDeliberation}` : ''}</div>
                     {retire && <div className="text-[12px] text-ko">Retiré : {it.retireMotif}</div>}
-                    {!retire && it.acte && it.acte.etat !== 'pret' && <div className="mt-0.5"><Badge tone={ETAT[it.acte.etat]?.tone}>{it.acte.etat === 'en_circuit' ? (it.acte.etape ?? 'En circuit') : ETAT[it.acte.etat]?.label}</Badge>{it.acte.holders?.length ? <span className="ml-2 text-[11px] text-mute">chez {it.acte.holders.join(', ')}</span> : null}</div>}
+                    {!retire && it.acte && it.acte.etat !== 'pret' && <div className="mt-0.5"><Badge tone={ETAT[it.acte.etat]?.tone}>{it.acte.etat === 'en_circuit' ? (it.acte.etape ?? 'En circuit') : ETAT[it.acte.etat]?.label}</Badge>{it.acte.holders?.length ? <span className="ml-2 text-[11px] text-mute">chez <AgentNames list={it.acte.holders} /></span> : null}</div>}
                   </div>
                   {canEdit && !retire && <div className="flex shrink-0 items-center">
                     <button className="rounded p-1 hover:bg-slate-100" aria-label="Monter" onClick={() => move(idx, idx - 1)} disabled={idx === 0}><ArrowUp className="h-4 w-4" /></button>
@@ -161,9 +162,9 @@ export default function Odj() {
             {visant.data!.map((a: any) => (
               <tr key={a.id} className={`hover:brightness-95 ${a.dansOdj ? '' : ETAT[a.etat]?.bg ?? ''}`}>
                 <td className="font-mono text-[12px]">#{a.numeroSuivi}</td>
-                <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link><div className="text-[12px] text-mute">{a.rubrique ?? '—'} · {a.redacteur}</div></td>
+                <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link><div className="text-[12px] text-mute">{a.rubrique ?? '—'} · <AgentName u={a.redacteur} /></div></td>
                 <td className="text-mute">{a.direction}</td><td>{a.rapporteur ?? <span className="text-warn">à désigner</span>}</td>
-                <td>{a.dansOdj && <Badge tone="ok">À l'ordre du jour</Badge>} {a.etat === 'pret' ? <Badge tone="ok">{a.dansOdj ? 'Circuit terminé' : 'Prêt à affecter'}</Badge> : a.etat === 'brouillon' ? <Badge>En rédaction</Badge> : a.etat === 'a_corriger' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{a.etape ?? a.statut}</Badge>}{a.holders?.length ? <div className="text-[11px] text-mute">chez {a.holders.join(', ')}</div> : null}</td>
+                <td>{a.dansOdj && <Badge tone="ok">À l'ordre du jour</Badge>} {a.etat === 'pret' ? <Badge tone="ok">{a.dansOdj ? 'Circuit terminé' : 'Prêt à affecter'}</Badge> : a.etat === 'brouillon' ? <Badge>En rédaction</Badge> : a.etat === 'a_corriger' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{a.etape ?? a.statut}</Badge>}{a.holders?.length ? <div className="text-[11px] text-mute">chez <AgentNames list={a.holders} /></div> : null}</td>
                 <td className="text-right">{canEdit && a.eligible && !a.dansOdj && !arrete && <button className="btn-secondary !py-1" disabled={busy} onClick={() => run((motif) => api.post(orgPath(o, `/seances/${id}/odj/affectations`), { acteIds: [a.id], motif }), 'Ajouté à l\'ordre du jour')}>Ajouter à l'ordre du jour</button>}</td>
               </tr>))}
           </tbody></table>

@@ -9,6 +9,9 @@ import { Gabarits, Identite, Utilisateurs } from './AdminExtra';
 import AdminIa from './AdminIa';
 import AgentPicker, { AgentList } from '../AgentPicker';
 import Collectivites from './Collectivites';
+import Organisation from './Organisation';
+import Circuits from './CircuitEditor';
+import { AgentName } from '../AgentName';
 
 const FONCTIONS: Record<string, string> = { responsable_intermediaire: 'Responsable intermédiaire', chef_service: 'Chef de service', directeur: 'Directeur', dga: 'DGA', dgs: 'DGS' };
 
@@ -35,11 +38,12 @@ function Titulaires() {
   const label = (code?: string) => dirs.data?.find((x) => x.code === code)?.label ?? code ?? 'Toute la collectivité';
   return (
     <div className="space-y-6">
+      <Organisation />
       <section className="card p-5"><h3 className="mb-2">Responsable intermédiaire</h3>
         <label className="flex items-start gap-3"><input type="checkbox" className="mt-1" checked={riOn} disabled={cfg.loading} onChange={async (e) => { try { await api.put(orgPath(o, '/settings/circuit.resp_intermediaire'), { value: e.target.checked, scope: 'organisme' }); cfg.reload(); toast(e.target.checked ? 'Étape « Responsable intermédiaire » activée' : 'Étape « Responsable intermédiaire » désactivée'); } catch (x) { toast(errMsg(x), 'ko'); } }} />
           <span><b>Activer l’étape « Responsable intermédiaire » dans les circuits</b><br /><span className="text-[12px] text-mute">Facultative et décochée par défaut : tant qu’elle est décochée, l’étape est ignorée même si des titulaires sont saisis ci-dessous. Une fois activée, elle n’est déclenchée que si un titulaire est désigné pour le service.</span></span></label>
       </section>
-      <section className="card p-5"><h3 className="mb-3">Titulaires des fonctions de validation</h3>
+      <details className="card p-5"><summary className="cursor-pointer text-[15px] font-bold">Saisie avancée des titulaires <span className="text-[12px] font-normal text-mute">— table complète, tous périmètres</span></summary><div className="mt-3"><h3 className="mb-3">Titulaires des fonctions de validation</h3>
         <form onSubmit={add} className="mb-4 grid gap-3 md:grid-cols-5 md:items-end"><ErrorBox msg={err} />
           <Field label="Fonction"><select className="input" value={f.fonction} onChange={(e) => setF({ ...f, fonction: e.target.value })}>{Object.entries(FONCTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
           <Field label="Agent (@nom)"><AgentPicker value={f.username} onChange={(u) => setF({ ...f, username: u })} required /></Field>
@@ -49,10 +53,10 @@ function Titulaires() {
         </form>
         {tit.loading ? <Loading /> : !tit.data?.length ? <Empty>Aucun titulaire désigné : les étapes obligatoires bloqueront l'envoi des actes.</Empty> : (
           <table className="w-full"><thead><tr><th>Fonction</th><th>Agent</th><th>Périmètre</th><th /></tr></thead><tbody>{tit.data.map((t) => (
-            <tr key={t.id}><td className="font-semibold">{FONCTIONS[t.fonction]}</td><td>{t.username}{t.suppleant && <span className="text-mute"> (suppl. {t.suppleant})</span>}</td>
+            <tr key={t.id}><td className="font-semibold">{FONCTIONS[t.fonction]}</td><td>{t.vacant ? <Badge tone="warn">Poste vacant</Badge> : <AgentName u={t.username} />}{t.suppleant && <span className="text-mute"> (suppl. <AgentName u={t.suppleant} />)</span>}</td>
               <td>{label(t.directionCode)}{t.serviceCode ? ` › ${dirs.data?.find((x) => x.code === t.directionCode)?.services?.find((s: any) => s.code === t.serviceCode)?.label ?? t.serviceCode}` : ''}</td>
               <td className="text-right"><button aria-label="Retirer" className="text-ko" onClick={async () => { await api.delete(orgPath(o, `/titulaires/${t.id}`)); tit.reload(); }}><Trash2 className="h-4 w-4" /></button></td></tr>))}</tbody></table>)}
-      </section>
+      </div></details>
 
       <section className="card p-5"><h3 className="mb-3">Autorisations de rédaction hors direction</h3>
         <form onSubmit={grant} className="mb-4 grid gap-3 md:grid-cols-4 md:items-end">
@@ -63,7 +67,7 @@ function Titulaires() {
         </form>
         {!aut.data?.length ? <p className="text-mute">Aucune autorisation étendue. Par défaut, un agent rédige pour sa propre direction.</p> : (
           <table className="w-full"><thead><tr><th>Agent</th><th>Périmètre</th><th>Accordée par</th><th /></tr></thead><tbody>{aut.data.map((g) => (
-            <tr key={g.id}><td>{g.username}</td><td>{label(g.directionCode)}{g.serviceCode ? ` › ${g.serviceCode}` : ''}</td><td>{g.grantedBy}</td><td className="text-right"><button aria-label="Révoquer" className="text-ko" onClick={async () => { await api.delete(orgPath(o, `/redaction/autorisations/${g.id}`)); aut.reload(); }}><Trash2 className="h-4 w-4" /></button></td></tr>))}</tbody></table>)}
+            <tr key={g.id}><td><AgentName u={g.username} /></td><td>{label(g.directionCode)}{g.serviceCode ? ` › ${g.serviceCode}` : ''}</td><td><AgentName u={g.grantedBy} /></td><td className="text-right"><button aria-label="Révoquer" className="text-ko" onClick={async () => { await api.delete(orgPath(o, `/redaction/autorisations/${g.id}`)); aut.reload(); }}><Trash2 className="h-4 w-4" /></button></td></tr>))}</tbody></table>)}
       </section>
 
       <section className="card p-5"><h3 className="mb-3">Groupes de valideurs (Service financier, juridique, SCC…)</h3>
@@ -81,29 +85,6 @@ function GroupeCard({ g, o, reload, toast }: { g: any; o: number; reload: () => 
 }
 
 /* -------------------------------------------------------------------------------------------------------- circuits */
-function Circuits() {
-  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
-  const list = useLoad(async () => (await api.get(orgPath(o, '/circuits'))).data.items as any[], [o]);
-  const [open, setOpen] = useState<any>(null);
-  const show = async (c: any) => { const v = c.versions.find((x: any) => x.status === 'published') ?? c.versions[0]; setOpen({ c, v: (await api.get(orgPath(o, `/circuits/${c.id}/versions/${v.version}`))).data }); };
-  const RES: Record<string, string> = { redacteur: 'Rédacteur', titulaire: 'Titulaire', groupe: 'Groupe', agent: 'Agent' };
-  return (
-    <div><p className="mb-4 text-mute">Le circuit est une donnée : il se modifie sans toucher au code (administrateur et SCC). L'éditeur graphique complet arrive ; ici, consultation et publication.</p>
-      {list.loading ? <Loading /> : <div className="grid gap-4 md:grid-cols-2">{list.data?.map((c) => (
-        <article key={c.id} className="card p-5"><div className="flex items-start justify-between"><h3>{c.nom}</h3><Badge tone="blue">{c.versions.find((v: any) => v.status === 'published') ? `v${c.versions.find((v: any) => v.status === 'published').version} publiée` : 'brouillon'}</Badge></div>
-          <p className="text-mute">{c.directionCode ? `Direction ${c.directionCode}` : 'Toutes directions'} · {c.versions.length} version(s)</p>
-          <div className="mt-3 flex gap-2"><button className="btn-secondary" onClick={() => show(c)}>Voir le parcours</button>
-            {c.versions.filter((v: any) => v.status === 'draft').map((v: any) => <button key={v.version} className="btn-primary" onClick={async () => { try { await api.post(orgPath(o, `/circuits/${c.id}/versions/${v.version}/publication`), {}); toast('Version publiée'); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); } }}>Publier v{v.version}</button>)}</div>
-        </article>))}</div>}
-      {open && <Modal title={`${open.c.nom} — version ${open.v.version}`} onClose={() => setOpen(null)} wide>
-        <ol className="space-y-2">{open.v.graph.steps.map((s: any, i: number) => (
-          <li key={s.key} className="flex items-center gap-3 rounded border border-line p-3"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[12px] font-bold text-white">{i + 1}</span>
-            <div className="flex-1"><b>{s.label}</b><div className="text-[12px] text-mute">{RES[s.resolver?.kind]} {s.resolver?.fonction || s.resolver?.code || s.resolver?.username || ''}{s.slaDays ? ` · délai ${s.slaDays} j ouvrés` : ''}{s.optional ? ' · optionnelle' : ''}{s.nonDelegable ? ' · non déléguable' : ''}</div></div></li>))}</ol>
-        <p className="mt-3 text-[12px] text-mute">Transitions conditionnelles : {open.v.graph.transitions.filter((t: any) => t.when).map((t: any) => `${t.from} → ${t.to} si ${t.when.field} = ${String(t.when.value)}`).join(' ; ') || 'aucune'}</p>
-      </Modal>}{node}</div>
-  );
-}
-
 /* --------------------------------------------------------------------------------------------- règles de notification */
 function Regles() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();

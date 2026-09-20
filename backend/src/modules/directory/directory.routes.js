@@ -21,6 +21,9 @@ module.exports = ({ makeRouter, dir }) => {
   r.get('/agents/search', { summary: 'Recherche un agent (nom, prénom, matricule, e-mail)', tags: ['annuaire'], query: SearchQuery },
     async (req, res) => res.json({ items: await dir.searchAgents(req.valid.query.q) }));
 
+  r.get('/agents/noms', { summary: "« Prénom NOM » d'une liste d'identifiants de connexion", tags: ['annuaire'], query: z.object({ u: z.string().max(4000).describe('Identifiants séparés par des virgules (200 au plus)') }),
+    description: "Sert à afficher les personnes par leur nom plutôt que par leur identifiant. Les identifiants inconnus sont absents de la réponse." },
+  async (req, res) => res.json({ noms: await dir.names(req.valid.query.u.split(',')) }));
   r.get('/agents/autocompletion', { summary: 'Autocomplétion « @nom » : identifiant de connexion, nom, direction', tags: ['annuaire'], query: SearchQuery,
     description: 'Deux lettres au moins. Renvoie l\'identifiant à utiliser partout où un agent doit être désigné (titulaires, groupes, délégations, rôles, mentions).' },
   async (req, res) => res.json({ items: await dir.searchLogins(req.valid.query.q) }));

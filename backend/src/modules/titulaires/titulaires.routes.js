@@ -6,7 +6,7 @@ const Org = z.object({ orgId: z.coerce.number().int().positive() });
 const IdP = Org.extend({ id: z.coerce.number().int().positive() });
 const ListQ = z.object({ fonction: z.enum(FONCTIONS).optional(), directionCode: z.string().max(40).optional(), serviceCode: z.string().max(40).optional() });
 const Add = z.object({
-  fonction: z.enum(FONCTIONS), username: z.string().trim().min(1).max(128),
+  fonction: z.enum(FONCTIONS), username: z.string().trim().min(1).max(128).optional(), vacant: z.boolean().default(false).describe('Poste vacant : pas de titulaire, l’étape du circuit est contournée'),
   directionCode: z.string().trim().max(40).optional(), serviceCode: z.string().trim().max(40).optional(),
   suppleant: z.string().trim().max(128).optional(), validFrom: z.iso.date().optional(), validTo: z.iso.date().optional(),
 }).refine((d) => !d.serviceCode || d.directionCode, { message: 'serviceCode exige directionCode', path: ['serviceCode'] });

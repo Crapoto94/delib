@@ -8,7 +8,7 @@ const ROLES = ['org_admin', 'scc']; // D26 : le circuit est modifiable par l'adm
 
 const Graph = z.object({
   start: z.string().min(1).max(40),
-  steps: z.array(z.record(z.string(), z.any())).max(60).describe('Étapes : { key, label, resolver:{kind,…}, mode, canEdit, optional, nonDelegable, slaDays, onEnter, onDone }'),
+  steps: z.array(z.record(z.string(), z.any())).max(60).describe('Étapes : { key, label, resolver:{kind,…}, mode, canEdit, optional, nonDelegable, slaDays, refusTo (étape de refus : par défaut l’étape précédente), onEnter, onDone }'),
   transitions: z.array(z.record(z.string(), z.any())).max(300).describe('Transitions : { from, to, when?, otherwise? }'),
 });
 const Create = z.object({
@@ -27,6 +27,8 @@ const Publish = z.object({
   effect: z.enum(['nouveaux-seulement', 'migrer']).default('nouveaux-seulement'),
   mapping: z.record(z.string(), z.string()).optional().describe('Correspondance ancienne étape → nouvelle étape pour les actes en cours (effet « migrer »)'),
 });
+const Update = z.object({ nom: z.string().trim().min(2).max(200).optional(), typeActeId: Id.nullable().optional(), directionCode: z.string().trim().max(40).nullable().optional() });
+const Dup = z.object({ code: z.string().regex(/^[a-z0-9_-]{2,40}$/), nom: z.string().trim().min(2).max(200) });
 const Cmp = z.object({ a: Id, b: Id });
 const ExportQ = z.object({ version: Id.optional() });
 
@@ -49,6 +51,19 @@ module.exports = ({ makeRouter, circuits }) => {
 
   r.get('/:id', { summary: "Circuit et liste de ses versions", tags: ['éditeur de circuit'], org: true, params: PC },
     async (req, res) => res.json(await circuits.get(req.org.id, req.valid.params.id)));
+
+  r.put('/:id', { summary: "Modifie les propriétés d'un circuit (nom, type d'acte, direction)", tags: ['éditeur de circuit'], org: true, roles: ROLES, params: PC, body: Update },
+    async (req, res) => res.json(await circuits.update(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
+  r.delete('/:id', { summary: 'Supprime un circuit', tags: ['éditeur de circuit'], org: true, roles: ROLES, params: PC, responses: { 204: 'Supprimé' },
+    description: "409 tant qu'un dossier a suivi ou suit ce circuit (l'historique d'un acte référence toujours sa version), ou s'il est le seul circuit publié." },
+  async (req, res) => { await circuits.remove(req.ctx, req.org.id, req.valid.params.id); res.status(204).end(); });
+
+  r.post('/:id/duplication', { summary: 'Duplique un circuit sous un nouveau code (brouillon v1)', tags: ['éditeur de circuit'], org: true, roles: ROLES, params: PC, body: Dup, responses: { 201: 'Créé' } },
+    async (req, res) => res.status(201).json(await circuits.duplicate(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
+  r.delete('/:id/versions/:n', { summary: 'Supprime un brouillon', tags: ['éditeur de circuit'], org: true, roles: ROLES, params: PV, responses: { 204: 'Supprimé' } },
+    async (req, res) => { await circuits.deleteDraft(req.ctx, req.org.id, req.valid.params.id, req.valid.params.n); res.status(204).end(); });
 
   r.get('/:id/export', { summary: 'Exporte un circuit en JSON (version publiée par défaut)', tags: ['éditeur de circuit'], org: true, roles: ROLES, params: PC, query: ExportQ },
     async (req, res) => res.json(await circuits.export(req.org.id, req.valid.params.id, req.valid.query.version)));

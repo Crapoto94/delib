@@ -3,6 +3,7 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Field, Loading, Spinner, useLoad, useToast } from '../ui';
+import { AgentName } from '../AgentName';
 
 const LIMITS: [string, string, string][] = [
   ['max_concurrent', 'Requêtes simultanées', "Nombre maximal d'appels à l'IA en même temps, tous utilisateurs confondus (l'IA est partagée : restez prudent)."],
@@ -45,7 +46,7 @@ export default function AdminIa() {
       <section className="card"><div className="border-b border-line px-5 py-3"><h3>Demandes récentes</h3></div>
         {jobs.loading ? <Loading /> : !jobs.data?.length ? <p className="p-6 text-center text-mute">Aucune demande.</p> : (
           <table className="w-full"><thead><tr><th>#</th><th>Demandeur</th><th>Dossier</th><th>Statut</th><th>Avancement</th><th>Déposée</th><th /></tr></thead><tbody>{jobs.data.map((j) => (
-            <tr key={j.id}><td>{j.id}</td><td>{j.requestedBy}</td><td>{j.acteId ? `#${j.acteId}` : '—'}</td><td><Badge tone={TONE[j.status]}>{LABEL[j.status]}</Badge>{j.status === 'queued' && <span className="ml-1 text-[11px] text-mute">n° {j.position}</span>}</td>
+            <tr key={j.id}><td>{j.id}</td><td><AgentName u={j.requestedBy} /></td><td>{j.acteId ? `#${j.acteId}` : '—'}</td><td><Badge tone={TONE[j.status]}>{LABEL[j.status]}</Badge>{j.status === 'queued' && <span className="ml-1 text-[11px] text-mute">n° {j.position}</span>}</td>
               <td className="text-[12px]">{j.status === 'error' ? <span className="text-ko">{j.error}</span> : `${j.progress}/${j.total || '?'} ${j.stepLabel ?? ''}`}</td><td className="text-[12px] text-mute">{dt(j.createdAt, { dateStyle: 'short', timeStyle: 'short' })}</td>
               <td className="text-right">{(j.status === 'queued' || j.status === 'running') && <button className="btn-secondary !py-1" onClick={() => cancel(j.id)}>Annuler</button>}</td></tr>))}</tbody></table>)}
       </section>{node}

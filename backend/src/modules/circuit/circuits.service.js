@@ -66,6 +66,51 @@ function createCircuits({ db, audit, engine, titulaires, bus }) {
       } catch (e) { if (e.code === '23505') throw E.conflict(`Le circuit « ${code} » existe déjà`); throw e; }
     },
 
+    /** Modifie les propriétés d'un circuit (nom, type d'acte, direction) — pas son graphe, qui se modifie par versions. */
+    async update(ctx, organismeId, id, { nom, typeActeId, directionCode }) {
+      const org = requireOrg(organismeId);
+      const before = await svc.def(org, id);
+      if (typeActeId) { const t = await db.get("SELECT 1 AS x FROM ref_items WHERE id = $1 AND kind = 'type_acte'", [typeActeId]); if (!t) throw E.badRequest("Type d'acte inconnu"); }
+      await db.run('UPDATE circuit_definitions SET nom = COALESCE($3, nom), type_acte_id = CASE WHEN $4::boolean THEN $5 ELSE type_acte_id END, direction_code = CASE WHEN $6::boolean THEN $7 ELSE direction_code END WHERE id = $1 AND organisme_id = $2',
+        [id, org, nom ?? null, typeActeId !== undefined, typeActeId ?? null, directionCode !== undefined, directionCode ?? null]);
+      await audit.log(ctx, { organismeId: org, action: 'circuit.update', entity: 'circuit_definitions', entityId: id, before: { nom: before.nom, typeActeId: before.type_acte_id, directionCode: before.direction_code }, after: { nom, typeActeId, directionCode } });
+      return svc.get(org, id);
+    },
+
+    /** Copie un circuit (dernière version) sous un nouveau code : point de départ d'un circuit voisin. */
+    async duplicate(ctx, organismeId, id, { code, nom }) {
+      const org = requireOrg(organismeId);
+      const d = await svc.def(org, id);
+      const v = await db.get('SELECT * FROM circuit_versions WHERE id = $1', [d.active_version_id]) || await db.get('SELECT * FROM circuit_versions WHERE definition_id = $1 ORDER BY version_no DESC LIMIT 1', [d.id]);
+      return svc.create(ctx, org, { code, nom, typeActeId: d.type_acte_id, directionCode: d.direction_code, graph: v.graph });
+    },
+
+    /** Supprime un circuit : refusé tant qu'un dossier l'utilise (l'historique d'un acte référence toujours sa version) ou s'il est le dernier circuit publié. */
+    async remove(ctx, organismeId, id) {
+      const org = requireOrg(organismeId);
+      const d = await svc.def(org, id);
+      const used = (await db.get('SELECT count(*)::int AS n FROM actes a JOIN circuit_versions v ON v.id = a.circuit_version_id WHERE v.definition_id = $1', [id])).n;
+      if (used) throw E.conflict(`${used} dossier(s) ont suivi ou suivent ce circuit : il ne peut pas être supprimé (publiez plutôt une nouvelle version)`);
+      if (d.active_version_id) {
+        const others = (await db.get('SELECT count(*)::int AS n FROM circuit_definitions WHERE organisme_id = $1 AND id <> $2 AND active_version_id IS NOT NULL', [org, id])).n;
+        if (!others) throw E.conflict("C'est le seul circuit publié : sans circuit, plus aucun dossier ne peut être envoyé. Publiez-en un autre avant de le supprimer.");
+      }
+      await db.tx(async (q) => {
+        await q.run('UPDATE circuit_definitions SET active_version_id = NULL WHERE id = $1', [id]);
+        await q.run('DELETE FROM circuit_versions WHERE definition_id = $1', [id]);
+        await q.run('DELETE FROM circuit_definitions WHERE id = $1', [id]);
+      });
+      await audit.log(ctx, { organismeId: org, action: 'circuit.delete', entity: 'circuit_definitions', entityId: id, before: { code: d.code, nom: d.nom } });
+    },
+
+    /** Supprime un BROUILLON (jamais une version publiée ou archivée). */
+    async deleteDraft(ctx, organismeId, id, n) {
+      const { d, v } = await svc.version(organismeId, id, n);
+      if (v.status !== 'draft') throw E.conflict('Seul un brouillon peut être supprimé');
+      await db.run('DELETE FROM circuit_versions WHERE id = $1', [v.id]);
+      await audit.log(ctx, { organismeId: d.organisme_id, action: 'circuit.draft_delete', entity: 'circuit_versions', entityId: v.id, before: { version: n } });
+    },
+
     async ensureGroups(ctx, organismeId, groupes) {
       const existing = await svc.groupCodes(organismeId);
       for (const [code, nom] of groupes) if (!existing.has(code)) await titulaires.createGroup(ctx, organismeId, { code, nom });

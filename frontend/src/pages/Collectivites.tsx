@@ -6,6 +6,7 @@ import { useAuth } from '../auth';
 import AgentPicker from '../AgentPicker';
 import { OrgLogo } from '../Brand';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
+import { AgentName } from '../AgentName';
 
 const TYPES: Record<string, string> = { commune: 'Commune', ccas: 'CCAS', autre: 'Autre organisme' };
 const ROLES: Record<string, string> = { org_admin: 'Administrateur', scc: 'SCC', teletransmission: 'Télétransmission', lecteur: 'Lecteur' };
@@ -129,7 +130,7 @@ function Admins({ o, onClose }: { o: any; onClose: () => void }) {
       </form>
       {roles.loading ? <Loading /> : !roles.data?.length ? <Empty><Building2 className="mx-auto mb-2 h-5 w-5" />Personne n'a de rôle dans cette collectivité.</Empty> : (
         <table className="w-full"><thead><tr><th>Agent</th><th>Rôle</th><th /></tr></thead><tbody>{roles.data.map((r) => (
-          <tr key={r.id}><td>@{r.username}</td><td><Badge tone="blue">{ROLES[r.role] ?? r.role}</Badge></td>
+          <tr key={r.id}><td><AgentName u={r.username} /> <span className="text-[11px] text-mute">@{r.username}</span></td><td><Badge tone="blue">{ROLES[r.role] ?? r.role}</Badge></td>
             <td className="text-right"><button className="text-ko" aria-label="Retirer" onClick={async () => { try { await api.delete(`/organismes/${o.id}/roles/${r.id}`); roles.reload(); } catch (x) { setErr(errMsg(x)); } }}><Trash2 className="h-4 w-4" /></button></td></tr>))}</tbody></table>)}
     </Modal>
   );

@@ -91,6 +91,10 @@ function validateGraph(graph, { groupCodes = null } = {}) {
     } else if (r.kind === 'agent' && !r.username) err('resolveur_agent', `Identifiant d'agent manquant pour l'étape ${s.key}`, s.key);
     if (s.mode && !MODES.includes(s.mode)) err('mode_invalide', `Mode inconnu pour l'étape ${s.key} : ${s.mode}`, s.key);
     if (s.mode === 'quorum' && !(Number.isInteger(s.quorum) && s.quorum >= 1)) err('quorum_invalide', `Quorum invalide pour l'étape ${s.key}`, s.key);
+    if (s.refusTo !== undefined && s.refusTo !== null && s.refusTo !== '') {
+      if (s.refusTo === s.key) err('refus_cible_invalide', `L'étape ${s.key} ne peut pas renvoyer vers elle-même en cas de refus`, s.key);
+      else if (!graph.steps.some((x) => x.key === s.refusTo)) err('refus_cible_inconnue', `Étape de refus inconnue pour l'étape ${s.key} : ${s.refusTo}`, s.key);
+    }
     if (s.slaDays !== undefined && !(Number(s.slaDays) >= 0 && Number(s.slaDays) <= 365)) err('sla_invalide', `Délai invalide pour l'étape ${s.key}`, s.key);
   }
   if (!graph.start || !keys.has(graph.start)) err('depart_invalide', "L'étape initiale est absente ou inconnue");
@@ -108,6 +112,10 @@ function validateGraph(graph, { groupCodes = null } = {}) {
     if (out.length && out.some((t) => t.when) && !out.some((t) => t.otherwise || !t.when)) err('sortie_par_defaut', `L'étape ${s.key} a des conditions sans sortie par défaut (« otherwise »)`, s.key);
     if (out.filter((t) => t.otherwise).length > 1) err('otherwise_multiple', `L'étape ${s.key} a plusieurs sorties « otherwise »`, s.key);
   }
+  // étape de refus : elle doit se trouver EN AMONT de l'étape qui refuse (on ne renvoie jamais un dossier vers l'avenir)
+  const reaches = (from, to) => { const seenR = new Set(); const st = [from]; while (st.length) { const k = st.pop(); if (k === to) return true; if (seenR.has(k)) continue; seenR.add(k); for (const t of outgoing(graph, k)) st.push(t.to); } return false; };
+  for (const s of graph.steps) if (s.refusTo && !reaches(s.refusTo, s.key)) err('refus_cible_aval', `L'étape de refus « ${s.refusTo} » de l'étape ${s.key} doit se trouver en amont dans le circuit`, s.key);
+  if (errors.length) return { ok: false, errors, warnings };
   // atteignabilité et boucles
   const seen = new Set(); const stack = [graph.start];
   while (stack.length) { const k = stack.pop(); if (seen.has(k)) continue; seen.add(k); for (const t of outgoing(graph, k)) stack.push(t.to); }
@@ -141,7 +149,7 @@ async function projectPath(graph, facts, resolve, { fromKey = null, skipKeys = n
     const step = stepOf(graph, key);
     if (!step) break;
     const r = skipKeys.has(key) ? { holders: [], skipped: true } : await resolve(step);
-    path.push({ key, label: step.label, holders: r.holders || [], optional: !!step.optional, skipped: !!r.skipped, reason: r.reason || null, missing: !!r.missing, canEdit: !!step.canEdit, nonDelegable: !!step.nonDelegable, slaDays: step.slaDays ?? null, mode: step.mode || 'one' });
+    path.push({ key, label: step.label, holders: r.holders || [], optional: !!step.optional, skipped: !!r.skipped, reason: r.reason || null, via: r.via || null, missing: !!r.missing, canEdit: !!step.canEdit, nonDelegable: !!step.nonDelegable, slaDays: step.slaDays ?? null, mode: step.mode || 'one' });
     key = nextKey(graph, key, facts);
   }
   return path;

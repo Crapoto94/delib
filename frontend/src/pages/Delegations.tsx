@@ -4,6 +4,7 @@ import { useAuth } from '../auth';
 import { d } from '../format';
 import AgentPicker from '../AgentPicker';
 import { Badge, Empty, ErrorBox, Field, Loading, PageTitle, useLoad, useToast } from '../ui';
+import { AgentName } from '../AgentName';
 
 export default function Delegations() {
   const { org, me } = useAuth(); const o = org!.id; const { toast, node } = useToast();
@@ -25,7 +26,7 @@ export default function Delegations() {
       </form>
       <div className="card">{list.loading ? <Loading /> : !list.data?.length ? <Empty>Aucune délégation.</Empty> : (
         <table className="w-full"><thead><tr><th>De</th><th>À</th><th>Portée</th><th>Période</th><th /></tr></thead><tbody>{list.data.map((x) => (
-          <tr key={x.id}><td>{x.delegant}{x.delegant === me?.username && <Badge tone="blue"> vous</Badge>}</td><td>{x.delegue}{x.delegue === me?.username && <Badge tone="blue"> vous</Badge>}</td><td>{x.scope}{x.scopeValue ? ` : ${x.scopeValue}` : ''}</td>
+          <tr key={x.id}><td><AgentName u={x.delegant} />{x.delegant === me?.username && <Badge tone="blue"> vous</Badge>}</td><td><AgentName u={x.delegue} />{x.delegue === me?.username && <Badge tone="blue"> vous</Badge>}</td><td>{x.scope}{x.scopeValue ? ` : ${x.scopeValue}` : ''}</td>
             <td>{d(x.startsAt)} → {x.endsAt ? d(x.endsAt) : 'révocation'}</td><td className="text-right">{x.active ? <button className="btn-ko" onClick={() => revoke(x.id)}>Révoquer</button> : <Badge>{x.revokedAt ? 'révoquée' : 'échue'}</Badge>}</td></tr>))}</tbody></table>)}</div>
       {node}
     </div>

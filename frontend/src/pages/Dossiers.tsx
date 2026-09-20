@@ -5,6 +5,7 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt, STATUTS } from '../format';
 import { Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, StatutBadge, useLoad } from '../ui';
+import { AgentName } from '../AgentName';
 
 function NewDossier({ onClose }: { onClose: () => void }) {
   const { org, me } = useAuth();
@@ -57,7 +58,7 @@ export default function Dossiers() {
               <tr key={a.id} className="hover:bg-soft">
                 <td className="font-mono text-[12px]">#{a.numeroSuivi}</td>
                 <td><Link to={`/dossiers/${a.id}`} className="font-semibold text-primary hover:underline">{a.titre}</Link></td>
-                <td className="text-mute">{a.direction?.label}</td><td>{a.redacteur}</td><td><StatutBadge statut={a.statut} /></td><td className="text-mute">{dt(a.updatedAt, { dateStyle: 'short' })}</td>
+                <td className="text-mute">{a.direction?.label}</td><td><AgentName u={a.redacteur} /></td><td><StatutBadge statut={a.statut} /></td><td className="text-mute">{dt(a.updatedAt, { dateStyle: 'short' })}</td>
               </tr>))}
           </tbody></table>
         )}

@@ -11,6 +11,7 @@
  */
 const { E } = require('../../shared/errors');
 const G = require('./graph');
+const normLabel = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 const { addBusinessDays } = require('../../shared/time');
 
 /** Statuts où l'acte parcourt le circuit ; « en_attente_scc » = étape SCC en cours (l'acte y reste une fois le circuit terminé). */
@@ -43,20 +44,27 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     const org = a.organisme_id; const r = step.resolver || {};
     // Responsable intermédiaire : fonction facultative, désactivée par défaut (paramètre `circuit.resp_intermediaire`, D56)
     if (r.kind === 'titulaire' && r.fonction === 'responsable_intermediaire' && cfg['circuit.resp_intermediaire']?.value !== true) return { holders: [], skipped: true, reason: 'desactive' };
-    let holders = [];
+    let holders = []; let via = null;
     if (r.kind === 'redacteur') holders = [a.redacteur, ...(a.co_redacteurs || [])];
-    else if (r.kind === 'titulaire') holders = (await titulaires.resolve(org, r.fonction, { directionCode: a.direction_code, serviceCode: a.service_code })).flatMap((t) => [t.username, t.suppleant].filter(Boolean));
+    else if (r.kind === 'titulaire') {
+      // service qui porte le nom de sa direction : le responsable de service est le directeur (D68)
+      const same = !!a.service_label && !!a.direction_label && normLabel(a.service_label) === normLabel(a.direction_label);
+      const t = await titulaires.resolveFor(org, r.fonction, { directionCode: a.direction_code, serviceCode: a.service_code, serviceSameAsDirection: same });
+      if (t.direct === 'dgs') return { holders: [], skipped: true, reason: 'dgs_direct', via: 'rattachement' }; // direction rattachée directement à la DGS : pas d'étape DGA (D66)
+      if (t.vacant) return { holders: [], skipped: true, reason: 'vacant', via: t.via }; // poste vacant : étape contournée (D67)
+      holders = t.holders; via = t.via;
+    }
     else if (r.kind === 'groupe') holders = await titulaires.groupMembers(org, r.code);
     else if (r.kind === 'agent') holders = [r.username];
     holders = [...new Set(holders.map((h) => h.toLowerCase()))];
     if (r.kind !== 'redacteur' && cfg['circuit.autovalidation']?.value !== true) {
       const self = new Set([a.redacteur, ...(a.co_redacteurs || [])]);
       const others = holders.filter((h) => !self.has(h));
-      if (holders.length && !others.length) return { holders: [], skipped: true, reason: 'auto_validation' };
+      if (holders.length && !others.length) return { holders: [], skipped: true, reason: 'auto_validation', via };
       holders = others;
     }
     if (!holders.length && r.kind !== 'redacteur') return step.optional ? { holders: [], skipped: true, reason: 'sans_titulaire' } : { holders: [], missing: true };
-    return { holders };
+    return { holders, via };
   }
 
   /** Parcours complet : étapes déjà franchies (pile) + projection à partir de l'étape courante. */
@@ -160,7 +168,9 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         events.push(['step.skipped', { organismeId: a.organisme_id, acteId: a.id, stepKey: key, reason: r.reason }]);
         cur = key; continue;
       }
-      if (cfg['circuit.dedupe']?.value === true && !r.missing && r.holders.length === 1 && r.holders[0] === ctx?.username && ctx?.username) {
+      // Quand la même personne doit valider plusieurs étapes de suite (chef de service puis directeur, par exemple), elle ne valide
+      // qu'une fois : les étapes suivantes sont validées implicitement (D69). Désactivable : `circuit.dedupe = false`.
+      if (cfg['circuit.dedupe']?.value !== false && !r.missing && ctx?.username && (def.mode || 'one') === 'one' && r.holders.includes(ctx.username) && fromKey !== graph.start) {
         await q.run("INSERT INTO step_instances (acte_id, step_key, label, round, status, holders, decision, acted_by, acted_at) VALUES ($1,$2,$3,$4,'done',$5::jsonb,'auto',$6, now())", [a.id, key, def.label, a.circuit_round, JSON.stringify(r.holders), ctx.username]);
         trail.push(key); applyDone(def);
         await event(q, a, ctx, 'auto_validate', { to: key });
@@ -296,7 +306,7 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     },
 
     /** Refus : cible « previous » | « first » | clé d'étape antérieure ; reprise « direct » | « complet » choisie par le refuseur. */
-    async refuse(ctx, organismeId, acteId, { target = 'previous', resume, motif }) {
+    async refuse(ctx, organismeId, acteId, { target, resume, motif }) {
       const a0 = await actes.load(ctx, organismeId, acteId);
       const cfg = await settings.resolve(a0.organisme_id);
       const out = await db.tx(async (q) => {
@@ -312,6 +322,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         const earlier = trail.slice(0, idx);
         if (!earlier.length) throw E.conflict('Aucune étape antérieure vers laquelle renvoyer');
         let to;
+        // sans choix explicite : l'étape de refus définie pour cette étape (D71), à défaut l'étape précédente (-1)
+        if (!target) { const cfgTarget = defOf(graph, a, a.current_step_key)?.refusTo; target = cfgTarget && earlier.includes(cfgTarget) ? cfgTarget : 'previous'; }
         if (target === 'previous') to = earlier[earlier.length - 1];
         else if (target === 'first') { if (cfg['circuit.retour_premiere']?.value === false) throw E.forbidden('Le retour à la première étape est désactivé'); to = earlier[0]; }
         else {
@@ -427,6 +439,7 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         acteId: a.id, statut: a.statut, submitted: true, versionId: a.circuit_version_id, currentStepKey: a.current_step_key, round: a.circuit_round,
         blocked: !!inst && inst.holders.length === 0, resume: a.resume_step ? { step: a.resume_step, from: a.return_from } : null,
         path, refuseTargets: targets, previous: targets.length ? targets[targets.length - 1].key : null,
+        refuseDefault: (() => { const c = defOf(graph, a, a.current_step_key)?.refusTo; return c && targets.some((x) => x.key === c) ? c : (targets.length ? targets[targets.length - 1].key : null); })(),
         actions: { submit: returnedToMe, validate: canValidate, refuse: canRefuse, onBehalfOf },
         due: inst?.due_at || null, late: !!inst?.due_at && new Date(inst.due_at) < new Date(), events,
       };

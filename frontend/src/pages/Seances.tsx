@@ -8,6 +8,7 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { d, daysUntil, dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
+import { AgentName } from '../AgentName';
 
 function NewSeance({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { org } = useAuth(); const o = org!.id;
@@ -52,7 +53,7 @@ function HorsDelai() {
       <section className="card"><div className="border-b border-line px-5 py-3"><h3>Actes hors délai (bloqués)</h3></div>
         {list.loading ? <Loading /> : !list.data?.length ? <Empty>Aucun acte hors délai.</Empty> : (
           <table className="w-full"><thead><tr><th>Acte</th><th>Rédacteur</th><th>Date limite</th><th>Séance</th><th /></tr></thead><tbody>{list.data.map((x) => (
-            <tr key={x.acteId}><td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${x.acteId}`}>#{x.numeroSuivi} {x.titre}</Link></td><td>{x.redacteur}</td>
+            <tr key={x.acteId}><td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${x.acteId}`}>#{x.numeroSuivi} {x.titre}</Link></td><td><AgentName u={x.redacteur} /></td>
               <td><Badge tone="ko">{d(x.dateLimiteRedaction)}</Badge></td><td>{d(x.dateSeance)}</td>
               <td className="text-right">{x.derogation ? <Badge tone="ok">Dérogation en vigueur</Badge> : <button className="btn-secondary" onClick={() => report(x.acteId)}>Reporter</button>}</td></tr>))}</tbody></table>)}
       </section>{node}

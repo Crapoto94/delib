@@ -5,6 +5,7 @@ import { api, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { dt } from './format';
 import { Badge, Loading } from './ui';
+import { AgentNames } from './AgentName';
 
 type Item = { acteId: number; numeroSuivi: number; numero: string | null; titre: string; etat: 'pret' | 'en_circuit' | 'a_corriger' | 'brouillon'; direction: string; etape: string | null; holders: string[]; echeance: string | null; enRetard: boolean; motifRetard: string | null; dansOdj: boolean };
 type Kpis = {
@@ -51,7 +52,7 @@ function ActesTable({ items }: { items: Item[] }) {
           <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${a.acteId}`}>{a.titre}</Link>{a.dansOdj && <span className="ml-2 align-middle"><Badge tone="ok">à l'ordre du jour</Badge></span>}</td>
           <td className="text-[12px] text-mute">{a.direction}</td>
           <td><Badge tone={ETAT[a.etat].tone}>{ETAT[a.etat].label}</Badge></td>
-          <td className="text-[12px]">{a.etape ?? '—'}{a.holders.length > 0 && <div className="text-mute">chez {a.holders.join(', ')}</div>}</td>
+          <td className="text-[12px]">{a.etape ?? '—'}{a.holders.length > 0 && <div className="text-mute">chez <AgentNames list={a.holders} /></div>}</td>
           <td className="whitespace-nowrap text-[12px]">{a.echeance ? dt(a.echeance, { dateStyle: 'short' }) : '—'}{a.enRetard && <div className="font-semibold text-ko">{a.motifRetard}</div>}</td>
         </tr>))}
     </tbody></table>

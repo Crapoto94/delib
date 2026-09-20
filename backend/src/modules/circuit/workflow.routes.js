@@ -5,7 +5,7 @@ const P = z.object({ orgId: Id });
 const PA = P.extend({ id: Id });
 const Validation = z.object({ comment: z.string().trim().max(2000).optional() });
 const Refus = z.object({
-  target: z.string().trim().min(1).max(60).default('previous').describe("« previous » (étape précédente réellement traversée), « first » (rédacteur) ou la clé d'une étape antérieure"),
+  target: z.string().trim().min(1).max(60).optional().describe("Sans valeur : l'étape de refus définie pour l'étape courante, à défaut l'étape précédente. « previous » (étape précédente réellement traversée), « first » (rédacteur) ou la clé d'une étape antérieure"),
   resume: z.enum(['direct', 'complet']).optional().describe('Reprise après correction : `direct` = retour à l\'étape qui refuse, `complet` = tout le circuit ; choisie par le refuseur'),
   motif: z.string().trim().min(3).max(2000),
 });

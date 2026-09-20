@@ -9,23 +9,42 @@ import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { d, dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, useLoad, useToast } from '../ui';
+import { AgentName, AgentNames } from '../AgentName';
 
 /* ------------------------------------------------------------------------------------------------ frise du circuit */
+const IGNOREE: Record<string, string> = {
+  vacant: 'Poste vacant — étape ignorée', dgs_direct: 'Direction rattachée directement à la DGS — étape ignorée', sans_titulaire: 'Aucun titulaire — étape ignorée',
+  auto_validation: 'Vous êtes le rédacteur — étape ignorée',
+};
+
+/** Frise du circuit : les étapes contournées (poste vacant, direction rattachée à la DGS…) et les validations implicites sont montrées comme telles. */
 function Frise({ circuit }: { circuit: any }) {
   if (!circuit?.path?.length) return null;
+  let n = 0;
   return (
     <ol className="flex gap-2 overflow-x-auto pb-2" aria-label="Circuit d'approbation">
-      {circuit.path.filter((p: any) => p.state !== 'skipped').map((p: any, i: number) => {
-        const cur = p.state === 'current'; const done = p.state === 'done';
+      {circuit.path.filter((p: any) => !(p.state === 'skipped' && (p.reason === 'desactive' || !p.reason))).map((p: any) => {
+        const skipped = p.state === 'skipped';
+        if (skipped) {
+          return (
+            <li key={p.key} className="min-w-[150px] flex-1 rounded-lg border border-dashed border-warn/40 bg-warn-bg/50 p-3 text-warn" title={IGNOREE[p.reason] ?? 'Étape ignorée'}>
+              <div className="flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-warn/20 text-[11px] font-bold">⤼</span><span className="truncate text-[12px] font-bold line-through decoration-warn/50">{p.label}</span></div>
+              <div className="mt-1 text-[11px] font-semibold">{IGNOREE[p.reason] ?? 'Étape ignorée'}{p.via === 'rh' && <span className="font-normal"> (vacant d'après les RH)</span>}</div>
+            </li>);
+        }
+        n += 1;
+        const cur = p.state === 'current'; const done = p.state === 'done'; const implicite = done && p.instance?.decision === 'auto';
         return (
           <li key={p.key} className={`min-w-[150px] flex-1 rounded-lg border p-3 ${cur ? 'border-primary bg-primary text-white' : done ? 'border-ok/30 bg-white' : 'border-line bg-white/60'}`}>
             <div className="flex items-center gap-2">
-              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${done ? 'bg-ok text-white' : cur ? 'bg-action text-white ring-4 ring-action/30' : 'bg-line text-slate-600'}`}>{done ? <Check className="h-3.5 w-3.5" /> : i + 1}</span>
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${done ? 'bg-ok text-white' : cur ? 'bg-action text-white ring-4 ring-action/30' : 'bg-line text-slate-600'}`}>{done ? <Check className="h-3.5 w-3.5" /> : n}</span>
               <span className="truncate text-[12px] font-bold">{p.label}</span>
             </div>
             <div className={`mt-1 truncate text-[11px] ${cur ? 'text-white/80' : 'text-mute'}`}>
-              {p.instance?.actedBy ? `${p.instance.actedBy}${p.instance.onBehalfOf ? ` (pour ${p.instance.onBehalfOf})` : ''}` : p.missing ? '⚠ aucun titulaire' : (p.holders || []).join(', ') || '—'}
+              {p.instance?.actedBy ? <><AgentName u={p.instance.actedBy} />{p.instance.onBehalfOf && <> (pour <AgentName u={p.instance.onBehalfOf} />)</>}</> : p.missing ? '⚠ aucun titulaire' : (p.holders || []).length ? <AgentNames list={p.holders} /> : '—'}
             </div>
+            {implicite && <div className="mt-1 text-[11px] italic text-mute">validée implicitement (déjà validée par la même personne)</div>}
+            {!done && p.via === 'directeur' && <div className={`mt-1 text-[11px] italic ${cur ? 'text-white/80' : 'text-mute'}`}>service de même nom : le directeur</div>}
             {cur && circuit.due && <div className="mt-1 text-[11px] font-semibold">{circuit.late ? '⏰ en retard · ' : 'échéance '}{dt(circuit.due, { dateStyle: 'short' })}</div>}
           </li>
         );
@@ -396,7 +415,7 @@ export default function Dossier() {
           <CommissionsBox acte={a} editable={editable} toast={toast} />
           {c?.events?.length > 0 && (
             <div className="card p-5"><h3 className="mb-2">Historique</h3><ul className="space-y-2 text-[12px]">{c.events.slice().reverse().slice(0, 12).map((e: any) => (
-              <li key={e.id}><b>{e.actor}</b>{e.onBehalfOf ? ` (pour ${e.onBehalfOf})` : ''} · {e.action}{e.to ? ` → ${e.to}` : ''}<div className="text-mute">{dt(e.at)}</div></li>))}</ul></div>)}
+              <li key={e.id}><b><AgentName u={e.actor} /></b>{e.onBehalfOf && <> (pour <AgentName u={e.onBehalfOf} />)</>} · {e.action}{e.to ? ` → ${e.to}` : ''}<div className="text-mute">{dt(e.at)}</div></li>))}</ul></div>)}
         </aside>
       </div>
       {copying && <CopieModal acte={a} onClose={() => setCopying(false)} toast={toast} />}

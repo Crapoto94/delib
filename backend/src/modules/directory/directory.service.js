@@ -48,6 +48,7 @@ function createDirectoryService({ db, adapter, config, log }) {
   // OFFICIEL du responsable d'une direction ou d'un service (« Directeur·trice des systèmes d'information »). Pour un responsable,
   // c'est l'intitulé de l'organigramme qui est affiché partout.
   let chartCache = { at: 0, list: null };
+  const nameCache = new Map(); // identifiant -> { name, at } (agents connus seulement de l'annuaire RH)
   async function chart() {
     if (chartCache.list && Date.now() - chartCache.at < config.directoryCacheMs) return chartCache.list;
     try { const list = await adapter.getOrganisationChart(); chartCache = { at: Date.now(), list }; return list; } catch (e) {
@@ -129,6 +130,36 @@ function createDirectoryService({ db, adapter, config, log }) {
     organisationChart: () => adapter.getOrganisationChart(),
     async searchAgents(q) { const list = await adapter.searchAgents(q); return Promise.all(list.map(async (a) => ({ ...a, poste: await posteAffiche(a) }))); },
     posteAffiche,
+
+    /** Poste de responsable vacant dans l'organigramme RH : { direction, service } (faux si l'organigramme est indisponible). */
+    async vacance(directionCode, serviceCode) {
+      const node = (await chart()).find((d) => d.code === directionCode);
+      const svcNode = serviceCode ? (node?.services || []).find((x) => x.code === serviceCode) : null;
+      return { direction: !!node?.vacant, service: !!svcNode?.vacant };
+    },
+
+    /**
+     * « Prénom NOM » d'une liste d'identifiants de connexion (affichage dans les listes à la place du login). Les agents connus
+     * localement d'abord, puis l'annuaire RH pour quelques inconnus ; un identifiant introuvable est simplement absent du résultat.
+     */
+    async names(usernames) {
+      const list = [...new Set((usernames || []).map((u) => String(u).trim().toLowerCase().replace(/^@/, '')).filter(Boolean))].slice(0, 200);
+      if (!list.length) return {};
+      const capName = (x) => String(x || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a1, b1) => a1 + b1.toUpperCase());
+      const full = (prenom, nom) => `${capName(prenom)} ${String(nom || '').toUpperCase()}`.trim();
+      const out = {};
+      for (const r of await db.all('SELECT username, nom, prenom, display_name FROM agent_ref WHERE username = ANY($1::text[])', [list])) {
+        if (r.nom && r.prenom) out[r.username] = full(r.prenom, r.nom);
+        else if (r.display_name && r.display_name.toLowerCase() !== r.username) out[r.username] = r.display_name;
+      }
+      for (const u of list.filter((x) => !out[x]).slice(0, 8)) {
+        if (nameCache.has(u) && Date.now() - nameCache.get(u).at < 600000) { if (nameCache.get(u).name) out[u] = nameCache.get(u).name; continue; }
+        let name = null;
+        try { const hit = (await adapter.searchAgents(u)).find((h) => (h.email || '').split('@')[0].toLowerCase() === u); if (hit?.displayName) name = capName(hit.displayName.split(' ')[0]) + ' ' + hit.displayName.split(' ').slice(1).join(' ').toUpperCase(); } catch { /* annuaire indisponible */ }
+        nameCache.set(u, { name, at: Date.now() }); if (name) out[u] = name.trim();
+      }
+      return out;
+    },
 
     /**
      * Autocomplétion d'un agent (« @nom ») : identifiant de connexion, nom, direction. Les agents déjà connectés d'abord, puis
