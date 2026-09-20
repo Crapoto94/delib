@@ -5,6 +5,7 @@
  *  - suppléant et dates de validité ;
  *  - POSTE VACANT : un titulaire « vacant » n'a pas de personne, l'étape du circuit est contournée automatiquement (D67) ;
  *  - RATTACHEMENT DES DIRECTIONS : chaque direction relève d'un DGA (ou directement de la DGS), choix d'organisation défini ici (D66) ;
+ *  - DGS : le titulaire « dgs » désigné ; à défaut, le DIRECTEUR de la direction générale des services de l'organigramme RH (D76) ;
  *  - un service qui porte le nom de sa direction (ou l'absence de service) : le responsable de service est le directeur (D68) ;
  *  - modifiables par l'administrateur, et par le directeur / le chef de service pour SON périmètre (D31).
  */
@@ -19,11 +20,13 @@ const toT = (r) => ({
 const today = () => new Date().toISOString().slice(0, 10);
 
 function createTitulaires({ db, audit, access }) {
+  let directionGenerale = null; // (organismeId) -> code de la direction générale (réglage, sinon détectée dans l'organigramme RH)
   let rhVacancy = null; // (directionCode, serviceCode) -> { direction, service } d'après l'organigramme RH (branché par le conteneur)
   const activeSql = "(valid_from IS NULL OR valid_from <= $X) AND (valid_to IS NULL OR valid_to >= $X)";
   const svc = {
     FONCTIONS,
     setRhVacancy(fn) { rhVacancy = fn; },
+    setDirectionGenerale(fn) { directionGenerale = fn; },
 
     async list(organismeId, { fonction, directionCode, serviceCode } = {}) {
       const org = requireOrg(organismeId);
@@ -40,6 +43,7 @@ function createTitulaires({ db, audit, access }) {
      */
     async resolve(organismeId, fonction, { directionCode, serviceCode } = {}, date = today()) {
       const org = requireOrg(organismeId);
+      if (fonction === 'dgs') return (await svc.resolveFor(org, 'dgs', {}, date)).holders.map((u) => ({ username: u, suppleant: null, perimetre: 'organisme' }));
       const rows = await db.all(
         `SELECT * FROM titulaires WHERE organisme_id = $1 AND fonction = $2 AND ${activeSql.replace(/\$X/g, '$3')}`, [org, fonction, date]);
       const pick = (perimetre, pred) => rows.filter((r) => r.perimetre === perimetre && pred(r));
@@ -58,7 +62,9 @@ function createTitulaires({ db, audit, access }) {
         db.all('SELECT * FROM dga_postes WHERE organisme_id = $1', [org]),
         db.all('SELECT * FROM direction_rattachements WHERE organisme_id = $1', [org]),
       ]);
-      return { rows, postes: new Map(postes.map((x) => [x.id, x])), rts: new Map(rts.map((x) => [x.direction_code, x])) };
+      let dg = null;
+      if (directionGenerale) { try { dg = await directionGenerale(org); } catch { /* annuaire indisponible : pas de repli */ } }
+      return { rows, postes: new Map(postes.map((x) => [x.id, x])), rts: new Map(rts.map((x) => [x.direction_code, x])), dg };
     },
 
     /**
@@ -89,6 +95,11 @@ function createTitulaires({ db, audit, access }) {
         || (!serviceLevel && r.perimetre === 'direction' && r.direction_code === directionCode) || (!serviceLevel && r.perimetre === 'organisme')));
       const persons = found.filter((r) => !r.vacant);
       if (persons.length) return { holders: persons.flatMap((r) => [r.username, r.suppleant]).filter(Boolean), vacant: false, direct: null, via: null, poste: null };
+      if (fonction === 'dgs') {
+        // pas de DGS désigné : c'est le directeur de la direction générale des services (jamais « vacant » : la validation DGS n'est jamais contournée)
+        const r = data.dg ? svc.resolveIn(data, 'directeur', { directionCode: data.dg }, rhv) : null;
+        return { holders: r?.holders || [], vacant: false, direct: null, via: r?.holders?.length ? 'direction_generale' : null, poste: null };
+      }
       if (found.some((r) => r.vacant)) return { holders: [], vacant: true, direct: null, via: null, poste: null };
       if (rhv && ['directeur', 'chef_service'].includes(fonction)) {
         const v = rhv(directionCode, serviceCode);

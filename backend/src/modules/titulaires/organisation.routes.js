@@ -9,7 +9,8 @@ const Poste = z.object({
   username: z.string().trim().min(1).max(128).optional(), suppleant: z.string().trim().max(128).optional(), vacant: z.boolean().default(false),
 });
 const Rattachement = z.object({ rattachement: z.enum(['dga', 'dgs']).nullable(), dgaPosteId: Id.optional() });
-const Adopt = z.object({ fonction: z.enum(['directeur', 'chef_service']), directionCode: z.string().trim().min(1).max(40), serviceCode: z.string().trim().max(40).optional() });
+const Adopt = z.object({ fonction: z.enum(['directeur', 'chef_service', 'dgs']), directionCode: z.string().trim().max(40).optional(), serviceCode: z.string().trim().max(40).optional() })
+  .refine((d) => d.fonction === 'dgs' || !!d.directionCode, { message: 'directionCode est obligatoire', path: ['directionCode'] });
 const T = ['organisation'];
 
 module.exports = ({ makeRouter, organisation, titulaires }) => {

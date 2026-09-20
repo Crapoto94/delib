@@ -62,6 +62,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const refs = createReferentiels({ db, audit });
   const titulaires = createTitulaires({ db, audit, access });
   titulaires.setRhVacancy((d, sv) => dir.vacance(d, sv));
+  titulaires.setDirectionGenerale(async (org) => (await dir.directionGenerale((await settings.resolve(org))['organisation.direction_generale']?.value))?.code ?? null);
   const redaction = createRedaction({ db, audit, access, titulaires, settings, bus });
   const acl = createActeAcl({ db, access, titulaires, settings });
   const actes = createActes({ db, audit, refs, redaction, dir, acl, bus, late });

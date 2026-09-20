@@ -131,6 +131,13 @@ function createDirectoryService({ db, adapter, config, log }) {
     async searchAgents(q) { const list = await adapter.searchAgents(q); return Promise.all(list.map(async (a) => ({ ...a, poste: await posteAffiche(a) }))); },
     posteAffiche,
 
+    /** Direction générale des services de l'organigramme RH : celle du code configuré, sinon celle qui porte ce nom. */
+    async directionGenerale(codeConfigure) {
+      const nodes = await chart();
+      if (codeConfigure) { const n = nodes.find((d) => d.code === codeConfigure); if (n) return n; }
+      return nodes.find((d) => normLabel(d.label) === 'DIRECTION GENERALE DES SERVICES') || nodes.find((d) => normLabel(d.label).startsWith('DIRECTION GENERALE')) || null;
+    },
+
     /** Agents de l'annuaire RH dont le nom complet est `nom` (« MERIEM KHAROUM ») : l'annuaire cherche un terme à la fois, on croise donc les termes. */
     async searchByName(nom) {
       const wanted = String(nom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().split(/\s+/).filter(Boolean).sort().join(' ');
@@ -166,13 +173,13 @@ function createDirectoryService({ db, adapter, config, log }) {
         if (r.nom && r.prenom) out[r.username] = full(r.prenom, r.nom);
         else if (r.display_name && r.display_name.toLowerCase() !== r.username) out[r.username] = r.display_name;
       }
-      // agents jamais connectés à l'application : l'annuaire RH, en cherchant sur des fragments de l'identifiant (« hbourdelet » -> « bourdelet »)
+      // agents jamais connectés à l'application : l'annuaire RH, en cherchant sur des fragments de l'identifiant (« hbourdelet » -> « bourdelet », « mmartialluit » -> « martia »)
       const inconnus = list.filter((x) => !out[x]).slice(0, 60);
       const trouve = async (u) => {
         const c = nameCache.get(u);
         if (c && Date.now() - c.at < 600000) return c.name;
         let name = null;
-        for (const q of [u.slice(2), u.slice(1), u]) {
+        for (const q of [...new Set([u.slice(2), u.slice(1), u, u.slice(1, 7), u.slice(1, 6)])]) { // les 2 derniers : noms composés (« martial-luit » ne contient pas « martialluit »)
           if (q.length < 3) continue;
           try {
             const hit = (await adapter.searchAgents(q)).find((h) => (h.email || '').split('@')[0].toLowerCase() === u);

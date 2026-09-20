@@ -49,7 +49,8 @@ function createOrganisation({ db, titulaires, dir }) {
         const manques = [dga, directeur, ...services.map((x) => x.chef)].filter((x) => x.statut === 'non_renseigne' || x.statut === 'non_defini').length;
         return { code: d.code, label: d.label, rattachement: rt ? { type: rt.rattachement, posteId: rt.dga_poste_id, poste: poste?.libelle ?? null } : null, dga, directeur, services, manques };
       });
-      const dgs = role('dgs', {});
+      const dgNode = await dir.directionGenerale(null).catch(() => null);
+      const dgs = { ...role('dgs', {}, rhOf(dgNode)), directionGenerale: dgNode ? { code: dgNode.code, label: dgNode.label } : null };
       const resume = {
         directions: directions.length, services: directions.reduce((n, d) => n + d.services.length, 0),
         manques: directions.reduce((n, d) => n + d.manques, 0) + (dgs.statut === 'non_renseigne' ? 1 : 0),
@@ -62,16 +63,16 @@ function createOrganisation({ db, titulaires, dir }) {
     /** Désigne le responsable indiqué par l'organigramme RH : retrouve son identifiant de connexion (jamais d'ambiguïté tolérée). */
     async adopter(ctx, organismeId, { fonction, directionCode, serviceCode }) {
       const org = requireOrg(organismeId);
-      if (!['directeur', 'chef_service'].includes(fonction)) throw E.badRequest('Seuls les responsables de direction et de service figurent dans l\'organigramme RH');
+      if (!['directeur', 'chef_service', 'dgs'].includes(fonction)) throw E.badRequest('Seuls le DGS et les responsables de direction et de service figurent dans l\'organigramme RH');
       const chart = await dir.organisationChart();
-      const d = chart.find((x) => x.code === directionCode);
-      const node = fonction === 'directeur' ? d : (d?.services || []).find((x) => x.code === serviceCode);
+      const d = fonction === 'dgs' ? await dir.directionGenerale(null) : chart.find((x) => x.code === directionCode);
+      const node = fonction === 'chef_service' ? (d?.services || []).find((x) => x.code === serviceCode) : d;
       if (!node) throw E.notFound('Direction ou service introuvable dans l\'organigramme RH');
       if (node.vacant || !node.responsable) throw E.conflict('Ce poste est vacant dans l\'organigramme RH : il n\'y a personne à désigner');
       const hits = (await dir.searchByName(node.responsable)).filter((a) => (a.email || '').includes('@'));
       const logins = [...new Set(hits.map((a) => a.email.split('@')[0].toLowerCase()))];
       if (logins.length !== 1) throw E.conflict(logins.length ? `Plusieurs agents portent le nom « ${node.responsable} » : désignez le bon à la main` : `Le responsable « ${node.responsable} » n'a pas été retrouvé dans l'annuaire : désignez-le à la main`);
-      return titulaires.add(ctx, org, { fonction, username: logins[0], directionCode, serviceCode: fonction === 'chef_service' ? serviceCode : undefined });
+      return titulaires.add(ctx, org, { fonction, username: logins[0], directionCode: fonction === 'dgs' ? undefined : directionCode, serviceCode: fonction === 'chef_service' ? serviceCode : undefined });
     },
   };
 }

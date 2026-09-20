@@ -32,20 +32,20 @@ export default function Organisation() {
       <div className="flex flex-wrap items-center gap-2 border-t border-line/60 px-4 py-2 text-[13px]">
         <span className="w-44 shrink-0 font-semibold">{titre}</span>
         <span className="flex min-w-[220px] flex-1 flex-wrap items-center gap-2">
-          {role.statut === 'personne' && <span><AgentNames list={role.holders.slice(0, 1)} />{role.holders[1] && <span className="text-mute"> (suppl. <AgentName u={role.holders[1]} />)</span>}{role.poste && <span className="text-[11px] text-mute"> · {role.poste}</span>}</span>}
-          {role.statut === 'implicite' && <span><Badge tone="blue">Le directeur</Badge> <span className="text-mute">service de même nom que la direction : </span><AgentNames list={role.holders.slice(0, 1)} /></span>}
+          {role.statut === 'personne' && <span><AgentNames list={role.holders.slice(0, 1)} />{role.via === 'direction_generale' && <span className="text-[11px] text-mute"> · responsable de la direction générale (organigramme RH)</span>}{role.holders[1] && <span className="text-mute"> (suppl. <AgentName u={role.holders[1]} />)</span>}{role.poste && <span className="text-[11px] text-mute"> · {role.poste}</span>}</span>}
+          {role.statut === 'implicite' && <span><Badge tone="blue">Directeur·trice</Badge> <span className="text-mute">service de même nom que la direction : </span><AgentNames list={role.holders.slice(0, 1)} /></span>}
           {role.statut === 'vacant' && <span><Badge tone="warn">Vacant</Badge> <span className="text-[12px] text-mute">{role.via === 'rh' ? 'vacant d’après les RH' : 'déclaré vacant'} — l’étape est contournée</span></span>}
           {role.statut === 'direct_dgs' && <Badge tone="blue">Directement rattachée à la DGS — pas de DGA</Badge>}
           {role.statut === 'non_defini' && <Badge tone="ko">Rattachement à définir</Badge>}
           {role.statut === 'non_renseigne' && <span><Badge tone="ko">À renseigner</Badge> <span className="text-[12px] text-ko">le circuit serait bloqué</span></span>}
-          {role.rh?.responsable && role.statut !== 'personne' && role.statut !== 'implicite' && !role.rh.vacant && (
+          {role.rh?.responsable && (role.statut !== 'personne' || role.via === 'direction_generale') && role.statut !== 'implicite' && !role.rh.vacant && (
             <span className="rounded bg-soft px-2 py-0.5 text-[12px]">RH : <b>{role.rh.responsable}</b>{role.rh.poste ? ` — ${role.rh.poste.toLowerCase()}` : ''}
-              {fonction !== 'dga' && <button className="ml-2 font-semibold text-action" onClick={() => act(() => api.post(orgPath(o, '/organisation/adopter'), { fonction, directionCode, serviceCode }), 'Responsable désigné')}>Désigner</button>}</span>)}
+              {fonction !== 'dga' && <button className="ml-2 font-semibold text-action" onClick={() => act(() => api.post(orgPath(o, '/organisation/adopter'), { fonction, directionCode: directionCode || undefined, serviceCode }), 'Responsable désigné')}>Désigner</button>}</span>)}
         </span>
-        {fonction !== 'dga' && fonction !== 'dgs' && (
+        {fonction !== 'dga' && (
           <span className="flex shrink-0 items-center gap-1">
             {role.statut !== 'implicite' && <button className="btn-secondary !py-0.5 !text-[12px]" onClick={() => setDesigner({ fonction, directionCode, serviceCode, titre })}><UserCheck className="h-3.5 w-3.5" /> Désigner…</button>}
-            {role.statut !== 'implicite' && !manuel.some((x) => x.vacant) && <button className="btn-secondary !py-0.5 !text-[12px]" onClick={() => act(() => api.post(orgPath(o, '/titulaires'), { fonction, vacant: true, directionCode, serviceCode }), 'Poste déclaré vacant')}><UserX className="h-3.5 w-3.5" /> Vacant</button>}
+            {role.statut !== 'implicite' && fonction !== 'dgs' && !manuel.some((x) => x.vacant) && <button className="btn-secondary !py-0.5 !text-[12px]" onClick={() => act(() => api.post(orgPath(o, '/titulaires'), { fonction, vacant: true, directionCode, serviceCode }), 'Poste déclaré vacant')}><UserX className="h-3.5 w-3.5" /> Vacant</button>}
             {manuel.map((x) => <button key={x.id} className="rounded p-1 text-ko hover:bg-ko-bg" title={x.vacant ? 'Retirer la déclaration de vacance' : `Retirer ${x.username}`} aria-label="Retirer" onClick={() => act(() => api.delete(orgPath(o, `/titulaires/${x.id}`)), 'Titulaire retiré')}><Trash2 className="h-3.5 w-3.5" /></button>)}
           </span>)}
       </div>
@@ -60,8 +60,9 @@ export default function Organisation() {
         <Badge tone={r.sansRattachement ? 'ko' : 'ok'}>{r.sansRattachement} direction(s) sans rattachement</Badge><Badge>{r.directions} directions · {r.services} services</Badge>
       </div>
 
-      <section className="card overflow-hidden"><h3 className="px-4 py-3">Direction générale</h3>
+      <section className="card overflow-hidden"><h3 className="px-4 py-3">DGS et DGA</h3>
         <RoleLine role={d.dgs} directionCode="" titre="DGS" />
+        {d.dgs.directionGenerale && <p className="px-4 pb-2 text-[12px] text-mute">Sans DGS désigné ici, le DGS est le responsable de la <b>{d.dgs.directionGenerale.label}</b> d'après l'organigramme RH.</p>}
         <div className="border-t border-line px-4 py-3">
           <div className="mb-2 flex items-center justify-between"><h4>Postes de DGA <span className="text-[12px] font-normal text-mute">— chacun encadre plusieurs directions et répond à la DGS</span></h4>
             <button className="btn-secondary !py-1" onClick={() => setPoste({ libelle: '', username: '', suppleant: '', vacant: false })}><Plus className="h-3.5 w-3.5" /> Nouveau poste de DGA</button></div>

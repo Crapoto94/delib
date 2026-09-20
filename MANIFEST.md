@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.11 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.12 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -480,6 +480,8 @@ Le circuit est une **donnée**, pas du code : `circuit_definitions → circuit_s
 
 - **ORG-10** — **Frise du circuit, rédacteur qui détient des étapes** : quand le rédacteur est lui-même titulaire des étapes qui suivent la rédaction (il est directeur, ou chef de service d'un service du même nom que sa direction…), ces étapes ne sont **pas affichées une à une** : elles **fusionnent avec la rédaction** en une seule carte « **Rédacteur / Directeur** » (avec le nom du rédacteur), et les étapes suivantes gardent leur ordre.
 - **ORG-11** — **Noms des personnes** (D73) : l'annuaire RH ne cherche qu'**un terme à la fois** ; pour désigner le responsable indiqué par les RH ou pour afficher le nom d'un agent **jamais connecté** à l'outil, on **croise les termes** (nom complet) ou on cherche sur des **fragments de l'identifiant** ; le nom RH est affiché « Prénom NOM » (« Meriem KHAROUM »).
+- **ORG-12** — **DGS et Direction générale** (D76) : la **DGS** (fonction) n'est pas la personne du jeu de démonstration (`demo.dgs`) mais le **responsable de la « DIRECTION GENERALE DES SERVICES »** de l'organigramme RH. Sans titulaire « DGS » désigné dans l'outil, le DGS est ce directeur (`via = direction_generale`) ; un titulaire désigné à la main reste prioritaire ; « Désigner » retrouve le responsable RH. La validation DGS n'est **jamais contournée** (ni vacance présumée). La direction est repérée par son libellé, ou par le réglage `organisation.direction_generale` (code de direction).
+- **ORG-13** — **Affichage** : le service qui porte le nom de sa direction est marqué « **Directeur·trice** » (forme épicène de l'organigramme) ; le nom du responsable est toujours « Prénom NOM », y compris pour les noms composés à trait d'union (« Maryline MARTIAL-LUIT » retrouvé depuis « mmartialluit »).
 
 ### 9.5 Délégations et absences
 
@@ -1599,6 +1601,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D73** | **Personnes affichées par « Prénom NOM »** (par exemple « Marc CHEVALIER ») dans toutes les listes, à la place de l'identifiant de connexion (valideurs, titulaires, rédacteurs, délégations, historique…). *(réalisé)* | 5, 12 |
 | **D74** | **Type de commission** : chaque commission est définie comme **associée à la rédaction des actes** (elle rend des avis sur les projets) ou **autre** (commission sans lien avec les actes : elle a ses propres dossiers). *(réalisé)* | 15 |
 | **D75** | **Convocation pour chaque commission, avec dossiers simples** : le module de convocation (D65) fonctionne pour **chaque commission** ; l'ordre du jour d'une réunion peut comporter, en plus des délibérations, des **dossiers simples** (**nom, description, pièces jointes**), consultables par les convoqués depuis leur lien personnel. *(réalisé)* | 15, 17 |
+| **D76** | **La DGS est le responsable de la Direction générale des services de l'organigramme RH** (et non un titulaire fictif de démonstration) : à défaut de titulaire désigné, le circuit s'adresse au directeur de la « DIRECTION GENERALE DES SERVICES » ; l'étape DGS n'est jamais contournée ; affichage « Directeur·trice » et « Prénom NOM » pour les noms composés. *(réalisé)* | 9.4 bis |
 
 ---
 
@@ -1619,6 +1622,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.12** | 2026-09-20 | **D76** : la DGS dérive de la Direction générale des services de l'organigramme RH (ORG-12), affichage « Directeur·trice » et noms composés (ORG-13) |
 | **1.11** | 2026-09-20 | les décisions **D66 à D75** sont **réalisées** : écran « Organisation », frise du circuit (étapes contournées, validations implicites), éditeur de circuits avec étape de refus, visibilité des actes (général et par utilisateur), type de commission, dossiers simples (description et pièces jointes) et convocation de chaque commission |
 | **1.10** | 2026-09-20 | décisions **D66 à D75** : postes de DGA et rattachement des directions (un DGA encadre plusieurs directions et répond à la DGS), postes vacants contournés, service de même nom que la direction, validation implicite, titulaires à partir de l'organisation, étape de refus par étape et CRUD des circuits, visibilité des actes paramétrable par utilisateur, noms « Prénom NOM », type de commission et dossiers simples ; les exigences non encore codées sont marquées « à réaliser » |
 | **1.9** | 2026-09-20 | décision **D65** : convocation des élus et des agents de la Ville avec lien personnel unique, suivi de lecture, journal de preuve, statistiques, relance et modificatif ; en-tête sur deux lignes (menu sous la barre d'outils) |

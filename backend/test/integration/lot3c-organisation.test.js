@@ -143,6 +143,14 @@ describe('règles de résolution en mémoire (service du nom de la direction, va
     expect(tit.resolveIn(data(), 'chef_service', { directionCode: 'D1', serviceCode: 'S1' }, rhv)).toMatchObject({ vacant: false, holders: [] });
     expect(tit.resolveIn(data(), 'dgs', {}, rhv)).toMatchObject({ vacant: false, holders: [] }); // jamais de vacance présumée pour la DGS
   });
+
+  it('sans DGS désigné, le DGS est le directeur de la Direction générale de l’organigramme RH ; un DGS désigné reste prioritaire (D76)', () => {
+    const dg = (rows) => ({ ...data(rows), dg: 'DG' });
+    const dirDG = row('directeur', 'direction', { direction_code: 'DG', username: 'hbourdelet' });
+    expect(tit.resolveIn(dg([dirDG]), 'dgs', {})).toMatchObject({ holders: ['hbourdelet'], via: 'direction_generale', vacant: false });
+    expect(tit.resolveIn(dg([dirDG, row('dgs', 'organisme', { username: 'demo.dgs' })]), 'dgs', {})).toMatchObject({ holders: ['demo.dgs'], via: null });
+    expect(tit.resolveIn(dg([]), 'dgs', {})).toMatchObject({ holders: [], vacant: false }); // direction générale sans titulaire : à renseigner, jamais contournée
+  });
 });
 
 describe('validation implicite d\'une personne qui valide plusieurs étapes de suite', () => {

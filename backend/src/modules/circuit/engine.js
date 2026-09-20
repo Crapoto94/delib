@@ -51,7 +51,7 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       const same = !!a.service_label && !!a.direction_label && normLabel(a.service_label) === normLabel(a.direction_label);
       const t = await titulaires.resolveFor(org, r.fonction, { directionCode: a.direction_code, serviceCode: a.service_code, serviceSameAsDirection: same });
       if (t.direct === 'dgs') return { holders: [], skipped: true, reason: 'dgs_direct', via: 'rattachement' }; // direction rattachée directement à la DGS : pas d'étape DGA (D66)
-      if (t.vacant) return { holders: [], skipped: true, reason: 'vacant', via: t.via }; // poste vacant : étape contournée (D67)
+      if (t.vacant && r.fonction !== 'dgs') return { holders: [], skipped: true, reason: 'vacant', via: t.via }; // poste vacant : étape contournée (D67)
       holders = t.holders; via = t.via;
     }
     else if (r.kind === 'groupe') holders = await titulaires.groupMembers(org, r.code);
