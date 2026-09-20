@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.29 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.30 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1401,6 +1401,19 @@ Pour rendre l'outil transposable, le cœur métier ne parle qu'à des **ports** 
 
 ---
 
+## 24 bis. API externe et clés d'accès (D97)
+
+Pour que d'autres applications (site de la Ville, portail, GED tierce…) **récupèrent les actes**, en particulier **une fois revenus du contrôle de légalité**, l'application expose une **API en lecture seule** protégée par des **clés d'API**. Les droits d'une clé **distinguent les actes en cours de rédaction des actes exécutoires**.
+
+- **EXT-01** — **Clés d'API** créées par l'administrateur de l'organisme (Paramétrages › Clés API) : nom de l'application cliente, **droits (portées)**, **date d'expiration** facultative, **adresses IP autorisées** facultatives, **limite d'appels par minute** (défaut 120). La clé (`vd_xxxxxxxx_…`) **n'est affichée qu'une seule fois** ; seule son **empreinte** est conservée. **Révocable** à tout moment, **renouvelable** (nouvelle clé, l'ancienne est révoquée).
+- **EXT-02** — **Portées** : **`actes:executoires`** — actes revenus du contrôle de légalité (accusé de réception reçu, publiés, exécutoires, archivés) : métadonnées, **texte adopté**, **PDF** et **annexes publiables** ; **`actes:adoptes`** — délibérations adoptées avant ou pendant la transmission (mêmes contenus, marqués « adopté, pas encore exécutoire ») ; **`actes:encours`** — actes en rédaction ou en circuit : **métadonnées seulement, jamais les textes, PDF ni annexes**. Une clé sans portée n'ouvre rien ; les portées ne se déduisent pas les unes des autres.
+- **EXT-03** — **Jamais exposés, quelle que soit la clé** : actes abandonnés, retirés, rejetés ou ajournés ; actes **confidentiels ou à huis clos** ; annexes non publiables ; notes, commentaires, historique du circuit, noms des rédacteurs et valideurs.
+- **EXT-04** — **Endpoints** (`/api/v1/externe/…`, en-tête `Authorization: Bearer <clé>` ou `X-API-Key`) : `GET /cle` (organisme et portées de la clé), `GET /actes` (filtres : catégorie, année, séance, type, matière, recherche, **`modifieDepuis`** pour synchroniser uniquement ce qui a changé ; pagination), `GET /actes/{id}`, `GET /actes/{id}/pdf`, `GET /actes/{id}/annexes/{annexeId}`, `GET /registre?annee=` (registre des délibérations exécutoires). Réponses JSON stables, dates ISO 8601.
+- **EXT-05** — **Sécurité** : une clé n'ouvre que **son organisme** ; limitation de débit par clé (429) ; **pas de CORS** (usage serveur à serveur : une clé placée dans un navigateur serait publique) ; contrôle d'IP ; date d'expiration ; chaque **usage** met à jour la date de dernier appel et un compteur ; **création, modification, révocation** sont auditées ; jamais de clé dans les journaux.
+- **EXT-06** — **Documentation** : chaque route figure dans le Swagger (schéma de sécurité « clé d'API ») ; l'écran de création rappelle un exemple d'appel.
+
+---
+
 ## 25. Paramétrage et multi-organismes
 
 Règle : **rien de propre à un organisme dans le code**. Une installation héberge **plusieurs organismes** (section 5) ; la configuration est en base, **hiérarchique** (plateforme → organisme → instance ou type d'acte, MOR-11), et dans `.env` pour les secrets.
@@ -1726,6 +1739,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D85** | **Espace élus** : API et front distincts (PDF finalisés seulement, ni notes ni saisie), authentification par invitation + mot de passe + code par mail, mise à disposition à l'envoi de la convocation, filigrane nominatif, **téléchargement en arrière-plan** (web et APK) pour un passage instantané d'un point à l'autre, lectures hors ligne synchronisées, notes personnelles partageables, suivi en direct. *(réalisé ; annotations sur PDF et service natif d'arrière-plan de l'APK : à venir)* | 18 |
 | **D90** | **Annotations sur les PDF de l'espace élus** : surlignage, note, dessin, signet ; privées par défaut, chiffrées au repos, partage figé par groupe ou par élus nommés, réponses, ré-ancrage par citation, export annoté *(ELU-71 à ELU-76)* | 18.4 |
 | **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
+| **D97** | **API externe et clés d'accès** : lecture seule, clés hachées à affichage unique, portées distinguant actes exécutoires / adoptés / en cours, IP autorisées, limite de débit, synchronisation incrémentale *(EXT-01 à EXT-06)* | 24 bis |
 | **D96** | **Sauvegarde vers un dossier réseau** : export logique cohérent en NDJSON, fichiers incrémentaux, destination UNC avec identifiants chiffrés, planification nocturne, rétention, journal, restauration outillée *(SAV-01 à SAV-07)* | 29.1 |
 | **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |
 | **D94** | **Gestion des élus et mot de passe oublié par SMS** : création / édition / suppression prudente, désactivation persistante après synchronisation, code SMS à 6 chiffres (5 min) → session de 12 h, journal des oublis, passerelle SMS *(ELU-80 à ELU-85)* | 18.4 ter |
@@ -1757,6 +1771,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.30** | 2026-09-20 | **D97** : API externe et clés d'accès (EXT-01 à EXT-06) |
 | **1.29** | 2026-09-20 | **D96** : sauvegarde vers dossier réseau (SAV-01 à SAV-07) |
 | **1.28** | 2026-09-20 | **D95** : stockage des fichiers dans Alfresco (GED-09, GED-10) |
 | **1.27** | 2026-09-20 | **D94** : gestion des élus, désactivation persistante, mot de passe oublié par SMS (ELU-80 à ELU-85) |

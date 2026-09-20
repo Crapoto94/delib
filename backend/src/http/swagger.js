@@ -30,11 +30,12 @@ function buildSpec(registry, { version = '0.1.0' } = {}) {
     responses[400] = { $ref: '#/components/responses/BadRequest' };
     if (spec.auth !== false) {
       responses[401] = { $ref: '#/components/responses/Unauthorized' };
+      if (spec.apiKey) responses[429] = { description: 'Limite d\'appels de la clé atteinte' };
       if (spec.org || spec.roles || spec.platform) responses[403] = { $ref: '#/components/responses/Forbidden' };
     }
     const op = {
       summary: spec.summary, description: spec.description, tags: spec.tags || ['divers'],
-      security: spec.auth === false ? [] : [{ bearerAuth: [] }],
+      security: spec.auth === false ? [] : [{ [spec.apiKey ? 'apiKeyAuth' : 'bearerAuth']: [] }],
       parameters: [...paramsFromPath(path), ...(spec.query ? queryParams(spec.query) : [])],
       responses,
     };
@@ -50,7 +51,7 @@ function buildSpec(registry, { version = '0.1.0' } = {}) {
     tags: [],
     paths,
     components: {
-      securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+      securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, apiKeyAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'Clé d\'API (vd_xxxxxxxx_…) ; l\'en-tête X-API-Key est aussi accepté' } },
       schemas: { Error: { type: 'object', properties: { error: { type: 'string' }, code: { type: 'string' }, details: {} }, required: ['error', 'code'] } },
       responses: {
         BadRequest: { description: 'Requête invalide', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },

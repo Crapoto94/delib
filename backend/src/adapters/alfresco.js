@@ -13,7 +13,6 @@ const { createHttpClient } = require('./http-client');
 const { E } = require('../shared/errors');
 
 const API = '/alfresco/api/-default-/public/alfresco/versions/1';
-const enc = encodeURIComponent;
 
 function createAlfresco({ tls, http: injected } = {}) {
   const clientOf = (cfg) => injected || createHttpClient({

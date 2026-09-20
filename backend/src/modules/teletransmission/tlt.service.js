@@ -7,7 +7,7 @@
  * (adaptateur `s2low-simulateur.js`), qui rejoue les réponses de S²LOW, dont les retours de la préfecture, pour tester toute la chaîne.
  * Les autres modes sont refusés avec un message clair jusqu'à l'obtention du certificat et de l'instance de test.
  */
-const crypto = require('crypto');
+const { createSecretBox } = require('../../shared/secretbox');
 const { E } = require('../../shared/errors');
 const tdt = require('../../adapters/tdt-catalogue');
 const { requireOrg } = require('../../db/pool');
@@ -24,10 +24,9 @@ const ACTE_TRANSMIS = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre'];
 const fmt = (pattern, vars) => String(pattern).replace(/\{(\w+)(?::(\d+))?\}/g, (m, k, w) => String(vars[k] ?? '').padStart(Number(w) || 0, '0')).toUpperCase();
 const day = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
 
-function createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter, log, config }) {
+function createTeletransmission({ db, audit, render, tenue, settings, storage, bus, adapter, log, config }) {
   // le mot de passe du TDT est chiffré au repos (comme celui de la GED) et ne quitte jamais le serveur
-  const cle = crypto.createHash('sha256').update(`${config?.jwt?.secret || 'dev'}:tdt`).digest();
-  const chiffre = (t) => { const iv = crypto.randomBytes(12); const c = crypto.createCipheriv('aes-256-gcm', cle, iv); const enc = Buffer.concat([c.update(String(t), 'utf8'), c.final()]); return `${iv.toString('base64')}.${c.getAuthTag().toString('base64')}.${enc.toString('base64')}`; };
+  const { chiffre } = createSecretBox(config?.jwt?.secret || 'dev', 'tdt');
   const need = (ctx, org, acl) => acl; void need;
 
   async function cfgOf(org) {

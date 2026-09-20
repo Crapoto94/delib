@@ -87,7 +87,7 @@ function createCahier({ db, audit, render, odj, storage, log, bus }) {
     const firstSeen = new Set();
     for (const [i, it] of items.entries()) {
       await progress(done, total, it.acte ? `Point ${it.numero ?? i + 1} — dossier n° ${it.acte.numeroSuivi}` : `Point ${i + 1}`);
-      const pieces = []; let titre = it.titre; let hash;
+      const pieces = []; const titre = it.titre; let hash;
       if (it.kind === 'deliberation' && it.acte) {
         const a = await db.get('SELECT * FROM actes WHERE id = $1', [it.acte.id]);
         const delib = await db.get('SELECT * FROM deliberations WHERE id = $1', [it.deliberationId]);

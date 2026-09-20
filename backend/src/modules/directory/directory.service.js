@@ -93,7 +93,6 @@ function createDirectoryService({ db, adapter, ad = null, config, log }) {
   }
 
   const keyOf = (x) => normLabel(x).split(' ').filter(Boolean).sort().join(' '); // « nom prénom » = « prénom nom »
-  const capWords = (x) => String(x || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a1, b1) => a1 + b1.toUpperCase());
   /** Nom d'un compte AD en « Prénom NOM ». L'AD écrit « NOM Prénom » (« DESNEULIN France ») : les mots en capitales en tête sont le nom. */
   function adName(u, full) {
     if (u.givenName && u.surname) return full(u.givenName, u.surname);

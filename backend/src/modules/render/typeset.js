@@ -10,7 +10,6 @@ const { embedFamily } = require('./fonts');
 
 const MM = 72 / 25.4;
 const A4 = { w: 595.28, h: 841.89 };
-const PT = { text: 'TimesRoman', bold: 'TimesRomanBold' };
 
 /** Caractères hors WinAnsi (police standard PDF) remplacés par un équivalent sûr. */
 const SAFE = { ' ': ' ', ' ': ' ', ' ': ' ', '‑': '-', '−': '-', '≥': '>=', '≤': '<=', '→': '->', '•': '-', '​': '' };

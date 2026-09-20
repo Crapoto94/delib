@@ -45,7 +45,9 @@ const MODULES = [
   require('../modules/ged/ged.routes'),
   require('../modules/recherche/recherche.routes'),
   require('../modules/parametrage/parametrage.routes'),
+  require('../modules/rgpd/rgpd.routes'),
   require('../modules/sauvegarde/sauvegarde.routes'),
+  require('../modules/externe/externe.routes'),
   require('../modules/titulaires/organisation.routes'),
   require('../modules/convocations/convocations.routes'),
   require('../modules/users/users.routes'),
@@ -80,6 +82,7 @@ function createApp(c) {
 
   const mw = createAuthMiddleware({ config, sessions: c.sessions, access: c.access, organismes: c.organismes });
   mw.authenticateElu = c.eluAuth.authenticate;
+  mw.authenticateApiKey = c.apiKeys.authenticate;
   const registry = [];
   const makeRouter = createRouterFactory(mw, registry);
   const limiter = config.env === 'test' ? (req, res, next) => next()

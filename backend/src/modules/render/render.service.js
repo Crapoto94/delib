@@ -15,7 +15,7 @@ const FINAL = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre', 'transmis
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const A4_TOL = 6; // points
 
-function createRender({ db, audit, storage, refs, actes, textes, config }) {
+function createRender({ db, audit, storage, actes, config }) {
   const measures = new Map();
   const measure = (family = 'interstate') => { if (!measures.has(family)) measures.set(family, T.createMeasure(family, config.fontsDir)); return measures.get(family); };
   const cache = new Map();
@@ -142,7 +142,7 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
       return remember(key, { ...out, layout, key });
     },
 
-    async textsFor(ctx, acte, target, deliberationId) {
+    async textsFor(ctx, acte) {
       const all = await db.all('SELECT * FROM tracked_texts WHERE acte_id = $1', [acte.id]);
       const pick = (kind, d) => all.find((t) => t.kind === kind && (t.deliberation_id ?? null) === (d ?? null));
       return { all, pick, expose: pick('expose', null), delibs: await db.all('SELECT * FROM deliberations WHERE acte_id = $1 ORDER BY ordre, id', [acte.id]) };
@@ -214,7 +214,7 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
       const parts = [];
       for (const [i, a] of rows.entries()) {
         try { parts.push({ titre: `Annexe ${i + 1} : ${a.titre}`, pdf: { buffer: await storage.get(a.storage_key), pageCount: a.pages } }); }
-        catch (e) {
+        catch {
           const doc = await PDFDocument.create(); const pg = doc.addPage([T.A4.w, T.A4.h]);
           pg.drawText(`Annexe ${i + 1} : ${String(a.titre).replace(/[^ -~\u00A0-\u00FF]/g, '?')}`, { x: 56, y: 760, size: 14 });
           pg.drawText('Fichier indisponible sur le serveur : redeposez cette annexe.', { x: 56, y: 730, size: 11 });
@@ -225,7 +225,7 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
     },
 
     /** Sommaire paginé + fusion des pièces (pdf-lib), utilisé par le dossier complet et repris par le cahier de séance. */
-    async assemble({ organismeId, titre, parts, vars, watermark }) {
+    async assemble({ organismeId, titre, parts, vars }) {
       let page = 2; const lines = [];
       for (const p of parts) { lines.push({ titre: p.titre, page }); page += p.pdf.pageCount; }
       const content = [

@@ -21,7 +21,7 @@ const dayNumber = (d) => { const p = parisParts(new Date(d)); return Date.UTC(p.
 const token = () => crypto.randomBytes(24).toString('base64url');
 const cap = (s) => String(s || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
 
-function createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir }) {
+function createConvocations({ db, audit, render, odj, storage, mail, settings, config, log, dir }) {
   const seanceRow = async (org, id) => {
     const s = await db.get('SELECT s.*, i.nom AS instance_nom, i.kind AS instance_kind, i.commission_id FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2', [id, requireOrg(org)]);
     if (!s) throw E.notFound('Séance introuvable');
@@ -85,7 +85,7 @@ function createConvocations({ db, audit, render, odj, seances, storage, mail, se
   }
 
   // ------------------------------------------------------------------------------------------ documents
-  async function buildDocs(ctx, org, s, { version, objet, message, urgence, urgenceMotif, items, differences }) {
+  async function buildDocs(ctx, org, s, { version, message, urgence, urgenceMotif, items, differences }) {
     const orgRow = await db.get('SELECT nom, contact FROM organismes WHERE id = $1', [org]);
     const vars = { organisme: orgRow?.nom || '', instance: s.instance_nom, date_seance: dateLong(s.date_seance).toUpperCase() };
     const numbered = items.filter((i) => i.kind !== 'chapitre');

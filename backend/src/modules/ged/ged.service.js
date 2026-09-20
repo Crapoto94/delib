@@ -8,6 +8,7 @@
  * un document modifié devient une nouvelle version du même nœud). Le mot de passe est chiffré au repos et jamais renvoyé.
  */
 const crypto = require('crypto');
+const { createSecretBox } = require('../../shared/secretbox');
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
 
@@ -28,9 +29,8 @@ const DUA = {
 };
 
 function createGed({ db, audit, config, log, adapters, render, tenue, pv, tlt, storage, cahier }) {
-  const key = crypto.createHash('sha256').update(`${config.jwt.secret}:ged`).digest();
-  const chiffre = (t) => { const iv = crypto.randomBytes(12); const c = crypto.createCipheriv('aes-256-gcm', key, iv); const enc = Buffer.concat([c.update(String(t), 'utf8'), c.final()]); return `${iv.toString('base64')}.${c.getAuthTag().toString('base64')}.${enc.toString('base64')}`; };
-  const dechiffre = (s) => { try { const [iv, tag, enc] = String(s).split('.').map((x) => Buffer.from(x, 'base64')); const d = crypto.createDecipheriv('aes-256-gcm', key, iv); d.setAuthTag(tag); return Buffer.concat([d.update(enc), d.final()]).toString('utf8'); } catch { return ''; } };
+  const box = createSecretBox(config.jwt.secret, 'ged'); // même clé qu'avant : les mots de passe déjà enregistrés restent lisibles
+  const { chiffre, dechiffre } = box;
   const SYS = (org, by = 'ged') => ({ username: by, kind: 'system', isPlatformAdmin: true, organismes: [], roles: [], orgIds: [org], agent: null, displayName: 'GED' });
 
   const row = async (org) => db.get('SELECT * FROM ged_config WHERE organisme_id = $1', [org]);

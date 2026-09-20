@@ -140,7 +140,7 @@ function createS2lowSimulateur({ db }) {
           if ([17, 0, -1, 6].includes(r.status) || r.attente) break;
           const step = SCENARIOS[r.scenario].steps[r.step];
           if (!step) break;
-          let ar = r.ar; let message = r.message; let status = step.status ?? r.status; let attente = false;
+          let ar = r.ar; let message = r.message; const status = step.status ?? r.status; let attente = false;
           if (step.ar) ar = { id: `${r.payload.departement || '094'}-${r.payload.siren || 'SIMULATION'}-${ymd(new Date())}-${r.numero}-DE`, date: new Date().toISOString() };
           if (step.status === 6) message = 'Acte refusé par la préfecture (simulation)';
           if (step.status === -1) message = 'Erreur simulée lors de la transmission';

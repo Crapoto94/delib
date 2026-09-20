@@ -24,7 +24,7 @@ const Verrou = z.object({ force: z.boolean().default(false) });
 const Pattern = z.object({ pattern: z.string().min(3).max(80).describe('Variables : {ANNEE} {N_SEANCE} {ORDRE} {ORDRE:03} {RUBRIQUE}') });
 const Apercu = Pattern.extend({ seanceId: Id.optional() });
 
-module.exports = ({ makeRouter, odj, config }) => {
+module.exports = ({ makeRouter, odj }) => {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 1 } });
   const r = makeRouter('/api/v1/organismes/:orgId');
   const ADMIN = ['org_admin', 'scc'];
