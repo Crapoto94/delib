@@ -28,6 +28,8 @@ function Frise({ circuit }: { circuit: any }) {
   let fin = 1; while (fin < path.length && absorbee(path[fin])) fin++;
   const groupe = path.slice(0, fin); const roles = groupe.slice(1).filter((p) => p.reason === 'auto_validation' && p.via !== 'directeur').map((p) => p.label);
   const items = roles.length ? [{ ...path[0], label: ['Rédacteur', ...roles].join(' / '), fusion: true }, ...path.slice(fin)] : path;
+  // Tant que le dossier est en rédaction (brouillon, ou renvoyé pour modification), aucune étape n’est « en cours » : c’est la rédaction, première carte.
+  const enRedaction = ['brouillon', 'modification_demandee'].includes(circuit.statut) && !path.some((p: any) => p.state === 'current');
   return (
     <ol className="flex gap-2 overflow-x-auto pb-2" aria-label="Circuit d'approbation">
       {items.filter((p: any) => !(p.ignoree && (p.reason === 'desactive' || !p.reason))).map((p: any) => {
@@ -40,7 +42,7 @@ function Frise({ circuit }: { circuit: any }) {
             </li>);
         }
         n += 1;
-        const cur = p.state === 'current'; const done = p.state === 'done'; const implicite = done && p.instance?.decision === 'auto';
+        const cur = p.state === 'current' || (enRedaction && p.key === items[0].key); const done = p.state === 'done'; const implicite = done && p.instance?.decision === 'auto';
         return (
           <li key={p.key} className={`min-w-[150px] flex-1 rounded-lg border p-3 ${cur ? 'border-primary bg-primary text-white' : done ? 'border-ok/30 bg-white' : 'border-line bg-white/60'}`}>
             <div className="flex items-center gap-2">
@@ -50,6 +52,7 @@ function Frise({ circuit }: { circuit: any }) {
             <div className={`mt-1 truncate text-[11px] ${cur ? 'text-white/80' : 'text-mute'}`}>
               {p.instance?.actedBy ? <><AgentName u={p.instance.actedBy} />{p.instance.onBehalfOf && <> (pour <AgentName u={p.instance.onBehalfOf} />)</>}</> : p.missing ? '⚠ aucun titulaire' : (p.holders || []).length ? <AgentNames list={p.holders} /> : '—'}
             </div>
+            {cur && enRedaction && <div className="mt-1 text-[11px] font-semibold">✎ en rédaction</div>}
             {implicite && <div className="mt-1 text-[11px] italic text-mute">validée implicitement (déjà validée par la même personne)</div>}
             {!done && p.via === 'directeur' && <div className={`mt-1 text-[11px] italic ${cur ? 'text-white/80' : 'text-mute'}`}>service de même nom : le directeur</div>}
             {cur && circuit.due && <div className="mt-1 text-[11px] font-semibold">{circuit.late ? '⏰ en retard · ' : 'échéance '}{dt(circuit.due, { dateStyle: 'short' })}</div>}

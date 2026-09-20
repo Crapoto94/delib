@@ -69,9 +69,8 @@ function createOrganisation({ db, titulaires, dir }) {
       const node = fonction === 'chef_service' ? (d?.services || []).find((x) => x.code === serviceCode) : d;
       if (!node) throw E.notFound('Direction ou service introuvable dans l\'organigramme RH');
       if (node.vacant || !node.responsable) throw E.conflict('Ce poste est vacant dans l\'organigramme RH : il n\'y a personne à désigner');
-      const hits = (await dir.searchByName(node.responsable)).filter((a) => (a.email || '').includes('@'));
-      const logins = [...new Set(hits.map((a) => a.email.split('@')[0].toLowerCase()))];
-      if (logins.length !== 1) throw E.conflict(logins.length ? `Plusieurs agents portent le nom « ${node.responsable} » : désignez le bon à la main` : `Le responsable « ${node.responsable} » n'a pas été retrouvé dans l'annuaire : désignez-le à la main`);
+      const logins = await dir.loginsByName(node.responsable);
+      if (logins.length !== 1) throw E.conflict(logins.length ? `Plusieurs agents portent le nom « ${node.responsable} » : désignez le bon à la main` : `Le responsable « ${node.responsable} » n'a été retrouvé ni dans l'annuaire RH ni dans l'Active Directory : désignez-le à la main`);
       return titulaires.add(ctx, org, { fonction, username: logins[0], directionCode: fonction === 'dgs' ? undefined : directionCode, serviceCode: fonction === 'chef_service' ? serviceCode : undefined });
     },
   };

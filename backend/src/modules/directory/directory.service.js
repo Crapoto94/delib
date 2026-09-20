@@ -7,7 +7,7 @@
  */
 const normLabel = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 
-function createDirectoryService({ db, adapter, config, log }) {
+function createDirectoryService({ db, adapter, ad = null, config, log }) {
   let dirCache = { at: 0, list: null };
 
   async function directions({ force = false } = {}) {
@@ -92,6 +92,17 @@ function createDirectoryService({ db, adapter, config, log }) {
     return who.poste ?? null;
   }
 
+  const keyOf = (x) => normLabel(x).split(' ').filter(Boolean).sort().join(' '); // « nom prénom » = « prénom nom »
+  const capWords = (x) => String(x || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a1, b1) => a1 + b1.toUpperCase());
+  /** Nom d'un compte AD en « Prénom NOM ». L'AD écrit « NOM Prénom » (« DESNEULIN France ») : les mots en capitales en tête sont le nom. */
+  function adName(u, full) {
+    if (u.givenName && u.surname) return full(u.givenName, u.surname);
+    const w = String(u.displayName || '').trim().split(/\s+/).filter(Boolean);
+    if (w.length < 2 || w.join(' ').toLowerCase() === u.username) return null;
+    let i = 0; while (i < w.length - 1 && w[i] === w[i].toUpperCase()) i++;
+    return full(w.slice(i).join(' ') || w[0], w.slice(0, i).join(' ') || w.slice(1).join(' '));
+  }
+
   async function upsertAgent(a) {
     await db.run(
       `INSERT INTO agent_ref (username, matricule, nom, prenom, display_name, email, direction_code, direction_label,
@@ -125,7 +136,7 @@ function createDirectoryService({ db, adapter, config, log }) {
     service: r.service_label, poste: r.poste, actif: r.actif, updatedAt: r.updated_at,
   });
 
-  return {
+  const svc = {
     directions,
     organisationChart: () => adapter.getOrganisationChart(),
     async searchAgents(q) { const list = await adapter.searchAgents(q); return Promise.all(list.map(async (a) => ({ ...a, poste: await posteAffiche(a) }))); },
@@ -136,6 +147,26 @@ function createDirectoryService({ db, adapter, config, log }) {
       const nodes = await chart();
       if (codeConfigure) { const n = nodes.find((d) => d.code === codeConfigure); if (n) return n; }
       return nodes.find((d) => normLabel(d.label) === 'DIRECTION GENERALE DES SERVICES') || nodes.find((d) => normLabel(d.label).startsWith('DIRECTION GENERALE')) || null;
+    },
+
+    /**
+     * Identifiants de connexion des agents qui portent ce nom complet. Source : l'annuaire RH (identifiant = partie locale de l'adresse) ;
+     * s'il ne donne aucun identifiant — fiche RH sans adresse e-mail, par exemple — l'Active Directory, qui porte l'identifiant lui-même.
+     */
+    async loginsByName(nom) {
+      const logins = new Set();
+      try { for (const h of await svc.searchByName(nom)) { const l = (h.email || '').split('@')[0].toLowerCase(); if (l) logins.add(l); } } catch (e) { log.warn({ err: e.message }, 'annuaire RH indisponible'); }
+      if (!logins.size && ad) {
+        const wanted = keyOf(nom);
+        const tokens = [...new Set(String(nom || '').split(/\s+/).filter((t) => t.length >= 3))].sort((x, y) => y.length - x.length);
+        for (const t of tokens.slice(0, 3)) {
+          try {
+            for (const u of await ad.searchUsers(t)) if (u.username && (keyOf(u.displayName) === wanted || keyOf(`${u.givenName || ''} ${u.surname || ''}`) === wanted)) logins.add(u.username.toLowerCase());
+          } catch (e) { log.warn({ err: e.message }, 'AD indisponible'); break; }
+          if (logins.size) break;
+        }
+      }
+      return [...logins];
     },
 
     /** Agents de l'annuaire RH dont le nom complet est `nom` (« MERIEM KHAROUM ») : l'annuaire cherche un terme à la fois, on croise donc les termes. */
@@ -174,12 +205,16 @@ function createDirectoryService({ db, adapter, config, log }) {
         else if (r.display_name && r.display_name.toLowerCase() !== r.username) out[r.username] = r.display_name;
       }
       // agents jamais connectés à l'application : l'annuaire RH, en cherchant sur des fragments de l'identifiant (« hbourdelet » -> « bourdelet », « mmartialluit » -> « martia »)
-      const inconnus = list.filter((x) => !out[x]).slice(0, 60);
+      const inconnus = list.filter((x) => !out[x]);
       const trouve = async (u) => {
         const c = nameCache.get(u);
         if (c && Date.now() - c.at < 600000) return c.name;
         let name = null;
-        for (const q of [...new Set([u.slice(2), u.slice(1), u, u.slice(1, 7), u.slice(1, 6)])]) { // les 2 derniers : noms composés (« martial-luit » ne contient pas « martialluit »)
+        if (ad) { // l'AD connaît l'identifiant exact : « DESNEULIN France » -> « France DESNEULIN » (la fiche RH n'a pas toujours d'adresse e-mail)
+          try { const u2 = await ad.getUser(u); if (u2) name = adName(u2, full); } catch { /* AD indisponible : on essaie l'annuaire RH */ }
+        }
+        if (name) { nameCache.set(u, { name, at: Date.now() }); return name; }
+        for (const q of [...new Set([u.slice(1), u.slice(2), u, u.slice(1, 7), u.slice(1, 6), u.slice(1, 5), u.slice(-5), u.slice(-4)])]) { // fragments : noms composés (« martial-luit », « le nech », « prat corona » ne contiennent pas l'identifiant entier)
           if (q.length < 3) continue;
           try {
             const hit = (await adapter.searchAgents(q)).find((h) => (h.email || '').split('@')[0].toLowerCase() === u);
@@ -189,8 +224,8 @@ function createDirectoryService({ db, adapter, config, log }) {
         nameCache.set(u, { name, at: Date.now() });
         return name;
       };
-      for (let i = 0; i < inconnus.length; i += 8) {
-        const lot = inconnus.slice(i, i + 8);
+      for (let i = 0; i < inconnus.length; i += 10) {
+        const lot = inconnus.slice(i, i + 10);
         (await Promise.all(lot.map(trouve))).forEach((n, k) => { if (n) out[lot[k]] = n; });
       }
       return out;
@@ -266,6 +301,7 @@ function createDirectoryService({ db, adapter, config, log }) {
     resolveService,
     normLabel,
   };
+  return svc;
 }
 
 module.exports = { createDirectoryService, normLabel };

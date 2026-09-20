@@ -34,6 +34,7 @@ const { createDeadlines } = require('./modules/seances/deadlines.service');
 const { createOdj } = require('./modules/seances/odj.service');
 const { createCahier } = require('./modules/seances/cahier.service');
 const { createKpis } = require('./modules/seances/kpis.service');
+const { createTenue } = require('./modules/seances/tenue.service');
 const { createOrganisation } = require('./modules/titulaires/organisation.service');
 const { createConvocations } = require('./modules/convocations/convocations.service');
 const { createUsers } = require('./modules/users/users.service');
@@ -49,7 +50,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const audit = createAudit(db);
   const access = createAccess(db);
   const sessions = createSessions(db);
-  const dir = createDirectoryService({ db, adapter: directoryAdapter, config, log });
+  const dir = createDirectoryService({ db, adapter: directoryAdapter, ad, config, log });
   const storage = createStorage(config);
   const organismes = createOrganismes({ db, audit, storage });
   const settings = createSettings({ db, audit });
@@ -81,6 +82,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   late.odj = odj;
   const cahier = createCahier({ db, audit, render, odj, storage, log });
   const kpis = createKpis({ db, odj, seances });
+  const tenue = createTenue({ db, audit, acl, access, seances, odj });
   const organisation = createOrganisation({ db, titulaires, dir });
   const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
@@ -91,7 +93,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
   const scheduler = createScheduler({ db, notifications, config, log });
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, organisation, convocations, users, ai, aiQueue };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, organisation, convocations, users, ai, aiQueue };
 }
 
 module.exports = { buildContainer };

@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.12 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.13 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -920,6 +920,22 @@ DMZ ─────────────────── firewall : un seul
 - **SEAN-06** — Statut de chaque point : *traité, retiré, ajourné, reporté, sans vote (communication)*.
 - **SEAN-07** — **Notes de débat** par point (résumé, intervenants) pour le procès-verbal ; assistance IA possible (section 21).
 
+### 19.1 bis Suivi de la séance en direct (D78)
+
+Une page de **suivi de séance** est **synchronisée en direct** : tous ceux qui l'affichent voient, en même temps, le point en cours, les présences et le résultat des votes. Le SCC (ou l'administrateur) **saisit** ; les autres membres de l'organisme **suivent en lecture seule**.
+
+- **LIVE-01** — **Synchronisation** : chaque modification incrémente un **numéro de version** de la séance ; les pages ouvertes l'interrogent en **attente longue** (elles sont réveillées dès qu'une modification est enregistrée, sinon repli périodique) et se mettent à jour sans recharger. Un indicateur « en direct » signale la connexion.
+- **LIVE-02** — **Ouverture et clôture** de la tenue : l'ouverture passe la séance à « tenue », la clôture à « close » (refusée tant qu'un point est en cours de débat) ; après la clôture, plus aucune saisie sans déverrouillage (VOT-07).
+- **LIVE-03** — **Élus classés par groupe politique** (ordre des groupes ; « sans groupe » en dernier), avec pour chacun un état de présence : **en salle**, **sorti** (temporairement), **absent**, **excusé**. Chaque **arrivée, sortie et retour est horodaté** et rattaché au point en cours (journal de la séance). Actions **individuelles ou pour tout un groupe**.
+- **LIVE-04** — **Pouvoirs** : « X donne pouvoir à Y » ; **un seul pouvoir par mandataire**, un mandataire ne peut pas être lui-même mandant, un élu ne se donne pas pouvoir. Le pouvoir n'est **effectif que si le mandant n'est pas en salle et que le mandataire l'est** ; si le mandant arrive, son pouvoir s'éteint pour la suite.
+- **LIVE-05** — **Point en cours** : le SCC choisit le point ou passe au **suivant / précédent** (les chapitres et points retirés sont sautés) ; **le point s'affiche pour tout le monde au même moment** dans la fenêtre de suivi (numéro, titre, direction, rapporteur, statut, accès au document).
+- **LIVE-06** — **Notes administratives** : un espace de notes **de la séance** et un espace de notes **par point** (intervenants, incidents, heure…), visibles du seul secrétariat (SEAN-07) ; enregistrées automatiquement.
+- **LIVE-07** — **Votes** : *Pour / Contre / Abstention / Ne prend pas part au vote (NPPV)*, saisis **par élu** ou **pour tout un groupe d'un coup** (avec possibilité de corriger ensuite un élu : « la majorité vote pour, mais X ne prend pas part au vote »). Scrutin : main levée, public, secret, unanimité (VOT-01).
+- **LIVE-08** — **Qui vote** : seuls votent les élus **en salle** au moment du vote, plus les mandants dont le **mandataire est en salle** (le mandant vote alors par son mandataire). Un élu **absent, excusé ou sorti** ne prend pas part au vote, **ni pour lui ni pour son mandant** (le pouvoir tombe si le mandataire est absent). Le décompte est recalculé à la clôture du vote : les voix non exercées sont enregistrées « absent ».
+- **LIVE-09** — **Quorum en direct** : nombre d'élus en salle (les pouvoirs ne comptent pas pour le quorum), seuil (majorité des membres en exercice `[H]`), alerte quand il n'est plus atteint.
+- **LIVE-10** — **Clôture d'un point** : *voté* (le résultat est calculé, VOT-03/VOT-04 : refus tant qu'un élu qui doit voter n'a pas de choix ; en cas de partage, la voix du président de séance est prépondérante et le président doit avoir voté), *sans vote* (communication), *retiré* ou *ajourné*. Le résultat met à jour le **statut de l'acte** (adopté, rejeté, retiré, ajourné) et est historisé. **Réouverture** d'un point avec motif obligatoire tant que la séance n'est pas close.
+- **LIVE-11** — **Président et secrétaire de séance** désignés parmi les élus.
+
 ### 19.2 Votes
 
 - **VOT-01** — **Mode de scrutin** : main levée, **scrutin public** (nominatif), **scrutin secret** (scrutateurs, bulletins blancs/nuls), **unanimité** (sans décompte). Défaut paramétrable par type de point ; le scrutin secret est proposé pour les **désignations**.
@@ -1601,6 +1617,8 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D73** | **Personnes affichées par « Prénom NOM »** (par exemple « Marc CHEVALIER ») dans toutes les listes, à la place de l'identifiant de connexion (valideurs, titulaires, rédacteurs, délégations, historique…). *(réalisé)* | 5, 12 |
 | **D74** | **Type de commission** : chaque commission est définie comme **associée à la rédaction des actes** (elle rend des avis sur les projets) ou **autre** (commission sans lien avec les actes : elle a ses propres dossiers). *(réalisé)* | 15 |
 | **D75** | **Convocation pour chaque commission, avec dossiers simples** : le module de convocation (D65) fonctionne pour **chaque commission** ; l'ordre du jour d'une réunion peut comporter, en plus des délibérations, des **dossiers simples** (**nom, description, pièces jointes**), consultables par les convoqués depuis leur lien personnel. *(réalisé)* | 15, 17 |
+| **D77** | **Données de démonstration retirées** : les agents fictifs `demo.*`, les élus « @demo.ivry » et tout ce qui s'y rattache (dossiers, séances de démo, titulaires, groupes) sont supprimés dès que les vrais services sont renseignés ; le script `scripts/purge-demo.js` (essai à blanc puis `--apply`) le fait sans toucher aux vrais agents ni aux vrais élus. *(réalisé)* | 30 |
+| **D78** | **Suivi de séance en direct** : page synchronisée pour tous ceux qui l'affichent ; présences, sorties et retours des élus par groupe, pouvoirs, point en cours partagé, notes administratives, votes (Pour / Contre / Abstention / NPPV) par élu ou par groupe, les absents ne prenant pas part au vote ni pour eux ni pour leur mandant ; résultat qui met à jour le statut de l'acte. *(réalisé)* | 19.1 bis |
 | **D76** | **La DGS est le responsable de la Direction générale des services de l'organigramme RH** (et non un titulaire fictif de démonstration) : à défaut de titulaire désigné, le circuit s'adresse au directeur de la « DIRECTION GENERALE DES SERVICES » ; l'étape DGS n'est jamais contournée ; affichage « Directeur·trice » et « Prénom NOM » pour les noms composés. *(réalisé)* | 9.4 bis |
 
 ---
@@ -1622,6 +1640,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.13** | 2026-09-20 | **D77** (purge des données de démonstration) et **D78** (suivi de séance en direct, LIVE-01 à LIVE-11) |
 | **1.12** | 2026-09-20 | **D76** : la DGS dérive de la Direction générale des services de l'organigramme RH (ORG-12), affichage « Directeur·trice » et noms composés (ORG-13) |
 | **1.11** | 2026-09-20 | les décisions **D66 à D75** sont **réalisées** : écran « Organisation », frise du circuit (étapes contournées, validations implicites), éditeur de circuits avec étape de refus, visibilité des actes (général et par utilisateur), type de commission, dossiers simples (description et pièces jointes) et convocation de chaque commission |
 | **1.10** | 2026-09-20 | décisions **D66 à D75** : postes de DGA et rattachement des directions (un DGA encadre plusieurs directions et répond à la DGS), postes vacants contournés, service de même nom que la direction, validation implicite, titulaires à partir de l'organisation, étape de refus par étape et CRUD des circuits, visibilité des actes paramétrable par utilisateur, noms « Prénom NOM », type de commission et dossiers simples ; les exigences non encore codées sont marquées « à réaliser » |
