@@ -237,7 +237,7 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
     },
 
     async cloturer(ctx, organismeId, seanceId) {
-      const emettre = () => bus?.emit?.('tenue.close', { organismeId: requireOrg(organismeId), seanceId }); // archivage automatique en GED (facultatif)
+      const emettre = () => bus?.emit?.('tenue.close', { organismeId: requireOrg(organismeId), seanceId, ctx }); // archivage automatique en GED (facultatif)
       const out = await svc.mutate(ctx, organismeId, seanceId, async (q, t) => {
         const enCours = await q.get("SELECT it.numero, it.titre FROM seance_points p JOIN seance_items it ON it.id = p.item_id WHERE p.seance_id = $1 AND p.etat = 'en_cours' ORDER BY it.position LIMIT 1", [seanceId]);
         if (enCours) throw E.conflict(`Le point ${enCours.numero ? `n° ${enCours.numero} ` : ''}« ${enCours.titre || ''} » est encore en cours : clôturez-le (résultat, retrait ou ajournement) avant de clore la séance`);

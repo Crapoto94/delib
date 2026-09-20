@@ -111,7 +111,8 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
   const pv = createPv({ db, audit, render, odj, tenue, actes });
   // télétransmission : le simulateur S²LOW tient lieu d'accès tant que le certificat n'est pas obtenu (D20, TLT-19) ; un adaptateur réel peut être injecté
-  const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config });
+  const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config, access });
+  acl.registerEditHook((ctx, a) => tlt.peutModifierTexte(ctx, a)); // le SCC modifie la délibération avant la transmission (TLT-32)
   const organisation = createOrganisation({ db, titulaires, dir });
   const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
@@ -132,6 +133,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
     if ((await settings.resolve(p.organismeId))['ai.precontrole_juridique']?.value === false) return;
     await ai.precontroleJuridique(p.organismeId, p.acteId);
   });
+  bus.on('tenue.close', (p) => tlt.preparationAuto(p)); // préparation automatique des transmissions (TLT-33, désactivée par défaut)
   bus.on('tenue.close', (p) => ged.auto(p));
   bus.on('cahier.built', (p) => ged.auto(p)); // un cahier terminé part en GED sans attendre la clôture de la séance
   const sms = createSms({ db, config, settings, log, tls: config.tls, http: smsHttp });

@@ -17,8 +17,11 @@ const Config = z.object({
   mode: z.enum(['simulation', 'test', 'production']), modeEnvoi: z.enum(['A', 'B']).describe('A : envoi direct ; B : préparation puis confirmation sur S²LOW (recommandé)'),
   scenario: Scenario.describe('Scénario de simulation par défaut'), siren: z.string().regex(/^\d{0,9}$/), departement: z.string().regex(/^\d{0,3}$/), arrondissement: z.string().regex(/^\d{0,1}$/),
   motif: z.string().trim().min(3).max(80).describe('Motif du numéro transmis : {ANNEE} {TYPE_SEANCE} {N_SEANCE:02} {ORDRE:03}'), doubleValidation: z.boolean(),
+  rolesEnvoi: z.array(z.enum(['org_admin', 'scc', 'teletransmission'])).max(3).describe('Rôles autorisés à envoyer et confirmer'), envoiAuto: z.boolean().describe("Envoie aussitôt après la préparation (incompatible avec la double validation)"),
+  confirmationAuto: z.boolean().describe("Mode B : confirme aussitôt après l'envoi"), preparationAuto: z.boolean().describe('Prépare les délibérations adoptées à la clôture de la séance'), modificationTexte: z.boolean().describe('Le SCC peut modifier le texte avant la transmission'),
 }).partial();
-const Preparer = z.object({ itemIds: z.array(Id).min(1).max(200), scenario: Scenario.optional().describe('Scénario de simulation pour ces transmissions') });
+const Preparer = z.object({ itemIds: z.array(Id).min(1).max(200), scenario: Scenario.optional().describe('Scénario de simulation pour ces transmissions'), envoyer: z.boolean().default(false).describe("Enchaîne l'envoi des transmissions préparées (« Préparer et envoyer »)") });
+const Lot = z.object({ ids: z.array(Id).min(1).max(200) });
 const Annuler = z.object({ motif: z.string().trim().max(300).optional() });
 const Reponse = z.object({ typeEnvoie: z.union([z.literal(3), z.literal(4)]).describe('3 : refus d’envoi de pièce ; 4 : envoi de pièce'), message: z.string().trim().max(1000).optional() });
 const Avancer = z.object({ transactionId: Id.optional(), remoteId: z.string().regex(/^S2L-\d+$/).optional().describe('Identifiant S²LOW (simulateur) : alternative à transactionId'), pas: z.number().int().min(1).max(10).default(1) });
@@ -48,6 +51,11 @@ module.exports = ({ makeRouter, tlt }) => {
 
   r.get('/transactions', { summary: 'Transactions de télétransmission', tags: T, org: true, roles: ROLES, params: P, query: ListQ },
     async (req, res) => res.json(await tlt.liste(req.ctx, req.org.id, req.valid.query)));
+  r.post('/transactions/envoi-lot', { summary: "Envoie plusieurs transmissions préparées d'un coup (chacune est traitée seule : une erreur n'arrête pas les autres)", tags: T, org: true, roles: ROLES, params: P, body: Lot,
+    description: "Renvoie, pour chaque transmission, `ok` ou la raison du refus. Double validation et rôles autorisés s'appliquent à chacune." },
+  async (req, res) => res.json(await tlt.envoyerLot(req.ctx, req.org.id, req.valid.body.ids, { confirmer: false })));
+  r.post('/transactions/confirmation-lot', { summary: "Mode B : confirme plusieurs transmissions postées « en attente » d'un coup", tags: T, org: true, roles: ROLES, params: P, body: Lot },
+    async (req, res) => res.json(await tlt.confirmerLot(req.ctx, req.org.id, req.valid.body.ids)));
   r.get('/transactions/:tid', { summary: 'Détail et journal d’une transaction', tags: T, org: true, roles: ROLES, params: PT },
     async (req, res) => res.json(await tlt.detail(req.ctx, req.org.id, req.valid.params.tid)));
   r.post('/transactions/:tid/envoi', { summary: 'Envoie la transaction à S²LOW (mode A : postée ; mode B : postée en attente de confirmation)', tags: T, org: true, roles: ROLES, params: PT,

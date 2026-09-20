@@ -24,10 +24,15 @@ const ACTE_TRANSMIS = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre'];
 const fmt = (pattern, vars) => String(pattern).replace(/\{(\w+)(?::(\d+))?\}/g, (m, k, w) => String(vars[k] ?? '').padStart(Number(w) || 0, '0')).toUpperCase();
 const day = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
 
-function createTeletransmission({ db, audit, render, tenue, settings, storage, bus, adapter, log, config }) {
+function createTeletransmission({ db, audit, render, tenue, settings, storage, bus, adapter, log, config, access }) {
   // le mot de passe du TDT est chiffré au repos (comme celui de la GED) et ne quitte jamais le serveur
   const { chiffre } = createSecretBox(config?.jwt?.secret || 'dev', 'tdt');
   const need = (ctx, org, acl) => acl; void need;
+
+  const ROLES_TLT = ['org_admin', 'scc', 'teletransmission'];
+  const STATUTS_EDITABLES = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre'];
+  /** Qui envoie et confirme : les rôles retenus par l'organisme (TLT-33) ; l'administrateur de la plateforme passe toujours. */
+  const peutEnvoyer = (ctx, org, cfg) => ctx?.isPlatformAdmin || access.rolesIn(ctx, org).some((r) => cfg.rolesEnvoi.includes(r));
 
   async function cfgOf(org) {
     const c = await settings.resolve(org);
@@ -37,6 +42,9 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       mode: v('tlt.mode', 'simulation'), modeEnvoi: v('tlt.mode_envoi', 'B') === 'A' ? 'A' : 'B', scenario: SCENARIOS[v('tlt.scenario', 'nominal')] ? v('tlt.scenario', 'nominal') : 'nominal',
       siren: String(v('tlt.siren', '')), departement: String(v('tlt.departement', '094')), arrondissement: String(v('tlt.arrondissement', '')),
       motif: String(v('tlt.motif_numero', DEFAULT_MOTIF)), doubleValidation: v('tlt.double_validation', false) === true,
+      // workflow d'envoi (TLT-33)
+      rolesEnvoi: Array.isArray(v('tlt.roles_envoi', null)) ? v('tlt.roles_envoi', []).filter((r) => ROLES_TLT.includes(r)) : ROLES_TLT, envoiAuto: v('tlt.envoi_auto', false) === true,
+      confirmationAuto: v('tlt.confirmation_auto', false) === true, preparationAuto: v('tlt.preparation_auto', false) === true, modificationTexte: v('tlt.modification_texte', true) !== false,
     };
   }
   const assertMode = (cfg) => {
@@ -115,7 +123,11 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     },
     async setConfig(ctx, organismeId, b) {
       const org = requireOrg(organismeId);
-      const map = { mode: 'tlt.mode', modeEnvoi: 'tlt.mode_envoi', scenario: 'tlt.scenario', siren: 'tlt.siren', departement: 'tlt.departement', arrondissement: 'tlt.arrondissement', motif: 'tlt.motif_numero', doubleValidation: 'tlt.double_validation' };
+      const map = { mode: 'tlt.mode', modeEnvoi: 'tlt.mode_envoi', scenario: 'tlt.scenario', siren: 'tlt.siren', departement: 'tlt.departement', arrondissement: 'tlt.arrondissement', motif: 'tlt.motif_numero', doubleValidation: 'tlt.double_validation', rolesEnvoi: 'tlt.roles_envoi', envoiAuto: 'tlt.envoi_auto', confirmationAuto: 'tlt.confirmation_auto', preparationAuto: 'tlt.preparation_auto', modificationTexte: 'tlt.modification_texte' };
+      const cur = await cfgOf(org); const fut = { ...cur, ...Object.fromEntries(Object.keys(map).filter((k) => b[k] !== undefined).map((k) => [k, b[k]])) };
+      if (fut.envoiAuto && fut.doubleValidation) throw E.badRequest("L'envoi automatique est incompatible avec la double validation (l'envoi doit être fait par une autre personne)");
+      if (fut.confirmationAuto && fut.modeEnvoi !== 'B') throw E.badRequest("La confirmation automatique n'a de sens qu'en mode B (préparation puis confirmation)");
+      if (b.rolesEnvoi !== undefined && !b.rolesEnvoi.length) throw E.badRequest('Au moins un rôle doit pouvoir envoyer');
       if (b.motif !== undefined) {
         const essai = fmt(b.motif, { ANNEE: '2026', TYPE_SEANCE: 'CM', N_SEANCE: 4, ORDRE: 12 });
         if (!NUMERO.test(essai)) throw E.badRequest(`Ce motif produit « ${essai} » : le numéro transmis doit compter 15 caractères au plus, en majuscules, chiffres ou « _ »`);
@@ -163,7 +175,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
 
     // ------------------------------------------------------------------------------------------ préparation et envoi
     /** Prépare la transmission : numéro transmis, PDF de la délibération, classification, annexes typées. Aucun envoi à ce stade. */
-    async preparer(ctx, organismeId, seanceId, { itemIds, scenario }) {
+    async preparer(ctx, organismeId, seanceId, { itemIds, scenario, envoyer = false }) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);
       const lot = await svc.lot(ctx, org, seanceId);
       const d = await tenue.donnees(ctx, org, seanceId);
@@ -187,7 +199,13 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         await audit.log(ctx, { organismeId: org, action: 'tlt.prepare', entity: 'tlt_transactions', entityId: r.id, after: { acteId: acte.id, numero: r.numero_transmis } });
         crees.push(toTx(r));
       }
-      return { crees, refuses };
+      // enchaîne l'envoi (et la confirmation) : à la demande (« Préparer et envoyer »), ou par le paramétrage (TLT-31, TLT-33)
+      let envois = null;
+      if (crees.length && (envoyer || cfg.envoiAuto)) {
+        if (cfg.doubleValidation) throw E.conflict("Double validation : l'envoi doit être fait par une autre personne que celle qui a préparé — les transmissions sont préparées, à envoyer depuis le suivi");
+        envois = await svc.envoyerLot(ctx, org, crees.map((c) => c.id), { confirmer: cfg.confirmationAuto });
+      }
+      return { crees, refuses, envois };
     },
 
     async _get(org, id) {
@@ -201,7 +219,10 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);
       const tx = await svc._get(org, id);
       if (tx.etat !== 'prepare') throw E.conflict(tx.etat === 'poste' ? 'Cette transaction a déjà été postée' : `Cette transaction est « ${tx.etat} » : préparez-la de nouveau`);
+      if (!peutEnvoyer(ctx, org, cfg)) throw E.forbidden("Votre rôle ne permet pas d'envoyer une transmission (paramétrage du workflow d'envoi)");
       if (cfg.doubleValidation && tx.prepared_by === ctx.username) throw E.forbidden('Double validation : l’envoi doit être fait par une autre personne que celle qui a préparé la transmission');
+      const modif = await db.get('SELECT max(updated_at) AS m FROM tracked_texts WHERE acte_id = $1', [tx.acte_id]);
+      if (modif?.m && new Date(modif.m) > new Date(tx.prepared_at)) throw E.conflict("Le texte de la délibération a été modifié depuis la préparation : annulez cette transmission et préparez-la de nouveau (le PDF préparé n'est plus à jour)");
       const pkg = tx.package; const enAttente = cfg.modeEnvoi === 'B';
       const r = await adapter.creer({ organismeId: org, ...pkg, enAttente });
       if (!r.ok) {
@@ -222,6 +243,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     async confirmer(ctx, organismeId, id) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);
       const tx = await svc._get(org, id);
+      if (!peutEnvoyer(ctx, org, cfg)) throw E.forbidden("Votre rôle ne permet pas de confirmer une transmission (paramétrage du workflow d'envoi)");
       if (tx.etat !== 'poste' || tx.status !== 17) throw E.conflict('Cette transaction n’est pas en attente de confirmation');
       const r = await adapter.confirmer(tx.remote_id);
       if (!r.ok) throw E.conflict(`S²LOW : ${r.message}`);
@@ -230,6 +252,58 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       await journal(id, ctx.username, 'confirme');
       await audit.log(ctx, { organismeId: org, action: 'tlt.confirmation', entity: 'tlt_transactions', entityId: id, after: { remoteId: tx.remote_id } });
       return toTx(row);
+    },
+
+    /**
+     * Envoi en masse (TLT-31) : chaque transmission est traitée seule, une erreur n'arrête pas les autres.
+     * Renvoie, pour chacune, { id, numeroTransmis, ok, etat, erreur }. `confirmer` : en mode B, confirme aussitôt les transmissions postées.
+     */
+    async envoyerLot(ctx, organismeId, ids, { confirmer = false } = {}) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); const out = [];
+      for (const id of [...new Set(ids)]) {
+        const ligne = { id, numeroTransmis: null, ok: false, etat: null, erreur: null };
+        try {
+          const tx = await svc._get(org, id); ligne.numeroTransmis = tx.numero_transmis;
+          let r = await svc.envoyer(ctx, org, id);
+          if (confirmer && cfg.modeEnvoi === 'B' && r.status === 17) r = await svc.confirmer(ctx, org, id);
+          Object.assign(ligne, { ok: true, etat: r.status === 17 ? 'en_attente_confirmation' : 'postee' });
+        } catch (e) { ligne.erreur = e.message; }
+        out.push(ligne);
+      }
+      await audit.log(ctx, { organismeId: org, action: 'tlt.envoi_lot', entity: 'tlt_transactions', after: { demandees: ids.length, envoyees: out.filter((x) => x.ok).length } });
+      return { items: out, envoyees: out.filter((x) => x.ok).length, refusees: out.filter((x) => !x.ok).length };
+    },
+
+    /** Confirmation en masse (mode B) : mêmes règles, transmission par transmission. */
+    async confirmerLot(ctx, organismeId, ids) {
+      const org = requireOrg(organismeId); const out = [];
+      for (const id of [...new Set(ids)]) {
+        const ligne = { id, numeroTransmis: null, ok: false, etat: null, erreur: null };
+        try { const tx = await svc._get(org, id); ligne.numeroTransmis = tx.numero_transmis; await svc.confirmer(ctx, org, id); Object.assign(ligne, { ok: true, etat: 'postee' }); } catch (e) { ligne.erreur = e.message; }
+        out.push(ligne);
+      }
+      await audit.log(ctx, { organismeId: org, action: 'tlt.confirmation_lot', entity: 'tlt_transactions', after: { demandees: ids.length, confirmees: out.filter((x) => x.ok).length } });
+      return { items: out, envoyees: out.filter((x) => x.ok).length, refusees: out.filter((x) => !x.ok).length };
+    },
+
+    /** Le SCC (et l'administrateur, le rôle télétransmission) modifient la délibération tant qu'elle n'est pas transmise (TLT-32). Branché sur les droits d'édition des actes. */
+    async peutModifierTexte(ctx, acte) {
+      if (!STATUTS_EDITABLES.includes(acte.statut)) return false;
+      if (!ctx?.isPlatformAdmin && !access.rolesIn(ctx, acte.organisme_id).some((r) => ROLES_TLT.includes(r))) return false;
+      return (await cfgOf(acte.organisme_id)).modificationTexte;
+    },
+
+    /** Préparation automatique à la clôture de la séance (TLT-33) : ce qui est prêt est préparé, ce qui est bloqué reste à traiter. */
+    async preparationAuto({ organismeId, seanceId, ctx }) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org);
+      if (!cfg.preparationAuto || !ctx) return null;
+      assertMode(cfg);
+      const lot = await svc.lot(ctx, org, seanceId);
+      const prets = lot.items.filter((i) => i.statut === 'a_preparer' && !i.controles.some((c) => c.niveau === 'bloquant')).map((i) => i.itemId);
+      if (!prets.length) return { crees: [], refuses: [] };
+      const r = await svc.preparer(ctx, org, seanceId, { itemIds: prets });
+      await audit.log({ username: 'system', onBehalfOf: ctx.username }, { organismeId: org, action: 'tlt.preparation_auto', entity: 'seances', entityId: seanceId, after: { preparees: r.crees.length, refusees: r.refuses.length } });
+      return r;
     },
 
     async annuler(ctx, organismeId, id, motif) {

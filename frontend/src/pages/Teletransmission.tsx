@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FastForward, FileText, FlaskConical, RefreshCw, Send, Stamp, XCircle } from 'lucide-react';
+import { CheckCircle2, FastForward, FileText, FlaskConical, Pencil, RefreshCw, Send, Stamp, XCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -13,6 +14,9 @@ type Tab = typeof TABS[number][0];
 
 const StatusBadge = ({ tx }: { tx: any }) => (tx.etat === 'prepare' ? <Badge tone="warn">Préparée — à envoyer</Badge> : tx.etat === 'erreur' ? <Badge tone="ko">Refusée par S²LOW</Badge>
   : <Badge tone={STATUS_TONE[String(tx.status)] ?? 'gray'}>{tx.status !== null ? `${tx.status} · ` : ''}{tx.statusLabel ?? tx.etat}</Badge>);
+
+/** Résumé d'un envoi ou d'une confirmation en masse : combien sont passées, et pour chaque refus le numéro et la raison. */
+const resume = (r: any, verbe: string) => `${r.envoyees} transmission(s) ${verbe}${r.refusees ? `, ${r.refusees} refusée(s) : ${r.items.filter((i: any) => !i.ok).map((i: any) => `${i.numeroTransmis ?? `n° ${i.id}`} — ${i.erreur}`).join(' | ')}` : ''}`;
 
 /** Contrôle de légalité : télétransmission des délibérations adoptées à la préfecture via S²LOW (TLT-01 à TLT-19). Mode simulation tant que l'accès n'est pas obtenu. */
 export default function Teletransmission() {
@@ -64,11 +68,12 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
   const items: any[] = lot.data?.items ?? [];
   const prets = items.filter((i) => i.statut === 'a_preparer' && !i.controles.some((c: any) => c.niveau === 'bloquant'));
   const toggle = (id: number) => setPick((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const preparer = async () => {
+  const preparer = async (envoyer = false) => {
     setBusy(true);
     try {
-      const r = (await api.post(root(`/seances/${sid}/preparation`), { itemIds: [...pick], scenario: scenario || undefined })).data;
-      toast(`${r.crees.length} transmission(s) préparée(s)${r.refuses.length ? `, ${r.refuses.length} refusée(s) : ${r.refuses.map((x: any) => x.raisons.join(' ; ')).join(' | ')}` : ''}`, r.refuses.length ? 'ko' : 'ok');
+      const r = (await api.post(root(`/seances/${sid}/preparation`), { itemIds: [...pick], scenario: scenario || undefined, envoyer })).data;
+      const env = r.envois ? ` ; ${resume(r.envois, cfg.modeEnvoi === 'B' && !cfg.confirmationAuto ? 'postée(s) en attente de confirmation' : 'envoyée(s)')}` : '';
+      toast(`${r.crees.length} transmission(s) préparée(s)${r.refuses.length ? `, ${r.refuses.length} refusée(s) : ${r.refuses.map((x: any) => x.raisons.join(' ; ')).join(' | ')}` : ''}${env}`, r.refuses.length || r.envois?.refusees ? 'ko' : 'ok');
       setPick(new Set()); lot.reload(); onDone();
     } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
   };
@@ -80,7 +85,8 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
         <Field label="Séance"><select className="input !w-auto" value={sid ?? ''} onChange={(e) => { setSid(Number(e.target.value)); setPick(new Set()); }}>{seances.data.map((s) => <option key={s.id} value={s.id}>{s.instance} — {dt(s.dateSeance, { dateStyle: 'long' })}</option>)}</select></Field>
         {cfg.mode === 'simulation' && <Field label="Scénario de simulation"><select className="input !w-auto" value={scenario} onChange={(e) => setScenario(e.target.value)}><option value="">Par défaut ({cfg.scenarios.find((s: any) => s.code === cfg.scenario)?.label})</option>{cfg.scenarios.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>}
         <div className="ml-auto flex items-center gap-2"><button className="btn-secondary" onClick={() => setPick(new Set(prets.map((i) => i.itemId)))} disabled={!prets.length}>Tout sélectionner</button>
-          <button className="btn-primary" disabled={busy || !pick.size} onClick={preparer}>{busy ? <Spinner /> : <Send className="h-4 w-4" />} Préparer {pick.size || ''} transmission(s)</button></div>
+          <button className="btn-secondary" disabled={busy || !pick.size} onClick={() => preparer(false)}>{busy ? <Spinner /> : <Send className="h-4 w-4" />} Préparer {pick.size || ''} transmission(s)</button>
+          {!cfg.doubleValidation && <button className="btn-primary" disabled={busy || !pick.size} title="Enchaîne la préparation et l’envoi de la sélection" onClick={() => preparer(true)}>{busy ? <Spinner /> : <Send className="h-4 w-4" />} Préparer et envoyer {pick.size || ''}</button>}</div>
       </div>
       {lot.loading ? <Loading /> : lot.data?.message ? <p className="p-6 text-mute">{lot.data.message}</p> : (
         <table className="w-full"><thead><tr><th className="w-8" /><th>N°</th><th>Délibération</th><th>Vote</th><th>Numéro transmis</th><th>Contrôles</th></tr></thead><tbody>{items.map((i) => {
@@ -88,7 +94,7 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
           return (
             <tr key={i.itemId} className={i.statut === 'exclu' ? 'bg-slate-50 text-mute' : ''}>
               <td>{i.statut === 'a_preparer' && <input type="checkbox" aria-label={`Sélectionner ${i.titre}`} disabled={bloque} checked={pick.has(i.itemId)} onChange={() => toggle(i.itemId)} />}</td>
-              <td className="font-mono text-[12px]">{i.numero ?? '—'}</td><td className="font-semibold">{i.titre}</td>
+              <td className="font-mono text-[12px]">{i.numero ?? '—'}</td><td className="font-semibold">{i.titre}{cfg.modificationTexte && i.statut !== 'exclu' && <Link to={`/dossiers/${i.acteId}`} className="ml-2 inline-flex items-center gap-1 text-[12px] font-semibold text-action" title="Ouvrir la délibération pour corriger son texte avant la transmission"><Pencil className="h-3 w-3" /> Modifier le texte</Link>}</td>
               <td>{i.resultat ? <Badge tone={i.resultat.startsWith('adopte') ? 'ok' : 'ko'}>{i.resultat.startsWith('adopte') ? 'Adoptée' : 'Rejetée'}</Badge> : <Badge>{i.etatPoint}</Badge>}</td>
               <td className="font-mono text-[12px]">{i.numeroTransmis ?? i.transaction?.numeroTransmis ?? '—'}</td>
               <td className="text-[12px]">
@@ -106,21 +112,41 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
 function Suivi({ root, rev, cfg, act, busy }: { root: (p?: string) => string; rev: number; cfg: any; act: (k: string, fn: () => Promise<unknown>, ok: string) => Promise<void>; busy: string | null }) {
   const list = useLoad(async () => (await api.get(root('/transactions'))).data.items as any[], [rev]);
   const [open, setOpen] = useState<number | null>(null); const detail = useLoad(async () => (open ? (await api.get(root(`/transactions/${open}`))).data : null), [open, rev]);
-  const { toast } = useToast();
+  const { toast } = useToast(); const [pick, setPick] = useState<Set<number>>(new Set()); const [lotBusy, setLotBusy] = useState<string | null>(null);
+  const toggle = (id: number) => setPick((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const aEnvoyer = (list.data ?? []).filter((x) => x.etat === 'prepare'); const aConfirmer = (list.data ?? []).filter((x) => x.etat === 'poste' && x.status === 17);
+  const choisies = (l: any[]) => l.filter((x) => pick.has(x.id)).map((x) => x.id);
+  const lot = async (kind: 'envoi' | 'confirmation', ids: number[]) => {
+    setLotBusy(kind);
+    try { const r = (await api.post(root(`/transactions/${kind}-lot`), { ids })).data; toast(resume(r, kind === 'envoi' ? (cfg.modeEnvoi === 'B' ? 'postée(s) en attente de confirmation' : 'envoyée(s)') : 'confirmée(s)'), r.refusees ? 'ko' : 'ok'); setPick(new Set()); await act('lot', async () => undefined, ''); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setLotBusy(null); }
+  };
   const pdf = async (path: string, titre: string) => { const m = await openPdf(() => api.get(root(path), { responseType: 'blob' }), titre); if (m) toast(m, 'ko'); };
   if (list.loading) return <Loading />;
   if (!list.data?.length) return <div className="card p-8 text-center text-mute">Aucune transmission. Préparez-en depuis l’onglet « À transmettre ».</div>;
   return (
     <div className="card overflow-hidden">
-      <table className="w-full"><thead><tr><th>Numéro transmis</th><th>Délibération</th><th>État</th><th>Identifiant S²LOW</th><th>AR préfecture</th><th /></tr></thead><tbody>{list.data.map((x) => (
+      {(aEnvoyer.length > 0 || aConfirmer.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-soft px-4 py-2 text-[13px]">
+          <span className="text-mute">Sélection : <b>{pick.size}</b></span>
+          <button className="btn-secondary !py-1" onClick={() => setPick(new Set([...aEnvoyer, ...aConfirmer].map((x) => x.id)))}>Tout sélectionner</button>
+          {pick.size > 0 && <button className="btn-secondary !py-1" onClick={() => setPick(new Set())}>Aucune</button>}
+          <span className="ml-auto flex gap-2">
+            {aEnvoyer.length > 0 && <button className="btn-primary !py-1" disabled={!!lotBusy || !choisies(aEnvoyer).length} onClick={() => lot('envoi', choisies(aEnvoyer))}>{lotBusy === 'envoi' ? <Spinner /> : <Send className="h-3.5 w-3.5" />} Envoyer la sélection ({choisies(aEnvoyer).length})</button>}
+            {aConfirmer.length > 0 && <button className="btn-primary !py-1" disabled={!!lotBusy || !choisies(aConfirmer).length} onClick={() => lot('confirmation', choisies(aConfirmer))}>{lotBusy === 'confirmation' ? <Spinner /> : <CheckCircle2 className="h-3.5 w-3.5" />} Confirmer la sélection ({choisies(aConfirmer).length})</button>}
+          </span>
+        </div>)}
+      <table className="w-full"><thead><tr><th className="w-8" /><th>Numéro transmis</th><th>Délibération</th><th>État</th><th>Identifiant S²LOW</th><th>AR préfecture</th><th /></tr></thead><tbody>{list.data.map((x) => (
         <>
           <tr key={x.id}>
+            <td>{(x.etat === 'prepare' || (x.etat === 'poste' && x.status === 17)) && <input type="checkbox" aria-label={`Sélectionner ${x.numeroTransmis}`} checked={pick.has(x.id)} onChange={() => toggle(x.id)} />}</td>
             <td className="font-mono text-[12px]">{x.numeroTransmis}<div className="font-sans text-[11px] text-mute">{x.mode === 'simulation' ? 'simulation' : x.mode} · {x.enAttente ? 'mode B' : 'mode A'}</div></td>
             <td><b>{x.titre}</b><div className="text-[11px] text-mute">Dossier #{x.numeroSuivi} · acte : {x.acteStatut.replace(/_/g, ' ')}</div></td>
             <td><StatusBadge tx={x} />{x.erreur && <div className="mt-1 text-[11px] text-ko">{x.erreur}</div>}</td>
             <td className="font-mono text-[12px]">{x.remoteId ?? '—'}</td>
             <td className="text-[12px]">{x.arLe ? <><CheckCircle2 className="mr-1 inline h-3.5 w-3.5 text-ok" />{dt(x.arLe)}<div className="font-mono text-[10px] text-mute">{x.arId}</div></> : '—'}</td>
             <td className="whitespace-nowrap text-right">
+              {x.etat === 'prepare' && cfg.modificationTexte && <Link to={`/dossiers/${x.acteId}`} className="mr-1 inline-flex items-center gap-1 text-[12px] font-semibold text-action" title="Modifier le texte : la transmission devra être annulée puis préparée de nouveau"><Pencil className="h-3 w-3" /> Texte</Link>}
               {x.etat === 'prepare' && <button className="btn-primary !py-1" disabled={busy === `e${x.id}`} onClick={() => act(`e${x.id}`, () => api.post(root(`/transactions/${x.id}/envoi`)), cfg.modeEnvoi === 'A' ? 'Transaction postée à S²LOW' : 'Transaction postée « en attente » : à confirmer')}><Send className="h-3.5 w-3.5" /> Envoyer</button>}
               {x.etat === 'poste' && x.status === 17 && <button className="btn-primary !py-1" disabled={busy === `c${x.id}`} onClick={() => act(`c${x.id}`, () => api.post(root(`/transactions/${x.id}/confirmation`)), 'Transaction confirmée : posté')}><CheckCircle2 className="h-3.5 w-3.5" /> Confirmer</button>}
               {x.arId && <><button className="btn-secondary !py-1" onClick={() => pdf(`/transactions/${x.id}/bordereau`, `Bordereau d’acquittement — ${x.numeroTransmis}`)}><FileText className="h-3.5 w-3.5" /> Bordereau</button>
@@ -129,7 +155,7 @@ function Suivi({ root, rev, cfg, act, busy }: { root: (p?: string) => string; re
               <button className="ml-1 text-[12px] font-semibold text-action" onClick={() => setOpen(open === x.id ? null : x.id)}>{open === x.id ? 'Masquer' : 'Journal'}</button>
             </td>
           </tr>
-          {open === x.id && <tr key={`d${x.id}`}><td colSpan={6} className="bg-soft">{detail.loading || !detail.data ? <Loading /> : (
+          {open === x.id && <tr key={`d${x.id}`}><td colSpan={7} className="bg-soft">{detail.loading || !detail.data ? <Loading /> : (
             <ul className="divide-y divide-line text-[12px]">{detail.data.journal.map((j: any) => <li key={j.id} className="flex flex-wrap gap-x-3 py-1"><span className="w-36 shrink-0 font-mono text-mute">{dt(j.at, { dateStyle: 'short', timeStyle: 'medium' })}</span><b>{JOURNAL[j.type] ?? j.type}</b><span className="text-mute">{j.detail ? JSON.stringify(j.detail) : ''}</span><span className="ml-auto text-mute">{j.actor}</span></li>)}</ul>)}</td></tr>}
         </>))}</tbody></table>
     </div>
@@ -194,7 +220,7 @@ function Simulation({ root, rev, cfg, act, busy }: { root: (p?: string) => strin
 
 /* ------------------------------------------------------------------------------------------------------------ paramètres */
 function Params({ root, cfg, onSaved, toast }: { root: (p?: string) => string; cfg: any; onSaved: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
-  const [f, setF] = useState({ mode: cfg.mode, modeEnvoi: cfg.modeEnvoi, scenario: cfg.scenario, siren: cfg.siren, departement: cfg.departement, arrondissement: cfg.arrondissement, motif: cfg.motif, doubleValidation: cfg.doubleValidation });
+  const [f, setF] = useState({ mode: cfg.mode, modeEnvoi: cfg.modeEnvoi, scenario: cfg.scenario, siren: cfg.siren, departement: cfg.departement, arrondissement: cfg.arrondissement, motif: cfg.motif, doubleValidation: cfg.doubleValidation, rolesEnvoi: cfg.rolesEnvoi as string[], envoiAuto: cfg.envoiAuto, confirmationAuto: cfg.confirmationAuto, preparationAuto: cfg.preparationAuto, modificationTexte: cfg.modificationTexte });
   const [busy, setBusy] = useState(false);
   const exemple = useMemo(() => f.motif.replace(/\{(\w+)(?::(\d+))?\}/g, (_m: string, k: string, w?: string) => String(({ ANNEE: 2026, TYPE_SEANCE: 'CM', N_SEANCE: 4, ORDRE: 12 } as Record<string, string | number>)[k] ?? '').padStart(Number(w) || 0, '0')).toUpperCase(), [f.motif]);
   const valide = /^[A-Z0-9_]{1,15}$/.test(exemple);
@@ -213,8 +239,19 @@ function Params({ root, cfg, onSaved, toast }: { root: (p?: string) => string; c
       <Field label="Motif du numéro transmis" hint="Variables : {ANNEE} {TYPE_SEANCE} {N_SEANCE:02} {ORDRE:03}. 15 caractères au plus, majuscules, chiffres ou « _ ».">
         <input className="input font-mono" value={f.motif} onChange={(e) => setF({ ...f, motif: e.target.value })} /></Field>
       <p className={`text-[13px] ${valide ? 'text-ok' : 'font-semibold text-ko'}`}>Exemple : <code>{exemple}</code> {valide ? '✓ conforme à S²LOW' : `✗ non conforme (${exemple.length} caractères, ou caractère interdit)`}</p>
-      <label className="flex items-center gap-3"><MailSwitch on={f.doubleValidation} onChange={(v) => setF({ ...f, doubleValidation: v })} label="Double validation" /><span>Double validation : l’envoi doit être fait par une autre personne que celle qui a préparé la transmission</span></label>
-      <div className="flex justify-end"><button className="btn-primary" disabled={busy || !valide} onClick={save}>{busy && <Spinner />} Enregistrer</button></div>
+      <label className="flex items-center gap-3"><MailSwitch on={f.doubleValidation} onChange={(v) => setF({ ...f, doubleValidation: v, envoiAuto: v ? false : f.envoiAuto })} label="Double validation" /><span>Double validation : l’envoi doit être fait par une autre personne que celle qui a préparé la transmission</span></label>
+      <section className="space-y-3 rounded-lg border border-line p-4" aria-label="Workflow d’envoi">
+        <h3>Workflow d’envoi au contrôle de légalité</h3>
+        <fieldset className="space-y-1"><legend className="text-[12px] font-semibold uppercase text-mute">Qui peut envoyer et confirmer</legend>
+          {([['org_admin', 'Administrateur'], ['scc', 'SCC (secrétariat des assemblées)'], ['teletransmission', 'Rôle « télétransmission »']] as const).map(([k, l]) => (
+            <label key={k} className="flex items-center gap-2"><input type="checkbox" checked={f.rolesEnvoi.includes(k)} onChange={(e) => setF({ ...f, rolesEnvoi: e.target.checked ? [...f.rolesEnvoi, k] : f.rolesEnvoi.filter((x) => x !== k) })} /> {l}</label>))}
+        </fieldset>
+        <label className="flex items-center gap-3"><MailSwitch on={f.modificationTexte} onChange={(v) => setF({ ...f, modificationTexte: v })} label="Modification du texte par le SCC" /><span>Le <b>SCC peut modifier le texte</b> de la délibération avant la transmission <span className="text-[12px] text-mute">— une transmission déjà préparée devra être annulée puis préparée de nouveau</span></span></label>
+        <label className="flex items-center gap-3"><MailSwitch on={f.preparationAuto} onChange={(v) => setF({ ...f, preparationAuto: v })} label="Préparation automatique" /><span><b>Préparer automatiquement</b> les délibérations adoptées à la clôture de la séance <span className="text-[12px] text-mute">— celles qui ont un contrôle bloquant restent à traiter</span></span></label>
+        <label className="flex items-center gap-3"><MailSwitch on={f.envoiAuto} disabled={f.doubleValidation} onChange={(v) => setF({ ...f, envoiAuto: v })} label="Envoi automatique" /><span><b>Envoyer automatiquement</b> après la préparation <span className="text-[12px] text-mute">— impossible avec la double validation</span></span></label>
+        <label className="flex items-center gap-3"><MailSwitch on={f.confirmationAuto} disabled={f.modeEnvoi !== 'B'} onChange={(v) => setF({ ...f, confirmationAuto: v })} label="Confirmation automatique" /><span><b>Confirmer automatiquement</b> après l’envoi <span className="text-[12px] text-mute">— mode B seulement ; la transmission part alors sans relecture sur S²LOW</span></span></label>
+      </section>
+      <div className="flex justify-end"><button className="btn-primary" disabled={busy || !valide || !f.rolesEnvoi.length} onClick={save}>{busy && <Spinner />} Enregistrer</button></div>
     </div>
   );
 }
