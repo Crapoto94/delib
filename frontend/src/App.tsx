@@ -14,6 +14,7 @@ import Teletransmission from './pages/Teletransmission';
 import Delegations from './pages/Delegations';
 import Preferences from './pages/Preferences';
 import DevEditor from './pages/DevEditor';
+import Aide from './aide/Aide';
 import { lazy, Suspense } from 'react';
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./elus/dev/DevAnnot')) : null;
 import ConvocationPublique from './pages/ConvocationPublique';
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="controle-legalite" element={<Teletransmission />} />
         <Route path="delegations" element={<Delegations />} />
         <Route path="preferences" element={<Preferences />} />
+        <Route path="aide/*" element={<Aide />} />
         <Route path="admin/*" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

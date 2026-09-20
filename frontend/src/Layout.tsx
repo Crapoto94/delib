@@ -7,6 +7,7 @@ import { Modal, useToast } from './ui';
 import { OrgLogo, useFavicon } from './Brand';
 import { AiChip } from './AiStatus';
 import Visite from './Visite';
+import { AideMenu } from './aide/Aide';
 import { PdfViewerHost } from './PdfViewer';
 import { useAuth } from './auth';
 import { api, org as orgPath } from './api';
@@ -92,6 +93,7 @@ export default function Layout() {
             </select>
           )}
           <AiChip />
+          <AideMenu />
           <span data-tour="notifications"><Bells orgId={org.id} /></span>
           <div className="relative" ref={ref} data-tour="menu-utilisateur">
             <button className="flex items-center gap-2 rounded p-1 hover:bg-slate-100" onClick={() => setMenu(!menu)} aria-haspopup="menu" aria-expanded={menu}>
