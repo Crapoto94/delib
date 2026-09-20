@@ -27,7 +27,18 @@ function parseJson(text) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts }) {
+function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts, visas }) {
+  /** Dépose les constats d'un rapport de références comme alertes du dossier (IA-36) : extrait dans « find », jamais appliqués automatiquement. */
+  const deposer = async (a, runId, rapport, fonction) => {
+    const out = [];
+    for (const c of rapport.constats) {
+      const src = c.source ? ` (source : ${c.source}${c.verifieLe ? `, vérifié le ${c.verifieLe}` : ''})` : '';
+      out.push(await db.get("INSERT INTO ai_suggestions (organisme_id, acte_id, text_id, run_id, kind, find, reason, categorie, gravite, fonction) VALUES ($1,$2,$3,$4,'alerte',$5,$6,'visa',$7,$8) RETURNING *",
+        [a.organisme_id, a.id, c.textId ?? null, runId, c.extrait ? c.extrait.slice(0, 240) : null, `${c.message}${src}`.slice(0, 600), c.gravite, fonction]));
+    }
+    return out;
+  };
+
   const svc = {
     /** Copie simple (CPY-01) ; avec `adapter`, l'adaptation est DÉPOSÉE dans la file d'attente (arrière plan) — la copie est immédiate. */
     async copy(ctx, organismeId, sourceId, { contexte, adapter = false } = {}) {
@@ -163,6 +174,9 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts }) {
           for (const c of A.controlesDeterministes(a, mds, { annexes: nAnnexes })) {
             alertes++; out.push(await svc.addAlert(a, c.textId, run.id, c.message, { categorie: c.categorie, gravite: c.gravite, analyse: 'complet' }));
           }
+          // références juridiques : vérifiées par le code contre la bibliothèque de visas (IA-31, IA-32)
+          const rapport = await visas.rapport(ctx, a.organisme_id, a.id);
+          for (const x of await deposer(a, run.id, rapport, 'complet')) { alertes++; out.push(x); }
         }
         await db.run('UPDATE ai_runs SET model = $2, prompt_chars = $3, response_chars = $4 WHERE id = $1', [run.id, model, promptChars, responseChars]);
       } catch (e) {
@@ -171,6 +185,20 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts }) {
       }
       await audit.log(ctx, { organismeId: a.organisme_id, action: `ia.analyse.${type}`, entity: 'actes', entityId: a.id, after: { runId: run.id, propositions: out.filter((o) => o.kind === 'remplacement').length, alertes } });
       return { runId: run.id, items: out.map(toS) };
+    },
+
+    /**
+     * « Vérifier les références » (IA-30, 31, 32, 35, 36) : immédiat, sans modèle, disponible même si l'IA est désactivée.
+     * Les alertes en attente de la même fonction sont remplacées ; les décisions déjà prises sont conservées.
+     */
+    async verifierReferences(ctx, organismeId, acteId) {
+      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const rapport = await visas.rapport(ctx, a.organisme_id, a.id);
+      const run = await db.get('INSERT INTO ai_runs (organisme_id, acte_id, kind, requested_by, context) VALUES ($1,$2,$3,$4,$5) RETURNING id', [a.organisme_id, a.id, 'analyse:references', ctx.username, A.LABEL.references]);
+      await db.run("UPDATE ai_suggestions SET status = 'obsolete' WHERE acte_id = $1 AND status = 'pending' AND fonction = 'references'", [a.id]);
+      const items = await deposer(a, run.id, rapport, 'references');
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'ia.analyse.references', entity: 'actes', entityId: a.id, after: { runId: run.id, references: rapport.references.length, constats: rapport.constats.length } });
+      return { runId: run.id, rapport, items: items.map(toS) };
     },
 
     /** « Tout accepter (orthographe seule) » (IA-13) : applique une à une les corrections d'orthographe et de typographie en attente. */

@@ -11,9 +11,18 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.32.0';
+export const VERSION = '0.33.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.33.0', type: 'minor', titre: 'Références juridiques vérifiées par le code',
+    items: [
+      "Bibliothèque de visas (Paramétrages › Visas et références) : textes normalisés avec statut, validité et dernière vérification ; import JSON/CSV ; fournie vide, maintenue par le juridique.",
+      "« Vérifier les références » dans l'assistant : codes, lois, décrets, arrêtés et délibérations citées sont extraits par règles et vérifiés par le code contre la bibliothèque, à la date de la séance (sans IA).",
+      "Listes de contrôle par type d'acte, matière et montant (visa ou mention attendus) ; ordre conventionnel des visas ; inclus dans le contrôle complet.",
+      "Veille : un texte devenu abrogé ou modifié prévient les rédacteurs des actes en cours qui le citent.",
+    ],
+  },
   {
     version: '0.32.0', type: 'minor', titre: 'Nouveau design, mode sombre et menu latéral des paramétrages',
     items: [

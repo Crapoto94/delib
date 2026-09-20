@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ArrowLeftRight, Bell, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileText, GitBranch, HardDrive, KeyRound, Landmark, ListPlus, Menu, Network, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileText, GitBranch, HardDrive, KeyRound, Landmark, ListPlus, Menu, Network, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, Users, type LucideIcon } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -12,6 +12,7 @@ import AdminMembres from './AdminMembres';
 import AdminSauvegarde from './AdminSauvegarde';
 import AdminCles from './AdminCles';
 import AdminRgpd from './AdminRgpd';
+import AdminVisas from './AdminVisas';
 import { AdminChamps, AdminConfiguration } from './AdminParametrage';
 import AdminRecherche from './AdminRecherche';
 import AdminElus from './AdminElus';
@@ -154,7 +155,8 @@ export function menu(isAdmin: boolean, plateforme: boolean): Groupe[] {
     { titre: 'Circuits et rédaction', entrees: [
       { k: 'circuits', label: 'Circuits', icon: GitBranch }, { k: 'gabarits', label: 'Gabarits PDF', icon: FileText },
       ...(isAdmin ? [{ k: 'champs', label: 'Champs personnalisés', icon: ListPlus }] : []),
-      { k: 'notifications', label: 'Notifications & relances', icon: Bell }, { k: 'ia', label: 'Assistant IA', icon: Sparkles }] },
+      { k: 'notifications', label: 'Notifications & relances', icon: Bell }, { k: 'ia', label: 'Assistant IA', icon: Sparkles },
+      { k: 'visas', label: 'Visas et références', icon: BookMarked }] },
     { titre: 'Séances et élus', entrees: [
       { k: 'elus', label: 'Élus', icon: Landmark }, { k: 'espace-elus', label: 'Espace élus', icon: Smartphone }] },
     { titre: 'Intégrations', entrees: [
@@ -211,7 +213,7 @@ export default function Admin() {
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
-        <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} /><Route path="calendrier" element={<Calendrier />} />
+        <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} /><Route path="visas" element={<AdminVisas />} /><Route path="calendrier" element={<Calendrier />} />
       </Routes>
         </div>
       </div>

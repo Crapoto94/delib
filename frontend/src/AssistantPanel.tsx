@@ -1,6 +1,6 @@
 import { useIa } from './useIa';
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ClipboardCheck, HelpCircle, Languages, ScrollText, Sparkles, Wand2, XCircle } from 'lucide-react';
+import { BookCheck, CheckCircle2, ClipboardCheck, HelpCircle, Languages, ScrollText, Sparkles, Wand2, XCircle } from 'lucide-react';
 import { api, errMsg, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { AiJob, Progress, useAiJobs } from './AiStatus';
@@ -13,6 +13,7 @@ const OUTILS = [
   { type: 'orthographe', label: "Vérifier l'orthographe", hint: 'Orthographe, grammaire, accords, typographie française', icon: Languages, scope: 'texte' },
   { type: 'style', label: 'Améliorer le style', hint: 'Clarté, concision, registre administratif', icon: Wand2, scope: 'texte' },
   { type: 'visas', label: 'Contrôler les visas et considérants', hint: 'Ordre, formulation, références à vérifier, cohérence', icon: ScrollText, scope: 'texte' },
+  { type: 'references', label: 'Vérifier les références', hint: 'Codes, lois, décrets, délibérations citées : vérifiés par le code contre la bibliothèque de visas, sans IA', icon: BookCheck, scope: 'dossier' },
   { type: 'complet', label: 'Contrôle complet du dossier', hint: 'Les trois passes + montants, annexes, incidence financière', icon: ClipboardCheck, scope: 'dossier' },
 ] as const;
 const CAT: Record<string, string> = { orthographe: 'Orthographe', typographie: 'Typographie', style: 'Style', visa: 'Visas', coherence: 'Cohérence', completude: 'Complétude', copie: 'Copie' };
@@ -46,6 +47,10 @@ export default function AssistantPanel({ acte, t, canEdit, beforeApply, afterApp
     setBusy(o2.type);
     try {
       await beforeApply();
+      if (o2.type === 'references') { // immédiat : vérifié par le code, sans IA
+        const r = (await api.post(orgPath(o, `/actes/${acte.id}/ia/references`), {})).data; const n = r.rapport.resume;
+        toast(r.items.length ? `Références vérifiées : ${n.bloquant} bloquant(s), ${n.aRevoir} à revoir, ${n.info} information(s)` : `${r.rapport.references.length} référence(s) vérifiée(s) : rien à signaler`); await load(); return;
+      }
       await api.post(orgPath(o, `/actes/${acte.id}/ia/analyse`), { type: o2.type, textId: o2.scope === 'texte' ? t.id : undefined });
       toast("Demande envoyée à l'IA : elle travaille en arrière plan, vous pouvez continuer");
     } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); }
@@ -79,7 +84,7 @@ export default function AssistantPanel({ acte, t, canEdit, beforeApply, afterApp
       </div>
       {canEdit ? (
         <div className="grid grid-cols-2 gap-2 border-b border-line p-3">
-          {OUTILS.filter((x) => ia[x.type]).map((x) => (
+          {OUTILS.filter((x) => x.type === 'references' || ia[x.type as keyof typeof ia]).map((x) => (
             <button key={x.type} title={x.hint + (x.scope === 'texte' ? ' — sur ce texte' : '')} className="flex items-start gap-2 rounded border border-line bg-surface p-2 text-left hover:border-action hover:bg-soft disabled:opacity-60" disabled={!!busy} onClick={() => run(x)}>
               <x.icon className="mt-0.5 h-4 w-4 shrink-0 text-action" />
               <span className="min-w-0"><span className="block text-[12px] font-semibold leading-4">{busy === x.type && <Spinner />} {x.label}</span><span className="block text-[10px] text-mute">{x.scope === 'texte' ? 'ce texte' : 'tout le dossier'}</span></span>
@@ -101,7 +106,7 @@ export default function AssistantPanel({ acte, t, canEdit, beforeApply, afterApp
                   <div className="mb-1 flex flex-wrap items-center gap-1"><Badge tone="blue">{CAT[s.categorie ?? ''] ?? s.categorie ?? 'Suggestion'}</Badge>{g && <Badge tone={g.tone}>{g.label}</Badge>}{s.textId === null && <Badge>Dossier</Badge>}</div>
                   {s.kind === 'remplacement' ? (
                     <div className="text-[13px] leading-5"><del className="mr-1 text-ko">{s.find}</del><ins className="text-ok-text no-underline">{s.replacement}</ins></div>
-                  ) : <p className="text-[13px] leading-5">{s.reason}</p>}
+                  ) : <><p className="text-[13px] leading-5">{s.reason}</p>{s.find && <p className="mt-1 border-l-2 border-line pl-2 text-[11px] italic text-mute">« {s.find} »</p>}</>}
                   {s.kind === 'remplacement' && why === s.id && <p className="mt-1 rounded bg-soft px-2 py-1 text-[12px] text-slate-700">{s.reason || 'Aucune explication fournie.'}</p>}
                   {canEdit && (
                     <div className="mt-2 flex flex-wrap gap-3">

@@ -52,6 +52,7 @@ const MODULES = [
   require('../modules/convocations/convocations.routes'),
   require('../modules/users/users.routes'),
   require('../modules/ai/ai.routes'),
+  require('../modules/ai/visas.routes'),
 ];
 
 function createApp(c) {

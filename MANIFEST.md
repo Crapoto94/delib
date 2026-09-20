@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.32 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.33 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1159,6 +1159,16 @@ Appels à l'**IA interne** de la Ville (API). Elle est déjà consommée par app
 - **IA-37** — **Pré-contrôle IA joint au dossier** : à l'entrée dans l'étape **Service juridique**, l'analyse experte peut être **lancée automatiquement** et jointe au dossier pour gagner du temps (option, non bloquant).
 - **IA-38** — **Bibliothèque de visas** (`visa_library`) : textes normalisés, statut, dates de validité, dernière vérification, **rattachement par matière et type d'acte** ; alertes lorsqu'un texte de la bibliothèque devient obsolète (veille), avec liste des **actes en cours concernés**.
 
+**Réalisation du lot 5c-1 (D101) — références juridiques vérifiées par le code**
+
+- **IA-38 (réalisée)** — **Bibliothèque de visas** administrable (*Paramétrages › Visas et références*) : une entrée = un texte normalisé (code + article, loi, ordonnance, décret, arrêté), avec **statut** (*en vigueur*, *modifié*, *abrogé*), **dates de validité**, **source**, **dernière vérification** et **rattachement** facultatif à des matières et types d'acte. Création, modification, suppression, **import en masse** (JSON ou CSV) et bouton **« Vérifié aujourd'hui »**. Réservée à l'administrateur et au SCC ; lisible par tous les agents (les contrôles s'en servent). **La bibliothèque est fournie vide** : le juridique la maintient, ni le modèle ni l'éditeur du logiciel n'y mettent de droit de mémoire (IA-05, IA-32).
+- **IA-30 (réalisée)** — **Extraction par règles** (sans modèle) dans tous les textes du dossier : articles de code (« article L. 2121-29 du code général des collectivités territoriales », listes « articles L. 2121-29 et L. 2122-22 »), codes cités sans article, lois, ordonnances et décrets (« loi n° 2015-991 du 7 août 2015 »), arrêtés, **délibérations antérieures** (par numéro « 2026-4-012 » ou par date). Chaque référence reçoit une **clé normalisée** (`cgct:L2121-29`, `loi:2015-991`, `delib:2026-4-012`) qui sert de rapprochement.
+- **IA-31 (réalisée)** — **Existence et actualité** : chaque référence est rapprochée de la bibliothèque et jugée **à la date de la séance visée** (à défaut, à la date du jour) : *à jour*, *à revoir* (texte modifié, ou **non vérifié depuis plus de 12 mois** — paramètre `ai.verif_validite_mois`), *obsolète* (abrogé, ou hors de sa période de validité), *introuvable* (absent de la bibliothèque : « à faire vérifier par le juridique », jamais affirmé faux). Une **délibération antérieure** citée par son numéro est rapprochée des actes de l'organisme : *introuvable*, ou *à revoir* si elle n'a pas été adoptée. L'option Légifrance (PISTE, Q46) reste à brancher.
+- **IA-32 (réalisée)** — **Listes de contrôle administrables** (*Paramétrages › Visas et références*) : règle **visa attendu** (clé de la bibliothèque) ou **mention attendue** (expression), par type d'acte et/ou par matière, avec **seuil de montant** facultatif, gravité (*bloquant*, *à revoir*, *information*) et message. Constats : *visa manquant*, *mention obligatoire absente*. Les règles sont écrites par le juridique.
+- **IA-35 (réalisée)** — **Ordre conventionnel** vérifié par le code : lois et codes, puis ordonnances et décrets, puis arrêtés, puis délibérations antérieures ; un visa hors ordre est signalé (information).
+- **IA-36 (réalisée)** — **Rapport structuré** : chaque constat a une gravité, un **extrait**, une explication, la **source** (entrée de la bibliothèque) et la date de dernière vérification. Il est produit par la nouvelle analyse **« Vérifier les références »** (immédiate, sans IA, disponible même si l'IA est désactivée), incluse dans le **contrôle complet**, et déposé dans les propositions du dossier comme alerte (à écarter, jamais appliquée automatiquement).
+- **IA-38 (veille, réalisée)** — Quand une entrée passe à *abrogé* ou *modifié*, les **rédacteurs des actes en cours qui la citent** sont notifiés ; la fiche de l'entrée liste ces **actes concernés**.
+
 ### 21.5 Niveau 4 — Autres propositions
 
 Classement : **P1** = fort gain, faible risque ; **P2** = gain net, effort moyen ; **P3** = à étudier.
@@ -1746,6 +1756,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D98** | **Alertes de recherche** : cloche sur une recherche enregistrée, vérification horaire avec les droits de la personne, notification dans l'application *(REC-29)* | 20.1 |
 | **D99** | **Thème** : couleurs et contrastes renforcés (inspirés des exports Stitch), jetons en variables CSS, **mode sombre** automatique / clair / sombre mémorisé sur l'appareil | UI-03, UI-04 |
 | **D100** | **Menu latéral** des paramétrages (à gauche, groupé, avec fil d'Ariane) au lieu des onglets horizontaux | UI-05 |
+| **D101** | **Références juridiques vérifiées par le code** : bibliothèque de visas administrable (fournie vide), extraction par règles, rapprochement à la date de la séance, listes de contrôle par type d'acte et matière, ordre conventionnel, rapport structuré, veille des textes modifiés ; analyse « Vérifier les références » sans IA | IA-30, 31, 32, 35, 36, 38 |
 | **D97** | **API externe et clés d'accès** : lecture seule, clés hachées à affichage unique, portées distinguant actes exécutoires / adoptés / en cours, IP autorisées, limite de débit, synchronisation incrémentale *(EXT-01 à EXT-06)* | 24 bis |
 | **D96** | **Sauvegarde vers un dossier réseau** : export logique cohérent en NDJSON, fichiers incrémentaux, destination UNC avec identifiants chiffrés, planification nocturne, rétention, journal, restauration outillée *(SAV-01 à SAV-07)* | 29.1 |
 | **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |
@@ -1778,6 +1789,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.33** | 2026-09-20 | **D101** : lot 5c-1, références juridiques vérifiées par le code (IA-30, 31, 32, 35, 36, 38) |
 | **1.32** | 2026-09-20 | **D99** : thème coloré et mode sombre (UI-03, UI-04) ; **D100** : menu latéral des paramétrages (UI-05) |
 | **1.31** | 2026-09-20 | **D98** : alertes de recherche (REC-29) ; amendements dans l'espace élus (ELU-41) |
 | **1.30** | 2026-09-20 | **D97** : API externe et clés d'accès (EXT-01 à EXT-06) |

@@ -62,6 +62,7 @@ const { createUsers } = require('./modules/users/users.service');
 const { createAi } = require('./modules/ai/ai.service');
 const { createPrompts } = require('./modules/ai/prompts');
 const { createAiQueue } = require('./modules/ai/queue');
+const { createVisas } = require('./modules/ai/visas.service');
 
 function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard }) {
   assertAuthPort(ad);
@@ -115,7 +116,8 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
   const aiPrompts = createPrompts({ settings, ai: aiAdapter, log });
-  const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log, queue: aiQueue, prompts: aiPrompts });
+  const visas = createVisas({ db, audit, actes, settings, log });
+  const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log, queue: aiQueue, prompts: aiPrompts, visas });
   const users = createUsers({ db, audit, dir, organismes, access, log, settings, acl });
   const delegations = createDelegations({ db, audit, access, titulaires, dir, bus });
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
@@ -146,7 +148,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche-alertes', (orgId) => alertes.verifier(orgId)); // alertes de recherche (REC-29) : au plus une vérification par heure et par alerte
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };
