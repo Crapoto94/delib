@@ -3,11 +3,14 @@
  *  - administrateur, SCC, lecteur : voient tous les actes de l'organisme (lecture seule pour le lecteur) ;
  *  - rédacteur et co-rédacteurs ;
  *  - participants du circuit : chaque personne du circuit voit l'acte dès l'envoi, avant son tour (VIS-01) ;
- *  - brouillon : agents du service du rédacteur et leur hiérarchie (VIS-02, D28) ;
+ *  - actes du service ou de la direction : PARAMÈTRE GÉNÉRAL de l'organisme (`actes.visibilite` : rédacteur uniquement, service, direction),
+ *    modifiable pour chaque utilisateur (D72) — remplace l'ancienne règle « brouillons du service » (VIS-02, D28) ;
  *  - édition : le rédacteur tant que l'acte est brouillon / à modifier ; en circuit, le détenteur de l'étape si elle est
  *    éditable (crochet enregistré par le moteur de circuit).
  */
 const EDITABLE = ['brouillon', 'modification_demandee'];
+const MODES = ['redacteur', 'service', 'direction'];
+const DEFAULT_MODE = 'service';
 
 function createActeAcl({ db, access, titulaires, settings }) {
   const editHooks = [];
@@ -23,16 +26,25 @@ function createActeAcl({ db, access, titulaires, settings }) {
     isStaff,
     registerEditHook: (fn) => editHooks.push(fn),
 
-    async scope(ctx, orgId) { return { hier: await titulaires.hierarchyScope(ctx.username, orgId) }; },
+    MODES, DEFAULT_MODE,
+
+    /** Visibilité des actes de l'utilisateur : son réglage personnel s'il existe, sinon le réglage général de l'organisme, sinon « service ». */
+    async visibilityMode(ctx, orgId) {
+      const mine = await db.get('SELECT visibilite FROM user_acte_visibility WHERE organisme_id = $1 AND username = $2', [orgId, ctx.username]);
+      if (mine && MODES.includes(mine.visibilite)) return mine.visibilite;
+      const general = (await settings.resolve(orgId))['actes.visibilite']?.value;
+      return MODES.includes(general) ? general : DEFAULT_MODE;
+    },
+
+    async scope(ctx, orgId) { return { hier: await titulaires.hierarchyScope(ctx.username, orgId), mode: await this.visibilityMode(ctx, orgId) }; },
 
     async canView(ctx, acte, scope) {
       if (isStaff(ctx, acte.organisme_id)) return true;
       if (acte.redacteur === ctx.username || (acte.co_redacteurs || []).includes(ctx.username)) return true;
       if ((acte.participants || []).includes(ctx.username)) return true;
       const s = scope || await this.scope(ctx, acte.organisme_id);
-      if (EDITABLE.includes(acte.statut) && acte.statut !== 'en_circuit') {
-        if (sameService(ctx, acte)) return true;
-      }
+      if (s.mode === 'direction' && ctx.agent?.direction_code && ctx.agent.direction_code === acte.direction_code) return true;
+      if (s.mode === 'service' && sameService(ctx, acte)) return true;
       return inHierarchy(s.hier, acte);
     },
 
@@ -52,13 +64,14 @@ function createActeAcl({ db, access, titulaires, settings }) {
     /** Fragment SQL de visibilité pour les listes (même règle que canView, évaluée en base). */
     async visibilitySql(ctx, orgId, startIndex) {
       if (isStaff(ctx, orgId)) return { where: 'TRUE', params: [] };
-      const h = (await this.scope(ctx, orgId)).hier;
+      const sc = await this.scope(ctx, orgId); const h = sc.hier;
       const p = []; const or = []; const add = (v) => { p.push(v); return `$${startIndex + p.length - 1}`; };
       const u = add(ctx.username);
       or.push(`a.redacteur = ${u}`, `a.co_redacteurs ? ${u}`, `a.participants ? ${u}`);
-      if (ctx.agent?.direction_code) {
+      if (ctx.agent?.direction_code && sc.mode === 'direction') or.push(`a.direction_code = ${add(ctx.agent.direction_code)}`);
+      else if (ctx.agent?.direction_code && sc.mode === 'service') {
         const d = add(ctx.agent.direction_code); const s = add(ctx.agent.service_code || null);
-        or.push(`(a.statut IN ('brouillon', 'modification_demandee') AND a.direction_code = ${d} AND (a.service_code IS NULL OR a.service_code = ${s}))`);
+        or.push(`(a.direction_code = ${d} AND (a.service_code IS NULL OR a.service_code = ${s}))`);
       }
       if (h.dgaOrganisme) or.push('TRUE');
       if (h.directions.length) or.push(`a.direction_code = ANY(${add(h.directions)}::text[])`);
@@ -68,4 +81,4 @@ function createActeAcl({ db, access, titulaires, settings }) {
   };
 }
 
-module.exports = { createActeAcl, EDITABLE };
+module.exports = { createActeAcl, EDITABLE, MODES: ['redacteur', 'service', 'direction'] };

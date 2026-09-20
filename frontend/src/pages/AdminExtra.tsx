@@ -4,6 +4,7 @@ import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { OrgLogo, resetBranding } from '../Brand';
+import { VisibiliteUtilisateur } from '../VisibiliteActes';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
 
 /* ------------------------------------------------------------------------------------------ utilisateurs et rôles */
@@ -46,6 +47,7 @@ function Fiche({ username, onClose, onChanged }: { username: string; onClose: ()
                 <span><b><Shield className="mr-1 inline h-4 w-4" />Administrateur de plateforme</b><br /><span className="text-[12px] text-mute">Tous les organismes, tous les droits. À réserver à la DSI.</span></span></label></li>}
             </ul>
             <p className="mt-2 text-[12px] text-mute">Les fonctions de validation (chef de service, directeur, DGA, DGS) se désignent dans « Titulaires & droits ».</p></section>
+          {f.data.visibiliteActes && <VisibiliteUtilisateur username={username} data={f.data.visibiliteActes} onChanged={f.reload} toast={toast} />}
           <section className="grid gap-4 md:grid-cols-2">
             <div><h3 className="mb-1">Fonctions et groupes</h3>
               {!f.data.titulaires.length && !f.data.groupes.length ? <p className="text-mute">Aucune fonction de validation ni groupe.</p> : <ul className="space-y-1">{f.data.titulaires.map((t: any) => <li key={t.id}><Badge tone="blue">{t.fonction.replace('_', ' ')}</Badge> {t.directionCode ?? 'toute la collectivité'}{t.serviceCode ? ` › ${t.serviceCode}` : ''}</li>)}{f.data.groupes.map((g: any) => <li key={g.code}><Badge>groupe</Badge> {g.nom}</li>)}</ul>}</div>

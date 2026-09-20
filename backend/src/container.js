@@ -76,7 +76,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   late.seances = seances;
   const deadlines = createDeadlines({ db, audit, actes, acl, titulaires, settings, bus });
   late.deadlines = deadlines;
-  const odj = createOdj({ db, audit, actes, acl, titulaires, settings, bus, late });
+  const odj = createOdj({ db, audit, actes, acl, titulaires, settings, bus, late, storage });
   late.odj = odj;
   const cahier = createCahier({ db, audit, render, odj, storage, log });
   const kpis = createKpis({ db, odj, seances });
@@ -84,7 +84,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
   const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log, queue: aiQueue });
-  const users = createUsers({ db, audit, dir, organismes, access, log });
+  const users = createUsers({ db, audit, dir, organismes, access, log, settings, acl });
   const delegations = createDelegations({ db, audit, access, titulaires, dir, bus });
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });

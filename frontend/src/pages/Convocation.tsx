@@ -9,7 +9,7 @@ import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useL
 
 const EVENT: Record<string, { label: string; tone?: 'ok' | 'ko' | 'warn' | 'blue' }> = {
   envoi: { label: 'Envoi', tone: 'blue' }, echec: { label: 'Échec d\'envoi', tone: 'ko' }, relance: { label: 'Relance', tone: 'warn' }, ouverture: { label: 'Lien ouvert' },
-  convocation_lue: { label: 'Convocation consultée', tone: 'ok' }, odj_lu: { label: 'Ordre du jour consulté', tone: 'ok' }, accuse: { label: 'Accusé de lecture', tone: 'ok' }, reponse: { label: 'Réponse de présence', tone: 'ok' },
+  convocation_lue: { label: 'Convocation consultée', tone: 'ok' }, piece_lue: { label: 'Pièce jointe consultée', tone: 'ok' }, odj_lu: { label: 'Ordre du jour consulté', tone: 'ok' }, accuse: { label: 'Accusé de lecture', tone: 'ok' }, reponse: { label: 'Réponse de présence', tone: 'ok' },
 };
 const when = (d?: string | null) => (d ? dt(d, { dateStyle: 'short', timeStyle: 'short' }) : '—');
 
@@ -147,7 +147,7 @@ function Journal({ root, n }: { root: string; n: number }) {
         <div className="overflow-x-auto"><table className="w-full text-[13px]"><thead><tr><th>Date</th><th>Évènement</th><th>Convoqué</th><th>Détail</th></tr></thead><tbody>{j.data.items.map((e) => (
           <tr key={e.id}><td className="whitespace-nowrap">{dt(e.at, { dateStyle: 'short', timeStyle: 'medium' })}</td><td><Badge tone={EVENT[e.type]?.tone}>{EVENT[e.type]?.label ?? e.type}</Badge></td>
             <td>{e.nom ? <span><b>{e.nom}</b> <span className="text-[11px] text-mute">{e.kind === 'agent' ? 'agent' : 'élu'}</span></span> : '—'}</td>
-            <td className="text-[12px] text-mute">{e.meta?.erreur ?? (e.meta?.reponse ? (e.meta.reponse === 'present' ? 'présent(e)' : 'absent(e)') : '')}{e.empreinteIp ? `${e.meta ? ' · ' : ''}empreinte ${e.empreinteIp}` : ''}</td></tr>))}</tbody></table></div>)}
+            <td className="text-[12px] text-mute">{e.meta?.fichier ? `« ${e.meta.fichier} »` : ''}{e.meta?.erreur ?? (e.meta?.reponse ? (e.meta.reponse === 'present' ? 'présent(e)' : 'absent(e)') : '')}{e.empreinteIp ? `${e.meta ? ' · ' : ''}empreinte ${e.empreinteIp}` : ''}</td></tr>))}</tbody></table></div>)}
       {j.data && j.data.items.length < j.data.total && <div className="border-t border-line p-3 text-center"><button className="btn-secondary" onClick={() => setLimit(limit + 200)}>Afficher plus</button></div>}
     </section>
   );

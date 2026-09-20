@@ -10,6 +10,7 @@ import AdminIa from './AdminIa';
 import AgentPicker, { AgentList } from '../AgentPicker';
 import Collectivites from './Collectivites';
 import Organisation from './Organisation';
+import { VisibiliteGenerale } from '../VisibiliteActes';
 import Circuits from './CircuitEditor';
 import { AgentName } from '../AgentName';
 
@@ -39,6 +40,7 @@ function Titulaires() {
   return (
     <div className="space-y-6">
       <Organisation />
+      <VisibiliteGenerale toast={toast} />
       <section className="card p-5"><h3 className="mb-2">Responsable intermédiaire</h3>
         <label className="flex items-start gap-3"><input type="checkbox" className="mt-1" checked={riOn} disabled={cfg.loading} onChange={async (e) => { try { await api.put(orgPath(o, '/settings/circuit.resp_intermediaire'), { value: e.target.checked, scope: 'organisme' }); cfg.reload(); toast(e.target.checked ? 'Étape « Responsable intermédiaire » activée' : 'Étape « Responsable intermédiaire » désactivée'); } catch (x) { toast(errMsg(x), 'ko'); } }} />
           <span><b>Activer l’étape « Responsable intermédiaire » dans les circuits</b><br /><span className="text-[12px] text-mute">Facultative et décochée par défaut : tant qu’elle est décochée, l’étape est ignorée même si des titulaires sont saisis ci-dessous. Une fois activée, elle n’est déclenchée que si un titulaire est désigné pour le service.</span></span></label>

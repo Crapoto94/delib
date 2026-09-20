@@ -39,7 +39,17 @@ function formatNumero(pattern, vars) {
   });
 }
 
-function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
+/** Pièces jointes d'un dossier simple : type contrôlé par l'extension ET par la signature du fichier, 20 Mo au plus. */
+const PIECES = {
+  pdf: { mime: 'application/pdf', magic: [0x25, 0x50, 0x44, 0x46] }, png: { mime: 'image/png', magic: [0x89, 0x50, 0x4e, 0x47] },
+  jpg: { mime: 'image/jpeg', magic: [0xff, 0xd8, 0xff] }, jpeg: { mime: 'image/jpeg', magic: [0xff, 0xd8, 0xff] },
+  docx: { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', magic: [0x50, 0x4b] }, xlsx: { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', magic: [0x50, 0x4b] },
+  pptx: { mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', magic: [0x50, 0x4b] }, odt: { mime: 'application/vnd.oasis.opendocument.text', magic: [0x50, 0x4b] },
+  ods: { mime: 'application/vnd.oasis.opendocument.spreadsheet', magic: [0x50, 0x4b] }, odp: { mime: 'application/vnd.oasis.opendocument.presentation', magic: [0x50, 0x4b] },
+};
+const MAX_PIECE = 20 * 1024 * 1024;
+
+function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage }) {
   const seanceOf = async (q, org, id, lock = false) => {
     const s = await q.get(`SELECT s.*, i.nom AS instance_nom, i.numbering AS instance_numbering, i.kind AS instance_kind, i.commission_id AS instance_commission_id FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2${lock ? ' FOR UPDATE OF s' : ''}`, [id, requireOrg(org)]);
     if (!s) throw E.notFound('Séance introuvable');
@@ -65,7 +75,9 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
   const rowsOf = (q, seanceId) => q.all(
     `SELECT it.*, a.titre AS acte_titre, a.numero_suivi, a.statut AS acte_statut, a.current_step_key AS acte_step, a.direction_label, a.redacteur, a.rubrique_id, ru.libelle AS rubrique,
             trim(e.prenom || ' ' || e.nom) AS rapporteur, d.titre AS delib_titre, d.ordre AS delib_ordre,
-            si.label AS etape, si.holders AS etape_holders
+            si.label AS etape, si.holders AS etape_holders,
+            (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', f.id, 'titre', f.titre, 'nom', fl.original_name, 'mime', fl.mime, 'taille', fl.size, 'pages', fl.pages) ORDER BY f.ordre, f.id), '[]'::jsonb)
+               FROM seance_item_fichiers f JOIN files fl ON fl.id = f.file_id WHERE f.item_id = it.id) AS fichiers
      FROM seance_items it LEFT JOIN actes a ON a.id = it.acte_id LEFT JOIN ref_items ru ON ru.id = a.rubrique_id
           LEFT JOIN step_instances si ON si.acte_id = a.id AND si.status = 'current'
           LEFT JOIN elus e ON e.id = a.rapporteur_id LEFT JOIN deliberations d ON d.id = it.deliberation_id
@@ -94,7 +106,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
     return 'en_circuit';
   };
   const toItem = (r, numeros, i) => ({
-    id: r.id, position: r.position, kind: r.kind, titre: r.kind === 'deliberation' ? (r.delib_titre || r.acte_titre) : r.titre, numerote: r.numerote,
+    id: r.id, position: r.position, kind: r.kind, titre: r.kind === 'deliberation' ? (r.delib_titre || r.acte_titre) : r.titre, description: r.description ?? null, fichiers: r.fichiers || [], numerote: r.numerote,
     numero: numeros.get(r.id) ?? r.numero ?? null, provisoire: !r.numero, statut: r.statut, retireMotif: r.retire_motif, ajouteApresArret: r.ajoute_apres_arret,
     acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: r.rapporteur, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
     deliberationId: r.deliberation_id, groupe: r.acte_id ? `a${r.acte_id}` : null, ordreDeliberation: r.delib_ordre ?? null, index: i,
@@ -304,7 +316,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
       await db.run("UPDATE actes SET statut = CASE WHEN statut = 'inscrit_odj' THEN 'en_attente_scc' ELSE statut END WHERE id = $1", [acte.id]);
     },
 
-    async addPoint(ctx, organismeId, seanceId, { kind = 'libre', titre, numerote = false, afterItemId, motif }) {
+    async addPoint(ctx, organismeId, seanceId, { kind = 'libre', titre, description, numerote = false, afterItemId, motif }) {
       const org = requireOrg(organismeId);
       const res = await mutate(ctx, org, seanceId, { motif }, async (q, s, after) => {
         let pos;
@@ -317,25 +329,72 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
         let numero = null; let seq = null;
         if (after && isNum) ({ numero, seq } = await numeroAjout(q, s, org, null, ''));
         const it = await q.get(
-          `INSERT INTO seance_items (organisme_id, seance_id, position, kind, titre, numerote, numero, numero_seq, ajoute_apres_arret, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`, [org, s.id, pos, kind, titre, isNum, numero, seq, after, ctx.username]);
+          `INSERT INTO seance_items (organisme_id, seance_id, position, kind, titre, description, numerote, numero, numero_seq, ajoute_apres_arret, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`, [org, s.id, pos, kind, titre, kind === 'libre' ? (description?.trim() || null) : null, isNum, numero, seq, after, ctx.username]);
         await hist(q, s.id, ctx, 'ajout', { itemId: it.id, after: { kind, titre, numero }, motif });
         return { id: it.id };
       });
       return { id: res.id, ...(await svc.get(ctx, org, seanceId)) };
     },
 
-    async updatePoint(ctx, organismeId, seanceId, itemId, { titre, numerote, motif }) {
+    async updatePoint(ctx, organismeId, seanceId, itemId, { titre, description, numerote, motif }) {
       const org = requireOrg(organismeId);
       await mutate(ctx, org, seanceId, { motif }, async (q, s) => {
         const it = await q.get('SELECT * FROM seance_items WHERE id = $1 AND seance_id = $2', [itemId, s.id]);
         if (!it || it.kind === 'deliberation') throw E.notFound('Point libre ou chapitre introuvable');
         if (numerote !== undefined && it.kind === 'libre' && s.odj_statut !== 'en_preparation') throw E.conflict("Après l'arrêt, la numérotation d'un point ne change plus");
-        await q.run('UPDATE seance_items SET titre = COALESCE($2, titre), numerote = CASE WHEN kind = \'libre\' THEN COALESCE($3, numerote) ELSE numerote END WHERE id = $1', [itemId, titre ?? null, numerote ?? null]);
+        await q.run('UPDATE seance_items SET titre = COALESCE($2, titre), numerote = CASE WHEN kind = \'libre\' THEN COALESCE($3, numerote) ELSE numerote END, description = CASE WHEN $4::boolean AND kind = \'libre\' THEN $5 ELSE description END WHERE id = $1', [itemId, titre ?? null, numerote ?? null, description !== undefined, description?.trim() || null]);
         await hist(q, s.id, ctx, 'modification', { itemId, before: { titre: it.titre, numerote: it.numerote }, after: { titre, numerote }, motif });
         return {};
       });
       return svc.get(ctx, org, seanceId);
+    },
+
+    // ---- pièces jointes d'un dossier simple (D75) --------------------------------------------------------------------
+    async addFichier(ctx, organismeId, seanceId, itemId, { titre, motif }, file) {
+      const org = requireOrg(organismeId);
+      if (!file?.buffer?.length) throw E.badRequest('Fichier manquant (champ « file »)');
+      if (file.buffer.length > MAX_PIECE) throw E.badRequest('Fichier trop volumineux (20 Mo au plus)');
+      const ext = String(file.originalname || '').split('.').pop().toLowerCase();
+      const def = PIECES[ext];
+      if (!def) throw E.badRequest(`Type de fichier non accepté (.${ext}) : PDF, images (png, jpg), documents Office ou OpenDocument`);
+      if (!def.magic.every((b, i) => file.buffer[i] === b)) throw E.badRequest(`Le contenu du fichier ne correspond pas à son extension (.${ext})`);
+      let pages = null;
+      if (ext === 'pdf') { const info = await require('../../shared/infra').inspectPdf(file.buffer); pages = info.pages; }
+      let id = null;
+      await mutate(ctx, org, seanceId, { motif }, async (q, s) => {
+        const it = await q.get('SELECT * FROM seance_items WHERE id = $1 AND seance_id = $2', [itemId, s.id]);
+        if (!it || it.kind !== 'libre') throw E.notFound('Dossier simple introuvable (seul un point libre peut avoir des pièces jointes)');
+        const put = await storage.put(file.buffer, { organismeId: org, ext });
+        const f = await q.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+          [org, put.key, String(file.originalname).slice(0, 200), def.mime, put.size, pages, put.sha256, ctx.username]);
+        const ordre = (await q.get('SELECT COALESCE(MAX(ordre), 0) + 1 AS n FROM seance_item_fichiers WHERE item_id = $1', [itemId])).n;
+        id = (await q.get('INSERT INTO seance_item_fichiers (item_id, file_id, titre, ordre, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id', [itemId, f.id, (titre || String(file.originalname).replace(/\.[^.]+$/, '')).slice(0, 200), ordre, ctx.username])).id;
+        await hist(q, s.id, ctx, 'modification', { itemId, after: { pieceJointe: String(file.originalname) }, motif });
+        return {};
+      });
+      return { id, ...(await svc.get(ctx, org, seanceId)) };
+    },
+
+    async removeFichier(ctx, organismeId, seanceId, itemId, fichierId, { motif } = {}) {
+      const org = requireOrg(organismeId);
+      await mutate(ctx, org, seanceId, { motif }, async (q, s) => {
+        const r = await q.get('DELETE FROM seance_item_fichiers WHERE id = $1 AND item_id = $2 AND item_id IN (SELECT id FROM seance_items WHERE seance_id = $3) RETURNING file_id', [fichierId, itemId, s.id]);
+        if (!r) throw E.notFound('Pièce jointe introuvable');
+        await hist(q, s.id, ctx, 'modification', { itemId, before: { pieceJointe: fichierId }, motif });
+        return {};
+      });
+      return svc.get(ctx, org, seanceId);
+    },
+
+    /** Téléchargement d'une pièce jointe (SCC, DGS, administrateurs). */
+    async getFichier(ctx, organismeId, seanceId, itemId, fichierId) {
+      const org = requireOrg(organismeId);
+      if (!(await canEdit(ctx, org))) throw E.forbidden("Les pièces jointes des dossiers sont réservées au SCC et à la DGS");
+      const r = await db.get(`SELECT f.titre, fl.storage_key, fl.mime, fl.original_name FROM seance_item_fichiers f JOIN files fl ON fl.id = f.file_id JOIN seance_items it ON it.id = f.item_id
+                              WHERE f.id = $1 AND it.id = $2 AND it.seance_id = $3 AND it.organisme_id = $4`, [fichierId, itemId, seanceId, org]);
+      if (!r) throw E.notFound('Pièce jointe introuvable');
+      return { buffer: await storage.get(r.storage_key), mime: r.mime, name: r.original_name };
     },
 
     async removePoint(ctx, organismeId, seanceId, itemId, { motif } = {}) {

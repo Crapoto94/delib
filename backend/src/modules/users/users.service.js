@@ -11,7 +11,9 @@ const toA = (r) => ({
   poste: r.poste, source: r.source, actif: r.actif, lastLoginAt: r.last_login_at, knownLocally: true,
 });
 
-function createUsers({ db, audit, dir, organismes, access, log }) {
+const MODES = ['redacteur', 'service', 'direction'];
+
+function createUsers({ db, audit, dir, organismes, access, log, settings, acl }) {
   const svc = {
     /** Recherche : agents connus localement puis annuaire RH (une panne de l'annuaire n'empêche pas la recherche locale). */
     async search(ctx, organismeId, q, { avecRole = false, limit = 100, offset = 0 } = {}) {
@@ -60,6 +62,7 @@ function createUsers({ db, audit, dir, organismes, access, log }) {
         titulaires: titulaires.map((t) => ({ id: t.id, fonction: t.fonction, perimetre: t.perimetre, directionCode: t.direction_code, serviceCode: t.service_code })),
         groupes, autorisationsRedaction: autorisations.map((g) => ({ id: g.id, directionCode: g.direction_code, serviceCode: g.service_code, expiresAt: g.expires_at })),
         delegations: delegations.map((d) => ({ id: d.id, delegant: d.delegant, delegue: d.delegue, scope: d.scope, endsAt: d.ends_at })), actesRediges: redacteur.n,
+        visibiliteActes: await svc.visibiliteUtilisateur(org, u),
       };
     },
 
@@ -69,6 +72,44 @@ function createUsers({ db, audit, dir, organismes, access, log }) {
       const known = await db.get('SELECT 1 AS x FROM agent_ref WHERE username = $1', [u]);
       if (!known && !(await dir.agentExists(u))) throw E.badRequest("Agent inconnu : ni connecté à l'application, ni présent dans l'annuaire RH");
       return organismes.addRole(ctx, organismeId, u, role);
+    },
+
+    // ---- visibilité des actes (D72) ----------------------------------------------------------------------------------
+    /** Réglage général de l'organisme et ce qui s'applique par défaut. */
+    async visibiliteGenerale(organismeId) {
+      const org = requireOrg(organismeId);
+      const e = (await settings.resolve(org))['actes.visibilite'];
+      const valeur = MODES.includes(e?.value) ? e.value : acl.DEFAULT_MODE;
+      return { valeur, source: MODES.includes(e?.value) ? e.origin : 'defaut', modes: MODES };
+    },
+    async setVisibiliteGenerale(ctx, organismeId, valeur) {
+      const org = requireOrg(organismeId);
+      if (!MODES.includes(valeur)) throw E.badRequest(`Visibilité inconnue : ${valeur}`);
+      await settings.put(ctx, { scope: 'organisme', organismeId: org, key: 'actes.visibilite', val: valeur });
+      return svc.visibiliteGenerale(org);
+    },
+    /** Visibilité d'un utilisateur : son réglage personnel (`override`) s'il existe, sinon le réglage général. */
+    async visibiliteUtilisateur(organismeId, username) {
+      const org = requireOrg(organismeId); const u = String(username).toLowerCase();
+      const general = await svc.visibiliteGenerale(org);
+      const mine = await db.get('SELECT visibilite, updated_by, updated_at FROM user_acte_visibility WHERE organisme_id = $1 AND username = $2', [org, u]);
+      const override = mine && MODES.includes(mine.visibilite) ? mine.visibilite : null;
+      return { username: u, effective: override ?? general.valeur, override, general: general.valeur, source: override ? 'utilisateur' : general.source, updatedBy: mine?.updated_by ?? null, updatedAt: mine?.updated_at ?? null, modes: MODES };
+    },
+    /** `valeur: null` : retire le réglage personnel (l'utilisateur suit à nouveau le réglage général). */
+    async setVisibiliteUtilisateur(ctx, organismeId, username, valeur) {
+      const org = requireOrg(organismeId); const u = String(username).toLowerCase();
+      if (!(await db.get('SELECT 1 AS x FROM agent_ref WHERE username = $1', [u]))) throw E.notFound("Cet agent ne s'est jamais connecté à l'application");
+      const before = await svc.visibiliteUtilisateur(org, u);
+      if (valeur === null) await db.run('DELETE FROM user_acte_visibility WHERE organisme_id = $1 AND username = $2', [org, u]);
+      else {
+        if (!MODES.includes(valeur)) throw E.badRequest(`Visibilité inconnue : ${valeur}`);
+        await db.run(`INSERT INTO user_acte_visibility (organisme_id, username, visibilite, updated_by) VALUES ($1,$2,$3,$4)
+                      ON CONFLICT (organisme_id, username) DO UPDATE SET visibilite = EXCLUDED.visibilite, updated_by = EXCLUDED.updated_by, updated_at = now()`, [org, u, valeur, ctx.username]);
+      }
+      const after = await svc.visibiliteUtilisateur(org, u);
+      await audit.log(ctx, { organismeId: org, action: 'utilisateur.visibilite', entity: 'user_acte_visibility', entityId: u, before: { override: before.override, effective: before.effective }, after: { override: after.override, effective: after.effective } });
+      return after;
     },
 
     /** Retrait : jamais le dernier administrateur de l'organisme (USR-04). */

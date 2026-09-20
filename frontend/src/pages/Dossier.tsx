@@ -273,7 +273,7 @@ function Completude({ c }: { c: any }) {
 function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolean; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth(); const o = org!.id;
   const mine = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/commissions`))).data, [acte.id]);
-  const all = useLoad(async () => (await api.get(orgPath(o, '/commissions'), { params: { actif: 'true' } })).data.items as any[], [o]);
+  const all = useLoad(async () => ((await api.get(orgPath(o, '/commissions'), { params: { actif: 'true' } })).data.items as any[]).filter((c) => c.type !== 'autre'), [o]);
   const [sel, setSel] = useState('');
   const AVIS: Record<string, string> = { favorable: 'Favorable', defavorable: 'Défavorable', reserve: 'Réservé', sans_avis: 'Sans avis' };
   const add = async () => { try { await api.post(orgPath(o, `/actes/${acte.id}/commissions`), { commissionId: Number(sel) }); setSel(''); mine.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };

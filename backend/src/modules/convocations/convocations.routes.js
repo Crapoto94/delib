@@ -15,6 +15,7 @@ const Envoi = z.object({
 const JournalQ = z.object({ type: z.enum(TYPES).optional(), destinataireId: Id.optional(), limit: z.coerce.number().int().min(1).max(500).default(100), offset: z.coerce.number().int().min(0).default(0) });
 const Relance = z.object({ cible: z.enum(['non_lecteurs', 'sans_reponse']).default('non_lecteurs') });
 const Tok = z.object({ token: z.string().min(20).max(64) });
+const TokPiece = Tok.extend({ fichierId: Id });
 const Reponse = z.object({ reponse: z.enum(['present', 'absent']), commentaire: z.string().trim().max(500).optional() });
 const T = ['convocations'];
 const ROLES = ['org_admin', 'scc'];
@@ -59,6 +60,11 @@ module.exports = ({ makeRouter, convocations, limiter }) => {
   };
   pub.get('/convocation.pdf', { summary: 'PDF de la convocation (enregistre la consultation)', tags: T, auth: false, limiter, params: Tok, responses: { 200: 'PDF' } }, pdf('convocation'));
   pub.get('/ordre-du-jour.pdf', { summary: "PDF de l'ordre du jour (enregistre la consultation)", tags: T, auth: false, limiter, params: Tok, responses: { 200: 'PDF' } }, pdf('odj'));
+  pub.get('/pieces/:fichierId', { summary: "Pièce jointe d'un dossier simple de la convocation (enregistre la consultation)", tags: T, auth: false, limiter, params: TokPiece, responses: { 200: 'Fichier' } },
+    async (req, res) => {
+      const f = await convocations.pieceToken(req.valid.params.token, req.valid.params.fichierId, meta(req));
+      res.setHeader('Content-Type', f.mime); res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(f.name)}"`); res.setHeader('Cache-Control', 'private, no-store'); res.send(f.buffer);
+    });
   pub.post('/accuse', { summary: "« J'ai pris connaissance »", tags: T, auth: false, limiter, params: Tok },
     async (req, res) => res.json(await convocations.accuseToken(req.valid.params.token, meta(req))));
   pub.post('/reponse', { summary: 'Réponse de présence (présent / absent excusé)', tags: T, auth: false, limiter, params: Tok, body: Reponse },

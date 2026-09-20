@@ -12,6 +12,7 @@ const Commission = z.object({
   nom: z.string().trim().min(2).max(160), description: z.string().max(1000).optional(), couleur: z.string().max(20).optional(), ordre: z.number().int().optional(),
   matieres: z.array(z.string().max(20)).max(100).optional(), directions: z.array(z.string().max(40)).max(50).optional(),
   thematiques: z.array(z.string().max(200)).max(100).optional(), sieges: z.number().int().min(1).max(100).nullable().optional(), siegesOpposition: z.number().int().min(0).max(100).nullable().optional(),
+  type: z.enum(['actes', 'autre']).optional().describe('`actes` : associée à la rédaction des actes (avis sur les projets) ; `autre` : sans lien avec les actes (défaut : actes)'),
 });
 const CommissionPatch = Commission.partial().extend({ actif: z.boolean().optional() });
 const Membres = z.object({ membres: z.array(z.object({ eluId: Id, fonction: z.enum(FONCTIONS).default('membre'), dateDebut: z.iso.date().optional(), dateFin: z.iso.date().optional() })).max(200) });

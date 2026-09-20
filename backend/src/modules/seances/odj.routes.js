@@ -1,18 +1,22 @@
 const { z } = require('zod');
+const multer = require('multer');
 
 const Id = z.coerce.number().int().positive();
 const P = z.object({ orgId: Id });
 const PS = P.extend({ id: Id });
 const PI = PS.extend({ itemId: Id });
 const PA = PS.extend({ acteId: Id });
+const PF = PI.extend({ fichierId: Id });
 const Motif = z.string().trim().min(3).max(500);
 const T = ['ordre du jour'];
 
 const Pending = z.object({ visee: z.enum(['cette', 'aucune', 'toutes']).default('toutes'), rubriqueId: Id.optional(), rapporteurId: Id.optional(), q: z.string().max(100).optional() });
 const Affecter = z.object({ acteIds: z.array(Id).min(1).max(100), motif: Motif.optional() });
 const Retrait = z.object({ motif: Motif.optional() });
-const Point = z.object({ kind: z.enum(['libre', 'chapitre']).default('libre'), titre: z.string().trim().min(2).max(300), numerote: z.boolean().default(false), afterItemId: Id.optional(), motif: Motif.optional() });
-const PointPatch = z.object({ titre: z.string().trim().min(2).max(300).optional(), numerote: z.boolean().optional(), motif: Motif.optional() });
+const Piece = z.object({ titre: z.string().trim().max(200).optional(), motif: Motif.optional() });
+
+const Point = z.object({ kind: z.enum(['libre', 'chapitre']).default('libre'), titre: z.string().trim().min(2).max(300), description: z.string().trim().max(5000).optional().describe('Dossier simple : description'), numerote: z.boolean().default(false), afterItemId: Id.optional(), motif: Motif.optional() });
+const PointPatch = z.object({ titre: z.string().trim().min(2).max(300).optional(), description: z.string().trim().max(5000).nullable().optional(), numerote: z.boolean().optional(), motif: Motif.optional() });
 const Ordre = z.object({ ids: z.array(Id).max(1000), motif: Motif.optional() });
 const TriQ = z.object({ critere: z.enum(['rubrique', 'rapporteur', 'numero', 'alpha']) });
 const Arret = z.object({ forcer: z.boolean().default(false) });
@@ -20,7 +24,8 @@ const Verrou = z.object({ force: z.boolean().default(false) });
 const Pattern = z.object({ pattern: z.string().min(3).max(80).describe('Variables : {ANNEE} {N_SEANCE} {ORDRE} {ORDRE:03} {RUBRIQUE}') });
 const Apercu = Pattern.extend({ seanceId: Id.optional() });
 
-module.exports = ({ makeRouter, odj }) => {
+module.exports = ({ makeRouter, odj, config }) => {
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 1 } });
   const r = makeRouter('/api/v1/organismes/:orgId');
   const ADMIN = ['org_admin', 'scc'];
 
@@ -49,6 +54,22 @@ module.exports = ({ makeRouter, odj }) => {
     async (req, res) => res.json(await odj.updatePoint(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, req.valid.body)));
   r.delete('/seances/:id/odj/points/:itemId', { summary: 'Supprime un point libre ou un chapitre', tags: T, org: true, params: PI, query: Retrait },
     async (req, res) => res.json(await odj.removePoint(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, req.valid.query)));
+
+  // ---- pièces jointes d'un dossier simple (point libre)
+  r.post('/seances/:id/odj/points/:itemId/fichiers', { summary: "Joint un fichier à un dossier simple (point libre)", tags: T, org: true, params: PI, responses: { 201: 'Créé' },
+    description: "Requête multipart/form-data : champ « file » (PDF, png, jpg, documents Office ou OpenDocument, 20 Mo au plus ; type vérifié par l'extension et par la signature du fichier), `titre` et `motif` (obligatoire après l'arrêt de l'ordre du jour) facultatifs." },
+  upload.single('file'), async (req, res, next) => {
+    const meta = Piece.safeParse(req.body || {});
+    if (!meta.success) return next(require('../../shared/errors').E.badRequest('Requête invalide', meta.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))));
+    res.status(201).json(await odj.addFichier(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, meta.data, req.file));
+  });
+  r.delete('/seances/:id/odj/points/:itemId/fichiers/:fichierId', { summary: "Retire une pièce jointe d'un dossier simple", tags: T, org: true, params: PF, query: Retrait },
+    async (req, res) => res.json(await odj.removeFichier(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, req.valid.params.fichierId, req.valid.query)));
+  r.get('/seances/:id/odj/points/:itemId/fichiers/:fichierId', { summary: "Télécharge une pièce jointe d'un dossier simple", tags: T, org: true, params: PF, responses: { 200: 'Fichier' } },
+    async (req, res) => {
+      const f = await odj.getFichier(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, req.valid.params.fichierId);
+      res.setHeader('Content-Type', f.mime); res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(f.name)}"`); res.send(f.buffer);
+    });
 
   r.put('/seances/:id/odj/ordre', { summary: 'Enregistre le classement (résultat du glisser-déposer)', tags: T, org: true, params: PS, body: Ordre,
     description: "`ids` : toutes les lignes actives dans le nouvel ordre. Déplacer un groupe ou plusieurs lignes = envoyer le nouveau tableau. Enregistrement automatique côté client ; historisé." },

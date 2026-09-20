@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, BookOpen, Download, Mail, GripVertical, Lock, Plus, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Download, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { TeamsForm, TeamsLink } from '../Reunions';
 import CahierModal from '../Cahier';
+import { showPdf } from '../PdfViewer';
 import SeanceKpis from '../SeanceKpis';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
@@ -31,7 +32,8 @@ export default function Odj() {
   const [order, setOrder] = useState<any[]>([]); const [dragFrom, setDragFrom] = useState<number | null>(null); const [over, setOver] = useState<number | null>(null);
   const [history, setHistory] = useState<any[][]>([]); const [sel, setSel] = useState<number[]>([]);
   const [arret, setArret] = useState<any>(null); const [busy, setBusy] = useState(false);
-  const [point, setPoint] = useState<{ kind: 'libre' | 'chapitre'; titre: string; numerote: boolean } | null>(null);
+  const [point, setPoint] = useState<{ kind: 'libre' | 'chapitre'; titre: string; description: string; numerote: boolean; files: File[] } | null>(null);
+  const [dossierOpen, setDossierOpen] = useState<any>(null);
   const [pattern, setPattern] = useState<{ value: string; exemples: string[] } | null>(null);
   const lockTimer = useRef<any>(null);
   const meta = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}`))).data, [o, id]);
@@ -105,7 +107,7 @@ export default function Odj() {
             {canEdit && <div className="ml-auto flex flex-wrap gap-2">
               <button className="btn-secondary !py-1" onClick={undo} disabled={!history.length}><Undo2 className="h-3.5 w-3.5" /> Annuler</button>
               <select className="input !w-auto !py-1" aria-label="Aide de tri" value="" onChange={(e) => { if (e.target.value) propose(e.target.value); }}><option value="">Trier par…</option><option value="rubrique">Rubrique</option><option value="rapporteur">Rapporteur</option><option value="numero">N° de suivi</option><option value="alpha">Ordre alphabétique</option></select>
-              <button className="btn-secondary !py-1" onClick={() => setPoint({ kind: 'libre', titre: '', numerote: false })}><Plus className="h-3.5 w-3.5" /> Point libre / chapitre</button>
+              <button className="btn-secondary !py-1" onClick={() => setPoint({ kind: 'libre', titre: '', description: '', numerote: false, files: [] })}><Plus className="h-3.5 w-3.5" /> Dossier simple / point libre / chapitre</button>
             </div>}
           </div>
           {order.some((i) => i.acte && i.acte.etat !== 'pret') && <div className="border-b border-line px-4 py-2"><Legende /></div>}
@@ -128,7 +130,9 @@ export default function Odj() {
                   <div className="w-36 shrink-0"><div className={`font-mono text-[13px] font-bold ${it.provisoire ? 'italic text-mute' : 'text-primary'}`}>{it.numero ?? '—'}</div>{it.numero && it.provisoire && <div className="text-[10px] uppercase text-mute">provisoire</div>}{it.ajouteApresArret && <Badge tone="warn">ajouté</Badge>}</div>
                   <div className="min-w-0 flex-1">
                     <div className={`font-semibold ${retire ? 'line-through' : ''}`}>{it.acte ? <Link className="text-primary hover:underline" to={`/dossiers/${it.acte.id}`}>{it.titre}</Link> : it.titre}</div>
-                    <div className="text-[12px] text-mute">{it.acte ? `Dossier #${it.acte.numeroSuivi} · ${it.acte.rubrique ?? '—'} · rapporteur : ${it.acte.rapporteur ?? '—'}` : 'Point libre'}{it.ordreDeliberation > 1 || (it.acte && order.filter((x) => x.acte?.id === it.acte.id).length > 1) ? ` · délibération ${it.ordreDeliberation}` : ''}</div>
+                    <div className="text-[12px] text-mute">{it.acte ? `Dossier #${it.acte.numeroSuivi} · ${it.acte.rubrique ?? '—'} · rapporteur : ${it.acte.rapporteur ?? '—'}` : (it.kind === 'libre' && (it.description || it.fichiers?.length) ? 'Dossier simple' : 'Point libre')}{it.ordreDeliberation > 1 || (it.acte && order.filter((x) => x.acte?.id === it.acte.id).length > 1) ? ` · délibération ${it.ordreDeliberation}` : ''}</div>
+                    {it.kind === 'libre' && it.description && <p className="mt-1 whitespace-pre-wrap text-[12px] text-slate-700">{it.description}</p>}
+                    {it.kind === 'libre' && !retire && (it.fichiers?.length > 0 || canEdit) && <div className="mt-1 flex flex-wrap items-center gap-1">{(it.fichiers ?? []).map((f: any) => <button key={f.id} className="inline-flex items-center gap-1 rounded-full bg-soft px-2 py-0.5 text-[11px] hover:bg-slate-200" title={f.nom} onClick={async () => { const r = await api.get(orgPath(o, `/seances/${id}/odj/points/${it.id}/fichiers/${f.id}`), { responseType: 'blob' }); if (f.mime === 'application/pdf') showPdf(r.data, f.titre); else { const a = document.createElement('a'); a.href = URL.createObjectURL(r.data); a.download = f.nom; a.click(); } }}><Paperclip className="h-3 w-3" />{f.titre}</button>)}{canEdit && <button className="rounded-full border border-dashed border-line px-2 py-0.5 text-[11px] text-action hover:bg-soft" onClick={() => setDossierOpen(it)}>{it.fichiers?.length ? 'Gérer' : '+ pièce jointe'}</button>}</div>}
                     {retire && <div className="text-[12px] text-ko">Retiré : {it.retireMotif}</div>}
                     {!retire && it.acte && it.acte.etat !== 'pret' && <div className="mt-0.5"><Badge tone={ETAT[it.acte.etat]?.tone}>{it.acte.etat === 'en_circuit' ? (it.acte.etape ?? 'En circuit') : ETAT[it.acte.etat]?.label}</Badge>{it.acte.holders?.length ? <span className="ml-2 text-[11px] text-mute">chez <AgentNames list={it.acte.holders} /></span> : null}</div>}
                   </div>
@@ -171,11 +175,23 @@ export default function Odj() {
         </section>)}
 
       {point && <Modal title="Ajouter à l'ordre du jour" onClose={() => setPoint(null)}><div className="space-y-4">
-        <Field label="Type"><select className="input" value={point.kind} onChange={(e) => setPoint({ ...point, kind: e.target.value as any })}><option value="libre">Point libre (approbation du PV, questions diverses…)</option><option value="chapitre">Chapitre (titre de regroupement, sans numéro)</option></select></Field>
-        <Field label="Intitulé"><input className="input" autoFocus value={point.titre} onChange={(e) => setPoint({ ...point, titre: e.target.value })} /></Field>
-        {point.kind === 'libre' && <label className="flex items-center gap-2"><input type="checkbox" checked={point.numerote} onChange={(e) => setPoint({ ...point, numerote: e.target.checked })} /> Numéroter ce point</label>}
+        <Field label="Type"><select className="input" value={point.kind} onChange={(e) => setPoint({ ...point, kind: e.target.value as any })}><option value="libre">Dossier simple / point libre (nom, description, pièces jointes)</option><option value="chapitre">Chapitre (titre de regroupement, sans numéro)</option></select></Field>
+        <Field label={point.kind === 'libre' ? 'Nom du dossier' : 'Intitulé'}><input className="input" autoFocus value={point.titre} onChange={(e) => setPoint({ ...point, titre: e.target.value })} /></Field>
+        {point.kind === 'libre' && <>
+          <Field label="Description (facultatif)"><textarea className="input min-h-[90px]" value={point.description} maxLength={5000} onChange={(e) => setPoint({ ...point, description: e.target.value })} /></Field>
+          <Field label="Pièces jointes (facultatif)" hint="PDF, images, documents Office ou OpenDocument — 20 Mo au plus par fichier."><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.pptx,.odt,.ods,.odp" onChange={(e) => setPoint({ ...point, files: [...point.files, ...Array.from(e.target.files ?? [])] })} /></Field>
+          {point.files.length > 0 && <ul className="space-y-1 text-[12px]">{point.files.map((f, i) => <li key={i} className="flex items-center gap-2"><Paperclip className="h-3 w-3" />{f.name}<button className="text-ko" aria-label="Retirer" onClick={() => setPoint({ ...point, files: point.files.filter((_, k) => k !== i) })}>×</button></li>)}</ul>}
+          <label className="flex items-center gap-2"><input type="checkbox" checked={point.numerote} onChange={(e) => setPoint({ ...point, numerote: e.target.checked })} /> Numéroter ce point</label></>}
         <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setPoint(null)}>Annuler</button>
-          <button className="btn-primary" disabled={point.titre.trim().length < 2} onClick={() => { const p = point; setPoint(null); run((motif) => api.post(orgPath(o, `/seances/${id}/odj/points`), { ...p, motif }), 'Point ajouté'); }}>Ajouter</button></div></div></Modal>}
+          <button className="btn-primary" disabled={point.titre.trim().length < 2} onClick={() => {
+            const p = point; setPoint(null);
+            run(async (motif) => {
+              const r = await api.post(orgPath(o, `/seances/${id}/odj/points`), { kind: p.kind, titre: p.titre, description: p.description || undefined, numerote: p.numerote, motif });
+              for (const f of p.files) { const fd = new FormData(); fd.append('file', f); if (motif) fd.append('motif', motif); await api.post(orgPath(o, `/seances/${id}/odj/points/${r.data.id}/fichiers`), fd); }
+              return r;
+            }, p.kind === 'libre' ? 'Dossier ajouté' : 'Chapitre ajouté');
+          }}>Ajouter</button></div></div></Modal>}
+      {dossierOpen && <DossierFichiers o={o} seanceId={Number(id)} item={(d.items.find((x: any) => x.id === dossierOpen.id)) ?? dossierOpen} onClose={() => setDossierOpen(null)} onChanged={() => { odj.reload(); }} />}
 
       {pattern && <Modal title="Format de numérotation" onClose={() => setPattern(null)}><div className="space-y-4">
         <Field label="Motif" hint="Variables : {ANNEE} {N_SEANCE} {ORDRE} {ORDRE:03} {RUBRIQUE} — préfixes, suffixes et séparateurs libres."><input className="input font-mono" value={pattern.value} onChange={(e) => previewPattern(e.target.value)} /></Field>
@@ -191,5 +207,35 @@ export default function Odj() {
       {teamsOpen && meta.data && <TeamsForm seance={meta.data} onClose={() => setTeamsOpen(false)} onDone={() => { toast('Visioconférence enregistrée'); meta.reload(); }} />}
       {node}
     </div>
+  );
+}
+
+
+/** Description et pièces jointes d'un dossier simple : modification, ajout et retrait de fichiers. */
+function DossierFichiers({ o, seanceId, item, onClose, onChanged }: { o: number; seanceId: number; item: any; onClose: () => void; onChanged: () => void }) {
+  const base = orgPath(o, `/seances/${seanceId}/odj/points/${item.id}`);
+  const [desc, setDesc] = useState<string>(item.description ?? ''); const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  const motif = () => { const m = window.prompt("L'ordre du jour est arrêté : indiquez le motif de la modification"); return m ?? null; };
+  const call = async (fn: (motifValue?: string) => Promise<unknown>) => {
+    setBusy(true); setErr(null);
+    try { await fn(); onChanged(); } catch (e: any) {
+      if (e?.response?.status === 400 && /motif/i.test(JSON.stringify(e.response.data))) { const m = motif(); if (m) { try { await fn(m); onChanged(); setBusy(false); return; } catch (x) { setErr(errMsg(x)); } } } else setErr(errMsg(e));
+    } finally { setBusy(false); }
+  };
+  return (
+    <Modal title={`Dossier — ${item.titre}`} onClose={onClose} wide>
+      <div className="space-y-4"><ErrorBox msg={err} />
+        <Field label="Description"><textarea className="input min-h-[90px]" value={desc} maxLength={5000} onChange={(e) => setDesc(e.target.value)} /></Field>
+        <div className="flex justify-end"><button className="btn-secondary" disabled={busy || desc === (item.description ?? '')} onClick={() => call((m) => api.put(base, { description: desc || null, motif: m }))}>Enregistrer la description</button></div>
+        <section><h4 className="mb-2">Pièces jointes</h4>
+          {!item.fichiers?.length ? <p className="text-mute">Aucune pièce jointe.</p> : <ul className="divide-y divide-line rounded border border-line">{item.fichiers.map((f: any) => (
+            <li key={f.id} className="flex items-center gap-3 px-3 py-2"><Paperclip className="h-4 w-4 text-mute" /><span className="min-w-0 flex-1"><b>{f.titre}</b><span className="block text-[11px] text-mute">{f.nom} · {Math.round((f.taille ?? 0) / 1024)} Ko{f.pages ? ` · ${f.pages} p.` : ''}</span></span>
+              <button className="text-[12px] font-semibold text-ko" disabled={busy} onClick={() => call((m) => api.delete(`${base}/fichiers/${f.id}`, { params: { motif: m } }))}>Retirer</button></li>))}</ul>}
+          <label className="btn-secondary mt-3 inline-flex cursor-pointer items-center gap-2"><Paperclip className="h-4 w-4" /> Ajouter un fichier
+            <input type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.pptx,.odt,.ods,.odp" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) call((m) => { const fd = new FormData(); fd.append('file', f); if (m) fd.append('motif', m); return api.post(`${base}/fichiers`, fd); }); }} /></label>
+        </section>
+        <div className="flex justify-end"><button className="btn-primary" onClick={onClose}>Fermer</button></div>
+      </div>
+    </Modal>
   );
 }

@@ -15,7 +15,7 @@ const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
 const { parisParts } = require('../../shared/time');
 
-const TYPES = ['envoi', 'echec', 'relance', 'ouverture', 'convocation_lue', 'odj_lu', 'accuse', 'reponse'];
+const TYPES = ['envoi', 'echec', 'relance', 'ouverture', 'convocation_lue', 'odj_lu', 'accuse', 'reponse', 'piece_lue'];
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const dayNumber = (d) => { const p = parisParts(new Date(d)); return Date.UTC(p.y, p.m - 1, p.d) / 86400000; };
 const token = () => crypto.randomBytes(24).toString('base64url');
@@ -89,7 +89,8 @@ function createConvocations({ db, audit, render, odj, seances, storage, mail, se
     const orgRow = await db.get('SELECT nom, contact FROM organismes WHERE id = $1', [org]);
     const vars = { organisme: orgRow?.nom || '', instance: s.instance_nom, date_seance: dateLong(s.date_seance).toUpperCase() };
     const numbered = items.filter((i) => i.kind !== 'chapitre');
-    const listLines = items.map((i) => (i.kind === 'chapitre' ? `# ${i.titre}` : `**${i.numero ?? '·'}** — ${i.titre}`)).join('\n');
+    const pieces = (i) => (i.fichiers?.length ? `Pièces jointes : ${i.fichiers.map((f) => f.titre).join(', ')}` : '');
+    const listLines = items.map((i) => (i.kind === 'chapitre' ? `# ${i.titre}` : `**${i.numero ?? '·'}** — ${i.titre}${i.description ? `\n${i.description}` : ''}${pieces(i) ? `\n${pieces(i)}` : ''}`)).join('\n');
     const sign = [orgRow?.contact?.signataire, orgRow?.contact?.signataireQualite].filter(Boolean);
     const conv = await render.build({ organismeId: org, docType: 'convocation', vars, watermark: '', title: `Convocation — ${s.instance_nom}`, content: [
       { type: 'space', h: 20 },
@@ -110,7 +111,7 @@ function createConvocations({ db, audit, render, odj, seances, storage, mail, se
       { type: 'title', text: orgRow?.nom || '', size: 14, align: 'center', bold: true, after: 10 },
       { type: 'title', text: 'ORDRE DU JOUR', size: 18, align: 'center', bold: true, boxed: true, after: 10 },
       { type: 'title', text: `${s.instance_nom} — ${dateLong(s.date_seance)} à ${heure(s.date_seance)}`, size: 12, align: 'center', bold: true, after: 14 },
-      { type: 'runs', runs: [{ type: 'text', text: items.map((i) => (i.kind === 'chapitre' ? `# ${i.titre}` : `**${i.numero ?? '·'}** — ${i.titre}${i.rapporteur ? `\nRapporteur : ${i.rapporteur}${i.rubrique ? ` · ${i.rubrique}` : ''}` : ''}\n`)).join('\n') }] },
+      { type: 'runs', runs: [{ type: 'text', text: items.map((i) => (i.kind === 'chapitre' ? `# ${i.titre}` : `**${i.numero ?? '·'}** — ${i.titre}${i.rapporteur ? `\nRapporteur : ${i.rapporteur}${i.rubrique ? ` · ${i.rubrique}` : ''}` : ''}${i.description ? `\n${i.description}` : ''}${pieces(i) ? `\n${pieces(i)}` : ''}\n`)).join('\n') }] },
     ] });
     const store = async (doc, name) => {
       const put = await storage.put(doc.buffer, { organismeId: org, ext: 'pdf' });
@@ -207,7 +208,7 @@ function createConvocations({ db, audit, render, odj, seances, storage, mail, se
       if (!chosen.length) throw E.badRequest('Aucun convoqué : choisissez au moins un élu ou un agent');
 
       const d = await odj.get(ctx, org, seanceId);
-      const items = d.items.filter((i) => i.statut === 'a_traiter').map((i) => ({ numero: i.numero, titre: i.titre, kind: i.kind, rubrique: i.acte?.rubrique ?? null, rapporteur: i.acte?.rapporteur ?? null, key: `${i.acte?.id ?? 't'}:${i.deliberationId ?? i.titre}` }));
+      const items = d.items.filter((i) => i.statut === 'a_traiter').map((i) => ({ numero: i.numero, titre: i.titre, kind: i.kind, rubrique: i.acte?.rubrique ?? null, rapporteur: i.acte?.rapporteur ?? null, description: i.description ?? null, fichiers: (i.fichiers || []).map((f) => ({ id: f.id, titre: f.titre, nom: f.nom, mime: f.mime, taille: f.taille })), key: `${i.acte?.id ?? 't'}:${i.deliberationId ?? i.titre}` }));
       if (!items.length) throw E.conflict("L'ordre du jour est vide");
       const prev = await db.get('SELECT * FROM convocations WHERE seance_id = $1 ORDER BY version_no DESC LIMIT 1', [seanceId]);
       const version = (prev?.version_no ?? 0) + 1;
@@ -353,7 +354,7 @@ function createConvocations({ db, audit, render, odj, seances, storage, mail, se
         convoque: { nom: d.nom, qualite: d.qualite },
         seance: { instance: s.instance_nom, dateSeance: s.date_seance, lieu: s.lieu, annulee: s.statut === 'annulee' },
         convocation: { version: conv.version_no, modificatif: conv.modificatif, objet: conv.objet, message: conv.message, urgence: conv.urgence, urgenceMotif: conv.urgence_motif, differences: conv.differences, envoyeLe: d.envoye_at },
-        ordreDuJour: conv.odj_snapshot.map(({ numero, titre, kind, rubrique, rapporteur }) => ({ numero, titre, kind, rubrique, rapporteur })),
+        ordreDuJour: conv.odj_snapshot.map(({ numero, titre, kind, rubrique, rapporteur, description, fichiers }) => ({ numero, titre, kind, rubrique, rapporteur, description: description ?? null, fichiers: fichiers ?? [] })),
         remplacee: conv.version_no < newest ? { version: newest } : null,
         lu: { convocation: fresh.conv_lectures > 0, odj: fresh.odj_lectures > 0, accuseAt: fresh.accuse_at },
         reponse: fresh.reponse ? { reponse: fresh.reponse, at: fresh.reponse_at, commentaire: fresh.reponse_commentaire } : null,
@@ -369,6 +370,17 @@ function createConvocations({ db, audit, render, odj, seances, storage, mail, se
       await db.run(`UPDATE convocation_destinataires SET ${colN} = ${colN} + 1, ${colAt} = COALESCE(${colAt}, now()) WHERE id = $1`, [d.id]);
       await logEvent(conv.id, d.id, type, null, req);
       return { buffer: await storage.get(f.storage_key), name: `${kind === 'odj' ? 'ordre-du-jour' : 'convocation'}-v${conv.version_no}.pdf` };
+    },
+
+    /** Pièce jointe d'un dossier simple, depuis le lien personnel : seules les pièces de CETTE version de la convocation sont accessibles ; chaque consultation est journalisée. */
+    async pieceToken(tok, fichierId, req) {
+      const { d, conv } = await svc.byToken(tok);
+      const dansConvocation = (conv.odj_snapshot || []).some((i) => (i.fichiers || []).some((f) => f.id === fichierId));
+      if (!dansConvocation) throw E.notFound('Pièce jointe introuvable');
+      const f = await db.get('SELECT f.titre, fl.storage_key, fl.mime, fl.original_name FROM seance_item_fichiers f JOIN files fl ON fl.id = f.file_id WHERE f.id = $1', [fichierId]);
+      if (!f) throw E.notFound('Pièce jointe introuvable (elle a été retirée)');
+      await logEvent(conv.id, d.id, 'piece_lue', { fichierId, fichier: f.titre }, req);
+      return { buffer: await storage.get(f.storage_key), mime: f.mime, name: f.original_name };
     },
 
     async accuseToken(tok, req) {

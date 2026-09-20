@@ -64,7 +64,8 @@ export function ReunionsSection({ commissionId, canEdit }: { commissionId: numbe
               <TeamsLink teams={r.teams} />
               <span className="ml-auto flex gap-2">
                 {canEdit && r.statut !== 'annulee' && <button className="btn-secondary !py-1" onClick={() => setTeamsFor(r)}><Video className="h-3.5 w-3.5" /> Teams</button>}
-                <Link className="btn-secondary !py-1" to={`/seances/${r.id}`}>Projets présentés →</Link></span>
+                {canEdit && r.statut !== 'annulee' && <Link className="btn-secondary !py-1" to={`/seances/${r.id}/convocation`}>Convocation</Link>}
+                <Link className="btn-secondary !py-1" to={`/seances/${r.id}`}>Ordre du jour →</Link></span>
             </li>);
         })}</ul>)}
       {creating && (

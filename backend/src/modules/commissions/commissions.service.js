@@ -8,7 +8,7 @@ const { requireOrg } = require('../../db/pool');
 
 const AVIS = ['favorable', 'defavorable', 'reserve', 'sans_avis'];
 const FONCTIONS = ['president', 'vice_president', 'membre'];
-const toC = (r) => ({ id: r.id, organismeId: r.organisme_id, nom: r.nom, description: r.description, couleur: r.couleur, ordre: r.ordre, matieres: r.matieres, directions: r.directions, thematiques: r.thematiques, sieges: r.sieges, siegesOpposition: r.sieges_opposition, actif: r.actif });
+const toC = (r) => ({ id: r.id, organismeId: r.organisme_id, nom: r.nom, description: r.description, couleur: r.couleur, ordre: r.ordre, matieres: r.matieres, directions: r.directions, thematiques: r.thematiques, sieges: r.sieges, siegesOpposition: r.sieges_opposition, type: r.type, actif: r.actif });
 const toAc = (r) => ({
   id: r.id, acteId: r.acte_id, commissionId: r.commission_id, commission: r.commission_nom, avis: r.avis, commentaire: r.avis_commentaire, datePassage: r.avis_date, avisPar: r.avis_par, avisAt: r.avis_at,
   misADispositionAt: r.mis_a_disposition_at, suspendue: r.suspendue, retireeAt: r.retiree_at, retireeMotif: r.retiree_motif,
@@ -41,8 +41,8 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log, late = {
     async create(ctx, organismeId, b) {
       const org = requireOrg(organismeId);
       try {
-        const r = await db.get('INSERT INTO commissions (organisme_id, nom, description, couleur, ordre, matieres, directions, thematiques, sieges, sieges_opposition) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10) RETURNING *',
-          [org, b.nom, b.description ?? null, b.couleur ?? null, b.ordre ?? 0, JSON.stringify(b.matieres || []), JSON.stringify(b.directions || []), JSON.stringify(b.thematiques || []), b.sieges ?? null, b.siegesOpposition ?? null]);
+        const r = await db.get('INSERT INTO commissions (organisme_id, nom, description, couleur, ordre, matieres, directions, thematiques, sieges, sieges_opposition, type) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10,$11) RETURNING *',
+          [org, b.nom, b.description ?? null, b.couleur ?? null, b.ordre ?? 0, JSON.stringify(b.matieres || []), JSON.stringify(b.directions || []), JSON.stringify(b.thematiques || []), b.sieges ?? null, b.siegesOpposition ?? null, b.type || 'actes']);
         await audit.log(ctx, { organismeId: org, action: 'commission.create', entity: 'commissions', entityId: r.id, after: toC(r) });
         await late.seances?.ensureCommissionInstance(r.id);
         return svc.get(org, r.id);
@@ -53,7 +53,7 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log, late = {
       const org = requireOrg(organismeId);
       const before = await svc.get(org, id);
       const set = []; const p = [id, org];
-      for (const [k, col, j] of [['nom', 'nom'], ['description', 'description'], ['couleur', 'couleur'], ['ordre', 'ordre'], ['actif', 'actif'], ['matieres', 'matieres', true], ['directions', 'directions', true], ['thematiques', 'thematiques', true], ['sieges', 'sieges'], ['siegesOpposition', 'sieges_opposition']]) {
+      for (const [k, col, j] of [['nom', 'nom'], ['description', 'description'], ['couleur', 'couleur'], ['ordre', 'ordre'], ['actif', 'actif'], ['matieres', 'matieres', true], ['directions', 'directions', true], ['thematiques', 'thematiques', true], ['sieges', 'sieges'], ['siegesOpposition', 'sieges_opposition'], ['type', 'type']]) {
         if (b[k] !== undefined) { p.push(j ? JSON.stringify(b[k]) : b[k]); set.push(`${col} = $${p.length}${j ? '::jsonb' : ''}`); }
       }
       if (set.length) await db.run(`UPDATE commissions SET ${set.join(', ')} WHERE id = $1 AND organisme_id = $2`, p);
@@ -119,6 +119,7 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log, late = {
       const a = await svc.loadEditable(ctx, organismeId, acteId);
       const c = await db.get('SELECT * FROM commissions WHERE id = $1 AND organisme_id = $2 AND actif', [commissionId, a.organisme_id]);
       if (!c) throw E.badRequest('Commission inconnue ou inactive dans cet organisme');
+      if (c.type === 'autre') throw E.badRequest(`La commission « ${c.nom} » n’est pas associée à la rédaction des actes : elle ne rend pas d’avis sur les projets`);
       try {
         const r = await db.get('INSERT INTO acte_commissions (acte_id, commission_id, created_by) VALUES ($1,$2,$3) RETURNING *', [a.id, c.id, ctx.username]);
         await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.commission.add', entity: 'acte_commissions', entityId: r.id, after: { acteId: a.id, commission: c.nom } });

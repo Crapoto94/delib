@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { CalendarDays, Check, FileText, MapPin, ScrollText } from 'lucide-react';
+import { CalendarDays, Check, FileText, MapPin, Paperclip, ScrollText } from 'lucide-react';
 import { OrgLogo } from '../Brand';
 import { PdfViewerHost, showPdf } from '../PdfViewer';
 import { dt } from '../format';
@@ -28,6 +28,14 @@ export default function ConvocationPublique() {
   const open = async (kind: 'convocation' | 'odj') => {
     setBusy(kind);
     try { const r = await fetch(api(token, kind === 'odj' ? '/ordre-du-jour.pdf' : '/convocation.pdf')); if (!r.ok) throw new Error(); showPdf(await r.blob(), kind === 'odj' ? "Ordre du jour" : 'Convocation'); await refresh(); } catch { setMsg('Document indisponible.'); } finally { setBusy(null); }
+  };
+  // pièce jointe d'un dossier : PDF dans la visionneuse, autres fichiers téléchargés (chaque ouverture est enregistrée)
+  const piece = async (f: { id: number; titre: string; nom: string; mime: string }) => {
+    try {
+      const r = await fetch(api(token, `/pieces/${f.id}`)); if (!r.ok) throw new Error();
+      const blob = await r.blob();
+      if (f.mime === 'application/pdf') showPdf(blob, f.titre); else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = f.nom; a.click(); }
+    } catch { setMsg('Pièce jointe indisponible.'); }
   };
   const post = async (path: string, body?: unknown) => {
     const r = await fetch(api(token, path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) });
@@ -60,7 +68,9 @@ export default function ConvocationPublique() {
         <section className="card p-5"><h3>Ordre du jour</h3>
           <ol className="mt-2 space-y-2 text-[14px]">{d.ordreDuJour.map((p: any, i: number) => p.kind === 'chapitre'
             ? <li key={i} className="pt-2 text-[12px] font-bold uppercase tracking-wider text-primary">{p.titre}</li>
-            : <li key={i} className="flex gap-3"><span className="w-24 shrink-0 font-mono text-[13px] font-bold text-primary">{p.numero ?? '·'}</span><span><b>{p.titre}</b>{p.rapporteur && <span className="block text-[12px] text-mute">Rapporteur : {p.rapporteur}{p.rubrique ? ` · ${p.rubrique}` : ''}</span>}</span></li>)}</ol></section>
+            : <li key={i} className="flex gap-3"><span className="w-24 shrink-0 font-mono text-[13px] font-bold text-primary">{p.numero ?? '·'}</span><span className="min-w-0"><b>{p.titre}</b>{p.rapporteur && <span className="block text-[12px] text-mute">Rapporteur : {p.rapporteur}{p.rubrique ? ` · ${p.rubrique}` : ''}</span>}
+                {p.description && <span className="mt-1 block whitespace-pre-wrap text-[13px] text-slate-700">{p.description}</span>}
+                {p.fichiers?.length > 0 && <span className="mt-1 flex flex-wrap gap-2">{p.fichiers.map((f: any) => <button key={f.id} className="inline-flex items-center gap-1 rounded-full bg-soft px-3 py-1 text-[12px] font-semibold hover:bg-slate-200" onClick={() => piece(f)}><Paperclip className="h-3.5 w-3.5" />{f.titre}</button>)}</span>}</span></li>)}</ol></section>
         <section className="card p-5">
           <h3>Votre réponse</h3>
           {d.reponse && <p className="mt-2 rounded bg-emerald-50 px-3 py-2 text-ok">Vous avez répondu : <b>{d.reponse.reponse === 'present' ? 'présent(e)' : 'absent(e) excusé(e)'}</b> le {dt(d.reponse.at, { dateStyle: 'short', timeStyle: 'short' })}. Vous pouvez la modifier.</p>}
