@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronRight, FileText, Folder, FolderPlus, Plug, XCircle } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -26,6 +26,55 @@ function Explorateur({ o, rev }: { o: number; rev: number }) {
             </button>
           </li>))}</ul>)}
     </div>
+  );
+}
+
+const octets = (n: number) => (n > 1e9 ? `${(n / 1e9).toFixed(1)} Go` : n > 1e6 ? `${(n / 1e6).toFixed(1)} Mo` : `${Math.round(n / 1e3)} Ko`);
+
+/** Stockage des fichiers (GED-09, GED-10) : volume local ou Alfresco, avec migration dans les deux sens. */
+function StockageFichiers({ o, rev, onDone }: { o: number; rev: number; onDone: () => void }) {
+  const { toast, node } = useToast();
+  const e = useLoad(async () => (await api.get(orgPath(o, '/ged/stockage'))).data, [o, rev]);
+  const [busy, setBusy] = useState<string | null>(null); const [supprimer, setSupprimer] = useState(false);
+  const enCours = !!e.data?.migration?.enCours;
+  // pendant une migration, l'avancement est relu toutes les 2 s
+  useEffect(() => { if (!enCours) return; const t = setInterval(() => e.reload(), 2000); return () => clearInterval(t); }, [enCours]); // eslint-disable-line react-hooks/exhaustive-deps
+  const d = e.data;
+  const choisir = async (stockage: 'local' | 'alfresco') => {
+    if (stockage === 'alfresco' && !window.confirm('Confier à Alfresco le stockage de TOUS les nouveaux fichiers (annexes, pièces, cahiers, PDF…) ? Si la GED devient injoignable, les dépôts de fichiers seront refusés. Les fichiers existants restent où ils sont tant que vous ne les migrez pas.')) return;
+    setBusy('choix');
+    try { await api.put(orgPath(o, '/ged/config'), { stockage }); toast(stockage === 'alfresco' ? 'Les nouveaux fichiers iront dans Alfresco' : 'Les nouveaux fichiers iront sur le volume local'); e.reload(); onDone(); } catch (x) { toast(errMsg(x), 'ko'); } finally { setBusy(null); }
+  };
+  const migrer = async (sens: 'vers_alfresco' | 'vers_local') => {
+    const q = sens === 'vers_alfresco' ? `Copier ${d.fichiers.local} fichier(s) du volume local vers Alfresco ?` : `Rapatrier ${d.fichiers.alfresco} fichier(s) d’Alfresco vers le volume local ?`;
+    if (!window.confirm(`${q}${supprimer ? '\n\nATTENTION : les fichiers d’origine seront supprimés après copie.' : '\n\nLes fichiers d’origine sont conservés.'}`)) return;
+    setBusy(sens);
+    try { await api.post(orgPath(o, '/ged/stockage/migration'), { sens, supprimerSource: supprimer }); toast('Migration lancée en arrière-plan'); e.reload(); } catch (x) { toast(errMsg(x), 'ko'); } finally { setBusy(null); }
+  };
+  if (!d) return e.error ? <ErrorBox msg={e.error} /> : <Loading />;
+  const m = d.migration;
+  return (
+    <section className="card space-y-3 p-5"><h3>Stockage des fichiers</h3>
+      <p className="max-w-4xl text-mute">Où sont enregistrés <b>tous les fichiers de l’application</b> : annexes déposées, pièces de l’ordre du jour, convocations, cahiers de séance, PDF produits, logo. Avec Alfresco, ils sont rangés dans <b>« 90 Stockage applicatif »</b> (noms techniques : ne pas les modifier à la main). Ceci est indépendant de l’<b>archivage</b> organisé ci-dessous.</p>
+      <div className="grid gap-3 md:grid-cols-2" role="radiogroup" aria-label="Stockage des fichiers">
+        {([['local', 'Volume local du serveur', 'Simple et rapide ; à sauvegarder avec la base.'], ['alfresco', 'Alfresco (GED)', 'Les fichiers vivent dans la GED, sauvegardée et gouvernée avec le reste. Exige une GED active et validée.']] as const).map(([k, titre, desc]) => (
+          <button key={k} role="radio" aria-checked={d.stockage === k} disabled={!!busy || d.stockage === k || (k === 'alfresco' && !d.gedActive)} onClick={() => choisir(k)}
+            className={`rounded border p-4 text-left ${d.stockage === k ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-line hover:bg-soft'} disabled:cursor-not-allowed`}>
+            <div className="flex items-center gap-2"><span className="font-bold">{titre}</span>{d.stockage === k && <Badge tone="ok">Choisi</Badge>}</div>
+            <p className="mt-1 text-[13px] text-mute">{desc}{k === 'alfresco' && !d.gedActive ? ' (activez d’abord la GED dans « Connexion »)' : ''}</p>
+          </button>))}
+      </div>
+      <div className="flex flex-wrap gap-2 text-[13px]"><Badge>{d.fichiers.local} fichier(s) en local ({octets(d.fichiers.octetsLocal)})</Badge><Badge tone="blue">{d.fichiers.alfresco} fichier(s) dans Alfresco ({octets(d.fichiers.octetsAlfresco)})</Badge></div>
+      <div className="flex flex-wrap items-center gap-2 rounded border border-line p-3">
+        <b className="text-[13px]">Migration :</b>
+        <button className="btn-secondary !py-1" disabled={!!busy || enCours || d.stockage !== 'alfresco' || d.fichiers.local === 0} onClick={() => migrer('vers_alfresco')} title={d.stockage !== 'alfresco' ? 'Choisissez d’abord Alfresco' : ''}>Local → Alfresco</button>
+        <button className="btn-secondary !py-1" disabled={!!busy || enCours || d.stockage !== 'local' || d.fichiers.alfresco === 0} onClick={() => migrer('vers_local')} title={d.stockage !== 'local' ? 'Repassez d’abord le stockage en local' : ''}>Alfresco → local</button>
+        <label className="flex items-center gap-1 text-[12px] text-mute"><input type="checkbox" checked={supprimer} onChange={(x) => setSupprimer(x.target.checked)} /> supprimer les fichiers d’origine après copie</label>
+      </div>
+      {m && <div className="text-[13px]">{m.enCours ? <><Spinner /> Migration en cours : <b>{m.faits}</b> / {m.total} fichier(s)…</> : <>Dernière migration ({m.sens === 'vers_alfresco' ? 'local → Alfresco' : 'Alfresco → local'}) : <Badge tone={m.echecs ? 'warn' : 'ok'}>{m.faits} / {m.total} migré(s){m.echecs ? `, ${m.echecs} échec(s)` : ''}</Badge></>}
+        {m.erreurs?.length > 0 && <ul className="mt-1 list-disc pl-5 text-ko">{m.erreurs.map((x: any, i: number) => <li key={i}>{x.fichier} : {x.erreur}</li>)}</ul>}</div>}
+      {node}
+    </section>
   );
 }
 
@@ -120,6 +169,8 @@ export default function AdminGed() {
         {plan && <div className="rounded bg-soft p-3 text-[12px]"><b>{plan.nouveaux ? `${plan.nouveaux} dossier(s) créé(s)` : 'Plan déjà complet'}</b>{plan.nouveaux > 0 && <ul className="mt-1 max-h-40 overflow-y-auto font-mono text-[11px]">{plan.dossiers.map((d: string) => <li key={d}>{d}</li>)}</ul>}</div>}
         <Explorateur o={o} rev={rev} />
       </section>
+
+      <StockageFichiers o={o} rev={rev} onDone={() => setRev((n) => n + 1)} />
 
       <Synchronisation o={o} rev={rev} onDone={() => setRev((n) => n + 1)} />
 

@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.27 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.28 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1075,6 +1075,8 @@ Tous les documents produits sont **archivés dans une GED Alfresco** (choix et p
 - **GED-06** — **Ce qui est archivé** pour une séance : convocation et ordre du jour envoyés, exposé, projet et annexes de chaque délibération, cahier de séance, procès-verbal et liste des délibérations, **extraits du registre** des délibérations votées, et, au contrôle de légalité, l'**accusé de réception**, le **bordereau** et l'**acte tamponné** ; chaque dépôt est journalisé (`ged_documents` : chemin, nœud, version, empreinte, date, auteur).
 - **GED-07** — **Résilience** : un échec d'archivage n'empêche jamais le travail de l'agent ; il est journalisé et **rejouable** (bouton « Archiver » idempotent). Un explorateur du plan de classement permet de vérifier le dépôt depuis l'outil.
 - **GED-08** — **Synchronisation VibeDélib ↔ GED (D93)** : **état comparé** séance par séance (à archiver, à mettre à jour, en erreur, manquants, synchronisés) ; **« Synchroniser »** (local → GED) dépose ce qui manque ou a changé, en nouvelle version, pour une séance ou pour toutes, idempotent et rejouable ; **« Vérifier la GED »** (GED → local) contrôle que chaque document déposé existe toujours dans la GED, marque les absents « manquants » et les redépose à la synchronisation suivante — **VibeDélib reste la source**, la GED n'est jamais relue pour alimenter l'outil. **Un cahier de séance terminé part en GED tout de suite** (archivage automatique), sans attendre la clôture de la séance.
+- **GED-09** — **Alfresco comme stockage des fichiers (D95)** : au choix de l'organisme (Paramétrages › GED › « Stockage des fichiers »), **tous les fichiers produits ou déposés** — annexes, pièces de l'ordre du jour, convocations, cahiers, PDF des séances, pièces de télétransmission, fonds de page, logo — sont **enregistrés dans Alfresco au lieu du volume local**, dans un dossier technique « 90 Stockage applicatif / année / mois » (noms opaques, à ne pas toucher à la main). Le basculement exige une connexion validée (test d'écriture et de relecture). Chaque fichier garde sa **clé de stockage** (`alf:` + nœud) : local et Alfresco **coexistent** sans rupture. Lecture par un **cache disque** (contenu immuable). **Aucun repli silencieux** : si Alfresco est injoignable, l'envoi est refusé avec un message clair (502) plutôt que de disperser des fichiers. Indépendant de l'**archivage** (plan de classement, GED-01 à 08), qui reste une copie organisée pour les archives.
+- **GED-10** — **Migration du stockage** (en arrière-plan, rejouable, avec compte rendu) : **local → Alfresco** (`stockage = alfresco` requis) et **Alfresco → local** (`stockage = local` requis), fichiers et logo ; la source n'est supprimée que sur demande expresse (jamais par défaut) ; un fichier illisible est signalé et n'arrête pas les autres.
 
 ### 19.6 Publication (phase aval)
 
@@ -1714,6 +1716,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D85** | **Espace élus** : API et front distincts (PDF finalisés seulement, ni notes ni saisie), authentification par invitation + mot de passe + code par mail, mise à disposition à l'envoi de la convocation, filigrane nominatif, **téléchargement en arrière-plan** (web et APK) pour un passage instantané d'un point à l'autre, lectures hors ligne synchronisées, notes personnelles partageables, suivi en direct. *(réalisé ; annotations sur PDF et service natif d'arrière-plan de l'APK : à venir)* | 18 |
 | **D90** | **Annotations sur les PDF de l'espace élus** : surlignage, note, dessin, signet ; privées par défaut, chiffrées au repos, partage figé par groupe ou par élus nommés, réponses, ré-ancrage par citation, export annoté *(ELU-71 à ELU-76)* | 18.4 |
 | **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
+| **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |
 | **D94** | **Gestion des élus et mot de passe oublié par SMS** : création / édition / suppression prudente, désactivation persistante après synchronisation, code SMS à 6 chiffres (5 min) → session de 12 h, journal des oublis, passerelle SMS *(ELU-80 à ELU-85)* | 18.4 ter |
 | **D93** | **Synchronisation avec la GED** : état comparé, local → GED en un clic, vérification GED → local, archivage du cahier dès sa fin *(GED-08)* | 19.5 bis |
 | **D92** | **Amendements en séance** : dépôt, vote avant le texte, application au texte avec suivi, procès-verbal *(LIVE-14, VOT-06)* | 19.1 bis |
@@ -1743,6 +1746,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.28** | 2026-09-20 | **D95** : stockage des fichiers dans Alfresco (GED-09, GED-10) |
 | **1.27** | 2026-09-20 | **D94** : gestion des élus, désactivation persistante, mot de passe oublié par SMS (ELU-80 à ELU-85) |
 | **1.26** | 2026-09-20 | **D93** : synchronisation GED (GED-08) |
 | **1.25** | 2026-09-20 | **D92** : amendements (LIVE-14) |

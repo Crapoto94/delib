@@ -16,15 +16,27 @@ async function nextCounter(runner, organismeId, key) {
   return Number(r.value);
 }
 
-/** StoragePort — volume local hors du code. Les clés sont générées par le serveur (jamais fournies par l'utilisateur). */
+/**
+ * StoragePort — volume local OU Alfresco, au choix de chaque organisme (GED-09, D95).
+ * La clé dit où est le fichier : « 12/2026/09/ab12….pdf » (volume local) ou « alf:<organisme>:<nœud> » (Alfresco) ; les deux coexistent.
+ * Les clés sont générées par le serveur (jamais fournies par l'utilisateur). Le backend Alfresco est branché après coup (`attach`) :
+ * il dépend de la configuration GED, qui elle-même dépend du stockage. Pas de repli silencieux : si Alfresco est choisi et injoignable, `put` échoue.
+ */
+const ALF = /^alf:(\d+):([0-9a-fA-F-]{8,64})$/;
+const MIME = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
+
 function createStorage(config) {
   const root = config.storage.dir;
+  const cacheDir = path.join(root, '.cache-alfresco');
+  let alf = null; // { cible(orgId) -> { cfg, ad } | null, dossier(orgId, cible) -> id de dossier, ad(orgId) -> { cfg, ad } | null }
   const resolve = (key) => {
     const full = path.resolve(root, key);
     if (!full.startsWith(root + path.sep)) throw E.badRequest('Clé de stockage invalide');
     return full;
   };
-  return {
+  const cacheFile = (nodeId) => path.join(cacheDir, nodeId);
+
+  const local = {
     async put(buffer, { organismeId, ext = 'bin' }) {
       const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
       const d = new Date();
@@ -37,6 +49,52 @@ function createStorage(config) {
     get: (key) => fs.promises.readFile(resolve(key)),
     async remove(key) { await fs.promises.rm(resolve(key), { force: true }); },
     exists: (key) => fs.promises.access(resolve(key)).then(() => true, () => false),
+  };
+
+  return {
+    /** Branche le backend Alfresco (appelé une fois par le conteneur, une fois la GED construite). */
+    attach(backend) { alf = backend; },
+    isAlfresco: (key) => ALF.test(String(key)),
+    local,
+
+    async put(buffer, { organismeId, ext = 'bin' }) {
+      const cible = alf && organismeId ? await alf.cible(organismeId) : null;
+      if (!cible) return local.put(buffer, { organismeId, ext });
+      const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+      const nom = `${sha256.slice(0, 16)}-${crypto.randomBytes(4).toString('hex')}.${ext.replace(/[^a-z0-9]/gi, '') || 'bin'}`;
+      const dossierId = await alf.dossier(organismeId, cible);
+      const r = await cible.ad.deposer(cible.cfg, dossierId, { nom, buffer, mime: MIME[ext] || 'application/octet-stream', description: 'Fichier de VibeDélib (stockage applicatif)' });
+      try { await fs.promises.mkdir(cacheDir, { recursive: true }); await fs.promises.writeFile(cacheFile(r.nodeId), buffer); } catch { /* le cache est facultatif */ }
+      return { key: `alf:${organismeId}:${r.nodeId}`, sha256, size: buffer.length };
+    },
+
+    async get(key) {
+      const m = ALF.exec(String(key));
+      if (!m) return local.get(key);
+      try { return await fs.promises.readFile(cacheFile(m[2])); } catch { /* pas en cache : lecture en GED */ }
+      const c = alf ? await alf.ad(Number(m[1])) : null;
+      if (!c) throw E.conflict('Ce fichier est stocké dans la GED, dont la configuration n\'est plus active');
+      const b = await c.ad.contenu(c.cfg, m[2]);
+      if (!b) throw E.notFound('Fichier introuvable dans la GED');
+      try { await fs.promises.mkdir(cacheDir, { recursive: true }); await fs.promises.writeFile(cacheFile(m[2]), b); } catch { /* facultatif */ }
+      return b;
+    },
+
+    async remove(key) {
+      const m = ALF.exec(String(key));
+      if (!m) return local.remove(key);
+      await fs.promises.rm(cacheFile(m[2]), { force: true });
+      const c = alf ? await alf.ad(Number(m[1])) : null;
+      if (c) await c.ad.supprimer(c.cfg, m[2]);
+    },
+
+    async exists(key) {
+      const m = ALF.exec(String(key));
+      if (!m) return local.exists(key);
+      if (await fs.promises.access(cacheFile(m[2])).then(() => true, () => false)) return true;
+      const c = alf ? await alf.ad(Number(m[1])) : null;
+      return c ? c.ad.existe(c.cfg, m[2]) : false;
+    },
   };
 }
 

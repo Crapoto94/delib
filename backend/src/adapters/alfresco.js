@@ -95,6 +95,13 @@ function createAlfresco({ tls, http: injected } = {}) {
       return (r.data?.list?.entries || []).map(({ entry: n }) => ({ id: n.id, nom: n.name, dossier: !!n.isFolder, taille: n.content?.sizeInBytes ?? null, version: n.properties?.['cm:versionLabel'] ?? null, modifieLe: n.modifiedAt, description: n.properties?.['cm:description'] ?? null }));
     },
 
+    /** Supprime un nœud (stockage applicatif : nettoyage à la demande, jamais par défaut). */
+    async supprimer(cfg, nodeId) {
+      const http = clientOf(cfg);
+      const r = await http.delete(`${API}/nodes/${nodeId}`, { params: { permanent: true } }).catch((e) => { throw failNet(e); });
+      if (![204, 404].includes(r.status)) throw E.upstream(explain(r));
+    },
+
     /** Le nœud existe-t-il encore dans la GED ? (vérification, sans télécharger le contenu) */
     async existe(cfg, nodeId) {
       const http = clientOf(cfg);

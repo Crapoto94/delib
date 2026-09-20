@@ -12,6 +12,7 @@ const Config = z.object({
   utilisateur: z.string().trim().max(120), motDePasse: z.string().max(200).describe('Vide : le mot de passe enregistré est conservé. Jamais renvoyé par l\'API.'),
   racine: z.string().trim().max(300).describe('Identifiant de nœud, ou chemin relatif à Company Home (ex. /Sites/archives/documentLibrary) ; vide = racine du dépôt'),
   autoArchivage: z.boolean(),
+  stockage: z.enum(['local', 'alfresco']).describe('Où sont enregistrés les fichiers de l\'application : volume local ou Alfresco (écriture / relecture validées avant bascule)'),
 }).partial();
 const Essai = Config.pick({ mode: true, url: true, utilisateur: true, motDePasse: true, racine: true }).optional();
 const NodeQ = z.object({ nodeId: z.string().regex(/^[0-9a-fA-F-]{8,64}$/).optional() });
@@ -37,6 +38,11 @@ module.exports = ({ makeRouter, ged }) => {
   r.post('/seances/:id/archivage', { summary: 'Archive (ou met à jour) tous les documents d\'une séance en GED : idempotent, nouvelle version si un document a changé', tags: T, org: true, roles: ARCH, params: PS,
     description: 'Convocation, ordre du jour, exposé, projet et annexes de chaque délibération, cahier, procès-verbal, liste, extraits du registre, accusés de réception. Un échec sur un document n\'arrête pas les autres et reste rejouable.' },
   async (req, res) => res.json(await ged.archiverSeance(req.ctx, req.org.id, req.valid.params.id)));
+  r.get('/stockage', { summary: 'Stockage des fichiers : choix courant, répartition local / Alfresco, migration en cours', tags: T, org: true, roles: ADMIN, params: P },
+    async (req, res) => res.json(await ged.etatStockage(req.org.id)));
+  r.post('/stockage/migration', { summary: 'Migre les fichiers en arrière-plan : local → Alfresco ou Alfresco → local (rejouable ; la source n’est supprimée que sur demande)', tags: T, org: true, roles: ADMIN, params: P, responses: { 202: 'Démarrée' },
+    body: z.object({ sens: z.enum(['vers_alfresco', 'vers_local']), supprimerSource: z.boolean().default(false) }) },
+  async (req, res) => res.status(202).json(await ged.migrerStockage(req.ctx, req.org.id, req.valid.body)));
   r.get('/synchronisation', { summary: 'État comparé VibeDélib / GED, séance par séance : à archiver, à mettre à jour, en erreur, manquants, synchronisés', tags: T, org: true, roles: ARCH, params: P },
     async (req, res) => res.json(await ged.etatSynchro(req.ctx, req.org.id)));
   r.post('/synchronisation', { summary: 'Synchronise vers la GED (local → GED) : dépose ce qui manque ou a changé, pour les séances indiquées ou toutes', tags: T, org: true, roles: ARCH, params: P,

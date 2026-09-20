@@ -34,9 +34,9 @@ function createGed({ db, audit, config, log, adapters, render, tenue, pv, tlt, s
   const SYS = (org, by = 'ged') => ({ username: by, kind: 'system', isPlatformAdmin: true, organismes: [], roles: [], orgIds: [org], agent: null, displayName: 'GED' });
 
   const row = async (org) => db.get('SELECT * FROM ged_config WHERE organisme_id = $1', [org]);
-  const view = (r) => ({ actif: !!r?.actif, mode: r?.mode || 'simulation', url: r?.url || '', utilisateur: r?.utilisateur || '', motDePasseDefini: !!r?.mot_de_passe_chiffre, racine: r?.racine || '-root-', autoArchivage: !!r?.auto_archivage, planCreeLe: r?.plan_cree_le || null });
+  const view = (r) => ({ actif: !!r?.actif, mode: r?.mode || 'simulation', url: r?.url || '', utilisateur: r?.utilisateur || '', motDePasseDefini: !!r?.mot_de_passe_chiffre, racine: r?.racine || '-root-', autoArchivage: !!r?.auto_archivage, planCreeLe: r?.plan_cree_le || null, stockage: r?.stockage || 'local' });
   /** Configuration d'exécution (avec le mot de passe déchiffré : ne quitte jamais le serveur). */
-  const cfgOf = async (org) => { const r = await row(org); return { organismeId: org, mode: r?.mode || 'simulation', actif: !!r?.actif, url: r?.url, utilisateur: r?.utilisateur, motDePasse: r?.mot_de_passe_chiffre ? dechiffre(r.mot_de_passe_chiffre) : '', racine: r?.racine || '-root-', autoArchivage: !!r?.auto_archivage }; };
+  const cfgOf = async (org) => { const r = await row(org); return { organismeId: org, mode: r?.mode || 'simulation', actif: !!r?.actif, url: r?.url, utilisateur: r?.utilisateur, motDePasse: r?.mot_de_passe_chiffre ? dechiffre(r.mot_de_passe_chiffre) : '', racine: r?.racine || '-root-', autoArchivage: !!r?.auto_archivage, stockage: r?.stockage || 'local' }; };
   const adapterOf = (cfg) => (cfg.mode === 'alfresco' ? adapters.alfresco : adapters.simulateur);
   const prerequis = (cfg) => { if (cfg.mode === 'alfresco' && (!cfg.url || !cfg.utilisateur || !cfg.motDePasse)) throw E.conflict('Renseignez l’URL, le compte et le mot de passe d’Alfresco (Paramétrages / GED) avant d’archiver'); };
 
@@ -50,6 +50,9 @@ function createGed({ db, audit, config, log, adapters, render, tenue, pv, tlt, s
   };
   const SOUS = { convocation: '01 Convocation et ordre du jour', dossiers: '02 Dossiers des délibérations', cahier: '03 Cahier de séance', suivi: '04 Suivi de séance et procès-verbal', legalite: '05 Contrôle de légalité' };
 
+  const dossiersStockage = new Map();
+  let migration = null; // { organismeId, sens, total, faits, echecs, debut, fin, promesse }
+
   const svc = {
     sur, DUA,
 
@@ -60,13 +63,19 @@ function createGed({ db, audit, config, log, adapters, render, tenue, pv, tlt, s
       const v = {
         actif: b.actif ?? cur?.actif ?? false, mode: b.mode ?? cur?.mode ?? 'simulation', url: b.url !== undefined ? b.url.trim().replace(/\/+$/, '') : cur?.url ?? null,
         utilisateur: b.utilisateur !== undefined ? b.utilisateur.trim() : cur?.utilisateur ?? null, racine: b.racine !== undefined ? (b.racine.trim() || '-root-') : cur?.racine ?? '-root-',
-        auto: b.autoArchivage ?? cur?.auto_archivage ?? false,
+        auto: b.autoArchivage ?? cur?.auto_archivage ?? false, stockage: b.stockage ?? cur?.stockage ?? 'local',
         mdp: b.motDePasse ? chiffre(b.motDePasse) : cur?.mot_de_passe_chiffre ?? null, // vide : on garde l'ancien
       };
       if (v.mode === 'alfresco' && v.actif && !(v.url && v.utilisateur && v.mdp)) throw E.badRequest('Pour activer l’archivage Alfresco, renseignez l’URL, le compte et le mot de passe');
-      await db.run(`INSERT INTO ged_config (organisme_id, actif, mode, url, utilisateur, mot_de_passe_chiffre, racine, auto_archivage, updated_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      if (v.stockage === 'alfresco') { // basculer le stockage exige une GED active ET un test d'écriture / relecture réussi (GED-09)
+        if (!v.actif) throw E.badRequest('Activez la GED avant de lui confier le stockage des fichiers');
+        const essai = await svc.sonder({ organismeId: org, mode: v.mode, actif: true, url: v.url, utilisateur: v.utilisateur, motDePasse: b.motDePasse || (cur?.mot_de_passe_chiffre ? dechiffre(cur.mot_de_passe_chiffre) : ''), racine: v.racine });
+        if (!essai.ok) throw E.conflict(`Le stockage dans la GED n'a pas pu être validé : ${essai.message}`);
+      }
+      await db.run(`INSERT INTO ged_config (organisme_id, actif, mode, url, utilisateur, mot_de_passe_chiffre, racine, auto_archivage, updated_by, stockage) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
                     ON CONFLICT (organisme_id) DO UPDATE SET actif = EXCLUDED.actif, mode = EXCLUDED.mode, url = EXCLUDED.url, utilisateur = EXCLUDED.utilisateur, mot_de_passe_chiffre = EXCLUDED.mot_de_passe_chiffre,
-                      racine = EXCLUDED.racine, auto_archivage = EXCLUDED.auto_archivage, updated_by = EXCLUDED.updated_by, updated_at = now()`, [org, v.actif, v.mode, v.url, v.utilisateur, v.mdp, v.racine, v.auto, ctx.username]);
+                      racine = EXCLUDED.racine, auto_archivage = EXCLUDED.auto_archivage, updated_by = EXCLUDED.updated_by, stockage = EXCLUDED.stockage, updated_at = now()`, [org, v.actif, v.mode, v.url, v.utilisateur, v.mdp, v.racine, v.auto, ctx.username, v.stockage]);
+      if (cur?.stockage !== v.stockage) await audit.log(ctx, { organismeId: org, action: 'ged.stockage', entity: 'ged_config', entityId: org, before: { stockage: cur?.stockage || 'local' }, after: { stockage: v.stockage } });
       await audit.log(ctx, { organismeId: org, action: 'ged.config', entity: 'ged_config', entityId: org, after: { actif: v.actif, mode: v.mode, url: v.url, utilisateur: v.utilisateur, racine: v.racine, autoArchivage: v.auto, motDePasseModifie: !!b.motDePasse } });
       return view(await row(org));
     },
@@ -79,6 +88,111 @@ function createGed({ db, audit, config, log, adapters, render, tenue, pv, tlt, s
       await audit.log(ctx, { organismeId: org, action: 'ged.test', entity: 'ged_config', entityId: org, after: { mode: cfg.mode, ok: r.ok, message: r.message } });
       return { mode: cfg.mode, ...r };
     },
+
+    // ------------------------------------------------------------------------------------------------ stockage des fichiers (GED-09, GED-10)
+    /** Cible du stockage pour un organisme : { cfg, ad } si Alfresco est choisi ET actif, sinon null (volume local). */
+    async cibleStockage(org) {
+      const cfg = await cfgOf(org);
+      if (!cfg.actif || cfg.stockage !== 'alfresco') return null;
+      prerequis(cfg);
+      return { cfg, ad: adapterOf(cfg) };
+    },
+    /** Cible pour LIRE un fichier déjà en GED : ne dépend pas du choix courant (un fichier reste lisible après un retour au stockage local). */
+    async adapteurLecture(org) {
+      const cfg = await cfgOf(org);
+      if (cfg.mode === 'alfresco' && (!cfg.url || !cfg.utilisateur || !cfg.motDePasse)) return null;
+      return { cfg, ad: adapterOf(cfg) };
+    },
+    /** Dossier technique « 90 Stockage applicatif / année / mois » (mémorisé). */
+    async dossierStockage(org, cible) {
+      const d = new Date(); const an = String(d.getUTCFullYear()); const mois = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const clef = `${org}:${cible.cfg.mode}:${cible.cfg.url}:${an}-${mois}`;
+      if (dossiersStockage.has(clef)) return dossiersStockage.get(clef);
+      const id = (await cible.ad.ensurePath(cible.cfg, [...(await racineSegments(org)), { nom: '90 Stockage applicatif', description: 'Fichiers de VibeDélib (annexes, pièces produites…). Noms opaques : ne pas modifier ni supprimer à la main.' }, { nom: an }, { nom: mois }])).id;
+      dossiersStockage.set(clef, id);
+      return id;
+    },
+    /** Sonde : écrit puis relit un petit fichier dans le dossier technique (validation avant de confier le stockage à la GED). */
+    async sonder(cfg) {
+      try {
+        prerequis(cfg);
+        const ad = adapterOf(cfg); const cible = { cfg, ad };
+        const t = await ad.testConnexion(cfg);
+        if (!t.ok) return { ok: false, message: t.message };
+        const dossier = await svc.dossierStockage(cfg.organismeId, cible);
+        const contenu = Buffer.from(`sonde VibeDélib ${Date.now()}`);
+        const r = await ad.deposer(cfg, dossier, { nom: `sonde-${crypto.randomBytes(4).toString('hex')}.txt`, buffer: contenu, mime: 'text/plain', description: 'Sonde de validation du stockage' });
+        const relu = await ad.contenu(cfg, r.nodeId);
+        await ad.supprimer(cfg, r.nodeId).catch(() => undefined);
+        if (!relu || !Buffer.from(relu).equals(contenu)) return { ok: false, message: 'Le fichier relu n\'est pas identique à celui écrit' };
+        return { ok: true, message: 'Écriture et relecture réussies' };
+      } catch (e) { return { ok: false, message: e.message }; }
+    },
+
+    async etatStockage(organismeId) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org);
+      const n = async (like) => (await db.get(`SELECT count(*)::int AS n, COALESCE(sum(size), 0)::bigint AS octets FROM files WHERE organisme_id = $1 AND storage_key ${like ? '' : 'NOT'} LIKE 'alf:%'`, [org]));
+      const [ged, loc] = [await n(true), await n(false)];
+      const logo = await db.get("SELECT logo_path FROM organismes WHERE id = $1", [org]);
+      return {
+        stockage: cfg.stockage, gedActive: cfg.actif, mode: cfg.mode,
+        fichiers: { local: loc.n, octetsLocal: Number(loc.octets), alfresco: ged.n, octetsAlfresco: Number(ged.octets) },
+        logo: logo?.logo_path ? (String(logo.logo_path).startsWith('alf:') ? 'alfresco' : 'local') : null,
+        migration: migration && migration.organismeId === org ? { sens: migration.sens, total: migration.total, faits: migration.faits, echecs: migration.echecs.length, enCours: !migration.fin, erreurs: migration.echecs.slice(0, 20), debut: migration.debut, fin: migration.fin } : null,
+      };
+    },
+
+    /**
+     * Migration des fichiers (GED-10), en arrière-plan : « vers_alfresco » (stockage = alfresco requis) ou « vers_local » (stockage = local requis).
+     * Rejouable : ce qui est déjà au bon endroit n'est pas touché. La source n'est supprimée que sur demande expresse.
+     */
+    async migrerStockage(ctx, organismeId, { sens, supprimerSource = false }) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org);
+      if (migration && !migration.fin) throw E.conflict('Une migration est déjà en cours');
+      if (sens === 'vers_alfresco') {
+        if (cfg.stockage !== 'alfresco' || !cfg.actif) throw E.conflict('Choisissez d\'abord Alfresco comme stockage (et activez la GED) : les nouveaux fichiers iront alors directement en GED');
+      } else if (sens === 'vers_local') {
+        if (cfg.stockage !== 'local') throw E.conflict('Repassez d\'abord le stockage en « local » : sinon les nouveaux fichiers repartiraient en GED pendant la migration');
+      } else throw E.badRequest('Sens de migration inconnu');
+      const lit = await svc.adapteurLecture(org);
+      if (!lit) throw E.conflict('La GED n\'est pas configurée');
+      const cible = sens === 'vers_alfresco' ? { cfg, ad: adapterOf(cfg) } : null;
+      const lignes = sens === 'vers_alfresco'
+        ? await db.all("SELECT id, storage_key, original_name FROM files WHERE organisme_id = $1 AND storage_key NOT LIKE 'alf:%' ORDER BY id", [org])
+        : await db.all("SELECT id, storage_key, original_name FROM files WHERE organisme_id = $1 AND storage_key LIKE 'alf:%' ORDER BY id", [org]);
+      const logo = await db.get('SELECT logo_path FROM organismes WHERE id = $1', [org]);
+      const logoAMigrer = logo?.logo_path && (sens === 'vers_alfresco') !== String(logo.logo_path).startsWith('alf:');
+      const etat = { organismeId: org, sens, total: lignes.length + (logoAMigrer ? 1 : 0), faits: 0, echecs: [], debut: new Date(), fin: null };
+      migration = etat;
+      const extDe = (nom, key) => (String(nom || key).match(/\.([a-z0-9]{2,5})$/i)?.[1] || 'bin').toLowerCase();
+      const deplacer = async (cle, nom) => {
+        const buffer = await storage.get(cle);
+        if (sens === 'vers_alfresco') {
+          const ext = extDe(nom, cle); const sha = crypto.createHash('sha256').update(buffer).digest('hex');
+          const dossierId = await svc.dossierStockage(org, cible);
+          const r = await cible.ad.deposer(cible.cfg, dossierId, { nom: `${sha.slice(0, 16)}-${crypto.randomBytes(4).toString('hex')}.${ext}`, buffer, mime: ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ext === 'jpg' ? 'image/jpeg' : 'application/octet-stream', description: 'Fichier de VibeDélib (migré depuis le stockage local)' });
+          if (supprimerSource) await storage.local.remove(cle).catch(() => undefined);
+          return `alf:${org}:${r.nodeId}`;
+        }
+        const put = await storage.local.put(buffer, { organismeId: org, ext: extDe(nom, cle) });
+        if (supprimerSource) await storage.remove(cle).catch(() => undefined);
+        return put.key;
+      };
+      etat.promesse = (async () => {
+        for (const f of lignes) {
+          try { const nouvelle = await deplacer(f.storage_key, f.original_name); await db.run('UPDATE files SET storage_key = $2 WHERE id = $1', [f.id, nouvelle]); etat.faits++; }
+          catch (e) { etat.echecs.push({ fichier: f.original_name, erreur: String(e.message).slice(0, 200) }); }
+        }
+        if (logoAMigrer) {
+          try { const nouvelle = await deplacer(logo.logo_path, 'logo.png'); await db.run('UPDATE organismes SET logo_path = $2 WHERE id = $1', [org, nouvelle]); etat.faits++; }
+          catch (e) { etat.echecs.push({ fichier: 'logo', erreur: String(e.message).slice(0, 200) }); }
+        }
+        etat.fin = new Date();
+        await audit.log(ctx, { organismeId: org, action: 'ged.migration_stockage', entity: 'files', after: { sens, total: etat.total, faits: etat.faits, echecs: etat.echecs.length, supprimerSource } });
+      })().catch((e) => { etat.echecs.push({ fichier: '(migration)', erreur: e.message }); etat.fin = new Date(); });
+      return { demarre: true, sens, total: etat.total };
+    },
+    async idle() { if (migration && !migration.fin) await migration.promesse; },
 
     // ------------------------------------------------------------------------------------------------ plan de classement
     /** Plan de classement : socle + années utiles (année en cours, années des séances). Idempotent : ce qui existe n'est jamais recréé. */

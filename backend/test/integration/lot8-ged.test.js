@@ -251,6 +251,7 @@ describe('synchronisation avec la GED (GED-08)', () => {
 
   it('état comparé, synchronisation locale → GED idempotente, vérification GED → local et redépôt des manquants', async () => {
     expect((await as(admin).put(G('/config'), { mode: 'simulation', actif: true, autoArchivage: false, racine: '', url: '', utilisateur: '' })).status).toBe(200);
+    await sleep(1000); // laisse finir l'archivage automatique déclenché par la clôture des tests précédents
     await env.db.run('DELETE FROM ged_documents WHERE seance_id = $1', [seance.id]);
     const avant = await ligne();
     expect(avant.documents).toBeGreaterThan(0); expect(avant).toMatchObject({ aArchiver: avant.documents, synchronises: 0 });

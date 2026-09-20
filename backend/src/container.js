@@ -118,6 +118,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
   // GED : simulateur persistant par défaut, Alfresco (REST v1) choisi par organisme ; adaptateurs injectables pour les tests
   const ged = createGed({ db, audit, config, log, adapters: gedAdapters || { simulateur: createGedSimulateur({ db }), alfresco: createAlfresco({ tls: config.tls }) }, render, tenue, pv, tlt, storage, cahier });
+  storage.attach({ cible: (org) => ged.cibleStockage(org), ad: (org) => ged.adapteurLecture(org), dossier: (org, cible) => ged.dossierStockage(org, cible) }); // Alfresco comme stockage (GED-09)
   bus.on('tenue.close', (p) => ged.auto(p));
   bus.on('cahier.built', (p) => ged.auto(p)); // un cahier terminé part en GED sans attendre la clôture de la séance
   const sms = createSms({ db, config, settings, log, tls: config.tls, http: smsHttp });
