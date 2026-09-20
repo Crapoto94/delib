@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import FriseSeance from './FriseSeance';
 import { ArrowLeft, ArrowRight, Eye, FileText, Lock, LockOpen, Play, RotateCcw, Square, Users } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -49,6 +50,15 @@ function Seg<T extends string>({ value, options, onChange, disabled, size = 'md'
       })}
     </span>
   );
+}
+
+/** Zoom sur un groupe : fait défiler jusqu'à ses élus (en tenant compte du panneau du point en cours, collé en haut) et le met brièvement en évidence. */
+function zoomerGroupe(id: number) {
+  const el = document.getElementById(`groupe-${id}`); if (!el) return;
+  const panneau = document.getElementById('point-en-cours'); const collé = panneau && getComputedStyle(panneau).position === 'sticky';
+  const decal = collé ? panneau!.getBoundingClientRect().height + 16 : 16;
+  window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - decal, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  el.classList.add('ring-2', 'ring-action', 'ring-inset'); window.setTimeout(() => el.classList.remove('ring-2', 'ring-action', 'ring-inset'), 1800);
 }
 
 /** Zone de notes enregistrée automatiquement (sans recharger les autres écrans). */
@@ -130,6 +140,7 @@ export default function SuiviSeance() {
   return (
     <div className="space-y-4">
       {node}
+      <FriseSeance seanceId={sid} rev={s.tenue?.version ?? 0} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[12px] text-mute"><Link to={`/seances/${sid}`} className="hover:underline">← Ordre du jour</Link></div>
@@ -179,7 +190,7 @@ export default function SuiviSeance() {
 
           <div className="order-1 min-w-0 space-y-4 lg:order-2">
             {/* ------------------------------------------------------------------ point en cours : affiché pour tous en même temps */}
-            <section className="card p-4 shadow-lift lg:sticky lg:top-2 lg:z-20">
+            <section id="point-en-cours" className="card p-4 shadow-lift lg:sticky lg:top-2 lg:z-20">
               {!c ? <p className="text-mute">{can && ouverte ? 'Aucun point en cours : choisissez un point dans l’ordre du jour, ou passez au suivant.' : 'Aucun point en cours pour le moment.'}</p> : (
                 <>
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -212,7 +223,7 @@ export default function SuiviSeance() {
                           return (
                             <div key={g.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-line bg-surface px-2 py-1">
                               <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.couleur || '#94A3B8' }} />
-                              <span className="min-w-0 flex-1 truncate text-[12px] font-semibold" title={g.nom}>{g.nom} <span className="font-normal text-mute">({eligibles} votant{eligibles > 1 ? 's' : ''}{pour ? ` · ${pour} pour` : ''})</span></span>
+                              <span className="min-w-0 flex-1 truncate text-[12px] font-semibold"><button type="button" className="max-w-full truncate text-left hover:text-action hover:underline" title={`Aller au groupe « ${g.nom} »`} onClick={() => zoomerGroupe(g.id)}>{g.nom}</button> <span className="font-normal text-mute">({eligibles} votant{eligibles > 1 ? 's' : ''}{pour ? ` · ${pour} pour` : ''})</span></span>
                               <Seg size="sm" value={unanime} fill={parts} disabled={!editable || !eligibles} options={VOTE} onChange={(v) => bulkVote(g, v)} />
                               <button className="text-[11px] text-mute hover:text-ko disabled:opacity-40" disabled={!editable || !eligibles} onClick={() => bulkVote(g, null)}>Effacer</button>
                             </div>);
@@ -263,7 +274,7 @@ export default function SuiviSeance() {
               {s.groupes.map((g: any) => {
                 const present = g.elus.filter((e: any) => e.presence === 'en_salle').length; const eligibles = g.elus.filter((e: any) => e.droit !== 'aucun').length;
                 return (
-                  <div key={g.id} className="border-b border-line last:border-b-0">
+                  <div key={g.id} id={`groupe-${g.id}`} className="border-b border-line last:border-b-0">
                     <div className="flex flex-wrap items-center gap-3 bg-soft px-4 py-2">
                       <span className="h-3 w-3 rounded-full" style={{ background: g.couleur || '#94A3B8' }} />
                       <b className="text-[13px]">{g.nom}</b><span className="text-[12px] text-mute">{present} en salle / {g.elus.length}</span>

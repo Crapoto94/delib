@@ -67,6 +67,12 @@ module.exports = ({ makeRouter, tlt }) => {
     async (req, res) => res.json(await tlt.annuler(req.ctx, req.org.id, req.valid.params.tid, req.valid.body.motif)));
   r.get('/transactions/:tid/bordereau', { summary: 'Bordereau d’acquittement (PDF)', tags: T, org: true, roles: ROLES, params: PT, responses: { 200: 'PDF' } },
     async (req, res) => send(res, await tlt.bordereau(req.ctx, req.org.id, req.valid.params.tid)));
+  r.get('/transactions/:tid/ar', { summary: "ARActe : champs lus de l'accusé de réception XML de la préfecture (identifiant, date de réception, acte reçu)", tags: T, org: true, roles: ROLES, params: PT },
+    async (req, res) => { const f = await tlt.arXml(req.ctx, req.org.id, req.valid.params.tid); res.json({ nom: f.name, ...f.champs }); });
+  r.get('/transactions/:tid/ar.xml', { summary: "Télécharge l'ARActe (fichier XML de la préfecture)", tags: T, org: true, roles: ROLES, params: PT, responses: { 200: 'XML' } },
+    async (req, res) => { const f = await tlt.arXml(req.ctx, req.org.id, req.valid.params.tid); res.setHeader('Content-Type', 'application/xml; charset=utf-8'); res.setHeader('Content-Disposition', `attachment; filename="${f.name}"`); res.send(f.buffer); });
+  r.get('/transactions/:tid/extrait', { summary: "Extrait du registre de la délibération transmise, tamponné avec l'AR de la préfecture (PDF)", tags: T, org: true, roles: ROLES, params: PT, responses: { 200: 'PDF' } },
+    async (req, res) => send(res, await tlt.extrait(req.ctx, req.org.id, req.valid.params.tid)));
   r.get('/transactions/:tid/acte-tamponne', { summary: 'Acte transmis, tamponné avec la date de publication (PDF)', tags: T, org: true, roles: ROLES, params: PT, query: Tampon, responses: { 200: 'PDF' } },
     async (req, res) => send(res, await tlt.acteTamponne(req.ctx, req.org.id, req.valid.params.tid, req.valid.query.dateAffichage)));
 

@@ -9,6 +9,14 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.35.0 — Contrôle de légalité, workflow de séance, bibliothèque et trajet des actes
+- Contrôle de légalité : envoi et confirmation en masse (cases à cocher dans le suivi, « Préparer et envoyer »), sans s'arrêter à la première erreur.
+- Contrôle de légalité : le SCC peut modifier le texte d'une délibération avant la transmission ; workflow d'envoi paramétrable (rôles, préparation, envoi et confirmation automatiques).
+- AR de la préfecture : tampon sur chaque page, fichier ARActe XML conservé, consultable et déposé en GED ; extrait du registre conforme au modèle de la Ville (garde, présence, délibération).
+- Séances : frise du workflow (Rédaction, Préparation, Convocation, Séance, Après la séance, Clôture) en haut des pages de la séance.
+- Nouveaux : « Bibliothèque » (délibérations adoptées consultables par tous, avec exposé des motifs et extrait du registre) et « Mes actes » (trajet complet des dossiers où j'ai eu un rôle).
+- Règles de notification : « active » et « obligatoire » réglables ; vote de groupe : case pleine si unanimité, remplissage proportionnel sinon, clic sur le nom pour zoomer sur le groupe.
+
 ## 0.34.0 — Pré-contrôle juridique et visas habituels
 - Pré-contrôle automatique des références à l'entrée du dossier dans l'étape « Service juridique » (sans IA, non bloquant).
 - Visas habituels : l'assistant signale un visa présent dans la plupart des délibérations similaires adoptées et absent du dossier.

@@ -16,6 +16,8 @@ import Preferences from './pages/Preferences';
 import DevEditor from './pages/DevEditor';
 import Aide from './aide/Aide';
 import Nouveautes from './pages/Nouveautes';
+import Bibliotheque from './pages/Bibliotheque';
+import MesActes from './pages/MesActes';
 import { lazy, Suspense } from 'react';
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./elus/dev/DevAnnot')) : null;
 const DevDesign = import.meta.env.DEV ? lazy(() => import('./dev/DevDesign')) : null;
@@ -35,6 +37,8 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="recherche" element={<Recherche />} />
         <Route path="dossiers" element={<Dossiers />} />
+        <Route path="bibliotheque" element={<Bibliotheque />} />
+        <Route path="mes-actes/:id?" element={<MesActes />} />
         <Route path="dossiers/:id" element={<Dossier />} />
         <Route path="seances/*" element={<Seances />} />
         <Route path="commissions" element={<Commissions />} />

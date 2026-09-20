@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FastForward, FileText, FlaskConical, Pencil, RefreshCw, Send, Stamp, XCircle } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Download, FastForward, FileCode2, FileText, FlaskConical, Pencil, RefreshCw, Send, Stamp, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -17,6 +17,26 @@ const StatusBadge = ({ tx }: { tx: any }) => (tx.etat === 'prepare' ? <Badge ton
 
 /** Résumé d'un envoi ou d'une confirmation en masse : combien sont passées, et pour chaque refus le numéro et la raison. */
 const resume = (r: any, verbe: string) => `${r.envoyees} transmission(s) ${verbe}${r.refusees ? `, ${r.refusees} refusée(s) : ${r.items.filter((i: any) => !i.ok).map((i: any) => `${i.numeroTransmis ?? `n° ${i.id}`} — ${i.erreur}`).join(' | ')}` : ''}`;
+
+/** ARActe (TLT-35) : les champs lus du fichier XML de la préfecture, et son téléchargement. */
+function ArActe({ root, tx, onClose }: { root: (p?: string) => string; tx: any; onClose: () => void }) {
+  const d = useLoad(async () => (await api.get(root(`/transactions/${tx.id}/ar`))).data, [tx.id]);
+  const telecharger = async () => {
+    const r = await api.get(root(`/transactions/${tx.id}/ar.xml`), { responseType: 'blob' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(r.data); a.download = d.data?.nom ?? `ARActe-${tx.numeroTransmis}.xml`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+  const champs: [string, any][] = d.data ? [['Identifiant de l’acte', d.data.idActe], ['Date de réception', d.data.dateReception], ['Numéro de l’acte', d.data.numero], ['Date de l’acte', d.data.dateActe], ['Nature (code)', d.data.codeNature], ['Matière (code)', d.data.codeMatiere], ['Objet', d.data.objet]] : [];
+  return (
+    <Modal title={`Accusé de réception de la préfecture — ${tx.numeroTransmis}`} onClose={onClose}>
+      {d.loading ? <Loading /> : !d.data ? <ErrorBox msg={d.error} /> : (
+        <div className="space-y-3">
+          {d.data.simulation && <p className="rounded bg-warn-bg px-3 py-2 text-[12px] text-warn">Fichier de simulation : il n’a aucune valeur juridique.</p>}
+          <dl className="grid grid-cols-[160px_1fr] gap-x-3 gap-y-1 text-[13px]">{champs.map(([k, v]) => v ? <Fragment key={k}><dt className="text-mute">{k}</dt><dd className="break-all font-semibold">{v}</dd></Fragment> : null)}</dl>
+          <div className="flex justify-end"><button className="btn-primary" onClick={telecharger}><Download className="h-4 w-4" /> Télécharger le fichier XML</button></div>
+        </div>)}
+    </Modal>
+  );
+}
 
 /** Contrôle de légalité : télétransmission des délibérations adoptées à la préfecture via S²LOW (TLT-01 à TLT-19). Mode simulation tant que l'accès n'est pas obtenu. */
 export default function Teletransmission() {
@@ -112,7 +132,7 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
 function Suivi({ root, rev, cfg, act, busy }: { root: (p?: string) => string; rev: number; cfg: any; act: (k: string, fn: () => Promise<unknown>, ok: string) => Promise<void>; busy: string | null }) {
   const list = useLoad(async () => (await api.get(root('/transactions'))).data.items as any[], [rev]);
   const [open, setOpen] = useState<number | null>(null); const detail = useLoad(async () => (open ? (await api.get(root(`/transactions/${open}`))).data : null), [open, rev]);
-  const { toast } = useToast(); const [pick, setPick] = useState<Set<number>>(new Set()); const [lotBusy, setLotBusy] = useState<string | null>(null);
+  const { toast } = useToast(); const [arOuvert, setArOuvert] = useState<any | null>(null); const [pick, setPick] = useState<Set<number>>(new Set()); const [lotBusy, setLotBusy] = useState<string | null>(null);
   const toggle = (id: number) => setPick((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const aEnvoyer = (list.data ?? []).filter((x) => x.etat === 'prepare'); const aConfirmer = (list.data ?? []).filter((x) => x.etat === 'poste' && x.status === 17);
   const choisies = (l: any[]) => l.filter((x) => pick.has(x.id)).map((x) => x.id);
@@ -149,7 +169,7 @@ function Suivi({ root, rev, cfg, act, busy }: { root: (p?: string) => string; re
               {x.etat === 'prepare' && cfg.modificationTexte && <Link to={`/dossiers/${x.acteId}`} className="mr-1 inline-flex items-center gap-1 text-[12px] font-semibold text-action" title="Modifier le texte : la transmission devra être annulée puis préparée de nouveau"><Pencil className="h-3 w-3" /> Texte</Link>}
               {x.etat === 'prepare' && <button className="btn-primary !py-1" disabled={busy === `e${x.id}`} onClick={() => act(`e${x.id}`, () => api.post(root(`/transactions/${x.id}/envoi`)), cfg.modeEnvoi === 'A' ? 'Transaction postée à S²LOW' : 'Transaction postée « en attente » : à confirmer')}><Send className="h-3.5 w-3.5" /> Envoyer</button>}
               {x.etat === 'poste' && x.status === 17 && <button className="btn-primary !py-1" disabled={busy === `c${x.id}`} onClick={() => act(`c${x.id}`, () => api.post(root(`/transactions/${x.id}/confirmation`)), 'Transaction confirmée : posté')}><CheckCircle2 className="h-3.5 w-3.5" /> Confirmer</button>}
-              {x.arId && <><button className="btn-secondary !py-1" onClick={() => pdf(`/transactions/${x.id}/bordereau`, `Bordereau d’acquittement — ${x.numeroTransmis}`)}><FileText className="h-3.5 w-3.5" /> Bordereau</button>
+              {x.arId && <><button className="btn-secondary mr-1 !py-1" onClick={() => setArOuvert(x)}><FileCode2 className="h-3.5 w-3.5" /> AR (XML)</button><button className="btn-secondary mr-1 !py-1" onClick={() => pdf(`/transactions/${x.id}/extrait`, `Extrait du registre tamponné — ${x.numeroTransmis}`)}><FileText className="h-3.5 w-3.5" /> Extrait du registre</button><button className="btn-secondary !py-1" onClick={() => pdf(`/transactions/${x.id}/bordereau`, `Bordereau d’acquittement — ${x.numeroTransmis}`)}><FileText className="h-3.5 w-3.5" /> Bordereau</button>
                 <button className="btn-secondary ml-1 !py-1" onClick={() => pdf(`/transactions/${x.id}/acte-tamponne`, `Acte tamponné — ${x.numeroTransmis}`)}><Stamp className="h-3.5 w-3.5" /> Acte tamponné</button></>}
               {(x.etat === 'prepare' || (x.etat === 'poste' && ![4, 5, 6].includes(x.status))) && <button className="ml-1 rounded p-1 text-ko hover:bg-ko-bg" title="Annuler" aria-label="Annuler" onClick={() => act(`a${x.id}`, () => api.post(root(`/transactions/${x.id}/annulation`), {}), 'Transaction annulée')}><XCircle className="h-4 w-4" /></button>}
               <button className="ml-1 text-[12px] font-semibold text-action" onClick={() => setOpen(open === x.id ? null : x.id)}>{open === x.id ? 'Masquer' : 'Journal'}</button>
@@ -158,6 +178,7 @@ function Suivi({ root, rev, cfg, act, busy }: { root: (p?: string) => string; re
           {open === x.id && <tr key={`d${x.id}`}><td colSpan={7} className="bg-soft">{detail.loading || !detail.data ? <Loading /> : (
             <ul className="divide-y divide-line text-[12px]">{detail.data.journal.map((j: any) => <li key={j.id} className="flex flex-wrap gap-x-3 py-1"><span className="w-36 shrink-0 font-mono text-mute">{dt(j.at, { dateStyle: 'short', timeStyle: 'medium' })}</span><b>{JOURNAL[j.type] ?? j.type}</b><span className="text-mute">{j.detail ? JSON.stringify(j.detail) : ''}</span><span className="ml-auto text-mute">{j.actor}</span></li>)}</ul>)}</td></tr>}
         </>))}</tbody></table>
+      {arOuvert && <ArActe root={root} tx={arOuvert} onClose={() => setArOuvert(null)} />}
     </div>
   );
 }

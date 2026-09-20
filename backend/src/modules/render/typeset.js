@@ -145,7 +145,9 @@ function layoutDocument({ content, cfg, vars, measure, logo }) {
       const height = sz * 1.5;
       if (y - height * (item.boxed ? 2 : 1) < bottom) newPage();
       if (item.boxed) {
-        page.ops.push({ rect: true, x: left + width * 0.2, y: y - height - 2, w: width * 0.6, h: height + 6 });
+        // l'encadré épouse le texte (avec une marge), centré comme lui
+        const tw = Math.min(width, measure({ text: fill(item.text, vars), bold: item.bold !== false }, sz) + 28); const bx = (item.align || 'left') === 'center' ? left + (width - tw) / 2 : left;
+        page.ops.push({ rect: true, x: bx, y: y - height - 2, w: tw, h: height + 6 });
       }
       flow([{ text: item.text, type: 'text' }], { sz, bold: item.bold !== false, align: item.align || 'left', justify: false, spacing: height });
       y -= item.after ?? 6;

@@ -121,6 +121,8 @@ export default function Layout() {
         <nav className="flex gap-1 overflow-x-auto py-1" aria-label="Navigation principale">
             <NavLink to="/" end className={tab} data-tour="nav-dashboard">Tableau de bord</NavLink>
             <NavLink to="/dossiers" className={tab} data-tour="nav-dossiers">Actes & Dossiers</NavLink>
+            <NavLink to="/mes-actes" className={tab} data-tour="nav-mes-actes">Mes actes</NavLink>
+            <NavLink to="/bibliotheque" className={tab} data-tour="nav-bibliotheque">Bibliothèque</NavLink>
             <NavLink to="/seances" className={tab} data-tour="nav-seances">Séances & Ordre du jour</NavLink>
             <NavLink to="/commissions" className={tab} data-tour="nav-commissions">Commissions</NavLink>
             {(isAdmin || isScc || org?.roles?.includes('teletransmission')) && <NavLink to="/controle-legalite" className={tab} data-tour="nav-cdl">Contrôle de légalité</NavLink>}

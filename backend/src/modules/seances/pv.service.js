@@ -6,6 +6,7 @@
  */
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
+const { apposerTampon, assembler } = require('../../shared/pdfstamp');
 
 const RESULTAT = {
   adopte_unanimite: "ADOPTÉE à l'unanimité", adopte_majorite: 'ADOPTÉE à la majorité', adopte_preponderante: 'ADOPTÉE (voix prépondérante du président de séance)',
@@ -131,8 +132,12 @@ function createPv({ db, audit, render, odj, tenue, actes }) {
       return { buffer: pdf.buffer, name: `liste-deliberations-seance-${seanceId}.pdf`, pages: pdf.pageCount };
     },
 
-    /** Extrait du registre d'une délibération votée (PST-01) : gabarit « délibération » de l'organisme + mention du vote + présences. */
-    async extrait(ctx, organismeId, seanceId, itemId) {
+    /**
+     * Extrait du registre d'une délibération votée (PST-01, TLT-36) : PDF en trois parties, comme le modèle de la Ville —
+     * (1) page de garde « EXTRAIT DU REGISTRE DES DÉLIBÉRATIONS », séance et objet ; (2) état de présence ; (3) texte de la délibération,
+     * mention du vote et mentions de transmission. Une fois l'AR reçu, chaque page porte le tampon de la préfecture (TLT-34).
+     */
+    async extrait(ctx, organismeId, seanceId, itemId, { tampon = true } = {}) {
       const org = requireOrg(organismeId); const d = await load(ctx, org, seanceId); const map = byId(d);
       const p = d.points.find((x) => x.id === itemId);
       if (!p) throw E.notFound("Point introuvable dans l'ordre du jour de cette séance");
@@ -145,21 +150,58 @@ function createPv({ db, audit, render, odj, tenue, actes }) {
       const { pick } = await render.textsFor(ctx, acte, 'deliberation', delib.id);
       const tpl = await render.getTemplate(org, 'deliberation');
       const vars = await render.varsFor(acte, delib);
+      const wm = watermark(d); const titre = `Extrait du registre — ${delib.titre}`;
+      const sansPagination = { pied: { ...(tpl.cfg.pied || {}), pagination: false } }; // les trois parties sont assemblées : pas de « Page 1 / 1 » par morceau
+      const orgRow = await db.get('SELECT nom FROM organismes WHERE id = $1', [org]);
+      const rubrique = acte.rubrique_id ? (await db.get('SELECT libelle FROM ref_items WHERE id = $1', [acte.rubrique_id]))?.libelle : null;
+      const president = d.tenue.president_elu_id ? map.get(d.tenue.president_elu_id) : null;
+
+      // 1. page de garde
+      const garde = await render.build({ organismeId: org, docType: 'deliberation', vars, watermark: wm, title: titre, cfgOverride: sansPagination, content: [
+        { type: 'space', h: 170 },
+        { type: 'title', text: 'EXTRAIT DU REGISTRE DES DÉLIBÉRATIONS', size: 14, boxed: true, align: 'center', after: 20 },
+        { type: 'title', text: `SÉANCE DU ${new Date(d.seance.dateSeance).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' }).toUpperCase()}`, size: 12, align: 'center', after: 90 },
+        runs(`**OBJET : ${(rubrique || 'DÉLIBÉRATION').toUpperCase()}**`), runs(`${p.numero ? `${p.numero} — ` : ''}${delib.titre}`),
+      ] });
+
+      // 2. état de présence
+      const pres = (m) => d.presences.get(m.id)?.statut;
+      const presents = d.membres.filter((m) => pres(m) === 'present'); const excuses = d.membres.filter((m) => pres(m) === 'excuse');
+      const absents = d.membres.filter((m) => !pres(m) || pres(m) === 'absent');
+      const pouvoirs = d.procurations.filter((x) => map.get(x.mandant) && map.get(x.mandataire));
+      const representes = new Set(pouvoirs.map((x) => x.mandant));
+      const libre = (t) => ({ type: 'title', text: t, size: 10, bold: true, align: 'left', after: 3 });
+      const presence = await render.build({ organismeId: org, docType: 'deliberation', vars, watermark: wm, title: titre, cfgOverride: sansPagination, content: [
+        { type: 'title', text: "ÉTAT DE PRÉSENCE À L'OUVERTURE DE SÉANCE", size: 11, boxed: true, align: 'center', after: 10 },
+        runs([`Nombre de membres composant le Conseil : **${d.membres.length}**`, `Nombre de conseillers en exercice : **${d.membres.length}**`, `Présents : **${presents.length}**`, `Absents représentés : **${pouvoirs.length}**`,
+          `Absents excusés : **${excuses.filter((m) => !representes.has(m.id)).length}**`, `Absents non excusés : **${absents.filter((m) => !representes.has(m.id)).length}**`].join('\n')),
+        { type: 'space', h: 8 },
+        runs(`Le ${dateLong(d.seance.dateSeance)}${d.tenue.ouverte_at ? ` à ${heure(d.tenue.ouverte_at)}` : ''}, le ${d.seance.instance} de ${orgRow?.nom || 'la collectivité'} s'est réuni en assemblée${president ? ` sous la présidence de ${nom(president)}` : ''}.`),
+        { type: 'space', h: 6 }, libre('PRÉSENTS'), runs(presents.length ? `${noms(presents)}.` : '—'),
+        { type: 'space', h: 6 }, libre('ABSENTS REPRÉSENTÉS'), runs(pouvoirs.length ? pouvoirs.map((x) => `${nom(map.get(x.mandant))}, représenté(e) par ${nom(map.get(x.mandataire))}`).join('\n') : '—'),
+        { type: 'space', h: 6 }, libre('ABSENTS EXCUSÉS'), runs(excuses.filter((m) => !representes.has(m.id)).length ? `${noms(excuses.filter((m) => !representes.has(m.id)))}.` : '—'),
+        { type: 'space', h: 6 }, libre('ABSENTS NON EXCUSÉS'), runs(absents.filter((m) => !representes.has(m.id)).length ? `${noms(absents.filter((m) => !representes.has(m.id)))}.` : '—'),
+      ] });
+
+      // 3. délibération, vote et mentions de transmission (renseignées quand l'AR est reçu)
+      const tx = await db.get("SELECT numero_transmis, ar_id, ar_at, sent_at, mode FROM tlt_transactions WHERE acte_id = $1 AND etat = 'poste' AND ar_id IS NOT NULL ORDER BY id DESC LIMIT 1", [acte.id]);
+      const jourFr = (x) => (x ? new Date(x).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Paris' }) : '');
       const text = (row) => (row ? render.runsOf({ ...row, markdown: row.markdown }, 'propre') : [{ text: '', type: 'text' }]);
       const dispLabel = tpl.cfg.sections?.dispositif ?? 'Après en avoir délibéré, le conseil DÉCIDE :';
-      const mention = [
-        '', `**Mention du vote** — séance du ${dateLong(d.seance.dateSeance)}`, '', ...voteLines(d, p, map), `**Résultat : ${RESULTAT[p.resultat] || ''}**`, '',
-        ...bureauLines(d, map), '', ...presenceLines(d, map),
-      ];
-      const pdf = await render.build({ organismeId: org, docType: 'deliberation', vars, watermark: watermark(d), title: `Extrait du registre — ${delib.titre}`, content: [
+      const mention = ['', `**Mention du vote** — séance du ${dateLong(d.seance.dateSeance)}`, '', ...voteLines(d, p, map), `**Résultat : ${RESULTAT[p.resultat] || ''}**`, '', ...bureauLines(d, map)];
+      const transmission = ['', 'TRANSMIS EN PRÉFECTURE', `LE ${jourFr(tx?.sent_at)}`, 'REÇU EN PRÉFECTURE', `LE ${jourFr(tx?.ar_at)}`, "PUBLIÉ PAR VOIE D'AFFICHAGE", `LE ${jourFr(tx?.ar_at)}`];
+      const corps = await render.build({ organismeId: org, docType: 'deliberation', vars, watermark: wm, title: titre, cfgOverride: sansPagination, content: [
         ...render.headerItems(tpl.cfg),
         { type: 'runs', runs: text(pick('visas', delib.id)) }, { type: 'space', h: 6 },
         ...(dispLabel ? [{ type: 'title', text: dispLabel, size: 11, bold: true, align: 'left', after: 4 }] : []),
         { type: 'runs', runs: text(pick('dispositif', delib.id)) },
-        { type: 'space', h: 8 }, runs(mention.join('\n')),
+        { type: 'space', h: 8 }, runs(mention.join('\n')), { type: 'space', h: 10 }, runs(transmission.join('\n')),
       ] });
-      await audit.log(ctx, { organismeId: org, action: 'seance.pv', entity: 'seances', entityId: seanceId, after: { type: 'extrait', itemId, acteId: acte.id, pages: pdf.pageCount } });
-      return { buffer: pdf.buffer, name: `extrait-registre-${p.numero || itemId}.pdf`, pages: pdf.pageCount };
+
+      let { buffer, pages } = await assembler([garde.buffer, presence.buffer, corps.buffer]);
+      if (tampon && tx) buffer = await apposerTampon(buffer, { arId: tx.ar_id, dateTransmission: tx.sent_at, dateReception: tx.ar_at, simulation: tx.mode === 'simulation' });
+      await audit.log(ctx, { organismeId: org, action: 'seance.pv', entity: 'seances', entityId: seanceId, after: { type: 'extrait', itemId, acteId: acte.id, pages, tamponne: !!(tampon && tx) } });
+      return { buffer, name: `extrait-registre-${p.numero || itemId}.pdf`, pages, tamponne: !!(tampon && tx) };
     },
   };
   return svc;

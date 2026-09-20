@@ -37,6 +37,8 @@ const { createSeances } = require('./modules/seances/seances.service');
 const { createDeadlines } = require('./modules/seances/deadlines.service');
 const { createOdj } = require('./modules/seances/odj.service');
 const { createCahier } = require('./modules/seances/cahier.service');
+const { createParcours } = require('./modules/seances/parcours.service');
+const { createBibliotheque } = require('./modules/actes/bibliotheque.service');
 const { createKpis } = require('./modules/seances/kpis.service');
 const { createTenue } = require('./modules/seances/tenue.service');
 const { createPv } = require('./modules/seances/pv.service');
@@ -108,10 +110,12 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   late.odj = odj;
   const cahier = createCahier({ db, audit, render, odj, storage, log, bus });
   const kpis = createKpis({ db, odj, seances });
+  const parcours = createParcours({ db, seances });
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
   const pv = createPv({ db, audit, render, odj, tenue, actes });
+  const bibliotheque = createBibliotheque({ db, audit, render, pv, textes });
   // télétransmission : le simulateur S²LOW tient lieu d'accès tant que le certificat n'est pas obtenu (D20, TLT-19) ; un adaptateur réel peut être injecté
-  const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config, access });
+  const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config, access, pv });
   acl.registerEditHook((ctx, a) => tlt.peutModifierTexte(ctx, a)); // le SCC modifie la délibération avant la transmission (TLT-32)
   const organisation = createOrganisation({ db, titulaires, dir });
   const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
@@ -133,6 +137,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
     if ((await settings.resolve(p.organismeId))['ai.precontrole_juridique']?.value === false) return;
     await ai.precontroleJuridique(p.organismeId, p.acteId);
   });
+  bus.on('tlt.ar', (p) => (p.seanceId ? ged.auto(p) : null)); // l'AR reçu (XML, bordereau, acte tamponné) part en GED (TLT-35)
   bus.on('tenue.close', (p) => tlt.preparationAuto(p)); // préparation automatique des transmissions (TLT-33, désactivée par défaut)
   bus.on('tenue.close', (p) => ged.auto(p));
   bus.on('cahier.built', (p) => ged.auto(p)); // un cahier terminé part en GED sans attendre la clôture de la séance
@@ -156,7 +161,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche-alertes', (orgId) => alertes.verifier(orgId)); // alertes de recherche (REC-29) : au plus une vérification par heure et par alerte
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

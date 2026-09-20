@@ -1,0 +1,8 @@
+# Copier en pulldocker.ini (non versionné) et renseigner les accès.
+ip:10.0.0.1
+port:22
+login:utilisateur
+password:mot-de-passe
+chemin:/opt/docker/vibedelib
+cmd1:git pull
+cmd2:docker compose build && docker compose up -d

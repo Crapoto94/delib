@@ -24,9 +24,12 @@ const ACTE_TRANSMIS = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre'];
 const fmt = (pattern, vars) => String(pattern).replace(/\{(\w+)(?::(\d+))?\}/g, (m, k, w) => String(vars[k] ?? '').padStart(Number(w) || 0, '0')).toUpperCase();
 const day = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
 
-function createTeletransmission({ db, audit, render, tenue, settings, storage, bus, adapter, log, config, access }) {
+function createTeletransmission({ db, audit, render, tenue, settings, storage, bus, adapter, log, config, access, pv }) {
   // le mot de passe du TDT est chiffré au repos (comme celui de la GED) et ne quitte jamais le serveur
   const { chiffre } = createSecretBox(config?.jwt?.secret || 'dev', 'tdt');
+  const { apposerTampon } = require('../../shared/pdfstamp');
+  /** Champs de l'ARActe (XML) lus sans dépendance : identifiant, date de réception, acte reçu. */
+  const lireArActe = (xml) => { const at = (nom) => new RegExp(`\\b${nom}="([^"]*)"`).exec(xml)?.[1]?.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') ?? null; return { idActe: at('IDActe'), dateReception: at('DateReception'), numero: at('actes:Numero'), dateActe: at('actes:Date'), codeNature: at('actes:CodeNatureActe'), codeMatiere: at('actes:CodeMatiere1'), objet: at('actes:Objet'), simulation: /SIMULATION/.test(xml) }; };
   const need = (ctx, org, acl) => acl; void need;
 
   const ROLES_TLT = ['org_admin', 'scc', 'teletransmission'];
@@ -342,7 +345,17 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         if ([1, 2, 3].includes(st.status)) await db.run("UPDATE actes SET statut = 'transmis' WHERE id = $1 AND statut IN ('adopte','texte_definitif_pret','pret_a_transmettre')", [tx.acte_id]);
         if (ar) { // l'AR renseigne d'office l'état de l'acte (TLT-07)
           await db.run("UPDATE actes SET statut = 'ar_recu' WHERE id = $1 AND statut IN ('adopte','texte_definitif_pret','pret_a_transmettre','transmis')", [tx.acte_id]);
-          await bus.emit('tlt.ar', { organismeId: org, acteId: tx.acte_id, transactionId: tx.id, arId: ar.id });
+          // l'ARActe (XML de la préfecture) est conservé, consultable et déposé en GED (TLT-35)
+          try {
+            const xml = await adapter.arActe?.(tx.remote_id);
+            if (xml) {
+              const put = await storage.put(Buffer.from(xml, 'utf8'), { organismeId: org, ext: 'xml' });
+              const f = await db.get("INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by) VALUES ($1,$2,$3,'application/xml',$4,$5,$6) RETURNING id", [org, put.key, `ARActe-${tx.numero_transmis}.xml`, put.size, put.sha256, actor]);
+              await db.run('UPDATE tlt_transactions SET ar_file_id = $2 WHERE id = $1', [tx.id, f.id]);
+              await journal(tx.id, actor, 'ar_xml', { fichier: `ARActe-${tx.numero_transmis}.xml` });
+            }
+          } catch (e) { log?.warn?.({ err: e.message, transaction: tx.id }, 'ARActe : conservation du fichier XML en échec'); }
+          await bus.emit('tlt.ar', { organismeId: org, acteId: tx.acte_id, transactionId: tx.id, seanceId: tx.seance_id, arId: ar.id });
         }
         void row;
       }
@@ -428,10 +441,25 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       if (!tx.ar_id) throw E.conflict('Pas encore d’accusé de réception : l’acte ne peut pas être tamponné');
       const f = await db.get('SELECT storage_key FROM files WHERE id = $1', [tx.file_id]);
       const src = await storage.get(f.storage_key);
-      const buffer = await adapter.tampon(src, { dateAffichage: dateAffichage || new Date().toISOString(), ar: { id: tx.ar_id, date: tx.ar_at } });
+      void dateAffichage; // l'encadré porte l'AR (TLT-34) ; la publication figure dans les mentions de l'extrait du registre
+      const buffer = await apposerTampon(src, { arId: tx.ar_id, dateTransmission: tx.sent_at, dateReception: tx.ar_at, simulation: tx.mode === 'simulation' });
       return { buffer, name: `acte-tamponne-${tx.numero_transmis}.pdf` };
     },
 
+    /** ARActe : contenu XML (téléchargement) et champs lus (consultation). */
+    async arXml(ctx, organismeId, id) {
+      const org = requireOrg(organismeId); const tx = await svc._get(org, id);
+      if (!tx.ar_file_id) throw E.conflict("Pas de fichier ARActe pour cette transmission (l'accusé de réception n'est pas encore reçu)");
+      const f = await db.get('SELECT storage_key, original_name FROM files WHERE id = $1', [tx.ar_file_id]);
+      const buffer = await storage.get(f.storage_key);
+      return { buffer, name: f.original_name, champs: lireArActe(buffer.toString('utf8')) };
+    },
+    /** Extrait du registre de la délibération transmise, avec le tampon de la préfecture (TLT-34, TLT-36). */
+    async extrait(ctx, organismeId, id) {
+      const org = requireOrg(organismeId); const tx = await svc._get(org, id);
+      if (!tx.item_id) throw E.conflict("Cette transmission n'est pas rattachée à un point de séance");
+      return pv.extrait(ctx, org, tx.seance_id, tx.item_id);
+    },
     // ------------------------------------------------------------------------------------------ simulation
     async simulation(ctx, organismeId) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org);

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import FriseSeance from './FriseSeance';
 import { DeleteSeanceModal, EditSeanceModal } from './SeanceActions';
 import { ArrowDown, ArrowUp, BookOpen, Download, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2, Radio, Pencil } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
@@ -103,6 +104,7 @@ export default function Odj() {
   return (
     <div>
       <div className="mb-1 text-[12px] text-mute"><Link to="/seances" className="hover:underline">Séances & Ordre du jour</Link> › {d.seance.instance}</div>
+      <div className="mb-4"><FriseSeance seanceId={Number(id)} /></div>
       <PageTitle title={`${meta.data?.kind === 'commission' ? 'Projets présentés — ' : 'Ordre du jour — '}${dt(d.seance.dateSeance, { dateStyle: 'long' })}`}
         sub={<span>{meta.data?.teams && <span className="mr-2"><TeamsLink teams={meta.data.teams} /></span>}Format de numérotation : <code>{d.pattern}</code> · <Badge tone={arrete ? 'ok' : 'warn'}>{arrete ? `arrêté le ${dt(d.arreteAt, { dateStyle: 'short' })}` : 'en préparation — numéros provisoires'}</Badge>{d.lock && <span className="ml-2 inline-flex items-center gap-1 text-warn"><Lock className="h-3.5 w-3.5" /> en cours de modification par {d.lock.username}</span>}</span>}
         actions={<>

@@ -17,3 +17,7 @@ police/
 # ressources pdf.js copiees au build (frontend/scripts/copy-pdfjs-assets.mjs)
 frontend/public/pdfjs/
 dist-elus/
+
+# accès serveur : jamais versionnés
+SSH.txt
+pulldocker.ini

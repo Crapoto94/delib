@@ -11,9 +11,20 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.34.0';
+export const VERSION = '0.35.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.35.0', type: 'minor', titre: 'Contrôle de légalité, workflow de séance, bibliothèque et trajet des actes',
+    items: [
+      "Contrôle de légalité : envoi et confirmation en masse (cases à cocher dans le suivi, « Préparer et envoyer »), sans s'arrêter à la première erreur.",
+      "Contrôle de légalité : le SCC peut modifier le texte d'une délibération avant la transmission ; workflow d'envoi paramétrable (rôles, préparation, envoi et confirmation automatiques).",
+      "AR de la préfecture : tampon sur chaque page, fichier ARActe XML conservé, consultable et déposé en GED ; extrait du registre conforme au modèle de la Ville (garde, présence, délibération).",
+      "Séances : frise du workflow (Rédaction, Préparation, Convocation, Séance, Après la séance, Clôture) en haut des pages de la séance.",
+      "Nouveaux : « Bibliothèque » (délibérations adoptées consultables par tous, avec exposé des motifs et extrait du registre) et « Mes actes » (trajet complet des dossiers où j'ai eu un rôle).",
+      "Règles de notification : « active » et « obligatoire » réglables ; vote de groupe : case pleine si unanimité, remplissage proportionnel sinon, clic sur le nom pour zoomer sur le groupe.",
+    ],
+  },
   {
     version: '0.34.0', type: 'minor', titre: 'Pré-contrôle juridique et visas habituels',
     items: [

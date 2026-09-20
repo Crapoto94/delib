@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import FriseSeance from './FriseSeance';
 import { BellRing, Check, Copy, Download, Eye, FileText, Mail, Send, UserCheck, Users } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -39,6 +40,7 @@ export default function Convocation() {
   const p = prep.data;
   return (
     <div className="space-y-6">
+      <FriseSeance seanceId={sid} />
       <PageTitle title={`Convocation — ${dt(p.seance.dateSeance, { dateStyle: 'long' })}`}
         sub={<span>{p.seance.instance}{p.seance.lieu ? ` · ${p.seance.lieu}` : ''} · <Link className="text-action hover:underline" to={`/seances/${sid}`}>Ordre du jour</Link></span>}
         actions={<button className="btn-primary" disabled={!p.odj.arrete} onClick={() => setSending(true)}><Send className="h-4 w-4" /> {versions.data?.length ? 'Envoyer un modificatif' : 'Convoquer'}</button>} />

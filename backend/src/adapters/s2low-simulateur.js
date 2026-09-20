@@ -101,6 +101,23 @@ function createS2lowSimulateur({ db }) {
       return { ok: true };
     },
 
+    /**
+     * ARActe : le fichier XML de l'accusé de réception de la préfecture (structure ACTES), tel que le tiers de télétransmission le renvoie.
+     * En simulation : même structure, marqué « SIMULATION » — aucune valeur juridique.
+     */
+    async arActe(remoteId) {
+      const r = await rowOf(remoteId);
+      if (!r?.ar) return null;
+      const x = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const p = r.payload || {}; const d = new Date(r.ar.date).toISOString().slice(0, 10);
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<!-- SIMULATION : fichier généré par le simulateur S²LOW, sans valeur juridique -->
+<actes:ARActe xmlns:actes="http://www.interieur.gouv.fr/ACTES#v1.1-20040216" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.interieur.gouv.fr/ACTES#v1.1-20040216 Schemas/actesv1_1.xsd" DateReception="${x(d)}" IDActe="${x(r.ar.id)}">
+  <actes:ActeRecu actes:Date="${x(String(p.decisionDate || d).slice(0, 10))}" actes:Numero="${x(r.numero)}" actes:CodeNatureActe="${x(p.natureCode ?? 1)}" actes:CodeMatiere1="${x(p.classif?.[0] ?? '')}" actes:Objet="${x(p.subject)}"/>
+</actes:ARActe>
+`;
+    },
+
     /** Bordereau d'acquittement (actes_create_pdf.php) : PDF. */
     async bordereau(remoteId) {
       const r = await rowOf(remoteId);
