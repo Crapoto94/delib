@@ -391,6 +391,18 @@ function IaPanel({ acte, editable, onApplied, toast }: { acte: any; editable: bo
 }
 
 /* ------------------------------------------------------------------------------------------------------- la page */
+/** REC-08 : actes proches de celui-ci (mêmes droits que la recherche) — pour s'en inspirer ou vérifier un précédent. */
+function ActesProches({ acte }: { acte: any }) {
+  const { org } = useAuth();
+  const l = useLoad(async () => (await api.get(orgPath(org!.id, '/recherche/similaires'), { params: { acteId: acte.id } })).data.items as any[], [org!.id, acte.id]);
+  if (!l.data?.length) return null;
+  return (
+    <div className="card p-5"><h3 className="mb-2">Actes proches</h3>
+      <ul className="space-y-2 text-[13px]">{l.data.map((x) => <li key={x.acteId}><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${x.acteId}`}>{x.titre}</Link><div className="text-[11px] text-mute">#{x.numeroSuivi}{x.numero ? ` · délibération ${x.numero}` : ''}</div></li>)}</ul>
+    </div>
+  );
+}
+
 export default function Dossier() {
   const { id } = useParams();
   const { org } = useAuth(); const o = org!.id;
@@ -424,6 +436,7 @@ export default function Dossier() {
           <IaPanel acte={a} editable={editable} onApplied={acte.reload} toast={toast} />
           {a.statut === 'brouillon' || a.statut === 'modification_demandee' ? <Completude c={a.completude} /> : null}
           <CommissionsBox acte={a} editable={editable} toast={toast} />
+          <ActesProches acte={a} />
           {c?.events?.length > 0 && (
             <div className="card p-5"><h3 className="mb-2">Historique</h3><ul className="space-y-2 text-[12px]">{c.events.slice().reverse().slice(0, 12).map((e: any) => (
               <li key={e.id}><b><AgentName u={e.actor} /></b>{e.onBehalfOf && <> (pour <AgentName u={e.onBehalfOf} />)</>} · {e.action}{e.to ? ` → ${e.to}` : ''}<div className="text-mute">{dt(e.at)}</div></li>))}</ul></div>)}

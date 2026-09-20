@@ -21,7 +21,25 @@ const DirectQ = z.object({ since: z.coerce.number().int().min(0).default(0), wai
 
 const Recherche = z.object({ q: z.string().trim().min(2).max(200), limit: z.coerce.number().int().min(1).max(50).default(20), offset: z.coerce.number().int().min(0).default(0) });
 
-module.exports = ({ makeRouter, limiter, eluAuth, espace, recherche }) => {
+const Rect = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().min(0).max(1), h: z.number().min(0).max(1) });
+const Trait = z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(2).max(3000);
+const Couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const Annotation = z.object({
+  docKey: z.string().min(3).max(80).regex(/^[a-z]:\d+(:(\d+|expose|projet))?$/), docVersion: z.string().min(1).max(80), page: z.number().int().min(1).max(5000),
+  kind: z.enum(['surlignage', 'note', 'dessin', 'signet']), rects: z.array(Rect).max(200).optional(), trace: z.array(Trait).max(200).optional(),
+  couleur: Couleur.optional(), citation: z.string().max(2000).optional(), contenu: z.string().max(10000).optional(),
+});
+const AnnotationUpd = z.object({ contenu: z.string().max(10000).optional(), couleur: Couleur.optional() });
+const Ancrage = z.object({ docVersion: z.string().min(1).max(80).optional(), page: z.number().int().min(1).max(5000).optional(), rects: z.array(Rect).max(200).optional(), trace: z.array(Trait).max(200).optional(), orpheline: z.boolean().optional() })
+  .refine((d) => d.orpheline || (d.docVersion && d.page), { message: 'Indiquez la nouvelle version et la page, ou « orpheline »' });
+const PartageAnnot = z.object({ mode: z.enum(['groupe', 'elus', 'revoquer']), eluIds: z.array(Id).max(100).optional() });
+const PartageLot = PartageAnnot.extend({ portee: z.enum(['document', 'seance']), docKey: z.string().min(3).max(80).optional() });
+const AnnotP = z.object({ id: Id });
+const AnnotQ = z.object({ docKey: z.string().min(3).max(80).optional() });
+const Reponse = z.object({ contenu: z.string().trim().min(1).max(5000) });
+const ExportQ = z.object({ partagees: z.enum(['0', '1']).default('0') });
+
+module.exports = ({ makeRouter, limiter, eluAuth, espace, recherche, annotations }) => {
   // ------------------------------------------------------------------------------------------------ authentification (publique)
   const a = makeRouter('/api/v1/elus-auth');
   a.post('/invitation/:token', { summary: 'Accepte l’invitation : choisit son mot de passe (lien reçu par mail, à usage unique)', tags: T, auth: false, limiter, params: z.object({ token: z.string().min(20).max(100) }), body: Invitation },
@@ -65,6 +83,26 @@ module.exports = ({ makeRouter, limiter, eluAuth, espace, recherche }) => {
     async (req, res) => {
       const { items, total, limit, offset, approchee } = await recherche.chercherElu(req.elu, await espace.seanceIds(req.elu), req.valid.query);
       res.json({ items, total, limit, offset, approchee });
+    });
+  // ------------------------------------------------------------------------------------------------ annotations sur les PDF (ELU-71 à ELU-76)
+  r.get('/seances/:id/annotations', { summary: 'Mes annotations et celles qu’on a partagées avec moi (contenu déchiffré pour moi seul)', tags: T, elu: true, params: SeanceP, query: AnnotQ },
+    async (req, res) => res.json({ items: await annotations.lister(req.elu, req.valid.params.id, req.valid.query) }));
+  r.post('/seances/:id/annotations', { summary: 'Crée une annotation (surlignage, note, dessin, signet) : privée par défaut', tags: T, elu: true, params: SeanceP, body: Annotation, responses: { 201: 'Créée' } },
+    async (req, res) => res.status(201).json(await annotations.creer(req.elu, req.valid.params.id, req.valid.body)));
+  r.put('/annotations/:id', { summary: 'Modifie le texte ou la couleur de mon annotation', tags: T, elu: true, params: AnnotP, body: AnnotationUpd }, async (req, res) => res.json(await annotations.modifier(req.elu, req.valid.params.id, req.valid.body)));
+  r.put('/annotations/:id/ancrage', { summary: 'Ré-ancre mon annotation sur une nouvelle version du document (ou la déclare orpheline)', tags: T, elu: true, params: AnnotP, body: Ancrage },
+    async (req, res) => res.json(await annotations.ancrer(req.elu, req.valid.params.id, req.valid.body)));
+  r.delete('/annotations/:id', { summary: 'Supprime mon annotation (partages et réponses compris)', tags: T, elu: true, params: AnnotP }, async (req, res) => res.json(await annotations.supprimer(req.elu, req.valid.params.id)));
+  r.post('/annotations/:id/partage', { summary: 'Partage mon annotation avec mon groupe (membres à cet instant) ou des élus nommés ; ou révoque le partage', tags: T, elu: true, params: AnnotP, body: PartageAnnot },
+    async (req, res) => res.json(await annotations.partager(req.elu, req.valid.params.id, req.valid.body)));
+  r.post('/seances/:id/annotations/partage', { summary: 'Partage (ou révoque) toutes mes annotations d’un document ou de la séance', tags: T, elu: true, params: SeanceP, body: PartageLot },
+    async (req, res) => res.json(await annotations.partagerLot(req.elu, req.valid.params.id, req.valid.body)));
+  r.post('/annotations/:id/reponses', { summary: 'Répond sur une annotation (auteur ou destinataire)', tags: T, elu: true, params: AnnotP, body: Reponse, responses: { 201: 'Créée' } },
+    async (req, res) => res.status(201).json(await annotations.repondre(req.elu, req.valid.params.id, req.valid.body.contenu)));
+  r.get('/seances/:id/dossier-annote', { summary: 'Mon dossier annoté en PDF : documents de la séance, annotations incorporées, filigrane nominatif', tags: T, elu: true, params: SeanceP, query: ExportQ, responses: { 200: 'PDF' } },
+    async (req, res) => {
+      const f = await annotations.exporter(req.elu, req.valid.params.id, { avecPartagees: req.valid.query.partagees === '1' });
+      res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', `attachment; filename="${f.name}"`); res.setHeader('Cache-Control', 'no-store'); res.send(f.buffer);
     });
   r.get('/collegues', { summary: 'Élus avec qui partager une note', tags: T, elu: true }, async (req, res) => res.json(await espace.collegues(req.elu)));
   r.get('/seances/:id/notes', { summary: 'Mes notes et celles qu’on a partagées avec moi', tags: T, elu: true, params: SeanceP }, async (req, res) => res.json(await espace.notes(req.elu, req.valid.params.id)));

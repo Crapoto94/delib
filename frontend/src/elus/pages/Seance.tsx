@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, FileText, Loader2, Minus, Plus, Radio, Star, StickyNote, Trash2 } from 'lucide-react';
-import { CanvasPdfViewer } from '../../PdfViewer';
+import LecteurAnnote from '../AnnotPdf';
 import { api, errMsg } from '../api';
 import { armerReprise, noterLecture, ouvrirDoc, prefetchSeance, type Doc } from '../docs';
 import { EtatTelechargement, definirSeanceSuivie } from './Accueil';
@@ -29,7 +29,7 @@ function Lecteur({ doc, seanceId }: { doc: Pick<Doc, 'key' | 'version' | 'url'> 
         <span className="w-10 text-center tabular-nums">{zoom} %</span>
         <button className="rounded p-2 hover:bg-slate-100" aria-label="Agrandir" onClick={() => setZoom((z) => Math.min(300, z + 20))}><Plus className="h-4 w-4" /></button>
       </div>
-      {err ? <p className="p-6 text-ko">{err}</p> : !blob ? <div className="flex flex-1 items-center justify-center p-10 text-mute"><Loader2 className="h-6 w-6 animate-spin" /></div> : <div className="flex min-h-0 flex-1 flex-col"><CanvasPdfViewer source={blob} zoom={zoom} /></div>}
+      {err ? <p className="p-6 text-ko">{err}</p> : !blob ? <div className="flex flex-1 items-center justify-center p-10 text-mute"><Loader2 className="h-6 w-6 animate-spin" /></div> : <div className="flex min-h-0 flex-1 flex-col"><LecteurAnnote blob={blob} doc={{ key: doc.key, version: doc.version, titre: doc.titre }} seanceId={seanceId} zoom={zoom} /></div>}
     </div>
   );
 }

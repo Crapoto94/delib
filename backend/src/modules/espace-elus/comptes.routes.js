@@ -7,7 +7,7 @@ const PS = P.extend({ id: Id });
 const ADMIN = ['org_admin', 'scc'];
 const T = ['espace élus'];
 
-module.exports = ({ makeRouter, eluAuth, espace }) => {
+module.exports = ({ makeRouter, eluAuth, espace, annotations }) => {
   const r = makeRouter('/api/v1/organismes/:orgId/espace-elus');
   r.get('/comptes', { summary: 'Comptes de l’espace élus : chaque élu, l’état de son accès (aucun, invité, actif, désactivé)', tags: T, org: true, roles: ADMIN, params: P,
     description: 'Jamais de mot de passe ni de lien. Le SCC ne peut ni lire ni réinitialiser un mot de passe : il renvoie une invitation.' },
@@ -19,5 +19,9 @@ module.exports = ({ makeRouter, eluAuth, espace }) => {
   r.get('/seances/:id/consultations', { summary: 'Preuve de consultation : par élu, nombre de documents lus, ouvertures, première et dernière lecture', tags: T, org: true, roles: ADMIN, params: PS,
     description: 'Métadonnées seulement : les notes personnelles des élus ne sont jamais accessibles aux agents (ELU-33).' },
   async (req, res) => res.json(await espace.consultations(req.org.id, req.valid.params.id)));
+  r.get('/seances/:id/annotations-meta', { summary: 'Annotations d’une séance : compteurs seulement (annotations, partagées, élus ayant annoté)', tags: T, org: true, roles: ADMIN, params: PS,
+    description: 'Le contenu, les auteurs et les destinataires ne sont jamais accessibles aux agents (ELU-72).' }, async (req, res) => res.json(await annotations.metadonnees(req.org.id, req.valid.params.id)));
+  r.delete('/comptes/:eluId/annotations', { summary: 'Purge toutes les annotations d’un élu (fin de mandat, demande RGPD)', tags: T, org: true, roles: ['org_admin'], params: PE },
+    async (req, res) => res.json(await annotations.purger(req.ctx, req.org.id, req.valid.params.eluId)));
   return [r];
 };

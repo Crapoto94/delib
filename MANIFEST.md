@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.22 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.23 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -910,6 +910,12 @@ DMZ ─────────────────── firewall : un seul
 - **ELU-68** — **Suivi de la séance en direct** : le point en cours et l'avancement (points clos, et — selon `elus.affiche_resultats` — « adoptée / rejetée ») sont suivis en **attente longue** ; **aucune note, aucun décompte de saisie**.
 - **ELU-69** — **Côté SCC** : liste des comptes (aucun / invité / actif / désactivé), invitation et renvoi, désactivation, et **preuve de consultation** par séance (par élu : documents lus, ouvertures, première et dernière lecture, lecture hors ligne) — **métadonnées seulement**.
 - **ELU-70** — **DMZ** : conteneur `elus-dmz` (front buildé + nginx **en liste blanche** `/api/v1/elus/` et `/api/v1/elus-auth/`, aucune autre route, aucun secret), fichiers fournis dans `elus-dmz/` ; domaine, port et pare-feu paramétrés par variables (D23).
+- **ELU-71** — **Annotations sur les PDF (D90)** : surlignage (sur une sélection de texte), **note ancrée**, **dessin au doigt ou au stylet**, **signet**, sur n'importe quel document de la séance ; couleurs au choix. Chaque annotation est ancrée à *document + version + page + zones (coordonnées relatives à la page) + citation du texte*. **Privée par défaut.**
+- **ELU-72** — **Confidentialité** : contenu (note, citation, réponses) **chiffré au repos** (AES-256-GCM, clé dérivée du secret de l'application) ; **aucune route ne le restitue** à un agent, au SCC ou à un administrateur, qui ne voient que des **métadonnées** (nombre d'annotations et de partages par séance) ; l'audit ne contient jamais le contenu.
+- **ELU-73** — **Partage** par annotation, par document ou pour tout le carnet de la séance : **avec mon groupe** (les membres **à l'instant du partage**, figés), **avec des élus nommés**, ou **révoqué** (pour tous ou pour un destinataire). Le destinataire voit « partagé par Prénom NOM », **répond** (fil sur l'annotation), mais ne peut ni la modifier ni la supprimer. Le partage est limité aux élus de l'organisme ayant accès à la séance. *Le partage avec les membres d'une commission (option d'ELU-32) reste à faire.*
+- **ELU-74** — **Nouvelle version d'un document** : l'annotation garde la version d'origine ; à l'ouverture de la nouvelle version, l'application **cherche la citation** dans le nouveau texte et **ré-ancre** l'annotation (page et zones) ; à défaut elle est marquée **« orpheline »** et **conservée**, avec sa citation.
+- **ELU-75** — **Export « mon dossier annoté »** en PDF : documents de la séance dans l'ordre de lecture, **annotations incorporées** (surlignages, dessins, numéros de notes et leur texte en fin de document), **filigrane nominatif** ; désactivable par le paramètre `elus.export_annote`. Les annotations partagées avec moi n'y figurent qu'à ma demande.
+- **ELU-76** — **Suppression** par l'élu (immédiate, y compris des partages et réponses) ; **purge** de toutes les annotations d'un élu à la demande de l'administrateur (fin de mandat, RGPD). *La purge automatique à échéance reste à faire.*
 
 ### 18.5 Mode séance
 
@@ -1092,7 +1098,7 @@ Affichage, mise en ligne sur le site de la commune, **recueil des actes administ
 - **REC-24** — **Facettes** avec compteurs (statut, type, nature, matière, rubrique, rapporteur, direction, séance, résultat du vote, année), **extraits surlignés** (échappés côté serveur), tri pertinence / date, pagination, **export CSV**.
 - **REC-25** — **Actes similaires** : sur la fiche d'un acte et à la création (« des délibérations proches existent »), par similarité de vocabulaire du titre et de l'objet, dans les limites des droits.
 - **REC-26** — **Recherches enregistrées** par utilisateur (nom, requête, critères). *Les alertes (REC-07) restent à faire.*
-- **REC-28** — **Interfaces** : page « Recherche » (barre globale + raccourci `/`, facettes cliquables avec compteurs, filtres actifs, tri, pagination, recherches enregistrées, export CSV), proposition d'**actes proches** à la création d'un dossier, onglet « Recherche » des Paramétrages (état, ré-indexation, synonymes, requêtes sans résultat), et loupe de l'**espace élus**. *Reste à faire : actes proches sur la fiche d'un dossier, alertes (REC-07), export Excel / PDF, OCR, import AirsDelib (REC-10).*
+- **REC-28** — **Interfaces** : page « Recherche » (barre globale + raccourci `/`, facettes cliquables avec compteurs, filtres actifs, tri, pagination, recherches enregistrées, export CSV), proposition d'**actes proches** à la création d'un dossier et sur sa fiche, onglet « Recherche » des Paramétrages (état, ré-indexation, synonymes, requêtes sans résultat), et loupe de l'**espace élus**. *Reste à faire : alertes (REC-07), export Excel / PDF, OCR, import AirsDelib (REC-10).*
 - **REC-27** — **Administration** : ré-indexation complète (par organisme), état de l'index (actes indexés, annexes lues, sans texte), journal anonymisé des requêtes (aucun nom, seulement la requête et le nombre de résultats).
 
 ---
@@ -1688,6 +1694,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D83** | **Activation / désactivation de chaque usage de l'IA** : désactivé, aucun appel et boutons masqués. *(réalisé)* | 21 |
 | **D84** | **Ergonomie du suivi de séance** (votes de groupe et notes en haut, éditeur WYSIWYG), **couleurs de l'ordre du jour** selon l'avancement, menu **« Paramétrages »**, **« Prénom NOM » partout**. *(réalisé)* | 19.1 bis, 16, 23 |
 | **D85** | **Espace élus** : API et front distincts (PDF finalisés seulement, ni notes ni saisie), authentification par invitation + mot de passe + code par mail, mise à disposition à l'envoi de la convocation, filigrane nominatif, **téléchargement en arrière-plan** (web et APK) pour un passage instantané d'un point à l'autre, lectures hors ligne synchronisées, notes personnelles partageables, suivi en direct. *(réalisé ; annotations sur PDF et service natif d'arrière-plan de l'APK : à venir)* | 18 |
+| **D90** | **Annotations sur les PDF de l'espace élus** : surlignage, note, dessin, signet ; privées par défaut, chiffrées au repos, partage figé par groupe ou par élus nommés, réponses, ré-ancrage par citation, export annoté *(ELU-71 à ELU-76)* | 18.4 |
 | **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
 | **D88** | **Choix du tiers de télétransmission** : catalogue de fournisseurs (S²LOW par défaut, FAST-Actes prévu), paramétrage et test de connexion dans un onglet dédié ; le mode réel reste fermé jusqu'au certificat *(TLT-30)* | 19.5 |
 | **D87** | **Recherche plein texte** sur PostgreSQL (`fr_unaccent`, pondération A–D, GIN, trigrammes) : index par acte tenu à jour par évènements, texte des annexes PDF extrait et mis en cache, filtrage par droits dans la requête, facettes, extraits, actes similaires, recherches enregistrées, ré-indexation en administration ; espace élus limité aux délibérations adoptées. *(REC-20 à REC-27)* | 20.1 |
@@ -1714,6 +1721,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.23** | 2026-09-20 | **D90** : annotations sur PDF (ELU-71 à ELU-76) |
 | **1.22** | 2026-09-20 | **D89** : visite guidée (UX-27) ; interfaces de la recherche (REC-28) |
 | **1.21** | 2026-09-20 | **D88** : choix du TDT (TLT-30) |
 | **1.20** | 2026-09-20 | **D87** : recherche plein texte (REC-20 à REC-27) |

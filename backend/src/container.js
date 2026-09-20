@@ -38,6 +38,7 @@ const { createTenue } = require('./modules/seances/tenue.service');
 const { createPv } = require('./modules/seances/pv.service');
 const { createGed } = require('./modules/ged/ged.service');
 const { createRecherche } = require('./modules/recherche/recherche.service');
+const { createAnnotations } = require('./modules/espace-elus/annotations.service');
 const { createGedSimulateur } = require('./adapters/ged-simulateur');
 const { createAlfresco } = require('./adapters/alfresco');
 const { createEluAuth } = require('./modules/espace-elus/elu-auth.service');
@@ -111,11 +112,12 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   bus.on('tenue.close', (p) => ged.auto(p));
   const eluAuth = createEluAuth({ db, config, mail, settings, audit, log });
   const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log });
+  const annotations = createAnnotations({ db, audit, config, espace, settings });
   const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

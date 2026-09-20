@@ -14,6 +14,8 @@ import Teletransmission from './pages/Teletransmission';
 import Delegations from './pages/Delegations';
 import Preferences from './pages/Preferences';
 import DevEditor from './pages/DevEditor';
+import { lazy, Suspense } from 'react';
+const DevAnnot = import.meta.env.DEV ? lazy(() => import('./elus/dev/DevAnnot')) : null;
 import ConvocationPublique from './pages/ConvocationPublique';
 
 export default function App() {
@@ -24,6 +26,7 @@ export default function App() {
       <Route path="/connexion" element={<Login />} />
       <Route path="/c/:token" element={<ConvocationPublique />} />
       {import.meta.env.DEV && <Route path="/dev/editeur" element={<DevEditor />} />}
+      {DevAnnot && <Route path="/dev/annot" element={<Suspense fallback={null}><DevAnnot /></Suspense>} />}
       <Route element={me ? <Layout /> : <Navigate to="/connexion" replace />}>
         <Route index element={<Dashboard />} />
         <Route path="recherche" element={<Recherche />} />
