@@ -1,8 +1,8 @@
 {
-  "name": "ivrydelib-backend",
+  "name": "vibedelib-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "IvryDélib — gestion des délibérations (backend)",
+  "description": "VibeDélib — gestion des délibérations (backend)",
   "main": "server.js",
   "type": "commonjs",
   "engines": {

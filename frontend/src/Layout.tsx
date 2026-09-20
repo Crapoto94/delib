@@ -62,14 +62,14 @@ export default function Layout() {
     <div className="min-h-screen pb-16">
       {me.impersonation && (
         <div role="status" className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-3 bg-warn px-4 py-2 text-[13px] font-semibold text-white">
-          <Eye className="h-4 w-4" /> Vous voyez IvryDélib en tant que {me.displayName} (@{me.username}) — vos actions sont faites avec ses droits et journalisées à votre nom.
+          <Eye className="h-4 w-4" /> Vous voyez VibeDélib en tant que {me.displayName} (@{me.username}) — vos actions sont faites avec ses droits et journalisées à votre nom.
           <button className="rounded bg-white px-3 py-1 text-warn" onClick={stopActAs}>Revenir à mon compte ({me.impersonation.by})</button>
         </div>)}
       <header className="sticky top-0 z-30 border-b border-line bg-white">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-2 md:px-8">
           <NavLink to="/" className="flex items-center gap-2">
             <OrgLogo orgId={org.id} nom={org.nom} hasLogo={!!org.hasLogo} version={org.logoVersion ?? null} className="h-10" />
-            <span className="leading-tight"><span className="block text-[16px] font-bold text-primary">IvryDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
+            <span className="leading-tight"><span className="block text-[16px] font-bold text-primary">VibeDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
           </NavLink>
           <nav className="ml-2 flex flex-wrap gap-1" aria-label="Navigation principale">
             <NavLink to="/" end className={tab}>Tableau de bord</NavLink>
@@ -114,7 +114,7 @@ export default function Layout() {
         </Modal>)}
       {toastNode}
       <footer className="fixed bottom-0 left-0 right-0 border-t border-line bg-white px-6 py-2 text-[11px] text-mute">
-        Ville d'Ivry-sur-Seine · IvryDélib — version de test
+        Ville d'Ivry-sur-Seine · VibeDélib — version de test
       </footer>
     </div>
   );

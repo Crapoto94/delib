@@ -30,7 +30,7 @@ module.exports = ({ makeRouter, dir }) => {
     description: "Un agent n'apparaît qu'après sa première connexion ; pour un agent jamais connecté, utiliser la recherche.",
   }, async (req, res) => {
     const a = await dir.getAgent(req.valid.params.username);
-    if (!a) throw E.notFound('Agent inconnu (jamais connecté à IvryDélib)');
+    if (!a) throw E.notFound('Agent inconnu (jamais connecté à VibeDélib)');
     res.json({ ...a, poste: await dir.posteAffiche({ displayName: a.displayName, nom: a.nom, prenom: a.prenom, direction: a.direction?.label, service: a.service, poste: a.poste }) });
   });
 

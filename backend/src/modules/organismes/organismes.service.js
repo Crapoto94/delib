@@ -89,7 +89,7 @@ function createOrganismes({ db, audit, storage }) {
     /** Identité publique de l'application (page de connexion) : organisme par défaut, sans donnée sensible. */
     async branding() {
       const r = await db.get('SELECT id, nom, logo_sha256, logo_path FROM organismes WHERE is_default');
-      return r ? { organismeId: r.id, nom: r.nom, hasLogo: !!r.logo_path, logoVersion: r.logo_sha256 ? r.logo_sha256.slice(0, 12) : null } : { organismeId: null, nom: 'IvryDélib', hasLogo: false, logoVersion: null };
+      return r ? { organismeId: r.id, nom: r.nom, hasLogo: !!r.logo_path, logoVersion: r.logo_sha256 ? r.logo_sha256.slice(0, 12) : null } : { organismeId: null, nom: 'VibeDélib', hasLogo: false, logoVersion: null };
     },
 
     /** Amorçage : garantit l'existence de l'organisme par défaut (Ville). */

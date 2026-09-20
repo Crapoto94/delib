@@ -47,7 +47,7 @@ module.exports = ({ makeRouter, commissions, seances }) => {
   r.get('/commissions/:id/reunions', { summary: "Réunions d'une commission (passées et à venir), avec le nombre de projets présentés", tags: T, org: true, params: PC },
     async (req, res) => res.json({ items: await seances.reunions(req.org.id, req.valid.params.id) }));
   r.post('/commissions/:id/reunions', { summary: 'Planifie une réunion de commission (avec Teams facultatif)', tags: T, org: true, roles: ADMIN, params: PC, body: Reunion, responses: { 201: 'Créé' },
-    description: "Une réunion est une séance de l'instance de la commission : son ordre du jour (`/seances/:id/odj`) liste les PROJETS PRÉSENTÉS. Teams : `auto` crée la réunion via Microsoft Graph (si configuré), `lien` enregistre un lien Teams collé à la main, `aucun`. `inviter: true` envoie les invitations Teams aux membres et secrétaires ; sinon seul le lien est communiqué par IvryDélib. Les membres et secrétaires sont prévenus par mail." },
+    description: "Une réunion est une séance de l'instance de la commission : son ordre du jour (`/seances/:id/odj`) liste les PROJETS PRÉSENTÉS. Teams : `auto` crée la réunion via Microsoft Graph (si configuré), `lien` enregistre un lien Teams collé à la main, `aucun`. `inviter: true` envoie les invitations Teams aux membres et secrétaires ; sinon seul le lien est communiqué par VibeDélib. Les membres et secrétaires sont prévenus par mail." },
   async (req, res) => res.status(201).json(await seances.createReunion(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
 
   r.get('/actes/:id/commissions', { summary: "Commissions d'un acte et leurs avis (vide = hors commission)", tags: T, org: true, params: PA },

@@ -8,7 +8,7 @@ const { createTestEnv } = require('../helpers');
 let env; let role; let a; let b;
 beforeAll(async () => {
   env = await createTestEnv();
-  role = 'ivrydelib_rls_' + crypto.randomBytes(3).toString('hex');
+  role = 'vibedelib_rls_' + crypto.randomBytes(3).toString('hex');
   await env.db.query(`CREATE ROLE ${role} NOLOGIN`);
   await env.db.query(`GRANT USAGE ON SCHEMA ${env.schema} TO ${role}`);
   await env.db.query(`GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA ${env.schema} TO ${role}`);

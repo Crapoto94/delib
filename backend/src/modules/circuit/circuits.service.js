@@ -171,7 +171,7 @@ function createCircuits({ db, audit, engine, titulaires, bus }) {
       const d = await svc.def(organismeId, id);
       const v = await db.get('SELECT * FROM circuit_versions WHERE definition_id = $1 AND version_no = $2', [d.id, n ?? (await db.get('SELECT version_no FROM circuit_versions WHERE id = $1', [d.active_version_id]))?.version_no ?? 1]);
       if (!v) throw E.notFound('Version introuvable');
-      return { format: 'ivrydelib.circuit/1', nom: d.nom, code: d.code, version: v.version_no, graph: v.graph };
+      return { format: 'vibedelib.circuit/1', nom: d.nom, code: d.code, version: v.version_no, graph: v.graph };
     },
 
     /** Circuit d'exemple pour l'organisme par défaut au premier démarrage (« jeu de données initial », CIR-04). */

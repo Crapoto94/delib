@@ -1,9 +1,9 @@
-# IvryDélib — backend
+# VibeDélib — backend
 
 Gestion des délibérations pour la Ville et ses organismes (CCAS…). Ce dossier contient le **lot 0** (fondations) ;
 la spécification complète est dans `../MANIFEST.md` et le plan du lot dans `../LOT0.md`.
 
-**Stack** : Node.js ≥ 22 · Express 5 · PostgreSQL (schéma dédié `ivrydelib`) · zod · JWT · pino · Swagger UI.
+**Stack** : Node.js ≥ 22 · Express 5 · PostgreSQL (schéma dédié `ivrydelib` — nom historique conservé après le renommage de l'outil en VibeDélib ; voir `DB_SCHEMA`) · zod · JWT · pino · Swagger UI.
 
 ## Démarrer
 
@@ -40,7 +40,7 @@ npm run spike     # vérifie les services réels (APM, Hub, PostgreSQL), sans do
 node scripts/smoke.js   # parcours réel contre un backend démarré, avec le compte de secours
 ```
 
-Les tests d'intégration utilisent la base du `.env` mais **un schéma jetable par fichier** (`ivrydelib_test_<aléa>`),
+Les tests d'intégration utilisent la base du `.env` mais **un schéma jetable par fichier** (`vibedelib_test_<aléa>`),
 supprimé à la fin ; le schéma réel n'est jamais touché. L'AD, l'APM et le Hub sont remplacés par de faux adaptateurs.
 
 ## Organisation

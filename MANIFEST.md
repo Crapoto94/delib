@@ -1,6 +1,6 @@
-# MANIFEST — IvryDélib : gestion des délibérations
+# MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.7 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.8 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -100,7 +100,7 @@ Le **premier lot de développement** couvre la rédaction et le circuit. Tout le
 
 Lu dans le tutoriel de formation (18 pages).
 
-| Constat AirsDelib | Décision IvryDélib |
+| Constat AirsDelib | Décision VibeDélib |
 |---|---|
 | Un « rapport » est **créé à l'intérieur d'une séance** (fil d'Ariane *Séances > CM du 22/02/2024 > Création*). | La séance est **optionnelle à la création** (séance visée) ; c'est le SCC qui affecte. |
 | 5 onglets à parcourir dans l'ordre : Fiche → **enregistrer** → Commissions → Rapport et Délibérations → Annexes → Commentaires. | **Un seul écran** avec sections ; commissions choisies dans la fiche. |
@@ -201,7 +201,7 @@ Lu dans le tutoriel de formation (18 pages).
 ### « Afficher en tant que » (D47)
 
 - **ACT-01** — Menu utilisateur → **« Afficher en tant que… »** (visible de l'administrateur de plateforme, de l'administrateur d'organisme et du SCC) : on choisit un agent par autocomplétion (D48) ; l'application se recharge avec **exactement les droits de cet agent**.
-- **ACT-02** — Un **bandeau permanent** (« Vous voyez IvryDélib en tant que… ») rappelle le mode et permet de **revenir à son compte** en un clic ; le mode ne survit pas à la déconnexion.
+- **ACT-02** — Un **bandeau permanent** (« Vous voyez VibeDélib en tant que… ») rappelle le mode et permet de **revenir à son compte** en un clic ; le mode ne survit pas à la déconnexion.
 - **ACT-03** — **Plafonds** : administrateur de plateforme → tout agent ; administrateur d'organisme → agents de ses organismes, **jamais** un administrateur de plateforme ; SCC → agents **ordinaires** de ses organismes (pas d'administrateur, pas de SCC). Pas d'enchaînement de deux « en tant que » ; l'en-tête est ignoré sur les routes d'authentification.
 - **ACT-04** — **Traçabilité** : début et fin du mode sont audités (`auth.act_as`, `auth.act_as_end`) ; toute action faite dans le mode est enregistrée avec **le vrai acteur** (`actor`) et l'utilisateur usurpé (`on_behalf_of`) ; les écrans métier montrent l'utilisateur affiché.
 - **ACT-05** — Techniquement, chaque requête porte l'en-tête `X-Act-As` ; le serveur **revérifie à chaque requête** que l'appelant a le droit d'agir en tant que cet utilisateur (jamais de confiance dans le client).
@@ -822,7 +822,7 @@ Reprise du schéma **déjà éprouvé par `parapheur-dmz`** d'appdsi (`C:\dev\ap
 ```
 Élu (navigateur) ──HTTPS──▶ [reverse proxy DMZ] ──HTTP──▶ [conteneur elus-dmz : front React + nginx]
                                                                     │  proxy serveur restreint (liste blanche)
-DMZ ─────────────────── firewall : un seul port TCP ouvert ──────▶ LAN [backend IvryDélib]
+DMZ ─────────────────── firewall : un seul port TCP ouvert ──────▶ LAN [backend VibeDélib]
 ```
 
 - **ELU-01** — Le conteneur DMZ ne contient que le **front minimal** (React buildé, autonome) et un **nginx** qui sert les fichiers statiques et **ne relaie que des préfixes en liste blanche** (`/api/v1/elus/`, `/api/v1/elus-auth/`, `/api/status` public réduit, flux temps réel de séance). Aucune autre route de l'API interne n'est joignable. Aucune base de données, aucun secret en DMZ.
@@ -938,7 +938,7 @@ Source : `SL-DOC-API.pdf` (*Documentation de l'API S²LOW, version 5.1 du 05/02/
 **Exigences**
 
 - **TLT-01** — **Lot de télétransmission** par séance : sélection des délibérations **adoptées** (et **signées** si la signature est activée ; rejetées, retirées ou non signées exclues avec explication).
-- **TLT-02** — **Correspondance IvryDélib → S²LOW** (par acte) :
+- **TLT-02** — **Correspondance VibeDélib → S²LOW** (par acte) :
 
   | Champ S²LOW | Source | Contrainte |
   |---|---|---|
@@ -955,9 +955,9 @@ Source : `SL-DOC-API.pdf` (*Documentation de l'API S²LOW, version 5.1 du 05/02/
   | `document_papier` | pièces complémentaires envoyées sur papier | 0 ou 1 |
 
 - **TLT-03** — **Numéro transmis distinct du numéro d'affichage.** Le motif d'affichage `2026-04-012` **est invalide** pour S²LOW (tiret). Un motif dédié, paramétrable, est généré, par défaut `{ANNEE}{TYPE_SEANCE}{N_SEANCE:02}_{ORDRE:03}` (ex. `2026CM04_012`, 12 caractères) `[H]`, avec contrôle d'**unicité** ; les deux numéros sont conservés et affichés. Le motif du numéro transmis est **lui aussi personnalisable**, avec **validation en direct** de sa conformité (≤ 15 caractères, majuscules, chiffres, `_`).
-- **TLT-04** — **Classification de la préfecture comme référence** : import régulier du `classification.xml` (demande puis récupération) ; **rapprochement automatique** avec `matieres.txt` (MAT-07) ; nature, matière et **types de pièces** ne sont acceptés que s'ils existent dans la classification ; les **types d'annexes** d'IvryDélib sont les `CodeTypePJ` (ANN-02).
+- **TLT-04** — **Classification de la préfecture comme référence** : import régulier du `classification.xml` (demande puis récupération) ; **rapprochement automatique** avec `matieres.txt` (MAT-07) ; nature, matière et **types de pièces** ne sont acceptés que s'ils existent dans la classification ; les **types d'annexes** d'VibeDélib sont les `CodeTypePJ` (ANN-02).
 - **TLT-05** — **Deux modes de transmission**, au choix de la collectivité :
-  - **Mode B — préparation puis confirmation (recommandé, par défaut)** : IvryDélib crée la transaction avec `en_attente = 1` (« préparation de l'envoi »), puis le SCC **confirme sur S²LOW** — soit en redirection (`post_confirm_api`, avec nonce et **certificat RGS\*\*** personnel de l'opérateur), soit dans l'interface S²LOW. L'action irréversible est ainsi faite par un humain identifié.
+  - **Mode B — préparation puis confirmation (recommandé, par défaut)** : VibeDélib crée la transaction avec `en_attente = 1` (« préparation de l'envoi »), puis le SCC **confirme sur S²LOW** — soit en redirection (`post_confirm_api`, avec nonce et **certificat RGS\*\*** personnel de l'opérateur), soit dans l'interface S²LOW. L'action irréversible est ainsi faite par un humain identifié.
   - **Mode A — envoi direct** : `en_attente = 0`, avec le certificat de service de la collectivité.
   Dans les deux cas, action **explicite** avec confirmation, rôle *Télétransmission*, **double validation** optionnelle (préparé par / envoyé par) ; **mode simulation** (aucun appel de création) ; **instance de test** S²LOW paramétrable ; **export ZIP** du paquet pour dépôt manuel.
 - **TLT-06** — **Contrôles préalables** (rapport *bloquant / avertissement*) : PDF valide et lisible, **objet ≤ 500 caractères**, **numéro conforme et unique**, **≥ 2 niveaux** de classification et codes présents dans la classification, `type_acte` et `type_pj` renseignés, formats d'annexes autorisés, tableaux de signatures synchronisés, **tailles** (limites non précisées dans le document : paramétrables, Q38), acte non déjà posté, date cohérente.
@@ -1003,7 +1003,7 @@ Affichage, mise en ligne sur le site de la commune, **recueil des actes administ
 
 ## 21. Assistant IA
 
-Appels à l'**IA interne** de la Ville (API). Elle est déjà consommée par appdsi via l'APM : `POST /api/v1/ai/query { prompt, model? }`, `GET /api/v1/ai/models`, variante **asynchrone** `query-async` + `query-progress/{id}` ; authentification par clé `X-API-KEY`. Il faudra **demander à l'admin APM la permission IA** pour la clé d'IvryDélib (Q45).
+Appels à l'**IA interne** de la Ville (API). Elle est déjà consommée par appdsi via l'APM : `POST /api/v1/ai/query { prompt, model? }`, `GET /api/v1/ai/models`, variante **asynchrone** `query-async` + `query-progress/{id}` ; authentification par clé `X-API-KEY`. Il faudra **demander à l'admin APM la permission IA** pour la clé d'VibeDélib (Q45).
 
 ### 21.1 Principes (garde-fous)
 
@@ -1546,7 +1546,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D50** | **Identité de l'organisme paramétrable** : nom de la collectivité, adresse, coordonnées, signataire des convocations et **logo** sont des paramètres (écran « Identité & logo »). **Le logo est aussi celui de l'application** (en-tête, page de connexion, icône de l'onglet) **et des PDF** (option de gabarit, par défaut seulement sans papier à en-tête). | 5, 12, 23, 25 |
 | **D51** | **Réunions de commission** : une commission a ses **dates de réunion** ; chaque réunion est une séance de l'instance de la commission dont l'**ordre du jour = les projets présentés** (mis à disposition de cette commission) ; l'avis, sans date saisie, prend la date de la réunion ; membres et secrétaires sont **prévenus** (convocation, modification, annulation) et **rappelés à J−2**. | 15, 16 |
 | **D52** | **Toute interrogation de l'IA se fait en arrière plan**, avec **indicateur visuel** (pastille dans l'en-tête, barre d'avancement sur le dossier) et une **file d'attente paramétrable** pour ne pas surcharger l'IA : requêtes simultanées, quota par utilisateur, taille de la file, intervalle entre appels, délai d'un appel, nombre d'essais. | 21 |
-| **D53** | **Réunions Teams** : une séance ou une réunion de commission peut être associée à une **réunion Microsoft Teams** — création automatique via Microsoft Graph (si configuré) ou **lien collé** ; les invitations Teams ne partent que sur demande explicite (`inviter`), sinon le lien est communiqué par IvryDélib. | 15, 17, 24 |
+| **D53** | **Réunions Teams** : une séance ou une réunion de commission peut être associée à une **réunion Microsoft Teams** — création automatique via Microsoft Graph (si configuré) ou **lien collé** ; les invitations Teams ne partent que sur demande explicite (`inviter`), sinon le lien est communiqué par VibeDélib. | 15, 17, 24 |
 | **D54** | **Séances** : onglets **À venir / Passées / Hors délai** ; la fiche d'une séance liste **tous les dossiers qui la visent**, quel que soit leur avancement (brouillon, étape du circuit, prêt à affecter). | 16 |
 | **D55** | **Déploiement** : `docker compose` fournit **le backend, le frontend (nginx, relais `/api`) et, en option, un PostgreSQL local** ; les fichiers déposés et les polices sont des volumes ; les secrets restent dans `.env`. | 3, 30 |
 | **D56** | **Responsable intermédiaire facultatif, désactivé par défaut** : l'étape n'est jouée que si l'administrateur d'organisme l'a activée (paramètre `circuit.resp_intermediaire`, case à cocher dans « Titulaires & droits », décochée à l'installation) **et** qu'un titulaire est désigné pour le service ; sinon elle est sautée et tracée. | 9, 12 |
@@ -1557,6 +1557,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D61** | **Intitulé de poste d'un agent** : pour le **responsable d'une direction ou d'un service**, l'application affiche l'**intitulé officiel de l'organigramme RH** (« Directeur des systèmes d'information »), et non la fonction « métier » de la fiche RH (« Directeur et expertise informatique ») ; c'est le cas partout où le poste apparaît (profil, sélecteur d'agent « @ », liste des utilisateurs, fiche). Le masculin ou le féminin des intitulés épicènes (« Directeur·trice ») est choisi **d'après la fiche RH**, jamais d'après le prénom ; à défaut la forme épicène est conservée. Les autres agents gardent leur fonction RH. | 5, 12 |
 | **D62** | **Indicateurs (KPI) de la séance** : l'écran de l'ordre du jour affiche, à la place de la liste d'avertissements, les indicateurs de la préparation — **compte à rebours** (jours avant la séance et avant la prochaine date clé), **taux de réalisation** (dossiers terminés / dossiers visant la séance, réparti par état), **actes à terminer**, **directions en retard**, **dossiers déjà à l'ordre du jour**, les **dates clés** avec leur compte à rebours, et, pour **chaque commission**, les **actes terminés (avis rendu) / prévus** avec le **compte à rebours de sa prochaine réunion**. Un **clic** sur « actes à terminer », « directions en retard » ou une commission ouvre le **détail** ; chaque dossier y est présenté avec sa **numérotation du Conseil** (numéro d'ordre du jour), un **lien vers le dossier**, son état, son étape et ses valideurs, son échéance. Réservé au SCC et aux administrateurs. | 16, 23 |
 | **D63** | **Multi-collectivités** : un administrateur de plateforme crée, active et désactive des **collectivités** (commune, CCAS, autre organisme) depuis *Administration › Collectivités*, leur **rattache des directions** de l'organigramme RH (une direction n'appartient qu'à une collectivité) et désigne leurs **administrateurs et rôles** ; une collectivité créée est **immédiatement utilisable** (circuit standard, groupes de valideurs, instance de séances). Un sélecteur de collectivité apparaît dans l'en-tête dès qu'on en voit plusieurs ; les données restent **étanches** d'une collectivité à l'autre. | 3, 5 |
+| **D64** | **Nom de l'outil : VibeDélib** (anciennement IvryDélib, 2026-09-20). Le nom est changé partout où il est visible : interface, page de connexion, titre de l'onglet, e-mails de notification, PDF (producteur), documentation de l'API, manifeste. « Ivry » reste le nom de la **ville** (Ville d'Ivry-sur-Seine, gabarits, données). Identifiants techniques renommés : paquets `vibedelib-backend` / `vibedelib-frontend`, journal, clés du navigateur (`vibedelib.*` : une reconnexion est nécessaire), format d'export des circuits `vibedelib.circuit/1` (l'ancien `ivrydelib.circuit/1` reste **accepté à l'import**). **Conservé volontairement** : le **schéma PostgreSQL `ivrydelib`** de la base partagée du DSI (`DB_SCHEMA`) ; le renommer suppose une décision côté DSI (`ALTER SCHEMA ivrydelib RENAME TO vibedelib` puis `DB_SCHEMA=vibedelib`). Le dépôt GitHub et le dossier de travail ne changent pas. | 1, 30 |
 
 ---
 
@@ -1577,6 +1578,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.8** | 2026-09-20 | décision **D64** : l'outil est renommé **VibeDélib** (ex-IvryDélib) ; le schéma PostgreSQL conserve son nom |
 | **1.7** | 2026-09-20 | décisions **D62 et D63** : indicateurs de la séance (compte à rebours, taux de réalisation, actes à terminer, directions en retard, avancement des commissions, détail au clic) remplaçant la liste d'avertissements, et administration multi-collectivités |
 | **1.6** | 2026-09-20 | décisions **D60 et D61** : cahier de séance (première version : génération asynchrone, versions, contrôles, profils, recto-verso, filigrane, traçabilité) et intitulé de poste d'après l'organigramme RH pour les responsables |
 | **1.5** | 2026-09-20 | décisions **D56 à D59** : responsable intermédiaire facultatif et désactivé par défaut, dossiers inscrits à l'ordre du jour avant la fin du circuit (fond coloré selon l'état de validation), visionneuse PDF unique (celle d'AppDSI), en-tête conservé dans l'éditeur, panneau Assistant IA réalisé (orthographe, style, visas, contrôle complet) ; corrections : espaces des titres en gras et ligatures « fi » dans les PDF, logo dans l'en-tête et intitulé de poste d'après l'organigramme RH |

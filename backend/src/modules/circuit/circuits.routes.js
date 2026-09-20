@@ -16,7 +16,7 @@ const Create = z.object({
   typeActeId: Id.optional(), directionCode: z.string().trim().max(40).optional(),
   fromTemplate: z.string().max(40).optional(), graph: Graph.optional(),
 });
-const Import = z.object({ format: z.literal('ivrydelib.circuit/1'), code: z.string().regex(/^[a-z0-9_-]{2,40}$/), nom: z.string().trim().min(2).max(200), graph: Graph });
+const Import = z.object({ format: z.enum(['vibedelib.circuit/1', 'ivrydelib.circuit/1']), code: z.string().regex(/^[a-z0-9_-]{2,40}$/), nom: z.string().trim().min(2).max(200), graph: Graph });
 const Draft = z.object({ fromVersion: z.number().int().positive().optional(), comment: z.string().max(300).optional() });
 const Simulation = z.object({
   typeActeId: Id.optional(), directionCode: z.string().trim().min(1).max(40), serviceCode: z.string().trim().max(40).optional(), redacteur: z.string().max(128).optional(),

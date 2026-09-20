@@ -4,7 +4,7 @@
  * Un tick : relances temporelles de chaque organisme → synthèses (à partir de 7 h 30) → file d'envoi → alerte d'échecs.
  * Les tâches d'autres modules (jalons de séance, mise à disposition…) s'y accrochent avec `register(name, fn)`.
  */
-const LOCK_KEY = 7420001; // arbitraire, propre à IvryDélib
+const LOCK_KEY = 7420001; // arbitraire, propre à VibeDélib
 
 function createScheduler({ db, notifications, config, log }) {
   let timer = null; let running = false;

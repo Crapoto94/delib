@@ -260,7 +260,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
   // -------------------------------------------------------------------------------------- envoi (file)
   const footerOf = (cfg) => ({ line1: cfg['mail.footer1']?.value, line2: cfg['mail.footer2']?.value, line3: cfg['mail.footer3']?.value, color: cfg['mail.footerColor']?.value });
 
-  const toHtml = (body) => body.split('\n').map((l) => (/^https?:\/\/\S+$/.test(l.trim()) ? `<p><a href="${esc(l.trim())}">Ouvrir dans IvryDélib</a></p>` : `<p>${esc(l)}</p>`)).join('');
+  const toHtml = (body) => body.split('\n').map((l) => (/^https?:\/\/\S+$/.test(l.trim()) ? `<p><a href="${esc(l.trim())}">Ouvrir dans VibeDélib</a></p>` : `<p>${esc(l)}</p>`)).join('');
 
   async function sendMail(orgId, to, subject, body) {
     const cfg = await settings.resolve(orgId);
@@ -282,7 +282,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
         const startDay = new Date(Date.UTC(parisParts(now).y, parisParts(now).m - 1, parisParts(now).d) - 2 * 3600 * 1000);
         const today = (await q.get("SELECT count(*)::int AS n FROM notification_log WHERE organisme_id = $1 AND recipient = $2 AND status = 'sent' AND channel = 'mail' AND sent_at >= $3", [first.organisme_id, first.recipient, startDay])).n;
         if (today >= cap) { await q.run("UPDATE notification_log SET status = 'digest', skip_reason = 'plafond' WHERE id = ANY($1::bigint[])", [items.map((i) => i.id)]); stats.deferred += items.length; continue; }
-        const subject = items.length === 1 ? first.subject : `${items.length} notifications IvryDélib`;
+        const subject = items.length === 1 ? first.subject : `${items.length} notifications VibeDélib`;
         const body = items.length === 1 ? first.body : items.map((i) => `• ${i.subject}\n${i.body}`).join('\n\n');
         try {
           await sendMail(first.organisme_id, first.email, subject, body);

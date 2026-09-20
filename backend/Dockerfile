@@ -1,4 +1,4 @@
-# IvryDélib — backend. Image minimale, exécutée par un utilisateur non privilégié.
+# VibeDélib — backend. Image minimale, exécutée par un utilisateur non privilégié.
 FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app

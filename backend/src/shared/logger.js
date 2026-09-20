@@ -4,7 +4,7 @@ const pino = require('pino');
 function createLogger(level = 'info') {
   return pino({
     level,
-    base: { app: 'ivrydelib' },
+    base: { app: 'vibedelib' },
     timestamp: pino.stdTimeFunctions.isoTime,
     redact: {
       paths: [

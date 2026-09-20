@@ -243,7 +243,7 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
         const src = await PDFDocument.load(b, { updateMetadata: false });
         for (const p of await out.copyPages(src, src.getPageIndices())) out.addPage(p);
       }
-      out.setProducer('IvryDélib');
+      out.setProducer('VibeDélib');
       return { buffer: Buffer.from(await out.save()), pageCount: out.getPageCount() };
     },
 

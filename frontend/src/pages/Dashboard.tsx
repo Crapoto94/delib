@@ -12,7 +12,9 @@ export default function Dashboard() {
   const mine = useLoad(async () => (await api.get(orgPath(o, '/actes'), { params: { scope: 'mine', limit: 8 } })).data.items as any[], [o]);
   const late = useLoad(async () => (await api.get(orgPath(o, '/circuit/en-retard'))).data.items as any[], [o]);
   const suivi = useLoad(async () => (await api.get(orgPath(o, '/circuit/suivi'))).data as { equipe: any[]; valides: any[] }, [o]);
-  const first = me?.displayName.split(' ').slice(-1)[0];
+  // prénom de l'agent (fiche RH), sinon premier mot du nom affiché ; « MARC-ANTOINE » -> « Marc-Antoine »
+  const cap = (s: string) => s.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_m, a, b) => a + b.toUpperCase());
+  const first = me ? cap(me.agent?.prenom || me.displayName.split(' ')[0] || '') : '';
 
   return (
     <div className="space-y-8">

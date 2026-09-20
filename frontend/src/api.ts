@@ -1,15 +1,15 @@
 import axios from 'axios';
 import { showPdf } from './PdfViewer';
 
-const TOKEN_KEY = 'ivrydelib.token';
-const ORG_KEY = 'ivrydelib.org';
+const TOKEN_KEY = 'vibedelib.token';
+const ORG_KEY = 'vibedelib.org';
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t: string | null) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
 export const getOrgId = (): number | null => { const v = localStorage.getItem(ORG_KEY); return v ? Number(v) : null; };
 export const setOrgId = (id: number) => localStorage.setItem(ORG_KEY, String(id));
 
-const ACT_AS_KEY = 'ivrydelib.actas';
+const ACT_AS_KEY = 'vibedelib.actas';
 export const getActAs = () => localStorage.getItem(ACT_AS_KEY);
 export const setActAs = (u: string | null) => (u ? localStorage.setItem(ACT_AS_KEY, u) : localStorage.removeItem(ACT_AS_KEY));
 

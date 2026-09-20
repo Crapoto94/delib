@@ -14,7 +14,7 @@ const isMobileDevice = () => typeof navigator !== 'undefined'
 const isSafariDesktop = () => typeof navigator !== 'undefined' && /Safari/i.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg|OPR|Android/i.test(navigator.userAgent);
 
 export type PdfRequest = { blob: Blob; title?: string };
-const EVT = 'ivrydelib:pdf';
+const EVT = 'vibedelib:pdf';
 /** Ouvre la visionneuse sur un PDF déjà chargé. */
 export const showPdf = (blob: Blob, title?: string) => window.dispatchEvent(new CustomEvent<PdfRequest>(EVT, { detail: { blob: new Blob([blob], { type: 'application/pdf' }), title } }));
 

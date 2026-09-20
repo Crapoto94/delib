@@ -43,7 +43,7 @@ const VISAS = 'Vu le code général des collectivités territoriales, notamment 
 
 async function pdf(title) {
   const d = await PDFDocument.create();
-  for (let i = 1; i <= 2; i++) { const p = d.addPage([595, 842]); p.drawText(`${title} — page ${i}`, { x: 50, y: 780, size: 14 }); p.drawText('Document de démonstration IvryDélib', { x: 50, y: 750, size: 10 }); }
+  for (let i = 1; i <= 2; i++) { const p = d.addPage([595, 842]); p.drawText(`${title} — page ${i}`, { x: 50, y: 780, size: 14 }); p.drawText('Document de démonstration VibeDélib', { x: 50, y: 750, size: 10 }); }
   return Buffer.from(await d.save());
 }
 

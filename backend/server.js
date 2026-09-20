@@ -24,7 +24,7 @@ async function main() {
   await bootstrap(c);
 
   const app = createApp(c);
-  const server = app.listen(config.port, () => log.info({ port: config.port, env: config.env, schema: config.db.schema }, 'IvryDélib démarré'));
+  const server = app.listen(config.port, () => log.info({ port: config.port, env: config.env, schema: config.db.schema }, 'VibeDélib démarré'));
 
   c.aiQueue.start();
   if (config.schedulerEnabled) c.scheduler.start();

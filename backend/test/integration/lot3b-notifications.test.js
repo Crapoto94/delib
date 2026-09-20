@@ -81,7 +81,7 @@ describe('notifications événementielles', () => {
     expect(st.sent).toBeGreaterThan(0);
     const m = env.mail.state.sent.slice(before).find((x) => x.to === 'claire.durand@ivry.test');
     expect(m.subject).toContain('À valider');
-    expect(m.html).toContain('Ouvrir dans IvryDélib');
+    expect(m.html).toContain('Ouvrir dans VibeDélib');
     expect(m.footer.line1).toBe("Ville d'Ivry");
     expect((await logOf(a.id, "AND recipient = 'durand'"))[0].status).toBe('sent');
   });
@@ -281,7 +281,7 @@ describe('fiabilité de l\'envoi', () => {
     expect(env.mail.state.sent.length - before).toBe(1);
     expect(st.grouped).toBe(3);
     const m = env.mail.state.sent.at(-1);
-    expect(m.subject).toBe('3 notifications IvryDélib');
+    expect(m.subject).toBe('3 notifications VibeDélib');
     expect(m.html).toContain('Sujet D2');
   });
 

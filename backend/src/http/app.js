@@ -78,7 +78,7 @@ function createApp(c) {
 
   const spec = buildSpec(registry, { version: pkg.version });
   app.get('/swagger.json', (req, res) => res.json(spec));
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec, { customSiteTitle: 'IvryDélib — API' }));
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec, { customSiteTitle: 'VibeDélib — API' }));
 
   app.use(notFound);
   app.use(errorHandler(log));

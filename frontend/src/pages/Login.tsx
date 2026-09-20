@@ -20,8 +20,8 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-soft p-4">
       <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-8">
         <div className="text-center">
-          <div className="mb-3 flex justify-center"><OrgLogo orgId={brand?.organismeId ?? null} nom={brand?.nom ?? 'Iv'} hasLogo={!!brand?.hasLogo} version={brand?.logoVersion ?? null} className="h-16" /></div>
-          <h2>IvryDélib</h2><p className="text-mute">{brand?.nom ?? ''} · gestion des délibérations</p>
+          <div className="mb-3 flex justify-center"><OrgLogo orgId={brand?.organismeId ?? null} nom={brand?.nom ?? 'Vd'} hasLogo={!!brand?.hasLogo} version={brand?.logoVersion ?? null} className="h-16" /></div>
+          <h2>VibeDélib</h2><p className="text-mute">{brand?.nom ?? ''} · gestion des délibérations</p>
         </div>
         <ErrorBox msg={err} />
         <label className="block"><span className="label">{local ? 'Compte de secours' : 'Identifiant (compte Windows)'}</span>

@@ -176,7 +176,7 @@ function layoutDocument({ content, cfg, vars, measure, logo }) {
 /** Dessine les pages composées (fond, contenu, pied de page, filigrane). Renvoie { buffer, pageCount }. */
 async function paintDocument({ layout, cfg, vars, bgFirst, bgNext, watermark, title, fontsDir, logo }) {
   const doc = await PDFDocument.create();
-  doc.setTitle(title || 'Document'); doc.setProducer('IvryDélib'); doc.setCreator('IvryDélib');
+  doc.setTitle(title || 'Document'); doc.setProducer('VibeDélib'); doc.setCreator('VibeDélib');
   const fonts = await embedFamily(doc, cfg.police?.famille, fontsDir);
   const bg = async (bytes) => (bytes ? (await doc.embedPdf(bytes, [0]))[0] : null);
   const first = await bg(bgFirst); const next = (await bg(bgNext)) || first;

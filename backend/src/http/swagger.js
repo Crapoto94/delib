@@ -45,7 +45,7 @@ function buildSpec(registry, { version = '0.1.0' } = {}) {
   }
   return {
     openapi: '3.0.3',
-    info: { title: 'IvryDélib — API', version, description: 'Gestion des délibérations (lot 0 : fondations). Préfixe /api/v1 ; erreurs normalisées { error, code }.' },
+    info: { title: 'VibeDélib — API', version, description: 'Gestion des délibérations (lot 0 : fondations). Préfixe /api/v1 ; erreurs normalisées { error, code }.' },
     servers: [{ url: '/' }],
     tags: [],
     paths,

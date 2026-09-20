@@ -1,4 +1,4 @@
-# IvryDélib — frontend : compilation (Vite) puis service statique par nginx, qui relaie /api vers le backend.
+# VibeDélib — frontend : compilation (Vite) puis service statique par nginx, qui relaie /api vers le backend.
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./

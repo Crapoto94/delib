@@ -20,7 +20,7 @@ export const resetBranding = () => { cache = null; };
 export function useFavicon(b: Branding | null) {
   useEffect(() => {
     if (!b) return;
-    document.title = `${b.nom} — IvryDélib`;
+    document.title = `${b.nom} — VibeDélib`;
     if (b.hasLogo && b.organismeId) {
       let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
@@ -34,5 +34,5 @@ export const logoUrl = (orgId: number, version: string | null) => `/api/v1/publi
 /** Logo de l'organisme, ou pastille aux initiales s'il n'y en a pas. */
 export function OrgLogo({ orgId, nom, hasLogo, version, className = 'h-9' }: { orgId: number | null; nom: string; hasLogo: boolean; version: string | null; className?: string }) {
   if (hasLogo && orgId) return <img src={logoUrl(orgId, version)} alt={`Logo ${nom}`} className={`${className} w-auto max-w-[180px] object-contain`} />;
-  return <span aria-hidden className={`flex aspect-square items-center justify-center rounded bg-primary font-bold text-white ${className}`}>{nom.split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase() || 'Iv'}</span>;
+  return <span aria-hidden className={`flex aspect-square items-center justify-center rounded bg-primary font-bold text-white ${className}`}>{nom.split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase() || 'Vd'}</span>;
 }

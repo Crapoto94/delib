@@ -25,6 +25,6 @@ describe('connexion de développement (sans AD)', () => {
   });
 
   it('est refusée par la configuration en production', () => {
-    expect(() => testConfig('ivrydelib_test_x', { NODE_ENV: 'production', DEV_LOGIN_PASSWORD: 'x', CORS_ORIGINS: 'https://x.fr' })).toThrow(/DEV_LOGIN_PASSWORD/);
+    expect(() => testConfig('vibedelib_test_x', { NODE_ENV: 'production', DEV_LOGIN_PASSWORD: 'x', CORS_ORIGINS: 'https://x.fr' })).toThrow(/DEV_LOGIN_PASSWORD/);
   });
 });

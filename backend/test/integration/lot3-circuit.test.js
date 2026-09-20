@@ -394,7 +394,7 @@ describe('éditeur de circuit', () => {
     const cmp = await as(t.martin).get(`${base()}/circuits/${circuit.id}/comparaison?a=1&b=${v2.version}`);
     expect(JSON.stringify(cmp.body)).toContain('chef_service');
     const exp = (await as(t.martin).get(`${base()}/circuits/${circuit.id}/export`)).body;
-    expect(exp.format).toBe('ivrydelib.circuit/1');
+    expect(exp.format).toBe('vibedelib.circuit/1');
     const imp = await as(t.martin).post(`${base()}/circuits/import`, { ...exp, code: 'copie', nom: 'Copie' });
     expect(imp.status).toBe(201);
   });

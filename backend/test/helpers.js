@@ -1,6 +1,6 @@
 /**
  * Aides de test. Les tests d'intégration tournent sur une VRAIE base PostgreSQL (celle du .env) mais dans un schéma
- * JETABLE propre à chaque fichier de test (ivrydelib_test_<aléa>), supprimé à la fin. Le schéma applicatif réel n'est
+ * JETABLE propre à chaque fichier de test (vibedelib_test_<aléa>), supprimé à la fin. Le schéma applicatif réel n'est
  * jamais touché : chaque suppression est précédée d'un contrôle du préfixe.
  * Les services externes (AD/APM, Hub) sont remplacés par de faux adaptateurs : aucun réseau, aucun identifiant réel.
  */
@@ -18,7 +18,7 @@ const { createApp } = require('../src/http/app');
 const { bootstrap } = require('../src/bootstrap');
 const { createFakeAuth, createFakeDirectory, createFakeMail, createFakeAi, createFakeMeeting } = require('../src/adapters/fake-directory');
 
-const PREFIX = 'ivrydelib_test_';
+const PREFIX = 'vibedelib_test_';
 
 function testConfig(schema, overrides = {}) {
   return buildConfig({
@@ -35,7 +35,7 @@ function testConfig(schema, overrides = {}) {
     LOCAL_ADMIN_PASSWORD: 'mot-de-passe-de-secours-123',
     RLS_ENABLED: 'false',
     LOG_LEVEL: 'silent',
-    STORAGE_DIR: require('path').join(require('os').tmpdir(), 'ivrydelib-test-' + process.pid),
+    STORAGE_DIR: require('path').join(require('os').tmpdir(), 'vibedelib-test-' + process.pid),
     CORS_ORIGINS: 'http://localhost:5160',
     DIRECTORY_CACHE_TTL_MIN: '60',
     ...overrides,

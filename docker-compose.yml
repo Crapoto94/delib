@@ -1,4 +1,4 @@
-# IvryDélib — Docker Compose : backend + frontend (+ PostgreSQL local facultatif).
+# VibeDélib — Docker Compose : backend + frontend (+ PostgreSQL local facultatif).
 # Ports : frontend 5160 (nginx, relaie /api), backend 3021, espace élus DMZ 5161 (à venir).
 # Les secrets viennent du fichier .env à la racine (jamais versionné) ; aucune URL ni clé n'est écrite ici.
 #
@@ -34,8 +34,8 @@ services:
     image: postgres:16-alpine
     restart: always
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-ivrydelib}
-      - POSTGRES_USER=${POSTGRES_USER:-ivrydelib}
+      - POSTGRES_DB=${POSTGRES_DB:-vibedelib}
+      - POSTGRES_USER=${POSTGRES_USER:-vibedelib}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?mot de passe requis}
     volumes: ["pgdata:/var/lib/postgresql/data"]
     ports: ["5432:5432"]

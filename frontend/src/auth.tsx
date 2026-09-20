@@ -4,7 +4,7 @@ import { api, getActAs, getOrgId, getToken, setActAs, setOrgId, setToken } from 
 export type Organisme = { id: number; code: string; nom: string; type: string; isDefault: boolean; roles: string[]; via?: string; hasLogo?: boolean; logoVersion?: string | null; contact?: Record<string, string>; adresse?: string | null };
 export type Me = {
   username: string; displayName: string; email: string | null; kind: string; isPlatformAdmin: boolean;
-  agent: null | { displayName?: string; direction?: { code: string; label: string }; service?: { code: string; label: string } | null; poste?: string };
+  agent: null | { displayName?: string; prenom?: string | null; nom?: string | null; direction?: { code: string; label: string }; service?: { code: string; label: string } | null; poste?: string };
   organismes: Organisme[]; defaultOrganismeId: number | null; onboarding: { toShow: any[] };
   impersonation: null | { by: string }; canImpersonate: boolean;
 };
