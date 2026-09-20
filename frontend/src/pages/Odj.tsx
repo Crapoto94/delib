@@ -6,6 +6,7 @@ import { useAuth } from '../auth';
 import { dt } from '../format';
 import { TeamsForm, TeamsLink } from '../Reunions';
 import CahierModal from '../Cahier';
+import SeanceKpis from '../SeanceKpis';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
 
 /** Ordre du jour d'une séance : classement par glisser-déposer (ou clavier), numérotation, affectation, arrêt (section 16.2). */
@@ -93,7 +94,7 @@ export default function Odj() {
           {canEdit && !arrete && <button className="btn-secondary" onClick={() => previewPattern(d.pattern)}>Numérotation…</button>}
           {canEdit && !arrete && <button className="btn-primary" onClick={() => doArret(false)} disabled={busy}>Arrêter l'ordre du jour</button>}
         </>} />
-      {d.warnings.length > 0 && <div className="mb-4 rounded border border-warn/30 bg-warn-bg p-3 text-warn">{d.warnings.map((w: any) => <div key={w.itemId}>⚠ {w.message}</div>)}</div>}
+      {canEdit && <SeanceKpis seanceId={Number(id)} rev={`${d.statut}|${d.items.map((i: any) => `${i.id}:${i.statut}:${i.acte?.etat ?? ''}`).join(',')}`} />}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="card" aria-label="Ordre du jour">

@@ -27,7 +27,7 @@ const AdminBody = z.object({ username: z.string().trim().min(1).max(128) });
 
 const multer = require('multer');
 
-module.exports = ({ makeRouter, organismes }) => {
+module.exports = ({ makeRouter, organismes, circuits, seances }) => {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
   const r = makeRouter('/api/v1/organismes');
   const pub = makeRouter('/api/v1/public');
@@ -47,8 +47,14 @@ module.exports = ({ makeRouter, organismes }) => {
     description: 'Un administrateur de plateforme voit tous les organismes ; un agent voit ceux où il a un rôle ou dont sa direction dépend.',
   }, (req, res) => res.json({ items: req.ctx.organismes.map(({ roles, via, ...o }) => ({ ...o, roles, via })) }));
 
-  r.post('/', { summary: 'Crée un organisme', tags: ['organismes'], platform: true, body: Create, responses: { 201: 'Créé' } },
-    async (req, res) => res.status(201).json(await organismes.create(req.ctx, req.valid.body)));
+  r.post('/', { summary: 'Crée un organisme (collectivité) prêt à l’emploi : circuit par défaut, groupes de valideurs, instance de séances', tags: ['organismes'], platform: true, body: Create, responses: { 201: 'Créé' } },
+    async (req, res) => {
+      const org = await organismes.create(req.ctx, req.valid.body);
+      // une collectivité neuve est immédiatement utilisable : circuit de validation, groupes de valideurs, instance délibérante
+      await circuits.ensureDefaults(org.id);
+      await seances.ensureDefaultInstance(org.id);
+      res.status(201).json(org);
+    });
 
   r.get('/:orgId', { summary: "Détail d'un organisme", tags: ['organismes'], org: true, params: OrgParams },
     (req, res) => res.json(req.org));

@@ -8,6 +8,7 @@ import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useT
 import { Gabarits, Identite, Utilisateurs } from './AdminExtra';
 import AdminIa from './AdminIa';
 import AgentPicker, { AgentList } from '../AgentPicker';
+import Collectivites from './Collectivites';
 
 const FONCTIONS: Record<string, string> = { responsable_intermediaire: 'Responsable intermédiaire', chef_service: 'Chef de service', directeur: 'Directeur', dga: 'DGA', dgs: 'DGS' };
 
@@ -164,8 +165,8 @@ function Calendrier() {
 }
 
 export default function Admin() {
-  const { isAdmin } = useAuth();
-  const tabs = [['identite', 'Identité & logo'], ['utilisateurs', 'Utilisateurs & rôles'], ['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['gabarits', 'Gabarits PDF'], ['notifications', 'Notifications & relances'], ['ia', 'Assistant IA'], ['elus', 'Élus'], ['calendrier', 'Jours fériés']];
+  const { isAdmin, me } = useAuth();
+  const tabs = [['identite', 'Identité & logo'], ['utilisateurs', 'Utilisateurs & rôles'], ['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['gabarits', 'Gabarits PDF'], ['notifications', 'Notifications & relances'], ['ia', 'Assistant IA'], ['elus', 'Élus'], ['calendrier', 'Jours fériés'], ...(me?.isPlatformAdmin ? [['collectivites', 'Collectivités']] : [])];
   return (
     <div>
       <PageTitle title="Administration" sub={isAdmin ? "Paramétrage de l'organisme." : "Paramétrage accessible au SCC."} />
@@ -175,7 +176,7 @@ export default function Admin() {
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
-        <Route path="elus" element={<Elus />} /><Route path="calendrier" element={<Calendrier />} />
+        <Route path="collectivites" element={<Collectivites />} /><Route path="elus" element={<Elus />} /><Route path="calendrier" element={<Calendrier />} />
       </Routes>
     </div>
   );
