@@ -11,9 +11,17 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.35.0';
+export const VERSION = '0.36.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.36.0', type: 'minor', titre: 'Listes filtrables, président de séance et date d’affichage',
+    items: [
+      "Toutes les listes déroulantes ont une zone de saisie pour filtrer les choix (dès 7 choix), utilisable au clavier.",
+      "Au conseil, le président de séance est le maire par défaut à l'ouverture du suivi de séance (modifiable).",
+      "Date d'affichage saisie par le SCC après l'AR : elle renseigne la mention « publié par voie d'affichage » de l'extrait du registre.",
+    ],
+  },
   {
     version: '0.35.0', type: 'minor', titre: 'Contrôle de légalité, workflow de séance, bibliothèque et trajet des actes',
     items: [

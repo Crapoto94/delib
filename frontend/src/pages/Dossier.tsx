@@ -11,6 +11,7 @@ import { d, dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
 import { useIa } from '../useIa';
+import { Select } from '../Select';
 
 /* ------------------------------------------------------------------------------------------------ frise du circuit */
 const IGNOREE: Record<string, string> = {
@@ -71,8 +72,8 @@ function ChampInput({ c, v, onChange, disabled, elus }: { c: any; v: any; onChan
     case 'nombre': return <input className="input" type="number" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} />;
     case 'date': return <input className="input" type="date" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value)} />;
     case 'booleen': return <div className="flex items-center gap-4 py-2">{[[true, 'Oui'], [false, 'Non']].map(([b, l]) => <label key={String(b)} className="flex items-center gap-1"><input type="radio" disabled={disabled} checked={v === b} onChange={() => onChange(b)} /> {l}</label>)}</div>;
-    case 'liste': return <select className="input" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value)}><option value="">— choisir —</option>{(c.options || []).map((o: any) => <option key={o.valeur} value={o.valeur}>{o.libelle}</option>)}</select>;
-    case 'elu': return <select className="input" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}><option value="">— choisir —</option>{elus.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}</option>)}</select>;
+    case 'liste': return <Select className="input" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value)}><option value="">— choisir —</option>{(c.options || []).map((o: any) => <option key={o.valeur} value={o.valeur}>{o.libelle}</option>)}</Select>;
+    case 'elu': return <Select className="input" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}><option value="">— choisir —</option>{elus.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}</option>)}</Select>;
     default: return <input className="input" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value)} />;
   }
 }
@@ -112,19 +113,19 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Direction porteuse"><div className="input bg-soft">{acte.direction?.label}{acte.service ? ` · ${acte.service.label}` : ''}</div></Field>
         <Field label="Séance visée" hint="Proposée par le rédacteur ; modifiable par la hiérarchie.">
-          <select className="input" disabled={dis && !acte.droits?.modifierSeance} value={f.seanceViseeId ?? ''} onChange={(e) => setF({ ...f, seanceViseeId: e.target.value })}>
+          <Select className="input" disabled={dis && !acte.droits?.modifierSeance} value={f.seanceViseeId ?? ''} onChange={(e) => setF({ ...f, seanceViseeId: e.target.value })}>
             <option value="">— à définir —</option>{seances.data?.map((s) => <option key={s.id} value={s.id}>{s.instance} — {d(s.dateSeance)}</option>)}
-          </select>
+          </Select>
         </Field>
         <div className="md:col-span-2"><Field label="Titre explicite de l'acte *"><input className="input" disabled={dis} value={f.titre ?? ''} onChange={(e) => setF({ ...f, titre: e.target.value })} /></Field></div>
-        <Field label="Domaine d'intervention (matière) *"><select className="input" disabled={dis} value={f.matiereId ?? ''} onChange={(e) => setF({ ...f, matiereId: e.target.value })}>
-          <option value="">— choisir —</option>{leaves.map((m) => <option key={m.id} value={m.id}>{m.code} — {m.libelle}</option>)}</select></Field>
-        <Field label="Rubrique *"><select className="input" disabled={dis} value={f.rubriqueId ?? ''} onChange={(e) => setF({ ...f, rubriqueId: e.target.value })}>
-          <option value="">— choisir —</option>{rubriques.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</select></Field>
-        <Field label="Nature *"><select className="input" disabled={dis} value={f.natureId ?? ''} onChange={(e) => setF({ ...f, natureId: e.target.value })}>
-          <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</select></Field>
-        <Field label="Élu rapporteur *"><select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => setF({ ...f, rapporteurId: e.target.value })}>
-          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${m.role})` : ''}</option>)}</select></Field>
+        <Field label="Domaine d'intervention (matière) *"><Select className="input" disabled={dis} value={f.matiereId ?? ''} onChange={(e) => setF({ ...f, matiereId: e.target.value })}>
+          <option value="">— choisir —</option>{leaves.map((m) => <option key={m.id} value={m.id}>{m.code} — {m.libelle}</option>)}</Select></Field>
+        <Field label="Rubrique *"><Select className="input" disabled={dis} value={f.rubriqueId ?? ''} onChange={(e) => setF({ ...f, rubriqueId: e.target.value })}>
+          <option value="">— choisir —</option>{rubriques.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
+        <Field label="Nature *"><Select className="input" disabled={dis} value={f.natureId ?? ''} onChange={(e) => setF({ ...f, natureId: e.target.value })}>
+          <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
+        <Field label="Élu rapporteur *"><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => setF({ ...f, rapporteurId: e.target.value })}>
+          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${m.role})` : ''}</option>)}</Select></Field>
         <div>
           <span className="label">Impact budgétaire (dépense ou recette) ? *</span>
           <div className="flex items-center gap-4 py-2">
@@ -260,11 +261,11 @@ function Actions({ acte, circuit, reload, toast }: { acte: any; circuit: any; re
       {refus && (
         <Modal title="Demander une modification" onClose={() => setRefus(false)}>
           <div className="space-y-4">
-            <Field label="Renvoyer à"><select className="input" value={target} onChange={(e) => setTarget(e.target.value)}>
+            <Field label="Renvoyer à"><Select className="input" value={target} onChange={(e) => setTarget(e.target.value)}>
               <option value="previous">L'étape précédente</option>{(circuit.refuseTargets || []).map((t: any) => <option key={t.key} value={t.key}>{t.first ? `${t.label} (rédacteur)` : t.label}</option>)}
-            </select></Field>
-            <Field label="Après correction, l'acte…"><select className="input" value={resume} onChange={(e) => setResume(e.target.value)}>
-              <option value="direct">revient directement à mon étape</option><option value="complet">repasse par tout le circuit</option></select></Field>
+            </Select></Field>
+            <Field label="Après correction, l'acte…"><Select className="input" value={resume} onChange={(e) => setResume(e.target.value)}>
+              <option value="direct">revient directement à mon étape</option><option value="complet">repasse par tout le circuit</option></Select></Field>
             <Field label="Motif (obligatoire)"><textarea className="input" rows={4} value={motif} onChange={(e) => setMotif(e.target.value)} autoFocus /></Field>
             <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setRefus(false)}>Annuler</button>
               <button className="btn-ko" disabled={busy || motif.trim().length < 3} onClick={() => act(() => api.post(orgPath(o, `/actes/${acte.id}/refus`), { target, resume, motif }).then(() => setRefus(false)), 'Modification demandée')}>Renvoyer</button></div>
@@ -328,8 +329,8 @@ function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolea
             <div className="text-[12px] text-mute">{c.suspendue ? '⏸ mise à disposition suspendue' : c.misADispositionAt ? `Mis à disposition le ${d(c.misADispositionAt)}` : 'Mise à disposition à la validation DGS'}</div>
             {c.avis ? <Badge tone={c.avis === 'favorable' ? 'ok' : c.avis === 'defavorable' ? 'ko' : 'warn'}>{AVIS[c.avis]}</Badge> : c.misADispositionAt && <button className="text-[12px] font-semibold text-action" onClick={() => avis(c)}>Saisir l'avis</button>}
           </li>))}</ul>)}
-      {editable && <div className="mt-3 flex gap-2"><select className="input" value={sel} onChange={(e) => setSel(e.target.value)} aria-label="Ajouter une commission"><option value="">Ajouter une commission…</option>
-        {all.data?.filter((c) => !taken.has(c.id)).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select><button className="btn-secondary" disabled={!sel} onClick={add}>Ajouter</button></div>}
+      {editable && <div className="mt-3 flex gap-2"><Select className="input" value={sel} onChange={(e) => setSel(e.target.value)} aria-label="Ajouter une commission"><option value="">Ajouter une commission…</option>
+        {all.data?.filter((c) => !taken.has(c.id)).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</Select><button className="btn-secondary" disabled={!sel} onClick={add}>Ajouter</button></div>}
     </div>
   );
 }

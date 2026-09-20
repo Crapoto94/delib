@@ -3,6 +3,7 @@ import { Download, Pencil, Plus, Upload } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { Badge, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 const TYPES: [string, string][] = [['texte', 'Texte'], ['nombre', 'Nombre'], ['date', 'Date'], ['liste', 'Liste de valeurs'], ['booleen', 'Oui / non'], ['elu', 'Élu'], ['agent', 'Agent']];
 const ROLES: [string, string][] = [['redacteur', 'Rédacteur'], ['scc', 'SCC'], ['org_admin', 'Administrateur']];
@@ -35,15 +36,15 @@ function ChampForm({ champ, champs, types, onClose, onSaved }: { champ: any | nu
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Libellé *"><input className="input" autoFocus value={f.libelle} onChange={(e) => setF({ ...f, libelle: e.target.value })} /></Field>
           <Field label="Code *" hint="Définitif : minuscules, chiffres et _"><input className="input font-mono" disabled={!!champ} value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /></Field>
-          <Field label="Type"><select className="input" disabled={!!champ} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>{TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
-          <Field label="S'applique à"><select className="input" disabled={!!champ} value={f.typeActeId} onChange={(e) => setF({ ...f, typeActeId: e.target.value })}><option value="">Tous les types d'actes</option>{types.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}</select></Field>
+          <Field label="Type"><Select className="input" disabled={!!champ} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>{TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+          <Field label="S'applique à"><Select className="input" disabled={!!champ} value={f.typeActeId} onChange={(e) => setF({ ...f, typeActeId: e.target.value })}><option value="">Tous les types d'actes</option>{types.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}</Select></Field>
         </div>
         {f.kind === 'liste' && <Field label="Valeurs" hint="Une par ligne : valeur=Libellé affiché"><textarea className="input h-24 font-mono text-[13px]" value={f.options} onChange={(e) => setF({ ...f, options: e.target.value })} placeholder={'haute=Haute\nbasse=Basse'} /></Field>}
         <Field label="Aide affichée sous le champ"><input className="input" value={f.aide} onChange={(e) => setF({ ...f, aide: e.target.value })} /></Field>
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.obligatoire} onChange={(e) => setF({ ...f, obligatoire: e.target.checked })} /> Obligatoire (bloque l'envoi au circuit)</label>
         <fieldset className="rounded border border-line p-3"><legend className="px-1 text-[12px] font-semibold uppercase text-mute">Afficher seulement si…</legend>
           <div className="grid gap-3 md:grid-cols-2">
-            <select className="input" value={f.condChamp} onChange={(e) => setF({ ...f, condChamp: e.target.value })}><option value="">Toujours affiché</option>{champs.filter((c) => c.code !== f.code).map((c) => <option key={c.code} value={c.code}>{c.libelle}</option>)}</select>
+            <Select className="input" value={f.condChamp} onChange={(e) => setF({ ...f, condChamp: e.target.value })}><option value="">Toujours affiché</option>{champs.filter((c) => c.code !== f.code).map((c) => <option key={c.code} value={c.code}>{c.libelle}</option>)}</Select>
             {f.condChamp && <input className="input" placeholder="…vaut (valeur exacte)" value={f.condValeur} onChange={(e) => setF({ ...f, condValeur: e.target.value })} />}
           </div>
         </fieldset>

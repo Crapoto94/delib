@@ -5,6 +5,7 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutBadge, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 /** Critères transmis tels quels à l'API (les noms sont ceux des facettes). */
 const CRITERES = ['statut', 'typeId', 'natureId', 'matiereId', 'rubriqueId', 'rapporteurId', 'directionCode', 'seanceId', 'resultat', 'annee', 'du', 'au'] as const;
@@ -61,7 +62,7 @@ export default function Recherche() {
       <form onSubmit={submit} className="card mb-4 flex flex-wrap items-center gap-2 p-3" role="search">
         <Search className="h-5 w-5 text-mute" />
         <input id="recherche-q" aria-label="Recherche" className="input min-w-0 flex-1" autoFocus placeholder={'Mots, « expression exacte », OR, -exclusion, urba*, n° de délibération…'} value={saisie} onChange={(e) => setSaisie(e.target.value)} />
-        <select aria-label="Tri" className="input w-auto" value={tri} onChange={(e) => set({ tri: e.target.value === 'pertinence' ? null : e.target.value })}><option value="pertinence">Pertinence</option><option value="date">Date de séance</option></select>
+        <Select aria-label="Tri" className="input w-auto" value={tri} onChange={(e) => set({ tri: e.target.value === 'pertinence' ? null : e.target.value })}><option value="pertinence">Pertinence</option><option value="date">Date de séance</option></Select>
         <button className="btn-primary">Rechercher</button>
       </form>
 

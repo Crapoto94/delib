@@ -4,6 +4,7 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, ErrorBox, Field, Loading, MailSwitch, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 const ETAT: Record<string, { label: string; tone?: 'ok' | 'warn' | 'ko' | 'blue' }> = { aucun: { label: 'Pas d’accès' }, invite: { label: 'Invité', tone: 'warn' }, actif: { label: 'Accès actif', tone: 'ok' }, desactive: { label: 'Désactivé', tone: 'ko' } };
 
@@ -20,7 +21,7 @@ function JournalOublis({ o }: { o: number }) {
   return (
     <section className="card overflow-hidden">
       <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3"><h3>Oublis de mot de passe</h3>
-        <select className="input !w-auto" aria-label="Filtrer par événement" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Tous les événements</option>{Object.entries(OUBLI).map(([k, x]) => <option key={k} value={k}>{x.label}</option>)}</select>
+        <Select className="input !w-auto" aria-label="Filtrer par événement" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Tous les événements</option>{Object.entries(OUBLI).map(([k, x]) => <option key={k} value={k}>{x.label}</option>)}</Select>
         <button className="btn-secondary !py-1" onClick={j.reload}>Actualiser</button>
         {j.data && <span className="ml-auto flex flex-wrap gap-1 text-[12px]" title="Dernières 24 heures">{Object.entries(j.data.dernieres24h as Record<string, number>).map(([k, n]) => <Badge key={k} tone={OUBLI[k]?.tone}>{OUBLI[k]?.label ?? k} : {n}</Badge>)}</span>}</div>
       {j.loading && !j.data ? <Loading /> : j.error ? <div className="p-4"><ErrorBox msg={j.error} /></div> : !j.data?.items.length ? <p className="p-6 text-center text-mute">Aucun oubli de mot de passe enregistré.</p> : (
@@ -51,7 +52,7 @@ function SmsPasserelle({ o }: { o: number }) {
       <p className="max-w-3xl text-mute">Quand un élu clique sur « Mot de passe oublié », un <b>code à 6 chiffres</b> part par SMS sur son mobile (valable 5 minutes ; connexion de 12 h). Les mobiles viennent du <b>Hub DSI</b> (champ téléphone, resynchronisé avec la liste des élus) ; un mobile saisi dans <b>Élus</b> a priorité.</p>
       {d.data.couverture && <p className={`rounded border px-3 py-2 text-[13px] ${d.data.couverture.sansMobile.length ? 'border-warn/30 bg-warn-bg text-warn' : 'border-ok/30 bg-ok-bg text-ok-text'}`}><b>{d.data.couverture.avecMobile} élu(s) sur {d.data.couverture.total}</b> ont un mobile utilisable.{d.data.couverture.sansMobile.length > 0 && <> Sans mobile (ou numéro non mobile) : {d.data.couverture.sansMobile.join(', ')} — à renseigner dans <b>Élus</b> ou dans le Hub DSI.</>}</p>}
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Mode"><select className="input" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="simulation">Simulation (aucun SMS n’est envoyé)</option><option value="http">Passerelle HTTP</option></select></Field>
+        <Field label="Mode"><Select className="input" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="simulation">Simulation (aucun SMS n’est envoyé)</option><option value="http">Passerelle HTTP</option></Select></Field>
         {!sim && <Field label="Adresse de la passerelle" hint="Passerelle SMS de la Ville : http(s)://…/api/v1/messages"><input className="input" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://…" /></Field>}
         {!sim && <Field label="Clé d’API / jeton" hint={d.data.config.jetonDefini ? 'Enregistré (chiffré) : laissez vide pour le conserver.' : 'Envoyé en « Authorization: Bearer », chiffré au repos.'}><input className="input" type="password" autoComplete="new-password" value={f.jeton} onChange={(e) => setF({ ...f, jeton: e.target.value })} /></Field>}
         {!sim && <Field label="Corps de la requête (JSON)" hint="Variables : {to} {message} {expediteur}. Vide : {&quot;recipient&quot;:&quot;{to}&quot;,&quot;message&quot;:&quot;{message}&quot;}"><input className="input font-mono text-[12px]" value={f.modele} onChange={(e) => setF({ ...f, modele: e.target.value })} /></Field>}
@@ -90,7 +91,7 @@ export default function AdminElus() {
         <section className="card space-y-4 p-5"><h3>Mise à disposition et affichage</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Les élus voient une séance dès…" hint="Tous les membres de l’instance y accèdent au même instant.">
-              <select className="input" value={v('elus.mad_declencheur', 'convocation')} onChange={(e) => setSetting('elus.mad_declencheur', e.target.value, 'Paramètre enregistré')}><option value="convocation">l’envoi de la convocation</option><option value="arret">l’arrêt de l’ordre du jour</option></select></Field>
+              <Select className="input" value={v('elus.mad_declencheur', 'convocation')} onChange={(e) => setSetting('elus.mad_declencheur', e.target.value, 'Paramètre enregistré')}><option value="convocation">l’envoi de la convocation</option><option value="arret">l’arrêt de l’ordre du jour</option></Select></Field>
             <Field label="Adresse de l’espace des élus" hint="Utilisée dans les invitations (ex. https://elus.ivry.local/elus.html)."><input className="input" defaultValue={v('elus.url_base', '')} placeholder="http://localhost:5160/elus.html" onBlur={(e) => e.target.value !== v('elus.url_base', '') && setSetting('elus.url_base', e.target.value.trim(), 'Adresse enregistrée')} /></Field>
           </div>
           <label className="flex items-center gap-3"><MailSwitch on={v('elus.suivi_direct', true) !== false} onChange={(b) => setSetting('elus.suivi_direct', b, 'Paramètre enregistré')} label="Suivi de la séance en direct" /><span>Permettre aux élus de <b>suivre la séance en direct</b> (point en cours)</span></label>
@@ -111,7 +112,7 @@ export default function AdminElus() {
 
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3"><h3>Preuve de consultation</h3>
-          <select className="input !w-auto" value={sid ?? ''} onChange={(e) => setSid(e.target.value ? Number(e.target.value) : null)} aria-label="Séance"><option value="">Choisir une séance…</option>{seances.data?.map((s) => <option key={s.id} value={s.id}>{s.instance} — {dt(s.dateSeance, { dateStyle: 'long' })}</option>)}</select>
+          <Select className="input !w-auto" value={sid ?? ''} onChange={(e) => setSid(e.target.value ? Number(e.target.value) : null)} aria-label="Séance"><option value="">Choisir une séance…</option>{seances.data?.map((s) => <option key={s.id} value={s.id}>{s.instance} — {dt(s.dateSeance, { dateStyle: 'long' })}</option>)}</Select>
           <span className="text-[12px] text-mute">Qui a consulté quoi et quand (métadonnées seulement : les notes des élus ne sont jamais accessibles).</span></div>
         {cons.data && <table className="w-full"><thead><tr><th>Élu</th><th>Documents lus</th><th>Ouvertures</th><th>Première lecture</th><th>Dernière lecture</th></tr></thead><tbody>{cons.data.map((c) => (
           <tr key={c.eluId}><td className="font-semibold">{c.nom}</td><td>{c.documentsLus}</td><td>{c.ouvertures}{c.horsLigne && <span className="ml-1 text-[11px] text-mute">(dont hors ligne)</span>}</td><td className="text-[12px]">{c.premiereLecture ? dt(c.premiereLecture) : <span className="text-mute">jamais</span>}</td><td className="text-[12px]">{c.derniereLecture ? dt(c.derniereLecture) : '—'}</td></tr>))}</tbody></table>}

@@ -214,3 +214,34 @@ describe('AR de la préfecture : tampon, ARActe XML, extrait du registre conform
     expect(xmlDoc.mime).toBe('application/xml'); expect((await xmlDoc.produire()).toString('utf8')).toMatch(/ARActe/);
   });
 });
+
+describe('date d’affichage saisie par le SCC (TLT-34)', () => {
+  const texte = async (buf) => {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), useSystemFonts: true, verbosity: 0, isEvalSupported: false }).promise;
+    let out = '';
+    for (let i = 1; i <= doc.numPages; i++) out += `${(await (await doc.getPage(i)).getTextContent()).items.map((x) => x.str).join(' ')} `;
+    return out.replace(/\s+/g, ' ');
+  };
+  it('renseigne « publié par voie d’affichage le … » de l’extrait ; par défaut la date de l’AR', async () => {
+    const tx = (await as(t.martin).get(TL('/transactions'))).body.items.find((x) => x.acteId === A1);
+    const fr = (iso) => new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Paris' });
+    let pdf = (await bin(t.martin, TL(`/transactions/${tx.id}/extrait`))).body;
+    expect(await texte(pdf)).toMatch(new RegExp(`PUBLIÉ PAR VOIE D'AFFICHAGE LE ${fr(tx.arLe)}`));
+
+    expect((await as(t.dupont).put(TL(`/transactions/${tx.id}/affichage`), { date: '2030-01-15' })).status).toBe(403);
+    expect((await as(t.martin).put(TL(`/transactions/${tx.id}/affichage`), { date: '2000-01-01' })).status).toBe(400); // avant l’AR
+    const ok = await as(t.martin).put(TL(`/transactions/${tx.id}/affichage`), { date: '2030-01-15' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200); expect(String(ok.body.dateAffichage).slice(0, 10)).toBe('2030-01-15');
+    pdf = (await bin(t.martin, TL(`/transactions/${tx.id}/extrait`))).body;
+    expect(await texte(pdf)).toMatch(/PUBLIÉ PAR VOIE D'AFFICHAGE LE 15\/01\/2030/);
+
+    // l’extrait déposé en GED change d’empreinte : il sera mis à jour
+    const sys = { username: 'ged-auto', isPlatformAdmin: true, kind: 'system', organismes: [], roles: [] };
+    const { docs } = await env.c.ged.documentsSeance(sys, ville.id, seance.id);
+    expect(docs.find((d) => d.key === `t${tx.id}:extrait-ar`)).toBeTruthy();
+    // effacer la date reprend celle de l’AR
+    expect((await as(t.martin).put(TL(`/transactions/${tx.id}/affichage`), { date: null })).status).toBe(200);
+    expect(await texte((await bin(t.martin, TL(`/transactions/${tx.id}/extrait`))).body)).toMatch(new RegExp(`PUBLIÉ PAR VOIE D'AFFICHAGE LE ${fr(tx.arLe)}`));
+  });
+});

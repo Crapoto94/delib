@@ -3,6 +3,7 @@ import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 /** Création ou modification d'un élu / membre (ELU-80). Les élus issus du Hub : identité en lecture seule, groupe, mandat et mobile modifiables. */
 function EluForm({ elu, groupes, onClose, onSaved }: { elu: any | null; groupes: any[]; onClose: () => void; onSaved: () => void }) {
@@ -33,8 +34,8 @@ function EluForm({ elu, groupes, onClose, onSaved }: { elu: any | null; groupes:
           <Field label="Courriel" hint="Sert d’identifiant de connexion à l’espace des élus."><input className="input" type="email" disabled={hub} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
           <Field label="Mobile" hint="Pour le code SMS « mot de passe oublié » (06…, 07… ou +33…)."><input className="input" type="tel" autoComplete="off" value={f.mobile} onChange={(e) => setF({ ...f, mobile: e.target.value })} placeholder={hub && elu?.mobile ? `Hub : ${elu.mobile}` : '06 12 34 56 78'} /></Field>
           <Field label="Rôle / fonction"><input className="input" disabled={hub} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} placeholder="Adjoint(e), conseiller(ère)…" /></Field>
-          <Field label="Qualité"><select className="input" disabled={hub} value={f.estElu ? 'elu' : 'non'} onChange={(e) => setF({ ...f, estElu: e.target.value === 'elu' })}><option value="elu">Élu</option><option value="non">Membre non élu (personne qualifiée…)</option></select></Field>
-          <Field label="Groupe politique"><select className="input" value={f.groupeId} onChange={(e) => setF({ ...f, groupeId: e.target.value })}><option value="">Non inscrit</option>{groupes.map((g) => <option key={g.id} value={g.id}>{g.nom}</option>)}</select></Field>
+          <Field label="Qualité"><Select className="input" disabled={hub} value={f.estElu ? 'elu' : 'non'} onChange={(e) => setF({ ...f, estElu: e.target.value === 'elu' })}><option value="elu">Élu</option><option value="non">Membre non élu (personne qualifiée…)</option></Select></Field>
+          <Field label="Groupe politique"><Select className="input" value={f.groupeId} onChange={(e) => setF({ ...f, groupeId: e.target.value })}><option value="">Non inscrit</option>{groupes.map((g) => <option key={g.id} value={g.id}>{g.nom}</option>)}</Select></Field>
           <div className="grid grid-cols-2 gap-3"><Field label="Mandat : début"><input className="input" type="date" value={f.mandatDebut} onChange={(e) => setF({ ...f, mandatDebut: e.target.value })} /></Field>
             <Field label="Fin"><input className="input" type="date" value={f.mandatFin} onChange={(e) => setF({ ...f, mandatFin: e.target.value })} /></Field></div>
         </div>
@@ -68,7 +69,7 @@ export default function AdminMembres() {
       <div className="flex flex-wrap items-end gap-3">
         <button className="btn-primary" onClick={() => setEdit('nouveau')}><Plus className="h-4 w-4" /> Nouvel élu ou membre</button>
         <button className="btn-secondary" onClick={sync}><RefreshCw className="h-3.5 w-3.5" /> Synchroniser avec le Hub</button>
-        <label className="ml-auto"><span className="label">Afficher</span><select className="input !w-auto" value={statut} onChange={(e) => setStatut(e.target.value as any)}><option value="true">Actifs</option><option value="false">Désactivés</option><option value="all">Tous</option></select></label>
+        <label className="ml-auto"><span className="label">Afficher</span><Select className="input !w-auto" value={statut} onChange={(e) => setStatut(e.target.value as any)}><option value="true">Actifs</option><option value="false">Désactivés</option><option value="all">Tous</option></Select></label>
         <label><span className="label">Recherche</span><input className="input" value={q} placeholder="Nom, prénom, courriel" onChange={(e) => setQ(e.target.value)} /></label>
       </div>
       <p className="text-[13px] text-mute">Les élus du Hub DSI se synchronisent ; les <b>membres non élus</b> (CCAS, personnes qualifiées) et les élus d’un autre organisme se saisissent à la main. <b>Un élu désactivé le reste</b>, même après une synchronisation.</p>

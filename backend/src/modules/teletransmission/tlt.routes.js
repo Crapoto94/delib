@@ -22,6 +22,7 @@ const Config = z.object({
 }).partial();
 const Preparer = z.object({ itemIds: z.array(Id).min(1).max(200), scenario: Scenario.optional().describe('Scénario de simulation pour ces transmissions'), envoyer: z.boolean().default(false).describe("Enchaîne l'envoi des transmissions préparées (« Préparer et envoyer »)") });
 const Lot = z.object({ ids: z.array(Id).min(1).max(200) });
+const Affichage = z.object({ date: z.iso.date().nullable().describe('Date de publication par voie d\'affichage ; null : reprend la date de l\'AR') });
 const Annuler = z.object({ motif: z.string().trim().max(300).optional() });
 const Reponse = z.object({ typeEnvoie: z.union([z.literal(3), z.literal(4)]).describe('3 : refus d’envoi de pièce ; 4 : envoi de pièce'), message: z.string().trim().max(1000).optional() });
 const Avancer = z.object({ transactionId: Id.optional(), remoteId: z.string().regex(/^S2L-\d+$/).optional().describe('Identifiant S²LOW (simulateur) : alternative à transactionId'), pas: z.number().int().min(1).max(10).default(1) });
@@ -63,6 +64,8 @@ module.exports = ({ makeRouter, tlt }) => {
   async (req, res) => res.json(await tlt.envoyer(req.ctx, req.org.id, req.valid.params.tid)));
   r.post('/transactions/:tid/confirmation', { summary: 'Mode B : confirme la transaction sur S²LOW (17 → 1)', tags: T, org: true, roles: ROLES, params: PT },
     async (req, res) => res.json(await tlt.confirmer(req.ctx, req.org.id, req.valid.params.tid)));
+  r.put('/transactions/:tid/affichage', { summary: "Date d'affichage (publication) : mention « publié par voie d'affichage » de l'extrait du registre, saisie après l'AR", tags: T, org: true, roles: ROLES, params: PT, body: Affichage },
+    async (req, res) => res.json(await tlt.definirAffichage(req.ctx, req.org.id, req.valid.params.tid, req.valid.body.date)));
   r.post('/transactions/:tid/annulation', { summary: 'Annule la transaction (avant l’acquittement)', tags: T, org: true, roles: ROLES, params: PT, body: Annuler },
     async (req, res) => res.json(await tlt.annuler(req.ctx, req.org.id, req.valid.params.tid, req.valid.body.motif)));
   r.get('/transactions/:tid/bordereau', { summary: 'Bordereau d’acquittement (PDF)', tags: T, org: true, roles: ROLES, params: PT, responses: { 200: 'PDF' } },

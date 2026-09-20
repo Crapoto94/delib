@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import AgentPicker from '../AgentPicker';
 import { AgentName, AgentNames } from '../AgentName';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 type Role = { fonction: string; statut: 'personne' | 'vacant' | 'implicite' | 'direct_dgs' | 'non_defini' | 'non_renseigne'; holders: string[]; via: string | null; poste: string | null; titulaires: { id: number; username: string | null; suppleant: string | null; vacant: boolean }[]; rh: { responsable: string | null; poste: string | null; vacant: boolean; estLeDirecteur?: boolean } | null };
 const LABEL: Record<string, string> = { directeur: 'Directeur', chef_service: 'Chef de service', dga: 'DGA', dgs: 'DGS' };
@@ -98,10 +99,10 @@ export default function Organisation() {
               <div>
                 <div className="flex flex-wrap items-center gap-2 border-t border-line/60 px-4 py-2 text-[13px]">
                   <span className="w-44 shrink-0 font-semibold">Rattachement (DGA)</span>
-                  <select className="input w-auto" aria-label={`Rattachement de ${dir.label}`} value={dir.rattachement ? (dir.rattachement.type === 'dgs' ? 'dgs' : `p${dir.rattachement.posteId}`) : ''}
+                  <Select className="input w-auto" aria-label={`Rattachement de ${dir.label}`} value={dir.rattachement ? (dir.rattachement.type === 'dgs' ? 'dgs' : `p${dir.rattachement.posteId}`) : ''}
                     onChange={(e) => { const x = e.target.value; act(() => api.put(orgPath(o, `/organisation/directions/${dir.code}/rattachement`), x === '' ? { rattachement: null } : x === 'dgs' ? { rattachement: 'dgs' } : { rattachement: 'dga', dgaPosteId: Number(x.slice(1)) }), 'Rattachement enregistré'); }}>
                     <option value="">— à définir —</option><option value="dgs">Directement rattachée à la DGS (pas de DGA)</option>{d.postesDga.map((p: any) => <option key={p.id} value={`p${p.id}`}>{p.libelle}{p.vacant ? ' (vacant)' : ''}</option>)}
-                  </select>
+                  </Select>
                   {dir.dga.statut === 'personne' && <span className="text-mute">→ <AgentNames list={dir.dga.holders.slice(0, 1)} /></span>}{dir.dga.statut === 'vacant' && <Badge tone="warn">DGA vacant — étape contournée</Badge>}
                 </div>
                 <RoleLine role={dir.directeur} directionCode={dir.code} titre="Directeur" />

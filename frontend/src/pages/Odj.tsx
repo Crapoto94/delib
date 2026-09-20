@@ -12,6 +12,7 @@ import { showPdf } from '../PdfViewer';
 import SeanceKpis from '../SeanceKpis';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
+import { Select } from '../Select';
 
 /** Ordre du jour d'une séance : classement par glisser-déposer (ou clavier), numérotation, affectation, arrêt (section 16.2). */
 /** Fond d'une ligne selon l'état de validation du dossier (D57). */
@@ -126,7 +127,7 @@ export default function Odj() {
             <b>{d.totals.deliberations} délibération(s)</b>{d.totals.retires > 0 && <Badge>{d.totals.retires} retirée(s)</Badge>}
             {canEdit && <div className="ml-auto flex flex-wrap gap-2">
               <button className="btn-secondary !py-1" onClick={undo} disabled={!history.length}><Undo2 className="h-3.5 w-3.5" /> Annuler</button>
-              <select className="input !w-auto !py-1" aria-label="Aide de tri" value="" onChange={(e) => { if (e.target.value) propose(e.target.value); }}><option value="">Trier par…</option><option value="rubrique">Rubrique</option><option value="rapporteur">Rapporteur</option><option value="numero">N° de suivi</option><option value="alpha">Ordre alphabétique</option></select>
+              <Select className="input !w-auto !py-1" aria-label="Aide de tri" value="" onChange={(e) => { if (e.target.value) propose(e.target.value); }}><option value="">Trier par…</option><option value="rubrique">Rubrique</option><option value="rapporteur">Rapporteur</option><option value="numero">N° de suivi</option><option value="alpha">Ordre alphabétique</option></Select>
               <button className="btn-secondary !py-1" onClick={() => setPoint({ kind: 'libre', titre: '', description: '', numerote: false, files: [] })}><Plus className="h-3.5 w-3.5" /> Dossier simple / point libre / chapitre</button>
             </div>}
           </div>
@@ -196,7 +197,7 @@ export default function Odj() {
         </section>)}
 
       {point && <Modal title="Ajouter à l'ordre du jour" onClose={() => setPoint(null)}><div className="space-y-4">
-        <Field label="Type"><select className="input" value={point.kind} onChange={(e) => setPoint({ ...point, kind: e.target.value as any })}><option value="libre">Dossier simple / point libre (nom, description, pièces jointes)</option><option value="chapitre">Chapitre (titre de regroupement, sans numéro)</option></select></Field>
+        <Field label="Type"><Select className="input" value={point.kind} onChange={(e) => setPoint({ ...point, kind: e.target.value as any })}><option value="libre">Dossier simple / point libre (nom, description, pièces jointes)</option><option value="chapitre">Chapitre (titre de regroupement, sans numéro)</option></Select></Field>
         <Field label={point.kind === 'libre' ? 'Nom du dossier' : 'Intitulé'}><input className="input" autoFocus value={point.titre} onChange={(e) => setPoint({ ...point, titre: e.target.value })} /></Field>
         {point.kind === 'libre' && <>
           <Field label="Description (facultatif)"><textarea className="input min-h-[90px]" value={point.description} maxLength={5000} onChange={(e) => setPoint({ ...point, description: e.target.value })} /></Field>

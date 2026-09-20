@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import { dt } from '../format';
 import { AgentName } from '../AgentName';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 const STATUT: Record<string, { label: string; tone: 'ok' | 'warn' | 'ko' }> = { en_vigueur: { label: 'En vigueur', tone: 'ok' }, modifie: { label: 'Modifié', tone: 'warn' }, abroge: { label: 'Abrogé', tone: 'ko' } };
 const TYPE: Record<string, string> = { code: 'Code (article)', loi: 'Loi', ordonnance: 'Ordonnance', decret: 'Décret', arrete: 'Arrêté', autre: 'Autre' };
@@ -27,7 +28,7 @@ function FormEntree({ entree, onClose, onSaved }: { entree: any | null; onClose:
         <Field label="Clé *" hint="Article d'un code : cgct:L2121-29 · code seul : ccp · loi : loi:2015-991 · décret : decret:2016-360 · arrêté : arrete:2024-12. C'est elle qui rapproche un visa du dossier de cette entrée."><input className="input font-mono" autoFocus value={f.cle} onChange={(e) => setF({ ...f, cle: e.target.value })} /></Field>
         <Field label="Intitulé normalisé *" hint="Tel qu'il doit être visé, par exemple « l'article L. 2121-29 du code général des collectivités territoriales »."><input className="input" value={f.intitule} onChange={(e) => setF({ ...f, intitule: e.target.value })} /></Field>
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Statut"><select className="input" value={f.statut} onChange={(e) => setF({ ...f, statut: e.target.value })}>{Object.entries(STATUT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
+          <Field label="Statut"><Select className="input" value={f.statut} onChange={(e) => setF({ ...f, statut: e.target.value })}>{Object.entries(STATUT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select></Field>
           <Field label="Dernière vérification à la source" hint="La date à laquelle le juridique a contrôlé le texte."><input className="input" type="date" value={f.verifieLe} onChange={(e) => setF({ ...f, verifieLe: e.target.value })} /></Field>
           <Field label="En vigueur à partir du"><input className="input" type="date" value={f.dateDebut} onChange={(e) => setF({ ...f, dateDebut: e.target.value })} /></Field>
           <Field label="Jusqu'au (vide : sans fin)"><input className="input" type="date" value={f.dateFin} onChange={(e) => setF({ ...f, dateFin: e.target.value })} /></Field>
@@ -84,7 +85,7 @@ function Bibliotheque() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <input className="input max-w-xs" placeholder="Rechercher (clé, intitulé)…" aria-label="Rechercher" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="input w-auto" aria-label="Statut" value={statut} onChange={(e) => setStatut(e.target.value)}><option value="">Tous les statuts</option>{Object.entries(STATUT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
+        <Select className="input w-auto" aria-label="Statut" value={statut} onChange={(e) => setStatut(e.target.value)}><option value="">Tous les statuts</option>{Object.entries(STATUT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select>
         <span className="ml-auto flex gap-2"><button className="btn-secondary" onClick={() => setImp(true)}><Upload className="h-4 w-4" /> Importer</button><button className="btn-primary" onClick={() => setEdit('nouvelle')}><Plus className="h-4 w-4" /> Ajouter un texte</button></span>
       </div>
       <div className="card overflow-x-auto">
@@ -127,8 +128,8 @@ function FormControle({ regle, types, matieres, onClose, onSaved }: { regle: any
         <ErrorBox msg={err} />
         <Field label="Nom de la règle *"><input className="input" autoFocus value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} /></Field>
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Type de règle"><select className="input" value={f.regle} onChange={(e) => setF({ ...f, regle: e.target.value })}><option value="visa">Visa attendu</option><option value="mention">Mention attendue</option></select></Field>
-          <Field label="Gravité du constat"><select className="input" value={f.gravite} onChange={(e) => setF({ ...f, gravite: e.target.value })}>{Object.entries(GRAVITE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
+          <Field label="Type de règle"><Select className="input" value={f.regle} onChange={(e) => setF({ ...f, regle: e.target.value })}><option value="visa">Visa attendu</option><option value="mention">Mention attendue</option></Select></Field>
+          <Field label="Gravité du constat"><Select className="input" value={f.gravite} onChange={(e) => setF({ ...f, gravite: e.target.value })}>{Object.entries(GRAVITE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select></Field>
         </div>
         {f.regle === 'visa'
           ? <Field label="Clé du visa attendu *" hint="Une clé de la bibliothèque, par exemple cgct:L1611-4."><input className="input font-mono" value={f.cle} onChange={(e) => setF({ ...f, cle: e.target.value })} /></Field>
@@ -136,8 +137,8 @@ function FormControle({ regle, types, matieres, onClose, onSaved }: { regle: any
             <Field label="Expression attendue dans les textes *" hint={f.estRegex ? 'Expression régulière (sans tenir compte de la casse).' : 'Recherchée sans tenir compte des accents ni de la casse.'}><input className="input" value={f.motif} onChange={(e) => setF({ ...f, motif: e.target.value })} /></Field>
             <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={f.estRegex} onChange={(e) => setF({ ...f, estRegex: e.target.checked })} /> C'est une expression régulière</label></>}
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Type d'acte" hint="Vide : tous."><select className="input" value={f.typeActeId} onChange={(e) => setF({ ...f, typeActeId: e.target.value })}><option value="">Tous</option>{types.map((x) => <option key={x.id} value={x.id}>{x.libelle}</option>)}</select></Field>
-          <Field label="Matière" hint="Vide : toutes ; les sous-matières sont comprises."><select className="input" value={f.matiereId} onChange={(e) => setF({ ...f, matiereId: e.target.value })}><option value="">Toutes</option>{matieres.map((x) => <option key={x.id} value={x.id}>{x.code} — {x.libelle}</option>)}</select></Field>
+          <Field label="Type d'acte" hint="Vide : tous."><Select className="input" value={f.typeActeId} onChange={(e) => setF({ ...f, typeActeId: e.target.value })}><option value="">Tous</option>{types.map((x) => <option key={x.id} value={x.id}>{x.libelle}</option>)}</Select></Field>
+          <Field label="Matière" hint="Vide : toutes ; les sous-matières sont comprises."><Select className="input" value={f.matiereId} onChange={(e) => setF({ ...f, matiereId: e.target.value })}><option value="">Toutes</option>{matieres.map((x) => <option key={x.id} value={x.id}>{x.code} — {x.libelle}</option>)}</Select></Field>
         </div>
         <Field label="À partir d'un montant de (€)" hint="Vide : quel que soit le montant. Sans montant renseigné sur la fiche, la règle ne s'applique pas."><input className="input" type="number" min={0} value={f.montantMin} onChange={(e) => setF({ ...f, montantMin: e.target.value })} /></Field>
         <Field label="Message affiché au rédacteur" hint="Facultatif : un message par défaut est composé."><textarea className="input h-16" value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} /></Field>

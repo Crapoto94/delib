@@ -184,12 +184,12 @@ function createPv({ db, audit, render, odj, tenue, actes }) {
       ] });
 
       // 3. délibération, vote et mentions de transmission (renseignées quand l'AR est reçu)
-      const tx = await db.get("SELECT numero_transmis, ar_id, ar_at, sent_at, mode FROM tlt_transactions WHERE acte_id = $1 AND etat = 'poste' AND ar_id IS NOT NULL ORDER BY id DESC LIMIT 1", [acte.id]);
+      const tx = await db.get("SELECT numero_transmis, ar_id, ar_at, sent_at, mode, date_affichage FROM tlt_transactions WHERE acte_id = $1 AND etat = 'poste' AND ar_id IS NOT NULL ORDER BY id DESC LIMIT 1", [acte.id]);
       const jourFr = (x) => (x ? new Date(x).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Paris' }) : '');
       const text = (row) => (row ? render.runsOf({ ...row, markdown: row.markdown }, 'propre') : [{ text: '', type: 'text' }]);
       const dispLabel = tpl.cfg.sections?.dispositif ?? 'Après en avoir délibéré, le conseil DÉCIDE :';
       const mention = ['', `**Mention du vote** — séance du ${dateLong(d.seance.dateSeance)}`, '', ...voteLines(d, p, map), `**Résultat : ${RESULTAT[p.resultat] || ''}**`, '', ...bureauLines(d, map)];
-      const transmission = ['', 'TRANSMIS EN PRÉFECTURE', `LE ${jourFr(tx?.sent_at)}`, 'REÇU EN PRÉFECTURE', `LE ${jourFr(tx?.ar_at)}`, "PUBLIÉ PAR VOIE D'AFFICHAGE", `LE ${jourFr(tx?.ar_at)}`];
+      const transmission = ['', 'TRANSMIS EN PRÉFECTURE', `LE ${jourFr(tx?.sent_at)}`, 'REÇU EN PRÉFECTURE', `LE ${jourFr(tx?.ar_at)}`, "PUBLIÉ PAR VOIE D'AFFICHAGE", `LE ${jourFr(tx?.date_affichage ? `${String(tx.date_affichage).slice(0, 10)}T12:00:00Z` : tx?.ar_at)}`];
       const corps = await render.build({ organismeId: org, docType: 'deliberation', vars, watermark: wm, title: titre, cfgOverride: sansPagination, content: [
         ...render.headerItems(tpl.cfg),
         { type: 'runs', runs: text(pick('visas', delib.id)) }, { type: 'space', h: 6 },

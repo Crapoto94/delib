@@ -3,6 +3,7 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, ErrorBox, Field, Loading, Modal, useLoad } from '../ui';
+import { Select } from '../Select';
 
 /** ISO -> valeur d'un <input type="datetime-local"> (heure locale). */
 const toLocalInput = (iso: string) => { const d = new Date(iso); const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
@@ -32,7 +33,7 @@ export function EditSeanceModal({ seance, onClose, onDone }: { seance: any; onCl
           <Field label="Date et heure"><input className="input" type="datetime-local" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           <Field label="Durée prévue (minutes)"><input className="input" type="number" min={15} max={720} step={15} value={duree} onChange={(e) => setDuree(e.target.value)} placeholder="120" /></Field>
           <Field label="Lieu"><input className="input" value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Salle du conseil, Hôtel de ville" /></Field>
-          <Field label="Type de séance"><select className="input" value={type} onChange={(e) => setType(e.target.value)}>{Object.entries(TYPES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+          <Field label="Type de séance"><Select className="input" value={type} onChange={(e) => setType(e.target.value)}>{Object.entries(TYPES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
         </div>
         {!commission && (
           <fieldset className="rounded border border-line p-3"><legend className="px-1 text-[12px] font-semibold text-mute">Dates clés (fin de journée)</legend>

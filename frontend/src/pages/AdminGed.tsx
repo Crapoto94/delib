@@ -4,6 +4,7 @@ import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, ErrorBox, Field, Loading, MailSwitch, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 /** Explorateur du plan de classement : on descend dossier par dossier (fil d'Ariane), les PDF s'ouvrent dans la visionneuse. */
 function Explorateur({ o, rev, mode, racine }: { o: number; rev: number; mode: string; racine: string }) {
@@ -145,7 +146,7 @@ export default function AdminGed() {
 
       <section className="card space-y-4 p-5"><h3 className="flex items-center gap-2">Connexion <Badge tone={cfg.data.mode === 'alfresco' ? 'blue' : 'warn'}>{cfg.data.mode === 'alfresco' ? `Alfresco${cfg.data.url ? ` · ${cfg.data.url}` : ''}` : 'Simulation (aucun serveur)'}</Badge></h3>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Mode" hint="La simulation garde une arborescence factice dans VibeDélib : elle permet de tout tester sans serveur Alfresco."><select className="input" value={v.mode} onChange={(e) => set({ mode: e.target.value })}><option value="simulation">Simulation (aucun serveur)</option><option value="alfresco">Alfresco</option></select></Field>
+          <Field label="Mode" hint="La simulation garde une arborescence factice dans VibeDélib : elle permet de tout tester sans serveur Alfresco."><Select className="input" value={v.mode} onChange={(e) => set({ mode: e.target.value })}><option value="simulation">Simulation (aucun serveur)</option><option value="alfresco">Alfresco</option></Select></Field>
           <Field label="Dossier racine" hint="Identifiant de nœud, ou chemin relatif à Company Home (ex. /Sites/archives/documentLibrary). Vide : racine du dépôt."><input className="input" value={v.racine === '-root-' ? '' : v.racine} placeholder="Racine du dépôt" onChange={(e) => set({ racine: e.target.value })} disabled={!alf} /></Field>
           <Field label="URL du serveur Alfresco" hint="Ex. https://alfresco.ivry.local"><input className="input" value={v.url} onChange={(e) => set({ url: e.target.value })} disabled={!alf} placeholder="https://alfresco.exemple.fr" /></Field>
           <Field label="Compte technique"><input className="input" value={v.utilisateur} onChange={(e) => set({ utilisateur: e.target.value })} disabled={!alf} autoComplete="off" /></Field>
@@ -178,7 +179,7 @@ export default function AdminGed() {
 
       <section className="card space-y-3 p-5"><h3>Archivage d’une séance</h3>
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="Séance"><select className="input !w-auto" value={sid ?? ''} onChange={(e) => { setSid(e.target.value ? Number(e.target.value) : null); setResultat(null); }}><option value="">Choisir une séance…</option>{seances.data?.map((s) => <option key={s.id} value={s.id}>{s.instance} — {dt(s.dateSeance, { dateStyle: 'long' })}</option>)}</select></Field>
+          <Field label="Séance"><Select className="input !w-auto" value={sid ?? ''} onChange={(e) => { setSid(e.target.value ? Number(e.target.value) : null); setResultat(null); }}><option value="">Choisir une séance…</option>{seances.data?.map((s) => <option key={s.id} value={s.id}>{s.instance} — {dt(s.dateSeance, { dateStyle: 'long' })}</option>)}</Select></Field>
           <button className="btn-primary" disabled={!sid || busy === 'arch'} onClick={archiver}>{busy === 'arch' && <Spinner />} Archiver la séance</button>
         </div>
         <ErrorBox msg={null} />

@@ -6,6 +6,7 @@ import { dt } from '../format';
 import { OrgLogo, resetBranding } from '../Brand';
 import { VisibiliteUtilisateur } from '../VisibiliteActes';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 /* ------------------------------------------------------------------------------------------ utilisateurs et rôles */
 const ROLES: Record<string, string> = { org_admin: 'Administrateur', scc: 'SCC', teletransmission: 'Télétransmission', lecteur: 'Lecteur' };
@@ -126,8 +127,8 @@ export function Gabarits() {
 
         <section className="card p-5"><h3 className="mb-3">Police et texte</h3>
           <div className="grid gap-4 md:grid-cols-4">
-            <Field label="Police"><select className="input" value={cfg.police.famille ?? 'interstate'} onChange={(e) => set(['police', 'famille'], e.target.value)}>
-              {fonts.data?.map((f) => <option key={f.id} value={f.id} disabled={!f.disponible}>{f.label}{f.disponible ? '' : ' — non installée'}</option>)}</select></Field>
+            <Field label="Police"><Select className="input" value={cfg.police.famille ?? 'interstate'} onChange={(e) => set(['police', 'famille'], e.target.value)}>
+              {fonts.data?.map((f) => <option key={f.id} value={f.id} disabled={!f.disponible}>{f.label}{f.disponible ? '' : ' — non installée'}</option>)}</Select></Field>
             <Field label="Taille (pt)"><input className="input" type="number" min={7} max={18} step={0.5} value={cfg.police.taille} onChange={(e) => set(['police', 'taille'], Number(e.target.value))} /></Field>
             <Field label="Interligne"><input className="input" type="number" min={1} max={2.5} step={0.05} value={cfg.police.interligne} onChange={(e) => set(['police', 'interligne'], Number(e.target.value))} /></Field>
             <label className="mt-6 flex items-center gap-2"><input type="checkbox" checked={!!cfg.police.justifie} onChange={(e) => set(['police', 'justifie'], e.target.checked)} /> Texte justifié</label>
@@ -144,7 +145,7 @@ export function Gabarits() {
             <li key={i} className="grid items-center gap-2 rounded border border-line p-2 md:grid-cols-[1fr_90px_110px_auto_auto_auto]">
               <input className="input" aria-label="Texte" value={b.texte} onChange={(e) => set(['entete', String(i), 'texte'], e.target.value)} />
               <input className="input" aria-label="Taille" type="number" min={6} max={40} value={b.taille ?? 11} onChange={(e) => set(['entete', String(i), 'taille'], Number(e.target.value))} />
-              <select className="input" aria-label="Alignement" value={b.align ?? 'left'} onChange={(e) => set(['entete', String(i), 'align'], e.target.value)}><option value="left">Gauche</option><option value="center">Centré</option><option value="right">Droite</option></select>
+              <Select className="input" aria-label="Alignement" value={b.align ?? 'left'} onChange={(e) => set(['entete', String(i), 'align'], e.target.value)}><option value="left">Gauche</option><option value="center">Centré</option><option value="right">Droite</option></Select>
               <label className="flex items-center gap-1 text-[12px]"><input type="checkbox" checked={!!b.gras} onChange={(e) => set(['entete', String(i), 'gras'], e.target.checked)} /> Gras</label>
               <label className="flex items-center gap-1 text-[12px]"><input type="checkbox" checked={!!b.encadre} onChange={(e) => set(['entete', String(i), 'encadre'], e.target.checked)} /> Encadré</label>
               <button className="text-ko" aria-label="Supprimer la ligne" onClick={() => set(['entete'], cfg.entete.filter((_: any, j: number) => j !== i))}><Trash2 className="h-4 w-4" /></button>

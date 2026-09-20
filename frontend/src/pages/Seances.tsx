@@ -11,6 +11,7 @@ import { useAuth } from '../auth';
 import { d, daysUntil, dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
 import { AgentName } from '../AgentName';
+import { Select } from '../Select';
 
 function NewSeance({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { org } = useAuth(); const o = org!.id;
@@ -25,7 +26,7 @@ function NewSeance({ onClose, onDone }: { onClose: () => void; onDone: () => voi
   return (
     <Modal title="Nouvelle séance" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4"><ErrorBox msg={err} />
-        <Field label="Instance"><select className="input" value={instanceId} onChange={(e) => setI(e.target.value)}>{inst.data?.map((i) => <option key={i.id} value={i.id}>{i.nom}</option>)}</select></Field>
+        <Field label="Instance"><Select className="input" value={instanceId} onChange={(e) => setI(e.target.value)}>{inst.data?.map((i) => <option key={i.id} value={i.id}>{i.nom}</option>)}</Select></Field>
         <Field label="Date et heure"><input className="input" type="datetime-local" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Lieu"><input className="input" value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Salle du conseil, Hôtel de ville" /></Field>
         {prop.data && <div className="rounded bg-soft p-3 text-[12px]"><b>Dates clés proposées</b><ul className="mt-1"><li>Date limite de rédaction : {d(prop.data.dateLimiteRedaction)}</li><li>Validation DGS : {d(prop.data.dateLimiteDgs)}</li><li>Mise à disposition des commissions : {d(prop.data.dateLimiteMadCommissions)}</li><li>Envoi de la convocation : {d(prop.data.dateEnvoiConvocation)}</li></ul></div>}

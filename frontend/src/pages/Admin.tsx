@@ -23,6 +23,7 @@ import Organisation from './Organisation';
 import { VisibiliteGenerale } from '../VisibiliteActes';
 import Circuits from './CircuitEditor';
 import { AgentName } from '../AgentName';
+import { Select } from '../Select';
 
 const FONCTIONS: Record<string, string> = { responsable_intermediaire: 'Responsable intermédiaire', chef_service: 'Chef de service', directeur: 'Directeur', dga: 'DGA', dgs: 'DGS' };
 
@@ -57,10 +58,10 @@ function Titulaires() {
       </section>
       <details className="card p-5"><summary className="cursor-pointer text-[15px] font-bold">Saisie avancée des titulaires <span className="text-[12px] font-normal text-mute">— table complète, tous périmètres</span></summary><div className="mt-3"><h3 className="mb-3">Titulaires des fonctions de validation</h3>
         <form onSubmit={add} className="mb-4 grid gap-3 md:grid-cols-5 md:items-end"><ErrorBox msg={err} />
-          <Field label="Fonction"><select className="input" value={f.fonction} onChange={(e) => setF({ ...f, fonction: e.target.value })}>{Object.entries(FONCTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+          <Field label="Fonction"><Select className="input" value={f.fonction} onChange={(e) => setF({ ...f, fonction: e.target.value })}>{Object.entries(FONCTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
           <Field label="Agent (@nom)"><AgentPicker value={f.username} onChange={(u) => setF({ ...f, username: u })} required /></Field>
-          <Field label="Direction"><select className="input" value={f.directionCode} onChange={(e) => setF({ ...f, directionCode: e.target.value, serviceCode: '' })}><option value="">(toutes — DGS)</option>{dirs.data?.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}</select></Field>
-          <Field label="Service"><select className="input" value={f.serviceCode} onChange={(e) => setF({ ...f, serviceCode: e.target.value })} disabled={!f.directionCode}><option value="">(toute la direction)</option>{services.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>
+          <Field label="Direction"><Select className="input" value={f.directionCode} onChange={(e) => setF({ ...f, directionCode: e.target.value, serviceCode: '' })}><option value="">(toutes — DGS)</option>{dirs.data?.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}</Select></Field>
+          <Field label="Service"><Select className="input" value={f.serviceCode} onChange={(e) => setF({ ...f, serviceCode: e.target.value })} disabled={!f.directionCode}><option value="">(toute la direction)</option>{services.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</Select></Field>
           <button className="btn-primary">Ajouter</button>
         </form>
         {tit.loading ? <Loading /> : !tit.data?.length ? <Empty>Aucun titulaire désigné : les étapes obligatoires bloqueront l'envoi des actes.</Empty> : (
@@ -73,8 +74,8 @@ function Titulaires() {
       <section className="card p-5"><h3 className="mb-3">Autorisations de rédaction hors direction</h3>
         <form onSubmit={grant} className="mb-4 grid gap-3 md:grid-cols-4 md:items-end">
           <Field label="Agent autorisé (@nom)"><AgentPicker value={a.username} onChange={(u) => setA({ ...a, username: u })} required /></Field>
-          <Field label="Direction"><select className="input" required value={a.directionCode} onChange={(e) => setA({ ...a, directionCode: e.target.value, serviceCode: '' })}><option value="">— choisir —</option>{dirs.data?.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}</select></Field>
-          <Field label="Service (facultatif)"><select className="input" value={a.serviceCode} onChange={(e) => setA({ ...a, serviceCode: e.target.value })}><option value="">Toute la direction</option>{dirs.data?.find((x) => x.code === a.directionCode)?.services?.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>
+          <Field label="Direction"><Select className="input" required value={a.directionCode} onChange={(e) => setA({ ...a, directionCode: e.target.value, serviceCode: '' })}><option value="">— choisir —</option>{dirs.data?.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}</Select></Field>
+          <Field label="Service (facultatif)"><Select className="input" value={a.serviceCode} onChange={(e) => setA({ ...a, serviceCode: e.target.value })}><option value="">Toute la direction</option>{dirs.data?.find((x) => x.code === a.directionCode)?.services?.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</Select></Field>
           <button className="btn-primary">Autoriser</button>
         </form>
         {!aut.data?.length ? <p className="text-mute">Aucune autorisation étendue. Par défaut, un agent rédige pour sa propre direction.</p> : (

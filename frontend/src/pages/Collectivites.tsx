@@ -7,6 +7,7 @@ import AgentPicker from '../AgentPicker';
 import { OrgLogo } from '../Brand';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
 import { AgentName } from '../AgentName';
+import { Select } from '../Select';
 
 const TYPES: Record<string, string> = { commune: 'Commune', ccas: 'CCAS', autre: 'Autre organisme' };
 const ROLES: Record<string, string> = { org_admin: 'Administrateur', scc: 'SCC', teletransmission: 'Télétransmission', lecteur: 'Lecteur' };
@@ -75,7 +76,7 @@ function CreateForm({ onClose, onDone }: { onClose: () => void; onDone: (o: any)
         <Field label="Nom"><input className="input" required autoFocus value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value, code: manual ? f.code : slug(e.target.value) })} placeholder="CCAS d'Ivry-sur-Seine" /></Field>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Code" hint="Identifiant court (minuscules, chiffres, - et _)"><input className="input" required pattern="[a-z0-9_-]{2,40}" value={f.code} onChange={(e) => { setManual(true); setF({ ...f, code: e.target.value }); }} /></Field>
-          <Field label="Type"><select className="input" value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>{Object.entries(TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+          <Field label="Type"><Select className="input" value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>{Object.entries(TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="SIREN (facultatif)"><input className="input" pattern="[0-9]{9}" value={f.siren} onChange={(e) => setF({ ...f, siren: e.target.value })} /></Field>
@@ -125,7 +126,7 @@ function Admins({ o, onClose }: { o: any; onClose: () => void }) {
     <Modal title={`Rôles — ${o.nom}`} onClose={onClose} wide>
       <form onSubmit={add} className="mb-4 grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end"><ErrorBox msg={err} />
         <AgentPicker label="Agent" value={u} onChange={setU} required />
-        <Field label="Rôle"><select className="input" value={role} onChange={(e) => setRole(e.target.value)}>{Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+        <Field label="Rôle"><Select className="input" value={role} onChange={(e) => setRole(e.target.value)}>{Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
         <button className="btn-primary" disabled={!u}><UserPlus className="h-4 w-4" /> Attribuer</button>
       </form>
       {roles.loading ? <Loading /> : !roles.data?.length ? <Empty><Building2 className="mx-auto mb-2 h-5 w-5" />Personne n'a de rôle dans cette collectivité.</Empty> : (

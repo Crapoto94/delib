@@ -5,6 +5,7 @@ import { dt } from '../format';
 import { Badge, MailSwitch, Field, Loading, Spinner, useLoad, useToast } from '../ui';
 import { AgentName } from '../AgentName';
 import { oublierIa } from '../useIa';
+import { Select } from '../Select';
 
 const LIMITS: [string, string, string][] = [
   ['max_concurrent', 'Requêtes simultanées', "Nombre maximal d'appels à l'IA en même temps, tous utilisateurs confondus (l'IA est partagée : restez prudent)."],
@@ -39,7 +40,7 @@ function PromptCard({ p, modeles, onSaved }: { p: Prompt; modeles: string[] | nu
         </Field>
         <Field label="Modèle" hint={modeles ? 'Liste fournie par l’IA interne.' : 'La liste des modèles n’est pas disponible : saisissez le nom du modèle.'}>
           {modeles ? (
-            <select className="input" value={modele} onChange={(e) => setModele(e.target.value)}><option value="">Modèle par défaut de l’IA</option>{choix.map((m) => <option key={m} value={m}>{m}</option>)}</select>
+            <Select className="input" value={modele} onChange={(e) => setModele(e.target.value)}><option value="">Modèle par défaut de l’IA</option>{choix.map((m) => <option key={m} value={m}>{m}</option>)}</Select>
           ) : <input className="input" value={modele} onChange={(e) => setModele(e.target.value)} placeholder="Modèle par défaut de l’IA" />}
         </Field>
       </div>}

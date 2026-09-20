@@ -8,6 +8,7 @@ import { AgentName } from '../AgentName';
 import { dt } from '../format';
 import NotesEditor from '../NotesEditor';
 import { Badge, ErrorBox, Field, Loading, Modal, useToast } from '../ui';
+import { Select } from '../Select';
 
 type Presence = 'en_salle' | 'sorti' | 'absent' | 'excuse';
 type Choix = 'pour' | 'contre' | 'abstention' | 'nppv';
@@ -240,9 +241,9 @@ export default function SuiviSeance() {
                       <button className="btn-primary" disabled={!editable} onClick={() => put('/courant', { sens: 'suivant' })}>Point suivant <ArrowRight className="h-4 w-4" /></button>
                       <span className="mx-1 h-6 w-px bg-line" />
                       {enCours && <>
-                        <select className="input !w-auto !py-1 !text-[12px]" value={c.scrutin} disabled={!editable} onChange={(e) => put(`/points/${c.id}/scrutin`, { scrutin: e.target.value })} aria-label="Mode de scrutin">
+                        <Select className="input !w-auto !py-1 !text-[12px]" value={c.scrutin} disabled={!editable} onChange={(e) => put(`/points/${c.id}/scrutin`, { scrutin: e.target.value })} aria-label="Mode de scrutin">
                           <option value="main_levee">À main levée</option><option value="public">Scrutin public</option><option value="secret">Scrutin secret</option><option value="unanimite">Unanimité</option>
-                        </select>
+                        </Select>
                         <button className="btn-primary" disabled={!editable} onClick={() => post(`/points/${c.id}/cloture`, { issue: 'vote' }, 'Vote clôturé')}>Clôturer le vote</button>
                         <button className="btn-secondary" disabled={!editable} onClick={() => post(`/points/${c.id}/cloture`, { issue: 'sans_vote' }, 'Point clos sans vote')}>Sans vote</button>
                         <button className="btn-secondary" disabled={!editable} onClick={() => post(`/points/${c.id}/cloture`, { issue: 'retire' }, 'Point retiré')}>Retiré</button>
@@ -266,8 +267,8 @@ export default function SuiviSeance() {
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
                 <h3>Élus, présences et votes</h3>
                 {can && <div className="flex flex-wrap items-center gap-3 text-[12px]">
-                  <label className="flex items-center gap-1">Président de séance <select className="input !w-auto !py-1 !text-[12px]" disabled={!editable} value={t.presidentId ?? ''} onChange={(e) => put('/bureau', { presidentId: e.target.value ? Number(e.target.value) : null })}><option value="">—</option>{elus.map((e) => <option key={e.id} value={e.id}>{nom(e)}</option>)}</select></label>
-                  <label className="flex items-center gap-1">Secrétaire <select className="input !w-auto !py-1 !text-[12px]" disabled={!editable} value={t.secretaireId ?? ''} onChange={(e) => put('/bureau', { secretaireId: e.target.value ? Number(e.target.value) : null })}><option value="">—</option>{elus.map((e) => <option key={e.id} value={e.id}>{nom(e)}</option>)}</select></label>
+                  <label className="flex items-center gap-1">Président de séance <Select className="input !w-auto !py-1 !text-[12px]" disabled={!editable} value={t.presidentId ?? ''} onChange={(e) => put('/bureau', { presidentId: e.target.value ? Number(e.target.value) : null })}><option value="">—</option>{elus.map((e) => <option key={e.id} value={e.id}>{nom(e)}</option>)}</Select></label>
+                  <label className="flex items-center gap-1">Secrétaire <Select className="input !w-auto !py-1 !text-[12px]" disabled={!editable} value={t.secretaireId ?? ''} onChange={(e) => put('/bureau', { secretaireId: e.target.value ? Number(e.target.value) : null })}><option value="">—</option>{elus.map((e) => <option key={e.id} value={e.id}>{nom(e)}</option>)}</Select></label>
                 </div>}
                 {!can && (t.presidentId || t.secretaireId) && <div className="text-[12px] text-mute">{t.presidentId && <>Président : {nom(byId.get(t.presidentId) || { nom: '' })} </>}{t.secretaireId && <>· Secrétaire : {nom(byId.get(t.secretaireId) || { nom: '' })}</>}</div>}
               </div>
@@ -303,9 +304,9 @@ export default function SuiviSeance() {
                               {mandant && <span className="text-mute">porte le pouvoir de <b>{nom(mandant)}</b></span>}
                               {mandataire && <span className="text-mute">pouvoir donné à <b>{nom(mandataire)}</b>{can && editable && <button className="ml-1 text-ko" onClick={() => act(() => api.delete(`${root}/procurations/${e.id}`))} aria-label="Retirer le pouvoir">✕</button>}</span>}
                               {!mandant && !mandataire && can && ouverte && e.presence !== 'en_salle' && (
-                                <select className="input !w-auto !py-0.5 !text-[11px]" value="" disabled={!editable} onChange={(ev) => ev.target.value && put('/procurations', { mandantId: e.id, mandataireId: Number(ev.target.value) })} aria-label={`Pouvoir de ${nom(e)}`}>
+                                <Select className="input !w-auto !py-0.5 !text-[11px]" value="" disabled={!editable} onChange={(ev) => ev.target.value && put('/procurations', { mandantId: e.id, mandataireId: Number(ev.target.value) })} aria-label={`Pouvoir de ${nom(e)}`}>
                                   <option value="">Donner pouvoir à…</option>{elus.filter((x) => x.id !== e.id && !x.pouvoirA && !x.pouvoirDe).map((x) => <option key={x.id} value={x.id}>{nom(x)}</option>)}
-                                </select>)}
+                                </Select>)}
                             </div>
                             <div className="ml-auto flex items-center gap-2">
                               {e.droit === 'pouvoir' && <span className="text-[11px] text-mute">vote par pouvoir</span>}
@@ -369,11 +370,11 @@ function DepotAmendement({ root, point, groupes, elus, onClose, onDone }: { root
       <div className="space-y-3">
         <ErrorBox msg={err} />
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Auteur"><select className="input" value={auteur} onChange={(e) => setAuteur(e.target.value)}>
+          <Field label="Auteur"><Select className="input" value={auteur} onChange={(e) => setAuteur(e.target.value)}>
             <optgroup label="Élu">{elus.map((e) => <option key={e.id} value={`elu:${e.id}`}>{nom(e)}</option>)}</optgroup>
             <optgroup label="Groupe">{groupes.filter((g) => g.id).map((g) => <option key={g.id} value={`groupe:${g.id}`}>Groupe {g.nom}</option>)}</optgroup>
-            <option value="libre:">Autre (à préciser)…</option></select></Field>
-          <Field label="Partie visée"><select className="input" value={cible} onChange={(e) => setCible(e.target.value)}>{Object.entries(CIBLE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+            <option value="libre:">Autre (à préciser)…</option></Select></Field>
+          <Field label="Partie visée"><Select className="input" value={cible} onChange={(e) => setCible(e.target.value)}>{Object.entries(CIBLE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
         </div>
         {auteur.startsWith('libre') && <Field label="Auteur (libellé)"><input className="input" value={libre} onChange={(e) => setLibre(e.target.value)} /></Field>}
         <Field label="Texte complet après amendement" hint="Modifiez le texte ci-dessous : c’est ce texte qui remplacera l’actuel si l’amendement est adopté (les changements seront suivis).">

@@ -14,6 +14,7 @@ import { useAuth } from './auth';
 import { api, org as orgPath } from './api';
 import { dt } from './format';
 import { ThemeSwitch, ThemeToggle } from './theme';
+import { Select } from './Select';
 
 function Bells({ orgId }: { orgId: number }) {
   const [data, setData] = useState<any>({ unread: 0, items: [] });
@@ -92,9 +93,9 @@ export default function Layout() {
             <Search className="h-4 w-4 text-mute" /><input id="recherche-globale" aria-label="Rechercher un acte" title="Raccourci : /" className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher (raccourci /)…" value={q} onChange={(e) => setQ(e.target.value)} />
           </form>
           {me.organismes.length > 1 && (
-            <select aria-label="Organisme" className="input w-auto" value={org.id} onChange={(e) => { setOrg(Number(e.target.value)); nav('/'); }}>
+            <Select aria-label="Organisme" className="input w-auto" value={org.id} onChange={(e) => { setOrg(Number(e.target.value)); nav('/'); }}>
               {me.organismes.map((o) => <option key={o.id} value={o.id}>{o.nom}</option>)}
-            </select>
+            </Select>
           )}
           <AiChip />
           <AideMenu />

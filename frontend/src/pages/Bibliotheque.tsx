@@ -4,6 +4,7 @@ import { api, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 /** Fiche de consultation d'une délibération adoptée : exposé des motifs, visas, dispositif, annexes, et les PDF (visionneuse). */
 function Fiche({ acteId, onClose }: { acteId: number; onClose: () => void }) {
@@ -41,7 +42,7 @@ export default function Bibliotheque() {
       <PageTitle title="Bibliothèque des actes" sub="Les délibérations adoptées de la collectivité (séances closes) : texte, exposé des motifs, extrait du registre. Consultation ouverte à tous les agents." />
       <form onSubmit={chercher} className="card mb-4 flex flex-wrap items-center gap-2 p-3">
         <div className="flex min-w-0 flex-1 items-center rounded bg-soft px-3"><Search className="h-4 w-4 text-mute" /><input className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" aria-label="Rechercher dans la bibliothèque" placeholder="Mots du titre, de l’objet, de l’exposé… ou n° de délibération" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        <select className="input w-auto" aria-label="Année de la séance" value={annee} onChange={(e) => setAnnee(e.target.value)}><option value="">Toutes les années</option>{ans.map((a) => <option key={a} value={a}>{a}</option>)}</select>
+        <Select className="input w-auto" aria-label="Année de la séance" value={annee} onChange={(e) => setAnnee(e.target.value)}><option value="">Toutes les années</option>{ans.map((a) => <option key={a} value={a}>{a}</option>)}</Select>
         <button className="btn-primary">Rechercher</button>
       </form>
       {d.loading && !d.data ? <Loading /> : !d.data ? <ErrorBox msg={d.error} /> : !d.data.items.length ? <div className="card"><Empty>Aucune délibération adoptée ne correspond.</Empty></div> : (

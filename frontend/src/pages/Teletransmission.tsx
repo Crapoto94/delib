@@ -5,6 +5,7 @@ import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, ErrorBox, Field, Loading, MailSwitch, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 const STATUS_TONE: Record<string, 'ok' | 'ko' | 'warn' | 'blue' | 'gray'> = { '-1': 'ko', '0': 'gray', '1': 'blue', '2': 'blue', '3': 'blue', '4': 'ok', '5': 'ok', '6': 'ko', '17': 'warn' };
 const DOC_LABEL: Record<number, string> = { 2: 'Courrier simple', 3: 'Demande de pièces complémentaires', 4: 'Lettre d’observations', 5: 'Déféré au tribunal administratif' };
@@ -20,6 +21,8 @@ const resume = (r: any, verbe: string) => `${r.envoyees} transmission(s) ${verbe
 
 /** ARActe (TLT-35) : les champs lus du fichier XML de la préfecture, et son téléchargement. */
 function ArActe({ root, tx, onClose }: { root: (p?: string) => string; tx: any; onClose: () => void }) {
+  const { toast, node } = useToast(); const [affichage, setAffichage] = useState<string>(tx.dateAffichage ? String(tx.dateAffichage).slice(0, 10) : '');
+  const enregistrerAffichage = async () => { try { await api.put(root(`/transactions/${tx.id}/affichage`), { date: affichage || null }); toast(affichage ? 'Date d’affichage enregistrée' : 'Date d’affichage effacée : la date de l’AR est reprise'); } catch (e) { toast(errMsg(e), 'ko'); } };
   const d = useLoad(async () => (await api.get(root(`/transactions/${tx.id}/ar`))).data, [tx.id]);
   const telecharger = async () => {
     const r = await api.get(root(`/transactions/${tx.id}/ar.xml`), { responseType: 'blob' });
@@ -32,8 +35,10 @@ function ArActe({ root, tx, onClose }: { root: (p?: string) => string; tx: any; 
         <div className="space-y-3">
           {d.data.simulation && <p className="rounded bg-warn-bg px-3 py-2 text-[12px] text-warn">Fichier de simulation : il n’a aucune valeur juridique.</p>}
           <dl className="grid grid-cols-[160px_1fr] gap-x-3 gap-y-1 text-[13px]">{champs.map(([k, v]) => v ? <Fragment key={k}><dt className="text-mute">{k}</dt><dd className="break-all font-semibold">{v}</dd></Fragment> : null)}</dl>
+          <div className="flex flex-wrap items-end gap-2 rounded border border-line p-3"><Field label="Date d’affichage (publication)" hint="Mention « publié par voie d’affichage » de l’extrait du registre. Vide : la date de l’AR."><input className="input" type="date" value={affichage} onChange={(e) => setAffichage(e.target.value)} /></Field><button className="btn-secondary" onClick={enregistrerAffichage}>Enregistrer</button></div>
           <div className="flex justify-end"><button className="btn-primary" onClick={telecharger}><Download className="h-4 w-4" /> Télécharger le fichier XML</button></div>
         </div>)}
+      {node}
     </Modal>
   );
 }
@@ -102,8 +107,8 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
   return (
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-end gap-3 border-b border-line px-4 py-3">
-        <Field label="Séance"><select className="input !w-auto" value={sid ?? ''} onChange={(e) => { setSid(Number(e.target.value)); setPick(new Set()); }}>{seances.data.map((s) => <option key={s.id} value={s.id}>{s.instance} — {dt(s.dateSeance, { dateStyle: 'long' })}</option>)}</select></Field>
-        {cfg.mode === 'simulation' && <Field label="Scénario de simulation"><select className="input !w-auto" value={scenario} onChange={(e) => setScenario(e.target.value)}><option value="">Par défaut ({cfg.scenarios.find((s: any) => s.code === cfg.scenario)?.label})</option>{cfg.scenarios.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>}
+        <Field label="Séance"><Select className="input !w-auto" value={sid ?? ''} onChange={(e) => { setSid(Number(e.target.value)); setPick(new Set()); }}>{seances.data.map((s) => <option key={s.id} value={s.id}>{s.instance} — {dt(s.dateSeance, { dateStyle: 'long' })}</option>)}</Select></Field>
+        {cfg.mode === 'simulation' && <Field label="Scénario de simulation"><Select className="input !w-auto" value={scenario} onChange={(e) => setScenario(e.target.value)}><option value="">Par défaut ({cfg.scenarios.find((s: any) => s.code === cfg.scenario)?.label})</option>{cfg.scenarios.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</Select></Field>}
         <div className="ml-auto flex items-center gap-2"><button className="btn-secondary" onClick={() => setPick(new Set(prets.map((i) => i.itemId)))} disabled={!prets.length}>Tout sélectionner</button>
           <button className="btn-secondary" disabled={busy || !pick.size} onClick={() => preparer(false)}>{busy ? <Spinner /> : <Send className="h-4 w-4" />} Préparer {pick.size || ''} transmission(s)</button>
           {!cfg.doubleValidation && <button className="btn-primary" disabled={busy || !pick.size} title="Enchaîne la préparation et l’envoi de la sélection" onClick={() => preparer(true)}>{busy ? <Spinner /> : <Send className="h-4 w-4" />} Préparer et envoyer {pick.size || ''}</button>}</div>
@@ -203,7 +208,7 @@ function Documents({ root, rev, onDone, toast }: { root: (p?: string) => string;
       {rep && (
         <Modal title="Répondre à la demande de pièces" onClose={() => setRep(null)}>
           <div className="space-y-4"><p className="text-[13px] text-mute">{rep.titre}</p>
-            <Field label="Réponse"><select className="input" value={type} onChange={(e) => setType(Number(e.target.value) as 3 | 4)}><option value={4}>Envoi de pièces</option><option value={3}>Refus d’envoi de pièces</option></select></Field>
+            <Field label="Réponse"><Select className="input" value={type} onChange={(e) => setType(Number(e.target.value) as 3 | 4)}><option value={4}>Envoi de pièces</option><option value={3}>Refus d’envoi de pièces</option></Select></Field>
             <Field label="Message (facultatif)"><textarea className="input" rows={3} value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
             <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setRep(null)}>Annuler</button><button className="btn-primary" onClick={send}>Envoyer la réponse</button></div></div>
         </Modal>)}
@@ -250,9 +255,9 @@ function Params({ root, cfg, onSaved, toast }: { root: (p?: string) => string; c
     <div className="card space-y-4 p-5">
       <ErrorBox msg={null} />
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Mode" hint="Les modes « test » et « production » seront disponibles quand le certificat et l’instance de test S²LOW auront été obtenus."><select className="input" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="simulation">Simulation (aucun envoi réel)</option><option value="test">Instance de test S²LOW</option><option value="production">Production</option></select></Field>
-        <Field label="Transmission" hint="Mode B : la transaction est postée « en attente » puis confirmée par une personne identifiée (recommandé)."><select className="input" value={f.modeEnvoi} onChange={(e) => setF({ ...f, modeEnvoi: e.target.value })}><option value="B">B — préparation puis confirmation</option><option value="A">A — envoi direct</option></select></Field>
-        <Field label="Scénario de simulation par défaut"><select className="input" value={f.scenario} onChange={(e) => setF({ ...f, scenario: e.target.value })}>{cfg.scenarios.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</select></Field>
+        <Field label="Mode" hint="Les modes « test » et « production » seront disponibles quand le certificat et l’instance de test S²LOW auront été obtenus."><Select className="input" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="simulation">Simulation (aucun envoi réel)</option><option value="test">Instance de test S²LOW</option><option value="production">Production</option></Select></Field>
+        <Field label="Transmission" hint="Mode B : la transaction est postée « en attente » puis confirmée par une personne identifiée (recommandé)."><Select className="input" value={f.modeEnvoi} onChange={(e) => setF({ ...f, modeEnvoi: e.target.value })}><option value="B">B — préparation puis confirmation</option><option value="A">A — envoi direct</option></Select></Field>
+        <Field label="Scénario de simulation par défaut"><Select className="input" value={f.scenario} onChange={(e) => setF({ ...f, scenario: e.target.value })}>{cfg.scenarios.map((s: any) => <option key={s.code} value={s.code}>{s.label}</option>)}</Select></Field>
         <Field label="SIREN"><input className="input" inputMode="numeric" maxLength={9} value={f.siren} onChange={(e) => setF({ ...f, siren: e.target.value.replace(/\D/g, '') })} /></Field>
         <Field label="Département (3 chiffres)"><input className="input" inputMode="numeric" maxLength={3} value={f.departement} onChange={(e) => setF({ ...f, departement: e.target.value.replace(/\D/g, '') })} /></Field>
         <Field label="Arrondissement"><input className="input" inputMode="numeric" maxLength={1} value={f.arrondissement} onChange={(e) => setF({ ...f, arrondissement: e.target.value.replace(/\D/g, '') })} /></Field>

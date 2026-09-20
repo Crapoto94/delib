@@ -109,6 +109,11 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
       if (!t) return { ...base, tenue: { statut: 'non_ouverte', version: 0 }, points: [], groupes: [], procurations: [], quorum: rules.quorum(0, 0) };
 
       const [ms, presences, procs] = await Promise.all([membres(db, org, s), presencesOf(db, seanceId), procurationsOf(db, seanceId)]);
+      // au conseil, le président de séance est par défaut le maire (modifiable) ; jamais pour une commission
+      if (!t.president_elu_id && t.statut === 'ouverte' && !s.commission) {
+        const maire = ms.find((m) => /^\s*(le |madame le |monsieur le )?maire\s*(\(.*\))?\s*$/i.test(m.role || ''));
+        if (maire) { await db.run('UPDATE seance_tenue SET president_elu_id = $2 WHERE seance_id = $1 AND president_elu_id IS NULL', [seanceId, maire.id]); t.president_elu_id = maire.id; }
+      }
       const points = await pointsOf(ctx, org, seanceId);
       const courant = points.find((p) => p.id === t.point_courant_id) || null;
       const ids = ms.map((m) => m.id);

@@ -7,6 +7,7 @@ import { useAuth } from '../auth';
 import { AgentList } from '../AgentPicker';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 const EVENT: Record<string, { label: string; tone?: 'ok' | 'ko' | 'warn' | 'blue' }> = {
   envoi: { label: 'Envoi', tone: 'blue' }, echec: { label: 'Échec d\'envoi', tone: 'ko' }, relance: { label: 'Relance', tone: 'warn' }, ouverture: { label: 'Lien ouvert' },
@@ -143,7 +144,7 @@ function Journal({ root, n }: { root: string; n: number }) {
   return (
     <section className="card overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3"><h3 className="text-[14px]">Journal de preuve</h3>
-        <select className="input w-auto" aria-label="Type d'évènement" value={type} onChange={(e) => setType(e.target.value)}><option value="">Tous les évènements</option>{Object.entries(EVENT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
+        <Select className="input w-auto" aria-label="Type d'évènement" value={type} onChange={(e) => setType(e.target.value)}><option value="">Tous les évènements</option>{Object.entries(EVENT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select>
         <span className="ml-auto text-[12px] text-mute">{j.data?.total ?? 0} évènement(s)</span></div>
       {j.loading ? <Loading /> : !j.data?.items.length ? <Empty>Aucun évènement.</Empty> : (
         <div className="overflow-x-auto"><table className="w-full text-[13px]"><thead><tr><th>Date</th><th>Évènement</th><th>Convoqué</th><th>Détail</th></tr></thead><tbody>{j.data.items.map((e) => (

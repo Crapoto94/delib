@@ -6,6 +6,7 @@ import { useAuth } from '../auth';
 import { AgentName } from '../AgentName';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutBadge, useLoad } from '../ui';
+import { Select } from '../Select';
 
 const ROLES: [string, string][] = [['', 'Tous mes rôles'], ['redacteur', 'Rédacteur'], ['co_redacteur', 'Co-rédacteur'], ['valideur', 'Valideur'], ['remplacant', 'Remplaçant'], ['commentateur', 'Commentaire'], ['participant', 'Dans le circuit']];
 const TYPE_TONE: Record<string, string> = { creation: 'bg-slate-400', etape: 'bg-action-solid', validation: 'bg-ok-solid', refus: 'bg-ko-solid', commentaire: 'bg-slate-500', vote: 'bg-primary', amendement: 'bg-warn-solid', transmission: 'bg-action-solid', ar: 'bg-ok-solid' };
@@ -26,8 +27,8 @@ function Liste() {
       <PageTitle title="Mes actes" sub="Les dossiers pour lesquels j’ai eu un rôle à un moment (rédaction, validation, remplacement, commentaire), avec leur trajet complet — circuit, modifications, amendements. Pour les délibérations de la collectivité, voir la Bibliothèque." />
       <div className="card mb-4 flex flex-wrap items-center gap-2 p-3">
         <input className="input max-w-xs" placeholder="Titre ou n° de suivi…" aria-label="Rechercher dans mes actes" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className="input w-auto" aria-label="Mon rôle" value={role} onChange={(e) => setRole(e.target.value)}>{ROLES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-        <select className="input w-auto" aria-label="Année de création" value={annee} onChange={(e) => setAnnee(e.target.value)}><option value="">Toutes les années</option>{ans.map((a) => <option key={a} value={a}>{a}</option>)}</select>
+        <Select className="input w-auto" aria-label="Mon rôle" value={role} onChange={(e) => setRole(e.target.value)}>{ROLES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
+        <Select className="input w-auto" aria-label="Année de création" value={annee} onChange={(e) => setAnnee(e.target.value)}><option value="">Toutes les années</option>{ans.map((a) => <option key={a} value={a}>{a}</option>)}</Select>
       </div>
       {d.loading && !d.data ? <Loading /> : !d.data ? <ErrorBox msg={d.error} /> : !d.data.items.length ? <div className="card"><Empty>Aucun acte ne correspond.</Empty></div> : (
         <div className="card overflow-x-auto"><table className="w-full"><thead><tr><th>Dossier</th><th>Mes rôles</th><th>Statut</th><th>Séance</th><th /></tr></thead><tbody>{d.data.items.map((a: any) => (

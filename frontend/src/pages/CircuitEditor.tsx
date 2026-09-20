@@ -4,6 +4,7 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import AgentPicker from '../AgentPicker';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 type Step = { key: string; label: string; resolver: { kind: string; fonction?: string; code?: string; username?: string }; mode?: string; quorum?: number; canEdit?: boolean; optional?: boolean; nonDelegable?: boolean; slaDays?: number; refusTo?: string; onEnter?: any; onDone?: any };
 type Transition = { from: string; to: string; when?: { field: string; op: string; value?: any }; otherwise?: boolean };
@@ -100,7 +101,7 @@ function CreateForm({ o, onClose, onDone }: { o: number; onClose: () => void; on
       <form onSubmit={submit} className="space-y-4"><ErrorBox msg={err} />
         <Field label="Nom"><input className="input" required autoFocus value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value, code: manual ? f.code : slug(e.target.value).replace(/_/g, '-') })} /></Field>
         <Field label="Code" hint="Minuscules, chiffres, - et _"><input className="input" required pattern="[a-z0-9_-]{2,40}" value={f.code} onChange={(e) => { setManual(true); setF({ ...f, code: e.target.value }); }} /></Field>
-        <Field label="Point de départ"><select className="input" value={f.modele} onChange={(e) => setF({ ...f, modele: e.target.value })}><option value="">Circuit vide (rédaction seule)</option>{modeles.data?.map((m) => <option key={m.code} value={m.code}>{m.nom}</option>)}</select></Field>
+        <Field label="Point de départ"><Select className="input" value={f.modele} onChange={(e) => setF({ ...f, modele: e.target.value })}><option value="">Circuit vide (rédaction seule)</option>{modeles.data?.map((m) => <option key={m.code} value={m.code}>{m.nom}</option>)}</Select></Field>
         <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy}>{busy && <Spinner />} Créer</button></div>
       </form>
     </Modal>
@@ -131,8 +132,8 @@ function PropsForm({ o, c, onClose, onDone }: { o: number; c: any; onClose: () =
     <Modal title={`Propriétés — ${c.nom}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4"><ErrorBox msg={err} />
         <Field label="Nom"><input className="input" required value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} /></Field>
-        <Field label="Direction" hint="Le circuit le plus spécifique s'applique."><select className="input" value={f.directionCode} onChange={(e) => setF({ ...f, directionCode: e.target.value })}><option value="">Toutes les directions</option>{dirs.data?.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</select></Field>
-        <Field label="Type d'acte"><select className="input" value={f.typeActeId} onChange={(e) => setF({ ...f, typeActeId: e.target.value })}><option value="">Tous les types</option>{types.data?.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}</select></Field>
+        <Field label="Direction" hint="Le circuit le plus spécifique s'applique."><Select className="input" value={f.directionCode} onChange={(e) => setF({ ...f, directionCode: e.target.value })}><option value="">Toutes les directions</option>{dirs.data?.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}</Select></Field>
+        <Field label="Type d'acte"><Select className="input" value={f.typeActeId} onChange={(e) => setF({ ...f, typeActeId: e.target.value })}><option value="">Tous les types</option>{types.data?.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}</Select></Field>
         <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy}>{busy && <Spinner />} Enregistrer</button></div>
       </form>
     </Modal>
@@ -227,18 +228,18 @@ function Editor({ o, c, version, toast, onClose }: { o: number; c: any; version:
               {cur.key !== g.start ? (
                 <>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <Field label="Qui valide"><select className="input" value={cur.resolver?.kind} onChange={(e) => upd(cur.key, { resolver: e.target.value === 'titulaire' ? { kind: 'titulaire', fonction: 'chef_service' } : e.target.value === 'groupe' ? { kind: 'groupe', code: groupes.data?.[0]?.code ?? '' } : e.target.value === 'agent' ? { kind: 'agent', username: '' } : { kind: 'redacteur' } })}>{Object.entries(KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
-                    {cur.resolver?.kind === 'titulaire' && <Field label="Fonction"><select className="input" value={cur.resolver.fonction} onChange={(e) => upd(cur.key, { resolver: { kind: 'titulaire', fonction: e.target.value } })}>{Object.entries(FONCTIONS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>}
-                    {cur.resolver?.kind === 'groupe' && <Field label="Groupe"><select className="input" value={cur.resolver.code} onChange={(e) => upd(cur.key, { resolver: { kind: 'groupe', code: e.target.value } })}>{groupes.data?.map((x) => <option key={x.code} value={x.code}>{x.nom}</option>)}</select></Field>}
+                    <Field label="Qui valide"><Select className="input" value={cur.resolver?.kind} onChange={(e) => upd(cur.key, { resolver: e.target.value === 'titulaire' ? { kind: 'titulaire', fonction: 'chef_service' } : e.target.value === 'groupe' ? { kind: 'groupe', code: groupes.data?.[0]?.code ?? '' } : e.target.value === 'agent' ? { kind: 'agent', username: '' } : { kind: 'redacteur' } })}>{Object.entries(KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+                    {cur.resolver?.kind === 'titulaire' && <Field label="Fonction"><Select className="input" value={cur.resolver.fonction} onChange={(e) => upd(cur.key, { resolver: { kind: 'titulaire', fonction: e.target.value } })}>{Object.entries(FONCTIONS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>}
+                    {cur.resolver?.kind === 'groupe' && <Field label="Groupe"><Select className="input" value={cur.resolver.code} onChange={(e) => upd(cur.key, { resolver: { kind: 'groupe', code: e.target.value } })}>{groupes.data?.map((x) => <option key={x.code} value={x.code}>{x.nom}</option>)}</Select></Field>}
                     {cur.resolver?.kind === 'agent' && <AgentPicker label="Agent" value={cur.resolver.username ?? ''} onChange={(u) => upd(cur.key, { resolver: { kind: 'agent', username: u } })} />}
                   </div>
                   <div className="grid gap-3 md:grid-cols-3">
-                    <Field label="Validation"><select className="input" value={cur.mode ?? 'one'} onChange={(e) => upd(cur.key, { mode: e.target.value === 'one' ? undefined : e.target.value, quorum: e.target.value === 'quorum' ? 2 : undefined })}>{Object.entries(MODES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+                    <Field label="Validation"><Select className="input" value={cur.mode ?? 'one'} onChange={(e) => upd(cur.key, { mode: e.target.value === 'one' ? undefined : e.target.value, quorum: e.target.value === 'quorum' ? 2 : undefined })}>{Object.entries(MODES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
                     {cur.mode === 'quorum' && <Field label="Quorum"><input className="input" type="number" min={1} value={cur.quorum ?? 2} onChange={(e) => upd(cur.key, { quorum: Number(e.target.value) })} /></Field>}
                     <Field label="Délai (jours ouvrés)"><input className="input" type="number" min={0} max={365} value={cur.slaDays ?? ''} onChange={(e) => upd(cur.key, { slaDays: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
                   </div>
                   <Field label="Étape de refus" hint="Où repart le dossier si cette étape le refuse. Sans choix : l'étape précédente (−1).">
-                    <select className="input" value={cur.refusTo ?? ''} onChange={(e) => upd(cur.key, { refusTo: e.target.value || undefined })}><option value="">Étape précédente (par défaut)</option>{upstream(g, cur.key).map((k) => <option key={k} value={k}>{g.steps.find((s) => s.key === k)?.label ?? k}</option>)}</select></Field>
+                    <Select className="input" value={cur.refusTo ?? ''} onChange={(e) => upd(cur.key, { refusTo: e.target.value || undefined })}><option value="">Étape précédente (par défaut)</option>{upstream(g, cur.key).map((k) => <option key={k} value={k}>{g.steps.find((s) => s.key === k)?.label ?? k}</option>)}</Select></Field>
                   <div className="flex flex-wrap gap-4 text-[13px]">
                     <label className="flex items-center gap-2"><input type="checkbox" checked={!!cur.canEdit} onChange={(e) => upd(cur.key, { canEdit: e.target.checked || undefined })} /> Peut modifier le texte</label>
                     <label className="flex items-center gap-2"><input type="checkbox" checked={!!cur.optional} onChange={(e) => upd(cur.key, { optional: e.target.checked || undefined })} /> Étape optionnelle (ignorée sans titulaire)</label>
@@ -255,14 +256,14 @@ function Editor({ o, c, version, toast, onClose }: { o: number; c: any; version:
         <div className="overflow-x-auto"><table className="w-full text-[13px]"><thead><tr><th>De</th><th>Vers</th><th>Condition</th><th /></tr></thead><tbody>
           {g.transitions.map((t, i) => (
             <tr key={i}>
-              <td><select className="input w-auto" value={t.from} onChange={(e) => change((x) => { x.transitions[i].from = e.target.value; })}>{g.steps.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></td>
-              <td><select className="input w-auto" value={t.to} onChange={(e) => change((x) => { x.transitions[i].to = e.target.value; })}>{g.steps.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></td>
+              <td><Select className="input w-auto" value={t.from} onChange={(e) => change((x) => { x.transitions[i].from = e.target.value; })}>{g.steps.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select></td>
+              <td><Select className="input w-auto" value={t.to} onChange={(e) => change((x) => { x.transitions[i].to = e.target.value; })}>{g.steps.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select></td>
               <td className="space-x-2">
-                <select className="input w-auto" value={t.otherwise ? 'otherwise' : t.when ? 'when' : 'none'} onChange={(e) => change((x) => { const y = x.transitions[i]; delete y.when; delete y.otherwise; if (e.target.value === 'when') y.when = { field: 'incidenceFinanciere', op: 'eq', value: true }; if (e.target.value === 'otherwise') y.otherwise = true; })}>
-                  <option value="none">Toujours</option><option value="when">Si…</option><option value="otherwise">Sinon (par défaut)</option></select>
+                <Select className="input w-auto" value={t.otherwise ? 'otherwise' : t.when ? 'when' : 'none'} onChange={(e) => change((x) => { const y = x.transitions[i]; delete y.when; delete y.otherwise; if (e.target.value === 'when') y.when = { field: 'incidenceFinanciere', op: 'eq', value: true }; if (e.target.value === 'otherwise') y.otherwise = true; })}>
+                  <option value="none">Toujours</option><option value="when">Si…</option><option value="otherwise">Sinon (par défaut)</option></Select>
                 {t.when && <>
-                  <select className="input w-auto" value={t.when.field} onChange={(e) => change((x) => { x.transitions[i].when!.field = e.target.value; })}>{Object.entries(FIELDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-                  <select className="input w-auto" value={t.when.op} onChange={(e) => change((x) => { x.transitions[i].when!.op = e.target.value; })}>{Object.entries(OPS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+                  <Select className="input w-auto" value={t.when.field} onChange={(e) => change((x) => { x.transitions[i].when!.field = e.target.value; })}>{Object.entries(FIELDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
+                  <Select className="input w-auto" value={t.when.op} onChange={(e) => change((x) => { x.transitions[i].when!.op = e.target.value; })}>{Object.entries(OPS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
                   {!['empty', 'notEmpty'].includes(t.when.op) && <input className="input inline-block w-32" value={String(t.when.value ?? '')} onChange={(e) => change((x) => { const raw = e.target.value; x.transitions[i].when!.value = raw === 'true' ? true : raw === 'false' ? false : raw !== '' && !isNaN(Number(raw)) ? Number(raw) : raw; })} />}</>}
               </td>
               <td className="text-right"><button className="rounded p-1 text-ko hover:bg-ko-bg" aria-label="Supprimer la transition" onClick={() => change((x) => { x.transitions.splice(i, 1); })}><Trash2 className="h-4 w-4" /></button></td>

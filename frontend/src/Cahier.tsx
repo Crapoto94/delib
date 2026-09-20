@@ -5,6 +5,7 @@ import { useAuth } from './auth';
 import { dt } from './format';
 import { Badge, Field, Loading, Modal, Spinner } from './ui';
 import { Progress } from './AiStatus';
+import { Select } from './Select';
 
 type Build = {
   id: number; version: number; libelle: string; profil: string; options: { rectoVerso?: boolean; anomalies?: string }; statut: 'queued' | 'running' | 'done' | 'error';
@@ -41,8 +42,8 @@ export default function CahierModal({ seanceId, onClose }: { seanceId: number; o
         <section className="rounded border border-line p-4">
           <h4 className="mb-3 flex items-center gap-2"><BookOpen className="h-4 w-4 text-action" /> Générer une nouvelle version</h4>
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Profil"><select className="input" value={f.profil} onChange={(e) => setF({ ...f, profil: e.target.value })}>{Object.entries(PROFILS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
-            <Field label="En cas d'anomalie"><select className="input" value={f.anomalies} onChange={(e) => setF({ ...f, anomalies: e.target.value })}>{Object.entries(POLITIQUES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+            <Field label="Profil"><Select className="input" value={f.profil} onChange={(e) => setF({ ...f, profil: e.target.value })}>{Object.entries(PROFILS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
+            <Field label="En cas d'anomalie"><Select className="input" value={f.anomalies} onChange={(e) => setF({ ...f, anomalies: e.target.value })}>{Object.entries(POLITIQUES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
           </div>
           <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={f.rectoVerso} onChange={(e) => setF({ ...f, rectoVerso: e.target.checked })} /> Impression recto-verso (chaque point commence sur une page impaire)</label>
           {controles.length > 0 && (

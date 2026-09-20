@@ -1,6 +1,7 @@
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { Badge, Loading, PageTitle, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 type Regle = { code: string; nom: string; family: string; familyLabel: string; kind: string; mail: boolean; mode: 'immediate' | 'inapp' | 'off' };
 
@@ -18,7 +19,7 @@ export default function Preferences() {
       <div className="card">{prefs.loading || !prefs.data ? <Loading /> : (
         <table className="w-full"><thead><tr><th>Famille</th><th>Mode</th></tr></thead><tbody>{prefs.data.items.map((p) => (
           <tr key={p.family}><td className="font-semibold">{p.label} {p.mandatory && <Badge tone="warn">obligatoire</Badge>}</td>
-            <td><select className="input w-56" disabled={p.mandatory} value={p.mode} onChange={(e) => set(p.family, e.target.value)}><option value="immediate">Immédiat</option><option value="digest">Dans la synthèse quotidienne</option><option value="off">Désactivé</option></select></td></tr>))}</tbody></table>)}</div>
+            <td><Select className="input w-56" disabled={p.mandatory} value={p.mode} onChange={(e) => set(p.family, e.target.value)}><option value="immediate">Immédiat</option><option value="digest">Dans la synthèse quotidienne</option><option value="off">Désactivé</option></Select></td></tr>))}</tbody></table>)}</div>
 
       {prefs.data && parFamille.size > 0 && (
         <div className="card overflow-hidden">
@@ -31,11 +32,11 @@ export default function Preferences() {
                 <li key={r.code} className="flex flex-wrap items-center gap-3 border-t border-line/60 px-4 py-2">
                   <div className="min-w-[240px] flex-1"><span className="text-[13px] font-semibold">{r.nom}</span>
                     <span className="ml-2 text-[11px] text-mute">{r.kind === 'temporal' ? 'relance' : 'évènement'}{!r.mail && ' · l’administration l’envoie dans l’outil seulement'}</span></div>
-                  <select className="input w-64" value={r.mode} aria-label={r.nom} onChange={(e) => setRegle(r.code, e.target.value)}>
+                  <Select className="input w-64" value={r.mode} aria-label={r.nom} onChange={(e) => setRegle(r.code, e.target.value)}>
                     <option value="immediate">{r.mail ? 'La recevoir (e-mail et outil)' : 'La recevoir (dans l’outil)'}</option>
                     {r.mail && <option value="inapp">Dans l’outil seulement (pas de mail)</option>}
                     <option value="off">Ne pas la recevoir</option>
-                  </select>
+                  </Select>
                 </li>))}</ul>
             </div>))}
         </div>)}

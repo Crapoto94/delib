@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { Badge, ErrorBox, Field, Loading, Spinner, useLoad, useToast } from '../ui';
+import { Select } from '../Select';
 
 const MODES: [string, string][] = [['simulation', 'Simulation (sans envoi réel)'], ['test', 'Test (instance de test du fournisseur)'], ['production', 'Production']];
 
@@ -51,9 +52,9 @@ export default function AdminTdt() {
         <div className="flex flex-wrap items-center justify-between gap-2"><h3>Connexion à {cur.nom}</h3></div>
         <p className="text-[13px] text-mute">{cur.note}</p>
         <Field label="Mode" hint="Le mode « simulation » teste toute la chaîne sans rien envoyer à la préfecture.">
-          <select className="input !w-auto" value={f.mode} onChange={(e) => { setTest(null); setF({ ...f, mode: e.target.value }); }}>
+          <Select className="input !w-auto" value={f.mode} onChange={(e) => { setTest(null); setF({ ...f, mode: e.target.value }); }}>
             {MODES.map(([k, l]) => <option key={k} value={k} disabled={!cur.modes[k]}>{l}{cur.modes[k] ? '' : ' — pas encore disponible'}</option>)}
-          </select>
+          </Select>
         </Field>
         <div className="grid gap-3 md:grid-cols-3">
           <Field label="Adresse du serveur"><input className="input" type="url" value={f.url} placeholder="https://…" onChange={(e) => setF({ ...f, url: e.target.value })} /></Field>

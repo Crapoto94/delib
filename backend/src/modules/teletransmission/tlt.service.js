@@ -63,7 +63,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
   const toTx = (r, extra = {}) => ({
     id: r.id, acteId: r.acte_id, seanceId: r.seance_id, itemId: r.item_id, numeroTransmis: r.numero_transmis, mode: r.mode, etat: r.etat, remoteId: r.remote_id, status: r.status,
     statusLabel: r.status_label, scenario: r.package?.scenario ?? null, enAttente: !!r.package?.enAttente, subject: r.package?.subject, decisionDate: r.package?.decisionDate,
-    preparePar: r.prepared_by, prepareLe: r.prepared_at, envoyePar: r.sent_by, envoyeLe: r.sent_at, arLe: r.ar_at, arId: r.ar_id, erreur: r.error, ...extra,
+    preparePar: r.prepared_by, prepareLe: r.prepared_at, envoyePar: r.sent_by, envoyeLe: r.sent_at, arLe: r.ar_at, arId: r.ar_id, dateAffichage: r.date_affichage ?? null, erreur: r.error, ...extra,
   });
 
   /** Numéro transmis d'une délibération : motif paramétrable, 15 caractères au plus, majuscules, chiffres et « _ » (TLT-03). */
@@ -444,6 +444,18 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       void dateAffichage; // l'encadré porte l'AR (TLT-34) ; la publication figure dans les mentions de l'extrait du registre
       const buffer = await apposerTampon(src, { arId: tx.ar_id, dateTransmission: tx.sent_at, dateReception: tx.ar_at, simulation: tx.mode === 'simulation' });
       return { buffer, name: `acte-tamponne-${tx.numero_transmis}.pdf` };
+    },
+
+    /** Date d'affichage (publication) : saisie par le SCC après l'AR ; elle renseigne « PUBLIÉ PAR VOIE D'AFFICHAGE LE » de l'extrait du registre. */
+    async definirAffichage(ctx, organismeId, id, date) {
+      const org = requireOrg(organismeId); const tx = await svc._get(org, id);
+      if (!tx.ar_id) throw E.conflict("Pas encore d'accusé de réception : la date d'affichage se saisit une fois l'acte reçu en préfecture");
+      if (date && new Date(`${date}T12:00:00Z`) < new Date(new Date(tx.ar_at).toISOString().slice(0, 10))) throw E.badRequest("La date d'affichage ne peut pas précéder la réception en préfecture");
+      const row = await db.get('UPDATE tlt_transactions SET date_affichage = $2, updated_at = now() WHERE id = $1 RETURNING *', [id, date || null]);
+      await journal(id, ctx.username, 'affichage', { date: date || null });
+      await audit.log(ctx, { organismeId: org, action: 'tlt.affichage', entity: 'tlt_transactions', entityId: id, after: { date: date || null } });
+      await bus.emit('tlt.ar', { organismeId: org, acteId: tx.acte_id, transactionId: tx.id, seanceId: tx.seance_id, arId: tx.ar_id, misAJour: true });
+      return toTx(row);
     },
 
     /** ARActe : contenu XML (téléchargement) et champs lus (consultation). */

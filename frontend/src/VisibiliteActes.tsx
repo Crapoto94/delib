@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, errMsg, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { useLoad } from './ui';
+import { Select } from './Select';
 
 export const VISIBILITE: Record<string, { label: string; aide: string }> = {
   redacteur: { label: 'Rédacteur uniquement', aide: 'Ses propres actes, ceux dont il est co-rédacteur ou participant.' },
@@ -32,10 +33,10 @@ export function VisibiliteUtilisateur({ username, data, onChanged, toast }: { us
   const set = async (v: string) => { setBusy(true); try { await api.put(orgPath(o, `/utilisateurs/${username}/visibilite-actes`), { visibilite: v === '' ? null : v }); toast('Visibilité enregistrée'); onChanged(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); } };
   return (
     <section><h3 className="mb-1">Visibilité des actes</h3>
-      <select className="input w-auto" aria-label="Visibilité des actes" disabled={busy} value={data.override ?? ''} onChange={(e) => set(e.target.value)}>
+      <Select className="input w-auto" aria-label="Visibilité des actes" disabled={busy} value={data.override ?? ''} onChange={(e) => set(e.target.value)}>
         <option value="">Réglage général ({VISIBILITE[data.general]?.label.toLowerCase()})</option>
         {Object.entries(VISIBILITE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-      </select>
+      </Select>
       <p className="mt-1 text-[12px] text-mute">{data.override ? 'Réglage personnel : ' : 'Suit le réglage général : '}{VISIBILITE[data.effective]?.aide}</p></section>
   );
 }

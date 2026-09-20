@@ -6,6 +6,7 @@ import { useAuth } from '../auth';
 import { dt, STATUTS } from '../format';
 import { Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, StatutBadge, useLoad } from '../ui';
 import { AgentName } from '../AgentName';
+import { Select } from '../Select';
 
 /** REC-08 : des actes proches existent déjà (dans la limite de mes droits) — consulter avant de rédiger. */
 function Similaires({ titre }: { titre: string }) {
@@ -40,7 +41,7 @@ function NewDossier({ onClose }: { onClose: () => void }) {
     <Modal title="Nouveau dossier" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <ErrorBox msg={err} />
-        <Field label="Type d'acte"><select className="input" value={typeId} onChange={(e) => setTypeId(Number(e.target.value))}>{types.data?.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}</select></Field>
+        <Field label="Type d'acte"><Select className="input" value={typeId} onChange={(e) => setTypeId(Number(e.target.value))}>{types.data?.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}</Select></Field>
         <Field label="Titre explicite de l'acte" hint="Ce titre apparaîtra sur l'ordre du jour officiel."><input className="input" autoFocus required minLength={3} value={titre} onChange={(e) => setTitre(e.target.value)} /></Field>
         <Similaires titre={titre} />
         <p className="text-[12px] text-mute">Direction porteuse : <b>{me?.agent?.direction?.label ?? 'à préciser'}</b> (déduite de votre fiche RH).</p>
@@ -67,7 +68,7 @@ export default function Dossiers() {
             <button key={k} role="tab" aria-selected={scope === k} onClick={() => set('scope', k)} className={`rounded px-3 py-2 text-[13px] font-semibold ${scope === k ? 'bg-primary text-white' : 'text-slate-700'}`}>{l}</button>
           ))}
         </div>
-        <label><span className="label">Statut</span><select className="input" value={statut} onChange={(e) => set('statut', e.target.value)}><option value="">Tous</option>{Object.entries(STATUTS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label>
+        <label><span className="label">Statut</span><Select className="input" value={statut} onChange={(e) => set('statut', e.target.value)}><option value="">Tous</option>{Object.entries(STATUTS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select></label>
         <label className="grow"><span className="label">Recherche</span><input className="input" value={q} placeholder="Titre ou n° de suivi" onChange={(e) => set('q', e.target.value)} /></label>
       </div>
       <div className="card overflow-x-auto">

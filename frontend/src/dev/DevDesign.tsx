@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { Badge, PageTitle } from '../ui';
 import { MenuLateral, menu } from '../pages/Admin';
 import { ThemeSwitch, ThemeToggle } from '../theme';
+import { Select } from '../Select';
 
 /** Banc d'essai visuel (développement uniquement : /dev/design) : en-tête, menu latéral, cartes, tableau, badges, formulaire — sans connexion. */
 export default function DevDesign() {
@@ -32,7 +33,7 @@ export default function DevDesign() {
               <tr><td className="font-semibold">Subventions aux associations</td><td>Culture</td><td><Badge tone="ok">Prêt</Badge> <Badge tone="blue">Séance 22/10</Badge> <Badge>Brouillon</Badge></td><td><button className="btn-secondary">Ouvrir</button></td></tr>
             </tbody></table></div>
             <div className="card space-y-3 p-5"><h3>Formulaire</h3>
-              <div className="grid gap-3 md:grid-cols-2"><label className="block"><span className="label">Nom</span><input className="input" defaultValue="Ville d'Ivry" /></label><label className="block"><span className="label">Choix</span><select className="input"><option>Option</option></select></label></div>
+              <div className="grid gap-3 md:grid-cols-2"><label className="block"><span className="label">Nom</span><input className="input" defaultValue="Ville d'Ivry" /></label><label className="block"><span className="label">Choix</span><Select className="input" defaultValue=""><option value="">— choisir —</option>{["ACTION SOCIALE","ASSURANCES","CITOYENNETÉ","COMMERCE","COMMUNICATION","CONTENTIEUX","COOPÉRATION INTERNATIONALE","CULTURE","ENFANCE","ÉQUIPEMENTS PUBLICS","FINANCES","GRAND PARIS"].map((x) => <option key={x} value={x}>{x}</option>)}</Select></label></div>
               <p className="rounded border border-warn/30 bg-warn-bg px-3 py-2 text-warn">Avertissement d'exemple.</p><p className="rounded border border-ko/30 bg-ko-bg px-3 py-2 text-ko">Erreur d'exemple.</p><p className="rounded border border-ok/30 bg-ok-bg px-3 py-2 text-ok-text">Succès d'exemple.</p>
               <ThemeSwitch />
             </div>

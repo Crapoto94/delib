@@ -6,6 +6,7 @@ import { api, errMsg } from '../api';
 import { armerReprise, noterLecture, ouvrirDoc, prefetchSeance, type Doc } from '../docs';
 import { EtatTelechargement, definirSeanceSuivie } from './Accueil';
 import { dt } from '../../format';
+import { Select } from '../../Select';
 
 type Sel = { kind: 'point'; id: number } | { kind: 'doc'; key: string };
 const TYPE_LABEL: Record<string, string> = { expose: 'Exposé des motifs', projet: 'Projet de délibération', annexe: 'Annexe', piece: 'Pièce jointe', convocation: 'Convocation', odj: 'Ordre du jour', cahier: 'Cahier de séance' };
@@ -78,7 +79,7 @@ function Notes({ seanceId, itemId, moi }: { seanceId: number; itemId: number; mo
         {err && <p className="text-[13px] text-ko">{err}</p>}
         <textarea className="input !text-[15px]" rows={3} placeholder="Ma note sur ce point…" value={texte} onChange={(e) => setTexte(e.target.value)} />
         <div className="flex flex-wrap items-center gap-2">
-          <select className="input !w-auto !py-2" value={partage} onChange={(e) => setPartage(e.target.value as any)}><option value="prive">Privée</option><option value="groupe">Partager avec mon groupe</option><option value="elus">Partager avec des élus…</option></select>
+          <Select className="input !w-auto !py-2" value={partage} onChange={(e) => setPartage(e.target.value as any)}><option value="prive">Privée</option><option value="groupe">Partager avec mon groupe</option><option value="elus">Partager avec des élus…</option></Select>
           <button className="btn-primary ml-auto !py-2" disabled={!texte.trim() || (partage === 'elus' && !avec.length)} onClick={ajouter}>Enregistrer</button>
         </div>
         {partage === 'elus' && <div className="max-h-40 overflow-y-auto rounded border border-line bg-surface p-2 text-[13px]">{collegues.map((c) => (
