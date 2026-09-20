@@ -62,6 +62,22 @@ function createTenue({ db, audit, acl, access, seances, odj }) {
   const svc = {
     rules,
 
+    /** Données brutes de la séance (procès-verbal, extraits du registre) : aucun filtrage par rôle, l'appelant a déjà contrôlé les droits. `null` si la séance n'a pas été ouverte. */
+    async donnees(ctx, organismeId, seanceId) {
+      const org = requireOrg(organismeId);
+      const s = await seances.get(org, seanceId);
+      const t = await db.get('SELECT * FROM seance_tenue WHERE seance_id = $1', [seanceId]);
+      if (!t) return null;
+      const [membresList, presences, procs, points] = await Promise.all([membres(db, org, s), presencesOf(db, seanceId), procurationsOf(db, seanceId), pointsOf(ctx, org, seanceId)]);
+      const votes = new Map();
+      for (const r of await db.all('SELECT v.item_id, v.elu_id, v.choix, v.mandataire_elu_id FROM seance_votes v JOIN seance_items i ON i.id = v.item_id WHERE i.seance_id = $1', [seanceId])) {
+        if (!votes.has(r.item_id)) votes.set(r.item_id, new Map());
+        votes.get(r.item_id).set(r.elu_id, { choix: r.choix, mandataire: r.mandataire_elu_id });
+      }
+      const journalRows = (await db.all('SELECT id, item_id, elu_id, type, detail, actor, at FROM seance_journal WHERE seance_id = $1 ORDER BY id', [seanceId])).map((r) => ({ ...r, id: Number(r.id) }));
+      return { seance: s, tenue: t, membres: membresList, presences, procurations: procs, points, votes, journal: journalRows };
+    },
+
     async etat(ctx, organismeId, seanceId) {
       const org = requireOrg(organismeId);
       const s = await seances.get(org, seanceId);

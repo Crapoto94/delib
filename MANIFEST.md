@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.15 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.16 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -957,6 +957,7 @@ Une page de **suivi de séance** est **synchronisée en direct** : tous ceux qui
 - **PST-02** — **Registre des délibérations** chronologique et paginé (PDF annuel).
 - **PST-03** — **Compte rendu / procès-verbal** : assemblage automatique (présences, ordre du jour, résultats, notes de débat), **édition avec suivi des modifications**, **approbation à la séance suivante** (point libre), publication. *Compte rendu succinct affiché sous huitaine — art. L2121-25 CGCT, à valider.*
 - **PST-04** — **Liste des délibérations** de la séance (publiable).
+- **PST-06** — **Réalisé (D81)** : à partir du suivi de séance (19.1 bis), le SCC obtient en PDF, à tout moment (filigrane « PROJET » tant que la séance n'est pas close) : le **procès-verbal** (bureau, présences par groupe, absents excusés, pouvoirs, quorum, mouvements de salle horodatés, puis pour chaque point le rapporteur, les observations du secrétariat — facultatives —, le décompte, les noms des votants contre / abstenus / ne prenant pas part au vote et le résultat, et le bloc de signature), la **liste des délibérations** (numéro, objet, rapporteur, résultat) et, pour chaque délibération votée, l'**extrait du registre** (visas, dispositif, mention du vote, présents, absents et pouvoirs, gabarit de l'organisme). Réservé au SCC, à la DGS et aux administrateurs ; un scrutin secret n'imprime aucun nom.
 - **PST-05** — États de l'acte : `Adoptée → Texte définitif prêt → [À signer → Signé, seulement si la signature est activée] → Prêt à transmettre → Transmis → AR reçu → Publié → Exécutoire` (ou `Rejetée`, `Retirée`, `Ajournée`).
 
 ### 19.4 Signature
@@ -1632,6 +1633,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D78** | **Suivi de séance en direct** : page synchronisée pour tous ceux qui l'affichent ; présences, sorties et retours des élus par groupe, pouvoirs, point en cours partagé, notes administratives, votes (Pour / Contre / Abstention / NPPV) par élu ou par groupe, les absents ne prenant pas part au vote ni pour eux ni pour leur mandant ; résultat qui met à jour le statut de l'acte. *(réalisé)* | 19.1 bis |
 | **D79** | **Canal des notifications et refus par l'utilisateur** (interrupteur mail / outil seulement par règle ; refus règle par règle des notifications facultatives) ; postes vacants annoncés au niveau de la direction ; l'AD retrouve l'identifiant d'un responsable absent de l'annuaire RH (fiche sans e-mail). *(réalisé)* | 22, 9.4 bis |
 | **D80** | **Modifier et supprimer une séance** (avec choix du devenir des dossiers : séance suivante ou sans affectation) ; **consignes et modèle de l'IA modifiables** par fonction dans Administration / Assistant IA. *(réalisé)* | 16.1, 21.6 ter |
+| **D81** | **Pièces produites après la séance** : procès-verbal, liste des délibérations et extrait du registre de chaque délibération, générés en PDF depuis le suivi de séance (présences, pouvoirs, votes, résultats). *(réalisé)* | 19.3 |
 | **D76** | **La DGS est le responsable de la Direction générale des services de l'organigramme RH** (et non un titulaire fictif de démonstration) : à défaut de titulaire désigné, le circuit s'adresse au directeur de la « DIRECTION GENERALE DES SERVICES » ; l'étape DGS n'est jamais contournée ; affichage « Directeur·trice » et « Prénom NOM » pour les noms composés. *(réalisé)* | 9.4 bis |
 
 ---
@@ -1653,6 +1655,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.16** | 2026-09-20 | **D81** : procès-verbal, liste des délibérations et extraits du registre en PDF (PST-06) |
 | **1.15** | 2026-09-20 | **D80** : modification et suppression d'une séance (SEA-10, SEA-11) ; consignes et modèle de l'IA par fonction (IA-70 à IA-72) |
 | **1.14** | 2026-09-20 | **D79** : canal mail / outil seulement par règle (NOT-26), refus règle par règle par l'utilisateur (NOT-27), vacants visibles au niveau de la direction (ORG-14), AD en repli pour les identifiants |
 | **1.13** | 2026-09-20 | **D77** (purge des données de démonstration) et **D78** (suivi de séance en direct, LIVE-01 à LIVE-11) |

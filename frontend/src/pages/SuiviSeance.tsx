@@ -1,6 +1,6 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Eye, Lock, LockOpen, Play, RotateCcw, Square, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Eye, FileText, Lock, LockOpen, Play, RotateCcw, Square, Users } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { AgentName } from '../AgentName';
@@ -99,6 +99,11 @@ export default function SuiviSeance() {
   const put = (p: string, b: unknown, ok?: string) => act(() => api.put(`${root}${p}`, b), ok);
   const post = (p: string, b?: unknown, ok?: string) => act(() => api.post(`${root}${p}`, b ?? {}), ok);
 
+  /** Pièces produites depuis la séance (procès-verbal, liste des délibérations, extrait du registre) : ouvertes dans la visionneuse. */
+  const piece = async (path: string, titre: string) => {
+    const m = await openPdf(() => api.get(orgPath(o, `/seances/${sid}${path}`), { responseType: 'blob' }), titre);
+    if (m) toast(m, 'ko');
+  };
   const elus = useMemo(() => (s?.groupes ?? []).flatMap((g: any) => g.elus) as any[], [s]);
   const byId = useMemo(() => new Map(elus.map((e) => [e.id, e])), [elus]);
 
@@ -125,6 +130,16 @@ export default function SuiviSeance() {
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={s.quorum.atteint ? 'ok' : t.statut === 'non_ouverte' ? 'gray' : 'ko'}><Users className="mr-1 inline h-3.5 w-3.5" />Quorum : {s.quorum.enSalle} en salle / {s.quorum.requis} requis ({s.quorum.membres} membres){t.statut !== 'non_ouverte' && !s.quorum.atteint ? ' — non atteint' : ''}</Badge>
           {t.statut === 'non_ouverte' && <Badge>Séance non ouverte</Badge>}{ouverte && <Badge tone="blue">Séance en cours</Badge>}{close && <Badge tone="warn"><Lock className="mr-1 inline h-3.5 w-3.5" />Séance close</Badge>}
+          {can && t.statut !== 'non_ouverte' && (
+            <details className="relative">
+              <summary className="btn-secondary cursor-pointer list-none"><FileText className="h-4 w-4" /> Pièces de séance</summary>
+              <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-line bg-white p-1 shadow-lift">
+                <button className="block w-full rounded px-3 py-2 text-left text-[13px] hover:bg-soft" onClick={() => piece('/proces-verbal', 'Procès-verbal de séance')}>Procès-verbal{!close && <span className="text-mute"> (projet)</span>}</button>
+                <button className="block w-full rounded px-3 py-2 text-left text-[13px] hover:bg-soft" onClick={() => piece('/proces-verbal?notes=false', 'Procès-verbal (sans les observations)')}>Procès-verbal sans les observations du secrétariat</button>
+                <button className="block w-full rounded px-3 py-2 text-left text-[13px] hover:bg-soft" onClick={() => piece('/liste-deliberations', 'Liste des délibérations')}>Liste des délibérations</button>
+                <p className="px-3 py-1 text-[11px] text-mute">L’extrait du registre de chaque délibération votée se trouve sur le point lui-même.</p>
+              </div>
+            </details>)}
           {can && t.statut === 'non_ouverte' && <button className="btn-primary" disabled={busy} onClick={() => post('/ouverture', {}, 'Séance ouverte')}><Play className="h-4 w-4" /> Ouvrir la séance</button>}
           {can && ouverte && <button className="btn-secondary" disabled={busy} onClick={() => post('/cloture', {}, 'Séance close')}><Square className="h-4 w-4" /> Clore la séance</button>}
           {can && close && <button className="btn-secondary" onClick={() => setMotif({ titre: 'Déverrouiller la séance', ok: (m) => act(() => api.post(`${root}/deverrouillage`, { motif: m }), 'Séance déverrouillée') as Promise<void> })}><LockOpen className="h-4 w-4" /> Déverrouiller</button>}
@@ -166,6 +181,7 @@ export default function SuiviSeance() {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={ETAT[c.etat].tone}>{ETAT[c.etat].label}</Badge>{c.resultat && <Badge tone={RESULTAT[c.resultat].tone}>{RESULTAT[c.resultat].label}</Badge>}
+                      {c.acte && c.etat === 'traite' && can && <button className="btn-secondary" onClick={() => piece(`/points/${c.id}/extrait`, `Extrait du registre — ${c.titre}`)}><FileText className="h-4 w-4" /> Extrait du registre</button>}
                       {c.acte && <button className="btn-secondary" onClick={async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${c.acte.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }), `Dossier #${c.acte.numeroSuivi} — ${c.titre}`); if (m) toast(m, 'ko'); }}><Eye className="h-4 w-4" /> Voir le dossier</button>}
                     </div>
                   </div>

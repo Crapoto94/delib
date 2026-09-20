@@ -211,6 +211,34 @@ describe('votes : par élu ou par groupe, absents exclus, pouvoirs', () => {
   });
 });
 
+describe('pièces produites après la séance (procès-verbal, liste, extrait du registre)', () => {
+  const pdfOf = (r) => { expect(r.status).toBe(200); expect(r.headers['content-type']).toMatch(/application\/pdf/); const b = Buffer.from(r.body); expect(b.subarray(0, 4).toString()).toBe('%PDF'); if (process.env.DUMP_PDF) require('fs').writeFileSync(`${process.env.DUMP_PDF}/${r.headers['content-disposition'].match(/filename="(.+)"/)[1]}`, b); return b; };
+  const get = (tok, u) => env.http().get(u).set(bearer(tok)).buffer(true).parse((res, cb) => { const c = []; res.on('data', (x) => c.push(x)); res.on('end', () => cb(null, Buffer.concat(c))); });
+
+  it('produit le procès-verbal, la liste des délibérations et l’extrait du registre d’une délibération votée', async () => {
+    const d = await pointDelib(); const l = await pointLibre();
+    pdfOf(await get(t.martin, T().replace('/tenue', '/proces-verbal')));
+    pdfOf(await get(t.martin, T().replace('/tenue', '/proces-verbal?notes=false')));
+    pdfOf(await get(t.martin, T().replace('/tenue', '/liste-deliberations')));
+    const ex = pdfOf(await get(t.martin, T(`/points/${d.id}/extrait`).replace('/tenue/points', '/points')));
+    expect(ex.length).toBeGreaterThan(1000);
+    expect((await get(t.martin, T(`/points/${l.id}/extrait`).replace('/tenue/points', '/points'))).status).toBe(400); // un point libre n’a pas d’extrait
+  });
+
+  it('refuse l’extrait d’une délibération non votée, aux non-habilités, et tant que la séance n’a pas été ouverte', async () => {
+    const d = await pointDelib();
+    await as(t.martin).post(T(`/points/${d.id}/reouverture`), { motif: 'Vérification avant impression' });
+    const nonVote = await get(t.martin, T(`/points/${d.id}/extrait`).replace('/tenue/points', '/points'));
+    expect(nonVote.status).toBe(409);
+    expect((await clore(d.id)).status).toBe(200); // de nouveau voté (mêmes votes)
+    expect((await get(t.dupont, T().replace('/tenue', '/proces-verbal'))).status).toBe(403);
+    expect((await env.http().get(T().replace('/tenue', '/proces-verbal'))).status).toBe(401);
+    const autre = (await as(t.martin).post(`${base()}/seances`, { instanceId: instance.id, dateSeance: inDays(50) })).body;
+    const r = await get(t.martin, `${base()}/seances/${autre.id}/proces-verbal`);
+    expect(r.status).toBe(409);
+  });
+});
+
 describe('autres issues, clôture de la séance', () => {
   it('un point libre peut être clos sans vote ; plus rien à traiter ensuite', async () => {
     const l = await pointLibre();
