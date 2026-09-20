@@ -12,6 +12,7 @@ const { createDirectoryService } = require('./modules/directory/directory.servic
 const { createOrganismes } = require('./modules/organismes/organismes.service');
 const { createSettings } = require('./modules/settings/settings.service');
 const { createOnboarding } = require('./modules/me/onboarding.service');
+const { createEntrainement } = require('./modules/me/entrainement.service');
 const { createBus, createStorage } = require('./shared/infra');
 const { createReferentiels } = require('./modules/referentiels/referentiels.service');
 const { createTitulaires } = require('./modules/titulaires/titulaires.service');
@@ -117,12 +118,14 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const eluAuth = createEluAuth({ db, config, mail, settings, audit, log });
   const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log });
   const annotations = createAnnotations({ db, audit, config, espace, settings });
+  const entrainement = createEntrainement({ db, actes, textes, audit });
   const configuration = createConfiguration({ db, audit, settings, circuits, champs });
   const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
   const scheduler = createScheduler({ db, notifications, config, log });
+  scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, entrainement, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

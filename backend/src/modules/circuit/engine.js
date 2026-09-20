@@ -218,6 +218,7 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     async submit(ctx, organismeId, acteId) {
       const a0 = await actes.load(ctx, organismeId, acteId);
       if (!IS_DRAFTER(ctx, a0) && !acl.isAdmin(ctx, a0.organisme_id)) throw E.forbidden("Seul le rédacteur envoie l'acte au circuit");
+      if (a0.custom?.entrainement) throw E.conflict('Ceci est un dossier d’entraînement : il ne s’envoie pas au circuit. Créez un vrai dossier pour envoyer.');
       if (!['brouillon', 'modification_demandee'].includes(a0.statut)) throw E.conflict(`Un acte « ${a0.statut} » ne peut pas être envoyé au circuit`);
       const graph0 = a0.circuit_version_id ? await graphOf(a0.circuit_version_id) : null;
       const returned = a0.statut === 'modification_demandee';

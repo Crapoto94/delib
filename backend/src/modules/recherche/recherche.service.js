@@ -119,6 +119,7 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
   async function reindexerActe(acteId) {
     const a = await db.get('SELECT * FROM actes WHERE id = $1', [acteId]);
     if (!a) return false;
+    if (a.custom?.entrainement) { await db.run('DELETE FROM search_index WHERE acte_id = $1', [acteId]); return false; } // le bac à sable n'est jamais cherchable
     const ref = async (id) => (id ? (await db.get('SELECT libelle FROM ref_items WHERE id = $1', [id]))?.libelle || '' : '');
     const [type, nature, matiere, rubrique] = await Promise.all([ref(a.type_id), ref(a.nature_id), ref(a.matiere_id), ref(a.rubrique_id)]);
     const rapp = a.rapporteur_id ? await db.get('SELECT nom, prenom FROM elus WHERE id = $1', [a.rapporteur_id]) : null;
@@ -172,7 +173,7 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
   async function enRetard(org, limite = 200) {
     return db.all(
       `SELECT a.id FROM actes a LEFT JOIN search_index si ON si.acte_id = a.id
-       WHERE a.organisme_id = $1 AND (si.acte_id IS NULL OR si.indexed_at < GREATEST(a.updated_at,
+       WHERE a.organisme_id = $1 AND NOT (a.custom ? 'entrainement') AND (si.acte_id IS NULL OR si.indexed_at < GREATEST(a.updated_at,
          COALESCE((SELECT max(t.updated_at) FROM tracked_texts t WHERE t.acte_id = a.id), 'epoch'),
          COALESCE((SELECT max(x.updated_at) FROM annexes x WHERE x.acte_id = a.id), 'epoch'),
          COALESCE((SELECT max(d.updated_at) FROM deliberations d WHERE d.acte_id = a.id), 'epoch'),

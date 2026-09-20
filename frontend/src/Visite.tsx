@@ -11,7 +11,7 @@ import { useAuth } from './auth';
 const TOUR_ID = 'first-login';
 const VERSION = 1;
 
-type Step = { id: string; badge: string; titre: string; texte: ReactNode; cible?: string; route?: string };
+type Step = { id: string; badge: string; titre: string; texte: ReactNode; cible?: string; route?: string; action?: { label: string; code: 'entrainement' } };
 
 const BADGES: Record<string, string> = { decouverte: '🧭 Explorateur', redaction: '✍️ Rédacteur', ia: '✨ Assistant IA', circuit: '🔁 Circuit', validation: '✅ Valideur' };
 
@@ -51,13 +51,21 @@ const STEPS: Step[] = [
   { id: 'recherche', badge: 'decouverte', titre: 'Retrouver n’importe quel acte', cible: 'recherche', texte: <>Cette barre cherche dans les <b>titres, les textes et les annexes</b>, même sans accents. Appuyez sur <kbd className="rounded border px-1">/</kbd> depuis n’importe quelle page. Essayez <code>"expression exacte"</code>, <code>-mot</code> pour exclure, ou un <b>numéro</b> de délibération.</> },
   { id: 'notifications', badge: 'decouverte', titre: 'La cloche et vos notifications', cible: 'notifications', texte: <>La cloche vous prévient de ce qui vous concerne : dossier à traiter, modification demandée, échéance qui approche. Dans <b>« Mes notifications »</b>, vous choisissez ce qui vous arrive aussi par mail et ce que vous préférez ne pas recevoir.</> },
   { id: 'menu', badge: 'decouverte', titre: 'Votre menu', cible: 'menu-utilisateur', route: '/', texte: <>Retrouvez ici vos <b>délégations</b>, vos <b>notifications</b> — et <b>« Revoir la visite »</b> quand vous voulez.</> },
+  { id: 'entrainement', badge: 'redaction', titre: 'À vous de jouer : un dossier d’entraînement', action: { label: 'Ouvrir mon dossier d’entraînement', code: 'entrainement' }, texte: <>Rien de tel que d’essayer ! Nous vous préparons un <b>dossier d’exemple</b>, déjà rempli. C’est un <b>bac à sable</b> : il ne partira <b>jamais</b> dans un vrai circuit, personne n’est notifié, et il disparaît tout seul au bout de 14 jours.
+    <p className="mt-2 font-semibold">Vos mini-défis :</p>
+    <ol className="mt-1 list-decimal space-y-1 pl-5">
+      <li>Ouvrez l’<b>exposé des motifs</b> et modifiez une phrase.</li>
+      <li>Lancez « <b>Vérifier l’orthographe</b> » avec l’assistant IA, puis acceptez ou refusez une suggestion.</li>
+      <li>Ajoutez un <b>commentaire</b> dans la discussion, avec une mention <b>@</b>.</li>
+      <li>Regardez l’indicateur de <b>complétude</b> : que manque-t-il pour envoyer ?</li>
+    </ol></> },
   { id: 'fin', badge: 'decouverte', titre: 'Bravo, vous êtes prêt·e !', texte: <>Vos badges sont ci-dessous. Pour vous lancer : <b>Actes & Dossiers → Nouveau dossier</b>. Et si vous hésitez, rejouez la visite quand vous voulez.</> },
 ];
 
 const pourMoi = (_s: Step) => true; // la visite s'adresse à tout utilisateur de base : pas de parcours SCC ni administrateur
 
 /** Boîte de la visite : projecteur sur l'élément visé, ou fenêtre centrée. */
-function Boite({ etape, i, n, onPrev, onNext, onQuit }: { etape: Step; i: number; n: number; onPrev: () => void; onNext: () => void; onQuit: () => void }) {
+function Boite({ etape, i, n, onPrev, onNext, onQuit, onAction, occupe }: { etape: Step; i: number; n: number; onPrev: () => void; onNext: () => void; onQuit: () => void; onAction: () => void; occupe: boolean }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const boite = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -111,6 +119,7 @@ function Boite({ etape, i, n, onPrev, onNext, onQuit }: { etape: Step; i: number
           <button className="text-[13px] text-mute hover:underline" onClick={onQuit}>Ignorer la visite</button>
           <div className="flex gap-2">
             {i > 0 && <button className="btn-secondary" onClick={onPrev}><ArrowLeft className="h-4 w-4" /> Précédent</button>}
+            {etape.action && <button className="btn-secondary" disabled={occupe} onClick={onAction}>{etape.action.label}</button>}
             <button className="btn-primary" data-suivant onClick={onNext}>{i === n - 1 ? 'Terminer' : 'Suivant'} {i < n - 1 && <ArrowRight className="h-4 w-4" />}</button>
           </div>
         </div>
@@ -120,7 +129,8 @@ function Boite({ etape, i, n, onPrev, onNext, onQuit }: { etape: Step; i: number
 }
 
 export default function Visite({ ouverte, onFermer }: { ouverte: boolean; onFermer: () => void }) {
-  const { me, reload } = useAuth();
+  const { me, org, reload } = useAuth();
+  const [occupe, setOccupe] = useState(false);
   const nav = useNavigate();
   const etapes = STEPS.filter(pourMoi);
   const [phase, setPhase] = useState<'accueil' | 'visite' | null>(null);
@@ -156,6 +166,15 @@ export default function Visite({ ouverte, onFermer }: { ouverte: boolean; onFerm
     enregistrer('started', done); aller(i + 1);
   };
   const precedent = () => aller(Math.max(0, i - 1));
+  /** Crée (ou retrouve) le dossier d'entraînement et y emmène : la visite reste « en cours » et se reprend là où on l'a laissée. */
+  const agir = async () => {
+    if (!org) return; setOccupe(true);
+    try {
+      const r = await api.post(`/organismes/${org.id}/entrainement`);
+      const done = Array.from(new Set([...faites, etapes[i].id])); setFaites(done); await enregistrer('started', done);
+      setPhase(null); onFermer(); nav(`/dossiers/${r.data.acteId}`);
+    } catch { /* la visite ne doit jamais gêner le travail */ } finally { setOccupe(false); }
+  };
   const quitter = () => fermer('skipped', faites);
 
   if (!phase) return null;
@@ -189,5 +208,5 @@ export default function Visite({ ouverte, onFermer }: { ouverte: boolean; onFerm
       </div>
     );
   }
-  return <Boite etape={etape} i={i} n={etapes.length} onPrev={precedent} onNext={suivant} onQuit={quitter} />;
+  return <Boite etape={etape} i={i} n={etapes.length} onPrev={precedent} onNext={suivant} onQuit={quitter} onAction={agir} occupe={occupe} />;
 }

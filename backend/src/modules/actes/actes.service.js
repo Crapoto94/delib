@@ -149,7 +149,11 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       if (patch.dateLimite !== undefined) add('date_limite', patch.dateLimite);
       if (patch.confidentialite !== undefined) add('confidentialite', patch.confidentialite);
       if (patch.commentaireInitial !== undefined) add('commentaire_initial', patch.commentaireInitial);
-      if (patch.custom !== undefined) add('custom', JSON.stringify(late.champs ? await late.champs.valider(ctx, before, patch.custom, before.custom) : patch.custom), '::jsonb');
+      if (patch.custom !== undefined) {
+        const c = late.champs ? await late.champs.valider(ctx, before, patch.custom, before.custom) : { ...patch.custom };
+        if (before.custom?.entrainement) c.entrainement = true; else delete c.entrainement; // le marqueur du bac à sable ne s'enlève ni ne s'ajoute à la main
+        add('custom', JSON.stringify(c), '::jsonb');
+      }
       if (patch.coRedacteurs !== undefined) {
         if (before.redacteur !== ctx.username && !acl.isAdmin(ctx, org)) throw E.forbidden('Seul le rédacteur désigne ses co-rédacteurs');
         add('co_redacteurs', JSON.stringify([...new Set(patch.coRedacteurs.map((u) => u.toLowerCase()))].filter((u) => u !== before.redacteur)), '::jsonb');

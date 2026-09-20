@@ -452,6 +452,7 @@ export default function Dossier() {
           <Discussion acte={a} toast={toast} />
         </div>
         <aside className="space-y-4">
+          {a.custom?.entrainement && <div role="note" className="rounded border border-primary/30 bg-primary/5 p-3 text-[13px]"><b>Dossier d’entraînement</b> : essayez tout librement. Il ne partira jamais dans un vrai circuit et se supprime tout seul au bout de 14 jours.</div>}
           <Actions acte={a} circuit={c} reload={reloadAll} toast={toast} />
           <IaPanel acte={a} editable={editable} onApplied={acte.reload} toast={toast} />
           {a.statut === 'brouillon' || a.statut === 'modification_demandee' ? <Completude c={a.completude} /> : null}

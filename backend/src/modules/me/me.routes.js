@@ -7,7 +7,9 @@ const TourBody = z.object({
   stepsDone: z.array(z.string().max(80)).max(200).optional(),
 });
 
-module.exports = ({ makeRouter, dir, onboarding }) => {
+const Id = z.coerce.number().int().positive();
+
+module.exports = ({ makeRouter, dir, onboarding, entrainement }) => {
   const r = makeRouter('/api/v1/me');
 
   r.get('/', {
@@ -46,5 +48,12 @@ module.exports = ({ makeRouter, dir, onboarding }) => {
   r.get('/onboarding-stats', { summary: 'Mesure anonymisée des tutoriels : taux de complétion, étapes atteintes, étapes d’abandon', tags: ['me'], platform: true },
     async (req, res) => res.json({ tours: await onboarding.stats() }));
 
-  return [r];
+  // dossier d'entraînement : bac à sable de la visite guidée (UX-22)
+  const o = makeRouter('/api/v1/organismes/:orgId');
+  o.post('/entrainement', {
+    summary: 'Crée (ou retrouve) mon dossier d’entraînement : un brouillon d’exemple qui ne part jamais dans un vrai circuit', tags: ['me'], org: true, params: z.object({ orgId: Id }), responses: { 201: 'Créé' },
+    description: 'Rédaction, suivi des modifications, assistant IA et commentaires fonctionnent ; l’envoi au circuit est refusé, le dossier n’entre pas dans la recherche et se purge au bout de 14 jours.',
+  }, async (req, res) => { const r = await entrainement.creer(req.ctx, req.org.id); res.status(r.cree ? 201 : 200).json(r); });
+
+  return [r, o];
 };
