@@ -1,0 +1,11 @@
+{
+  "name": "VibeDélib — Espace des élus",
+  "short_name": "Élus",
+  "start_url": "./elus.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F2942",
+  "lang": "fr",
+  "icons": []
+}

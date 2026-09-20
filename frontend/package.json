@@ -8,7 +8,9 @@
     "dev": "vite",
     "prebuild": "node scripts/copy-pdfjs-assets.mjs",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --port 5160"
+    "preview": "vite preview --port 5160",
+    "dev:elus": "vite --config vite.elus.config.ts",
+    "build:elus": "tsc --noEmit && vite build --config vite.elus.config.ts"
   },
   "dependencies": {
     "@fontsource/source-sans-3": "^5.1.0",

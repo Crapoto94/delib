@@ -71,7 +71,7 @@ export default function PdfViewer({ blob, title, onClose }: { blob: Blob; title?
 }
 
 /** Rendu pdf.js multi-pages (mobile : les iframes PDF ne s'affichent pas ; Safari macOS : le lecteur natif ignore le zoom). */
-function CanvasPdfViewer({ source, zoom }: { source: Blob; zoom: number }) {
+export function CanvasPdfViewer({ source, zoom }: { source: Blob; zoom: number }) {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null); const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;

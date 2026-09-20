@@ -1,0 +1,12 @@
+# Conteneur DMZ de l'espace des élus. Domaine, port et adresse du backend LAN sont PARAMÉTRÉS (D23) : rien n'est écrit en dur.
+services:
+  elus-dmz:
+    build: { context: .., dockerfile: elus-dmz/Dockerfile }
+    restart: always
+    ports: ["${ELUS_DMZ_PORT:-5161}:80"]
+    environment:
+      BACKEND_HOST: ${ELUS_BACKEND_HOST:?adresse du backend VibeDélib sur le LAN}
+      BACKEND_PORT: ${ELUS_BACKEND_PORT:-3021}
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run, /tmp]
+    security_opt: ["no-new-privileges:true"]

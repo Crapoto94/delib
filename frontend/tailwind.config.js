@@ -1,6 +1,6 @@
 /** Jetons issus de stitch/ivryd_lib_r_publique_moderne/DESIGN.md */
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  content: ['./index.html', './elus.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       fontFamily: { sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'] },
