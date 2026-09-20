@@ -1,6 +1,6 @@
 {
   "name": "vibedelib-backend",
-  "version": "0.36.0",
+  "version": "0.36.1",
   "private": true,
   "description": "VibeDélib — gestion des délibérations (backend)",
   "main": "server.js",

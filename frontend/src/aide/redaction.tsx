@@ -222,9 +222,23 @@ export const redaction: Article = {
             <Li>Les <Terme>commissions</Terme> concernées donnent leur avis.</Li>
             <Li>Les élus sont <Terme>convoqués</Terme> et consultent les documents.</Li>
             <Li>Le jour de la séance, les votes sont saisis ; l'acte devient <Terme>Adopté</Terme> ou <Terme>Rejeté</Terme>.</Li>
-            <Li>Le SCC prépare ensuite l'envoi au <Terme>contrôle de légalité</Terme> (préfecture).</Li>
+            <Li>Le SCC prépare ensuite l'envoi au <Terme>contrôle de légalité</Terme> (préfecture) ; une fois l'accusé de réception reçu, l'extrait du registre est tamponné.</Li>
           </Liste>
           <P>Vous n'avez plus rien à faire : suivez l'avancement sur la fiche du dossier ou depuis le tableau de bord.</P>
+        </>
+      ),
+    },
+    {
+      id: 'r-retrouver',
+      titre: 'Retrouver un acte : « Mes actes » et « Bibliothèque »',
+      bloc: (
+        <>
+          <P>Deux rubriques distinctes, à ne pas confondre :</P>
+          <Liste>
+            <Li><Terme>Mes actes</Terme> : les dossiers où <b>vous</b> avez eu un rôle à un moment (rédacteur, valideur, remplaçant, commentaire), même terminés ou non adoptés. Ouvrez le <Terme>trajet</Terme> d'un dossier pour voir son circuit complet — qui a validé ou refusé, et quand —, les modifications, les commentaires, les amendements du conseil, le vote et la transmission.</Li>
+            <Li><Terme>Bibliothèque</Terme> : les délibérations <b>adoptées</b> de la collectivité, une fois la séance close. Tous les agents peuvent les rechercher et les consulter (texte, exposé des motifs, extrait du registre). C'est de la consultation seule : elle n'ouvre pas le trajet des dossiers.</Li>
+          </Liste>
+          <P>Les actes confidentiels ou à huis clos n'apparaissent jamais dans la bibliothèque.</P>
         </>
       ),
     },

@@ -9,6 +9,9 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.36.1 — Visite guidée et aide mises à jour
+- Visite guidée (version 2) et aide : « Mes actes », « Bibliothèque » et « Vérifier les références » sont expliqués ; la visite est reproposée à ceux qui avaient terminé la précédente.
+
 ## 0.36.0 — Listes filtrables, président de séance et date d’affichage
 - Toutes les listes déroulantes ont une zone de saisie pour filtrer les choix (dès 7 choix), utilisable au clavier.
 - Au conseil, le président de séance est le maire par défaut à l'ouverture du suivi de séance (modifiable).

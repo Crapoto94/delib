@@ -11,9 +11,15 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.36.0';
+export const VERSION = '0.36.1';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.36.1', type: 'patch', titre: 'Visite guidée et aide mises à jour',
+    items: [
+      "Visite guidée (version 2) et aide : « Mes actes », « Bibliothèque » et « Vérifier les références » sont expliqués ; la visite est reproposée à ceux qui avaient terminé la précédente.",
+    ],
+  },
   {
     version: '0.36.0', type: 'minor', titre: 'Listes filtrables, président de séance et date d’affichage',
     items: [
