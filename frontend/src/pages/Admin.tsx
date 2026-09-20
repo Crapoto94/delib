@@ -7,6 +7,8 @@ import { dt } from '../format';
 import { Badge, MailSwitch, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
 import { Gabarits, Identite, Utilisateurs } from './AdminExtra';
 import AdminGed from './AdminGed';
+import AdminTdt from './AdminTdt';
+import AdminRecherche from './AdminRecherche';
 import AdminElus from './AdminElus';
 import AdminIa from './AdminIa';
 import AgentPicker, { AgentList } from '../AgentPicker';
@@ -158,7 +160,7 @@ function Calendrier() {
 
 export default function Admin() {
   const { isAdmin, me } = useAuth();
-  const tabs = [['identite', 'Identité & logo'], ['utilisateurs', 'Utilisateurs & rôles'], ['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['gabarits', 'Gabarits PDF'], ['notifications', 'Notifications & relances'], ['ia', 'Assistant IA'], ['elus', 'Élus'], ['espace-elus', 'Espace élus'], ['ged', 'GED (Alfresco)'], ['calendrier', 'Jours fériés'], ...(me?.isPlatformAdmin ? [['collectivites', 'Collectivités']] : [])];
+  const tabs = [['identite', 'Identité & logo'], ['utilisateurs', 'Utilisateurs & rôles'], ['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['gabarits', 'Gabarits PDF'], ['notifications', 'Notifications & relances'], ['ia', 'Assistant IA'], ['elus', 'Élus'], ['espace-elus', 'Espace élus'], ['tdt', 'Télétransmission (TDT)'], ['ged', 'GED (Alfresco)'], ...(isAdmin ? [['recherche', 'Recherche']] : []), ['calendrier', 'Jours fériés'], ...(me?.isPlatformAdmin ? [['collectivites', 'Collectivités']] : [])];
   return (
     <div>
       <PageTitle title="Paramétrages" sub={isAdmin ? "Paramétrage de l'organisme." : "Paramétrage accessible au SCC."} />
@@ -168,7 +170,7 @@ export default function Admin() {
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
-        <Route path="collectivites" element={<Collectivites />} /><Route path="elus" element={<Elus />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="calendrier" element={<Calendrier />} />
+        <Route path="collectivites" element={<Collectivites />} /><Route path="elus" element={<Elus />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="calendrier" element={<Calendrier />} />
       </Routes>
     </div>
   );

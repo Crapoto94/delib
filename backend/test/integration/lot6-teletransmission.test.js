@@ -204,11 +204,36 @@ describe('retours de la préfecture : demande de pièces, refus', () => {
 
 describe('mode réel non disponible, droits', () => {
   it('hors simulation, l’envoi est refusé avec un message clair tant que l’accès à S²LOW n’est pas configuré', async () => {
-    expect((await as(admin).put(TL('/config'), { mode: 'production' })).status).toBe(200);
+    const refus = await as(admin).put(TL('/config'), { mode: 'production' });
+    expect(refus.status).toBe(409); expect(refus.body.error).toMatch(/pas encore disponible/); // refusé dès le paramétrage
+    // état hérité ou forcé en base : l'usage reste refusé avec un message clair
+    await env.c.settings.put(await env.c.access.loadContext('boot'), { scope: 'organisme', organismeId: ville.id, key: 'tlt.mode', val: 'production' });
     const r = await preparer([A4]);
-    expect(r.status).toBe(409); expect(r.body.error).toMatch(/pas encore configuré/);
+    expect(r.status).toBe(409); expect(r.body.error).toMatch(/pas encore disponible/);
     expect((await avancer()).status).toBe(409);
     expect((await as(admin).put(TL('/config'), { mode: 'simulation' })).status).toBe(200);
+  });
+
+  it('choix du tiers de télétransmission : S²LOW par défaut, FAST-Actes listé mais pas encore disponible, mot de passe chiffré et jamais renvoyé', async () => {
+    const c = (await as(admin).get(TL('/config'))).body;
+    expect(c.fournisseur).toBe('s2low');
+    expect(c.fournisseurs.map((f) => [f.code, f.disponible])).toEqual([['s2low', true], ['fast', false]]);
+    expect(c.fournisseurs[0].champs.map((x) => x.code)).toEqual(['url', 'utilisateur', 'motDePasse']);
+    const fast = await as(admin).put(TL('/config'), { fournisseur: 'fast' });
+    expect(fast.status).toBe(409); expect(fast.body.error).toMatch(/pas encore disponible/);
+    expect((await as(admin).put(TL('/config'), { fournisseur: 'inconnu' })).status).toBe(400);
+    expect((await as(t.dupont).put(TL('/config'), { fournisseur: 's2low' })).status).toBe(403);
+    const r = await as(admin).put(TL('/config'), { fournisseur: 's2low', url: 'https://s2low.ivry.local', utilisateur: 'svc-vibedelib', motDePasse: 'Secret-tres-long-2026' });
+    expect(r.status).toBe(200);
+    expect(r.body.connexionFournisseur).toEqual({ url: 'https://s2low.ivry.local', utilisateur: 'svc-vibedelib', motDePasseDefini: true });
+    expect(JSON.stringify(r.body)).not.toMatch(/Secret-tres-long/);
+    const stocke = (await env.db.get("SELECT value FROM settings WHERE key = 'tdt.s2low.mot_de_passe'")).value;
+    expect(String(stocke)).not.toMatch(/Secret-tres-long/); // chiffré au repos
+    // un second enregistrement sans mot de passe conserve l'existant
+    expect((await as(admin).put(TL('/config'), { utilisateur: 'svc2' })).body.connexionFournisseur).toMatchObject({ utilisateur: 'svc2', motDePasseDefini: true });
+    const essai = (await as(admin).post(TL('/test'))).body;
+    expect(essai).toMatchObject({ ok: true, fournisseur: 'S²LOW', mode: 'simulation' });
+    expect((await as(t.dupont).post(TL('/test'))).status).toBe(403);
   });
 
   it('les non-habilités ne voient rien ; le rôle « télétransmission » suffit', async () => {

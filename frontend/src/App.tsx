@@ -4,6 +4,7 @@ import { Loading } from './ui';
 import Layout from './Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Recherche from './pages/Recherche';
 import Dossiers from './pages/Dossiers';
 import Dossier from './pages/Dossier';
 import Admin from './pages/Admin';
@@ -25,6 +26,7 @@ export default function App() {
       {import.meta.env.DEV && <Route path="/dev/editeur" element={<DevEditor />} />}
       <Route element={me ? <Layout /> : <Navigate to="/connexion" replace />}>
         <Route index element={<Dashboard />} />
+        <Route path="recherche" element={<Recherche />} />
         <Route path="dossiers" element={<Dossiers />} />
         <Route path="dossiers/:id" element={<Dossier />} />
         <Route path="seances/*" element={<Seances />} />

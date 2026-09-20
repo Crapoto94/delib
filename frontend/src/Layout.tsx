@@ -57,6 +57,15 @@ export default function Layout() {
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
+  // raccourci « / » : place le curseur dans la recherche, sauf si on est déjà en train de saisir
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || t?.closest('input, textarea, select, [contenteditable=true]')) return;
+      e.preventDefault(); (document.getElementById('recherche-globale') as HTMLInputElement | null)?.focus();
+    };
+    document.addEventListener('keydown', h); return () => document.removeEventListener('keydown', h);
+  }, []);
   useFavicon(org ? { organismeId: org.id, nom: org.nom, hasLogo: !!org.hasLogo, logoVersion: org.logoVersion ?? null } : null);
   if (!me || !org) return null;
   return (
@@ -72,8 +81,8 @@ export default function Layout() {
             <OrgLogo orgId={org.id} nom={org.nom} hasLogo={!!org.hasLogo} version={org.logoVersion ?? null} className="h-10" />
             <span className="leading-tight"><span className="block text-[16px] font-bold text-primary">VibeDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
           </NavLink>
-          <form className="ml-auto flex min-w-0 max-w-sm flex-1 items-center rounded bg-soft px-3" onSubmit={(e) => { e.preventDefault(); nav(`/dossiers?q=${encodeURIComponent(q)}`); }}>
-            <Search className="h-4 w-4 text-mute" /><input aria-label="Rechercher un acte" className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher un acte, mot-clé…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <form className="ml-auto flex min-w-0 max-w-sm flex-1 items-center rounded bg-soft px-3" onSubmit={(e) => { e.preventDefault(); nav(`/recherche?q=${encodeURIComponent(q)}`); }}>
+            <Search className="h-4 w-4 text-mute" /><input id="recherche-globale" aria-label="Rechercher un acte" title="Raccourci : /" className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher (raccourci /)…" value={q} onChange={(e) => setQ(e.target.value)} />
           </form>
           {me.organismes.length > 1 && (
             <select aria-label="Organisme" className="input w-auto" value={org.id} onChange={(e) => { setOrg(Number(e.target.value)); nav('/'); }}>

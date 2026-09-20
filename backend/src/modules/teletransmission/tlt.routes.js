@@ -11,6 +11,9 @@ const T = ['télétransmission'];
 const Scenario = z.enum(Object.keys(SCENARIOS));
 
 const Config = z.object({
+  fournisseur: z.string().regex(/^[a-z0-9_]{2,20}$/).describe('Tiers de télétransmission : s2low (défaut), fast (à venir)'),
+  url: z.string().trim().max(300).refine((v) => v === '' || /^https?:\/\/.+/i.test(v), 'URL http(s) attendue'), utilisateur: z.string().trim().max(120),
+  motDePasse: z.string().max(200).describe('Vide : le mot de passe enregistré est conservé. Jamais renvoyé par l\'API.'),
   mode: z.enum(['simulation', 'test', 'production']), modeEnvoi: z.enum(['A', 'B']).describe('A : envoi direct ; B : préparation puis confirmation sur S²LOW (recommandé)'),
   scenario: Scenario.describe('Scénario de simulation par défaut'), siren: z.string().regex(/^\d{0,9}$/), departement: z.string().regex(/^\d{0,3}$/), arrondissement: z.string().regex(/^\d{0,1}$/),
   motif: z.string().trim().min(3).max(80).describe('Motif du numéro transmis : {ANNEE} {TYPE_SEANCE} {N_SEANCE:02} {ORDRE:03}'), doubleValidation: z.boolean(),
@@ -30,6 +33,8 @@ module.exports = ({ makeRouter, tlt }) => {
   r.get('/config', { summary: 'Paramètres de télétransmission (mode, envoi A/B, identifiants, motif du numéro, scénario de simulation)', tags: T, org: true, roles: ROLES, params: P,
     description: 'Tant que l’accès à S²LOW n’est pas obtenu (D20), le mode est « simulation » : le simulateur rejoue les réponses de S²LOW, dont les retours de la préfecture.' },
   async (req, res) => res.json(await tlt.config(req.org.id)));
+  r.post('/test', { summary: 'Teste la connexion au tiers de télétransmission choisi', tags: T, org: true, roles: ['org_admin'], params: P,
+    description: 'Ne lève pas d’erreur : renvoie `{ ok, message, fournisseur, mode }`.' }, async (req, res) => res.json(await tlt.tester(req.ctx, req.org.id)));
   r.put('/config', { summary: 'Modifie les paramètres de télétransmission', tags: T, org: true, roles: ['org_admin'], params: P, body: Config },
     async (req, res) => res.json(await tlt.setConfig(req.ctx, req.org.id, req.valid.body)));
   r.get('/tableau', { summary: 'Tableau de bord : à préparer, en attente de confirmation, en attente d’AR, en erreur, documents de la préfecture à traiter', tags: T, org: true, roles: ROLES, params: P },

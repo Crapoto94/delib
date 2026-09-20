@@ -7,7 +7,9 @@
  * (adaptateur `s2low-simulateur.js`), qui rejoue les réponses de S²LOW, dont les retours de la préfecture, pour tester toute la chaîne.
  * Les autres modes sont refusés avec un message clair jusqu'à l'obtention du certificat et de l'instance de test.
  */
+const crypto = require('crypto');
 const { E } = require('../../shared/errors');
+const tdt = require('../../adapters/tdt-catalogue');
 const { requireOrg } = require('../../db/pool');
 const { NUMERO, SCENARIOS, STATUS } = require('../../adapters/s2low-simulateur');
 
@@ -22,21 +24,31 @@ const ACTE_TRANSMIS = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre'];
 const fmt = (pattern, vars) => String(pattern).replace(/\{(\w+)(?::(\d+))?\}/g, (m, k, w) => String(vars[k] ?? '').padStart(Number(w) || 0, '0')).toUpperCase();
 const day = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
 
-function createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter, log }) {
+function createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter, log, config }) {
+  // le mot de passe du TDT est chiffré au repos (comme celui de la GED) et ne quitte jamais le serveur
+  const cle = crypto.createHash('sha256').update(`${config?.jwt?.secret || 'dev'}:tdt`).digest();
+  const chiffre = (t) => { const iv = crypto.randomBytes(12); const c = crypto.createCipheriv('aes-256-gcm', cle, iv); const enc = Buffer.concat([c.update(String(t), 'utf8'), c.final()]); return `${iv.toString('base64')}.${c.getAuthTag().toString('base64')}.${enc.toString('base64')}`; };
   const need = (ctx, org, acl) => acl; void need;
 
   async function cfgOf(org) {
     const c = await settings.resolve(org);
     const v = (k, d) => (c[k]?.value === undefined || c[k]?.value === null || c[k]?.value === '' ? d : c[k].value);
     return {
+      fournisseur: tdt.FOURNISSEURS[v('tdt.fournisseur', 's2low')] ? v('tdt.fournisseur', 's2low') : 's2low',
       mode: v('tlt.mode', 'simulation'), modeEnvoi: v('tlt.mode_envoi', 'B') === 'A' ? 'A' : 'B', scenario: SCENARIOS[v('tlt.scenario', 'nominal')] ? v('tlt.scenario', 'nominal') : 'nominal',
       siren: String(v('tlt.siren', '')), departement: String(v('tlt.departement', '094')), arrondissement: String(v('tlt.arrondissement', '')),
       motif: String(v('tlt.motif_numero', DEFAULT_MOTIF)), doubleValidation: v('tlt.double_validation', false) === true,
     };
   }
   const assertMode = (cfg) => {
-    if (cfg.mode !== 'simulation') throw E.conflict("L'accès à S²LOW n'est pas encore configuré (certificat et instance de test à obtenir) : seul le mode « simulation » est disponible pour le moment");
+    const f = tdt.FOURNISSEURS[cfg.fournisseur];
+    if (!f?.modes?.[cfg.mode]) throw E.conflict(`Le mode « ${cfg.mode} » de ${f?.nom || 'ce fournisseur'} n'est pas encore disponible (certificat et instance de test à obtenir) : seul le mode « simulation » de S²LOW l'est pour le moment`);
   };
+  /** Paramètres de connexion du fournisseur choisi (le mot de passe n'est jamais renvoyé). */
+  async function connexionDe(org, fournisseur) {
+    const c = await settings.resolve(org); const k = (x) => c[`tdt.${fournisseur}.${x}`]?.value;
+    return { url: String(k('url') || ''), utilisateur: String(k('utilisateur') || ''), motDePasseDefini: !!k('mot_de_passe') };
+  }
   const journal = (transactionId, actor, type, detail = null) => db.run('INSERT INTO tlt_journal (transaction_id, type, detail, actor) VALUES ($1,$2,$3::jsonb,$4)', [transactionId, type, detail ? JSON.stringify(detail) : null, actor]);
   const toTx = (r, extra = {}) => ({
     id: r.id, acteId: r.acte_id, seanceId: r.seance_id, itemId: r.item_id, numeroTransmis: r.numero_transmis, mode: r.mode, etat: r.etat, remoteId: r.remote_id, status: r.status,
@@ -93,7 +105,14 @@ function createTeletransmission({ db, audit, actes, render, tenue, settings, sto
     // ------------------------------------------------------------------------------------------ paramètres
     async config(organismeId) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org);
-      return { ...cfg, scenarios: Object.entries(SCENARIOS).map(([code, s]) => ({ code, label: s.label })), classification: await adapter.classification(), connexion: cfg.mode === 'simulation' ? await adapter.testConnexion() : { ok: false, message: 'Accès à S²LOW non configuré' } };
+      return { ...cfg, fournisseurs: tdt.liste().map((f) => ({ ...f, connexion: undefined })), connexionFournisseur: await connexionDe(org, cfg.fournisseur), scenarios: Object.entries(SCENARIOS).map(([code, s]) => ({ code, label: s.label })), classification: await adapter.classification(), connexion: cfg.mode === 'simulation' ? await adapter.testConnexion() : { ok: false, message: 'Accès à S²LOW non configuré' } };
+    },
+
+    /** Teste la connexion au fournisseur choisi (la simulation répond toujours ; le réel n'est pas encore ouvert). */
+    async tester(ctx, organismeId) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); const f = tdt.FOURNISSEURS[cfg.fournisseur];
+      if (cfg.mode === 'simulation' && f.modes.simulation) return { ...(await adapter.testConnexion()), fournisseur: f.nom, mode: 'simulation' };
+      return { ok: false, fournisseur: f.nom, mode: cfg.mode, message: `Le mode « ${cfg.mode} » de ${f.nom} n'est pas encore disponible : le connecteur attend le certificat et l'instance de test.` };
     },
     async setConfig(ctx, organismeId, b) {
       const org = requireOrg(organismeId);
@@ -102,7 +121,19 @@ function createTeletransmission({ db, audit, actes, render, tenue, settings, sto
         const essai = fmt(b.motif, { ANNEE: '2026', TYPE_SEANCE: 'CM', N_SEANCE: 4, ORDRE: 12 });
         if (!NUMERO.test(essai)) throw E.badRequest(`Ce motif produit « ${essai} » : le numéro transmis doit compter 15 caractères au plus, en majuscules, chiffres ou « _ »`);
       }
+      if (b.fournisseur !== undefined) {
+        const f = tdt.FOURNISSEURS[b.fournisseur];
+        if (!f) throw E.badRequest('Fournisseur de télétransmission inconnu');
+        if (!tdt.disponible(f)) throw E.conflict(`${f.nom} : connecteur pas encore disponible. Le choix reste sur S²LOW.`);
+      }
+      const fournisseur = b.fournisseur ?? (await cfgOf(org)).fournisseur; const f = tdt.FOURNISSEURS[fournisseur];
+      if (b.mode !== undefined && b.mode !== 'simulation' && !f.modes[b.mode]) throw E.conflict(`Le mode « ${b.mode} » de ${f.nom} n'est pas encore disponible (certificat et instance de test à obtenir)`);
+      if (b.fournisseur !== undefined) await settings.put(ctx, { scope: 'organisme', organismeId: org, key: 'tdt.fournisseur', val: b.fournisseur });
+      const conn = { url: 'url', utilisateur: 'utilisateur' };
+      for (const [k, sub] of Object.entries(conn)) if (b[k] !== undefined) await settings.put(ctx, { scope: 'organisme', organismeId: org, key: `tdt.${fournisseur}.${sub}`, val: String(b[k]) });
+      if (b.motDePasse) await settings.put(ctx, { scope: 'organisme', organismeId: org, key: `tdt.${fournisseur}.mot_de_passe`, val: chiffre(b.motDePasse) });
       for (const [k, key] of Object.entries(map)) if (b[k] !== undefined) await settings.put(ctx, { scope: 'organisme', organismeId: org, key, val: b[k] });
+      await audit.log(ctx, { organismeId: org, action: 'tlt.config', entity: 'settings', after: { fournisseur, mode: b.mode ?? undefined, motDePasseModifie: !!b.motDePasse } });
       return svc.config(org);
     },
 

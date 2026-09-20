@@ -37,6 +37,7 @@ const { createKpis } = require('./modules/seances/kpis.service');
 const { createTenue } = require('./modules/seances/tenue.service');
 const { createPv } = require('./modules/seances/pv.service');
 const { createGed } = require('./modules/ged/ged.service');
+const { createRecherche } = require('./modules/recherche/recherche.service');
 const { createGedSimulateur } = require('./adapters/ged-simulateur');
 const { createAlfresco } = require('./adapters/alfresco');
 const { createEluAuth } = require('./modules/espace-elus/elu-auth.service');
@@ -94,7 +95,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
   const pv = createPv({ db, audit, render, odj, tenue, actes });
   // télétransmission : le simulateur S²LOW tient lieu d'accès tant que le certificat n'est pas obtenu (D20, TLT-19) ; un adaptateur réel peut être injecté
-  const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log });
+  const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config });
   const organisation = createOrganisation({ db, titulaires, dir });
   const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
@@ -110,9 +111,11 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   bus.on('tenue.close', (p) => ged.auto(p));
   const eluAuth = createEluAuth({ db, config, mail, settings, audit, log });
   const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log });
+  const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
   const scheduler = createScheduler({ db, notifications, config, log });
+  scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

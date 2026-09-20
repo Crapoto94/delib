@@ -7,6 +7,24 @@ import { dt, STATUTS } from '../format';
 import { Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, StatutBadge, useLoad } from '../ui';
 import { AgentName } from '../AgentName';
 
+/** REC-08 : des actes proches existent déjà (dans la limite de mes droits) — consulter avant de rédiger. */
+function Similaires({ titre }: { titre: string }) {
+  const { org } = useAuth();
+  const [items, setItems] = useState<any[]>([]);
+  useEffect(() => {
+    if (titre.trim().length < 10) { setItems([]); return; }
+    const t = setTimeout(() => { api.get(orgPath(org!.id, '/recherche/similaires'), { params: { titre: titre.trim() } }).then((r) => setItems(r.data.items || [])).catch(() => setItems([])); }, 500);
+    return () => clearTimeout(t);
+  }, [titre, org]);
+  if (!items.length) return null;
+  return (
+    <div className="rounded border border-warn/40 bg-warn-bg p-3 text-[13px]" role="note">
+      <b>Des actes proches existent déjà</b> — consultez-les avant de rédiger (vous pourrez vous en inspirer) :
+      <ul className="mt-1 list-disc pl-5">{items.map((a) => <li key={a.acteId}><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${a.acteId}`} target="_blank">{a.titre}</Link> <span className="text-mute">#{a.numeroSuivi}{a.numero ? ` · ${a.numero}` : ''}</span></li>)}</ul>
+    </div>
+  );
+}
+
 function NewDossier({ onClose }: { onClose: () => void }) {
   const { org, me } = useAuth();
   const nav = useNavigate();
@@ -24,6 +42,7 @@ function NewDossier({ onClose }: { onClose: () => void }) {
         <ErrorBox msg={err} />
         <Field label="Type d'acte"><select className="input" value={typeId} onChange={(e) => setTypeId(Number(e.target.value))}>{types.data?.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}</select></Field>
         <Field label="Titre explicite de l'acte" hint="Ce titre apparaîtra sur l'ordre du jour officiel."><input className="input" autoFocus required minLength={3} value={titre} onChange={(e) => setTitre(e.target.value)} /></Field>
+        <Similaires titre={titre} />
         <p className="text-[12px] text-mute">Direction porteuse : <b>{me?.agent?.direction?.label ?? 'à préciser'}</b> (déduite de votre fiche RH).</p>
         <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || !typeId}>{busy && <Spinner />} Créer le brouillon</button></div>
       </form>

@@ -132,6 +132,9 @@ function createEspaceElus({ db, audit, settings, render, tenue, storage, cahier,
     stamp, nomOf,
 
     /** Accueil : prochaine séance, compte à rebours, documents nouveaux ou modifiés depuis la dernière lecture. */
+    /** Séances de mon espace (pour la recherche : rien d'autre n'est cherchable). */
+    async seanceIds(elu) { return (await visibles(elu)).map((v) => v.row.id); },
+
     async accueil(elu) {
       const list = await visibles(elu);
       const now = Date.now();

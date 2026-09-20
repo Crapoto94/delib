@@ -19,7 +19,9 @@ const Etat = z.object({ lu: z.boolean().optional(), favori: z.boolean().optional
 const Note = z.object({ id: Id.optional(), itemId: Id.optional(), texte: z.string().trim().min(1).max(10000), partage: z.enum(['prive', 'groupe', 'elus']).default('prive'), avec: z.array(Id).max(60).default([]) });
 const DirectQ = z.object({ since: z.coerce.number().int().min(0).default(0), wait: z.coerce.number().int().min(0).max(30).default(0) });
 
-module.exports = ({ makeRouter, limiter, eluAuth, espace }) => {
+const Recherche = z.object({ q: z.string().trim().min(2).max(200), limit: z.coerce.number().int().min(1).max(50).default(20), offset: z.coerce.number().int().min(0).default(0) });
+
+module.exports = ({ makeRouter, limiter, eluAuth, espace, recherche }) => {
   // ------------------------------------------------------------------------------------------------ authentification (publique)
   const a = makeRouter('/api/v1/elus-auth');
   a.post('/invitation/:token', { summary: 'Accepte l’invitation : choisit son mot de passe (lien reçu par mail, à usage unique)', tags: T, auth: false, limiter, params: z.object({ token: z.string().min(20).max(100) }), body: Invitation },
@@ -59,6 +61,11 @@ module.exports = ({ makeRouter, limiter, eluAuth, espace }) => {
   r.put('/points/:itemId/etat', { summary: 'Marque un point comme lu et / ou favori', tags: T, elu: true, params: ItemP, body: Etat },
     async (req, res) => res.json(await espace.marquer(req.elu, req.valid.params.itemId, req.valid.body)));
 
+  r.get('/recherche', { summary: 'Recherche dans les délibérations adoptées de mes séances (titre, objet, dispositif) : ni brouillon, ni annexe, ni note', tags: T, elu: true, query: Recherche },
+    async (req, res) => {
+      const { items, total, limit, offset, approchee } = await recherche.chercherElu(req.elu, await espace.seanceIds(req.elu), req.valid.query);
+      res.json({ items, total, limit, offset, approchee });
+    });
   r.get('/collegues', { summary: 'Élus avec qui partager une note', tags: T, elu: true }, async (req, res) => res.json(await espace.collegues(req.elu)));
   r.get('/seances/:id/notes', { summary: 'Mes notes et celles qu’on a partagées avec moi', tags: T, elu: true, params: SeanceP }, async (req, res) => res.json(await espace.notes(req.elu, req.valid.params.id)));
   r.post('/seances/:id/notes', { summary: 'Crée ou modifie une note (privée par défaut ; partage avec mon groupe ou des élus nommés)', tags: T, elu: true, params: SeanceP, body: Note, responses: { 201: 'Créée' },
