@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import { PageTitle } from '../ui';
 import { ACCES_LABEL, ARTICLES, peutVoir } from './articles';
 import { Article } from './ui';
+import Documents from './Documents';
 
 export function useAideDisponible() {
   const { isAdmin, isScc } = useAuth();
@@ -97,7 +98,7 @@ function Sommaire({ article, dispo }: { article: Article; dispo: Article[] }) {
           </NavLink>
         ))}
       </nav>
-      <nav className="card p-3" aria-label="Sommaire">
+      {article.sections.length > 0 && <nav className="card p-3" aria-label="Sommaire">
         <div className="mb-1 px-2 text-[11px] font-bold uppercase tracking-wider text-mute">Sommaire</div>
         <ol className="space-y-0.5">
           {article.sections.map((s, k) => (
@@ -108,7 +109,7 @@ function Sommaire({ article, dispo }: { article: Article; dispo: Article[] }) {
             </li>
           ))}
         </ol>
-      </nav>
+      </nav>}
       <nav className="flex items-center justify-between gap-2 text-[13px]">
         {prec ? <Link className="inline-flex items-center gap-1 font-semibold text-action" to={`/aide/${prec.code}`}><ArrowLeft className="h-4 w-4" /> {prec.titre}</Link> : <span />}
         {suiv && <Link className="inline-flex items-center gap-1 text-right font-semibold text-action" to={`/aide/${suiv.code}`}>{suiv.titre} <ArrowRight className="h-4 w-4" /></Link>}
@@ -129,12 +130,14 @@ function ArticlePage({ article, dispo }: { article: Article; dispo: Article[] })
             <div><h1 className="text-[26px] leading-tight">{article.titre}</h1><p className="mt-1 text-mute">{ACCES_LABEL[article.acces]}</p></div>
           </div>
           {article.intro}
-          {article.sections.map((s) => (
-            <section key={s.id} className="scroll-mt-28 border-t border-line pt-5 first:border-t-0">
-              <h2 id={s.id} className="scroll-mt-28 text-[20px]">{s.titre}</h2>
-              <div className="mt-3">{s.bloc}</div>
-            </section>
-          ))}
+          {article.document
+            ? <Documents />
+            : article.sections.map((s) => (
+              <section key={s.id} className="scroll-mt-28 border-t border-line pt-5 first:border-t-0">
+                <h2 id={s.id} className="scroll-mt-28 text-[20px]">{s.titre}</h2>
+                <div className="mt-3">{s.bloc}</div>
+              </section>
+            ))}
         </article>
       </div>
     </div>

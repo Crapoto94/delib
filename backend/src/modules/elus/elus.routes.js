@@ -9,7 +9,7 @@ const Flag = z.enum(['true', 'false']).transform((v) => v === 'true');
 const ListQ = z.object({ q: z.string().max(80).optional(), actif: z.enum(['true', 'false', 'all']).default('true'), groupeId: Id.optional(), estElu: Flag.optional() });
 const Elu = z.object({
   nom: z.string().trim().min(1).max(120), prenom: z.string().trim().max(120).optional(), email: z.email().optional(), telephone: z.string().max(40).optional(),
-  role: z.string().max(80).optional(), delegation: z.string().max(160).optional(), estElu: z.boolean().optional(), groupeId: Id.nullable().optional(),
+  mobile: z.string().trim().max(40).nullable().optional().describe('Mobile pour le code SMS (mot de passe oublié) ; saisi ici, jamais écrasé par la synchronisation'), role: z.string().max(80).optional(), delegation: z.string().max(160).optional(), estElu: z.boolean().optional(), groupeId: Id.nullable().optional(),
   mandatDebut: z.iso.date().nullable().optional(), mandatFin: z.iso.date().nullable().optional(),
 });
 const EluPatch = Elu.partial().extend({ actif: z.boolean().optional() });
@@ -30,6 +30,10 @@ module.exports = ({ makeRouter, elus }) => {
   r.get('/elus/:id', { summary: 'Fiche d\'un élu', tags: T, org: true, params: PI }, async (req, res) => res.json(await elus.get(req.org.id, req.valid.params.id)));
   r.put('/elus/:id', { summary: 'Modifie un élu (identité seulement pour la saisie manuelle)', tags: T, org: true, roles: ADMIN, params: PI, body: EluPatch },
     async (req, res) => res.json(await elus.update(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
+  r.delete('/elus/:id', { summary: 'Supprime un élu créé à la main, sans historique (sinon : le désactiver)', tags: T, org: true, roles: ['org_admin'], params: PI,
+    description: 'Refusé (409) pour un élu issu du Hub DSI et pour tout élu ayant un historique (présences, votes, pouvoirs, rapporteur, commissions, annotations). La désactivation, elle, survit aux synchronisations.' },
+  async (req, res) => res.json(await elus.remove(req.ctx, req.org.id, req.valid.params.id)));
 
   r.get('/groupes-politiques', { summary: 'Groupes politiques', tags: T, org: true, params: P }, async (req, res) => res.json({ items: await elus.groupes(req.org.id) }));
   r.post('/groupes-politiques', { summary: 'Crée un groupe politique', tags: T, org: true, roles: ADMIN, params: P, body: Groupe, responses: { 201: 'Créé' } },

@@ -24,6 +24,7 @@ const { createAnnexes } = require('./modules/annexes/annexes.service');
 const { createComments } = require('./modules/comments/comments.service');
 const { createTextes } = require('./modules/textes/textes.service');
 const { createRender } = require('./modules/render/render.service');
+const { createDocs } = require('./modules/docs/docs.service');
 const { createDelegations } = require('./modules/circuit/delegations.service');
 const { createEngine } = require('./modules/circuit/engine');
 const { createCircuits } = require('./modules/circuit/circuits.service');
@@ -41,6 +42,7 @@ const { createPv } = require('./modules/seances/pv.service');
 const { createGed } = require('./modules/ged/ged.service');
 const { createChamps } = require('./modules/parametrage/champs.service');
 const { createConfiguration } = require('./modules/parametrage/configuration.service');
+const { createSms } = require('./adapters/sms');
 const { createRecherche } = require('./modules/recherche/recherche.service');
 const { createAnnotations } = require('./modules/espace-elus/annotations.service');
 const { createGedSimulateur } = require('./adapters/ged-simulateur');
@@ -56,7 +58,7 @@ const { createAi } = require('./modules/ai/ai.service');
 const { createPrompts } = require('./modules/ai/prompts');
 const { createAiQueue } = require('./modules/ai/queue');
 
-function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, guard }) {
+function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, guard }) {
   assertAuthPort(ad);
   assertMailPort(mail);
   assertAiPort(aiAdapter);
@@ -89,6 +91,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const textes = createTextes({ db, audit, actes, acl, bus });
   late.texts = textes;
   const render = createRender({ db, audit, storage, refs, actes, textes, config });
+  const docs = createDocs({ render, config });
   const commissions = createCommissions({ db, audit, actes, acl, settings, bus, log, late });
   late.commissions = commissions;
   const seances = createSeances({ db, audit, actes, acl, settings, bus, late, meeting, log });
@@ -117,7 +120,8 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const ged = createGed({ db, audit, config, log, adapters: gedAdapters || { simulateur: createGedSimulateur({ db }), alfresco: createAlfresco({ tls: config.tls }) }, render, tenue, pv, tlt, storage, cahier });
   bus.on('tenue.close', (p) => ged.auto(p));
   bus.on('cahier.built', (p) => ged.auto(p)); // un cahier terminé part en GED sans attendre la clôture de la séance
-  const eluAuth = createEluAuth({ db, config, mail, settings, audit, log });
+  const sms = createSms({ db, config, settings, log, tls: config.tls, http: smsHttp });
+  const eluAuth = createEluAuth({ db, config, mail, settings, audit, log, sms });
   const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log });
   const annotations = createAnnotations({ db, audit, config, espace, settings });
   const amendements = createAmendements({ db, audit, tenue, textes });
@@ -128,7 +132,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, entrainement, amendements, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, entrainement, amendements, sms, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

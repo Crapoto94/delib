@@ -9,6 +9,7 @@ const { requireOrg } = require('../../db/pool');
 const toElu = (r) => r && ({
   id: r.id, organismeId: r.organisme_id, source: r.source, nom: r.nom, prenom: r.prenom, nomComplet: `${r.prenom} ${r.nom}`.trim(), email: r.email, telephone: r.telephone,
   role: r.role, delegation: r.delegation, estElu: r.est_elu, groupeId: r.groupe_id, groupe: r.groupe_nom ?? undefined, mandatDebut: r.mandat_debut, mandatFin: r.mandat_fin, actif: r.actif,
+  mobile: r.mobile_local || r.telephone || null, mobileLocal: r.mobile_local ?? null, desactiveManuellement: !!r.desactive_manuellement,
 });
 const toGroupe = (r) => ({ id: r.id, nom: r.nom, couleur: r.couleur, ordre: r.ordre, actif: r.actif });
 
@@ -48,9 +49,9 @@ function createElus({ db, audit, directoryAdapter, log }) {
       const org = requireOrg(organismeId);
       await svc.checkGroupe(org, b.groupeId);
       const r = await db.get(
-        `INSERT INTO elus (organisme_id, source, nom, prenom, email, telephone, role, delegation, est_elu, groupe_id, mandat_debut, mandat_fin)
-         VALUES ($1,'manual',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-        [org, b.nom, b.prenom || '', b.email?.toLowerCase() ?? null, b.telephone ?? null, b.role ?? null, b.delegation ?? null, b.estElu ?? true, b.groupeId ?? null, b.mandatDebut ?? null, b.mandatFin ?? null]);
+        `INSERT INTO elus (organisme_id, source, nom, prenom, email, telephone, role, delegation, est_elu, groupe_id, mandat_debut, mandat_fin, mobile_local)
+         VALUES ($1,'manual',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+        [org, b.nom, b.prenom || '', b.email?.toLowerCase() ?? null, b.telephone ?? null, b.role ?? null, b.delegation ?? null, b.estElu ?? true, b.groupeId ?? null, b.mandatDebut ?? null, b.mandatFin ?? null, b.mobile || null]);
       await audit.log(ctx, { organismeId: org, action: 'elu.create', entity: 'elus', entityId: r.id, after: toElu(r) });
       return toElu(r);
     },
@@ -60,15 +61,46 @@ function createElus({ db, audit, directoryAdapter, log }) {
       const org = requireOrg(organismeId);
       const before = await svc.get(org, id);
       await svc.checkGroupe(org, patch.groupeId);
-      const cols = { groupeId: 'groupe_id', mandatDebut: 'mandat_debut', mandatFin: 'mandat_fin', actif: 'actif' };
+      const cols = { groupeId: 'groupe_id', mandatDebut: 'mandat_debut', mandatFin: 'mandat_fin', actif: 'actif', mobile: 'mobile_local' };
       if (before.source === 'manual') Object.assign(cols, { nom: 'nom', prenom: 'prenom', email: 'email', telephone: 'telephone', role: 'role', delegation: 'delegation', estElu: 'est_elu' });
       else if (['nom', 'prenom', 'email', 'telephone', 'role', 'delegation', 'estElu'].some((k) => patch[k] !== undefined)) throw E.conflict("Identité issue du Hub DSI : elle n'est pas modifiable ici");
       const set = []; const p = [id, org];
-      for (const [k, col] of Object.entries(cols)) if (patch[k] !== undefined) { p.push(k === 'email' && patch[k] ? patch[k].toLowerCase() : patch[k]); set.push(`${col} = $${p.length}`); }
+      for (const [k, col] of Object.entries(cols)) if (patch[k] !== undefined) { p.push(k === 'email' && patch[k] ? patch[k].toLowerCase() : (k === 'mobile' ? (patch[k] || null) : patch[k])); set.push(`${col} = $${p.length}`); }
+      if (patch.actif !== undefined) { p.push(!patch.actif); set.push(`desactive_manuellement = $${p.length}`); } // désactivé à la main : la synchronisation ne le réactive jamais (ELU-81)
       if (!set.length) return before;
       const r = await db.get(`UPDATE elus SET ${set.join(', ')} WHERE id = $1 AND organisme_id = $2 RETURNING *`, p);
       await audit.log(ctx, { organismeId: org, action: 'elu.update', entity: 'elus', entityId: id, before, after: toElu(r) });
       return svc.get(org, id);
+    },
+
+    /**
+     * Suppression (ELU-82) : refusée pour un élu du Hub (il serait recréé : on le désactive) et pour tout élu ayant un historique.
+     * Sinon définitive ; son compte d'accès et ses sessions partent avec lui.
+     */
+    async usage(organismeId, id) {
+      const org = requireOrg(organismeId);
+      const n = async (sql) => (await db.get(sql, [id])).n;
+      return {
+        presences: await n('SELECT count(*)::int AS n FROM seance_presences WHERE elu_id = $1'),
+        votes: await n('SELECT (SELECT count(*) FROM seance_votes WHERE elu_id = $1) + (SELECT count(*) FROM seance_amendement_votes WHERE elu_id = $1) AS n'),
+        pouvoirs: await n('SELECT count(*)::int AS n FROM seance_procurations WHERE mandant_elu_id = $1 OR mandataire_elu_id = $1'),
+        actes: await n('SELECT count(*)::int AS n FROM actes WHERE rapporteur_id = $1 OR rapporteur_compl_id = $1'),
+        commissions: await n('SELECT count(*)::int AS n FROM commission_membres WHERE elu_id = $1'),
+        annotations: await n('SELECT count(*)::int AS n FROM elu_annotations WHERE elu_id = $1'),
+        _org: org,
+      };
+    },
+    async remove(ctx, organismeId, id) {
+      const org = requireOrg(organismeId);
+      const e = await svc.get(org, id);
+      if (e.source === 'hub') throw E.conflict('Élu issu du Hub DSI : il serait recréé à la prochaine synchronisation. Désactivez-le : la désactivation est conservée.');
+      const u = await svc.usage(org, id); delete u._org;
+      const libelles = { presences: 'présence(s)', votes: 'vote(s)', pouvoirs: 'pouvoir(s)', actes: 'acte(s) comme rapporteur', commissions: 'appartenance(s) à une commission', annotations: 'annotation(s)' };
+      const usages = Object.entries(u).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${libelles[k]}`);
+      if (usages.length) throw E.conflict(`Cet élu a un historique (${usages.join(', ')}) : désactivez-le plutôt que de le supprimer`);
+      await db.run('DELETE FROM elus WHERE id = $1 AND organisme_id = $2', [id, org]);
+      await audit.log(ctx, { organismeId: org, action: 'elu.delete', entity: 'elus', entityId: id, before: e });
+      return { id };
     },
 
     /** Synchronise depuis le Hub : crée les nouveaux, met à jour l'identité, désactive les absents ; ne touche jamais à la surcouche. */
@@ -84,8 +116,8 @@ function createElus({ db, audit, directoryAdapter, log }) {
           await db.run("INSERT INTO elus (organisme_id, source, external_id, nom, prenom, email, telephone, role, delegation) VALUES ($1,'hub',$2,$3,$4,$5,$6,$7,$8)",
             [org, e.externalId, e.nom, e.prenom, e.email, e.telephone, e.role, e.delegation]); created++;
         } else if (['nom', 'prenom', 'email', 'telephone', 'role', 'delegation'].some((k) => (ex[k] ?? null) !== (e[k] ?? null))) {
-          await db.run('UPDATE elus SET nom = $2, prenom = $3, email = $4, telephone = $5, role = $6, delegation = $7, actif = true WHERE id = $1', [ex.id, e.nom, e.prenom, e.email, e.telephone, e.role, e.delegation]); updated++;
-        } else if (!ex.actif) { await db.run('UPDATE elus SET actif = true WHERE id = $1', [ex.id]); updated++; }
+          await db.run('UPDATE elus SET nom = $2, prenom = $3, email = $4, telephone = $5, role = $6, delegation = $7, actif = NOT desactive_manuellement WHERE id = $1', [ex.id, e.nom, e.prenom, e.email, e.telephone, e.role, e.delegation]); updated++;
+        } else if (!ex.actif && !ex.desactive_manuellement) { await db.run('UPDATE elus SET actif = true WHERE id = $1', [ex.id]); updated++; }
       }
       const gone = (await db.all("SELECT id, external_id FROM elus WHERE organisme_id = $1 AND source = 'hub' AND actif", [org])).filter((r) => !seen.has(r.external_id));
       for (const g of gone) await db.run('UPDATE elus SET actif = false WHERE id = $1', [g.id]);

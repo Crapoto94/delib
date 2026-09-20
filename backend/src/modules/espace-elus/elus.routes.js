@@ -8,6 +8,8 @@ const Appareil = z.string().trim().min(8).max(200).optional().describe('Identifi
 const Invitation = z.object({ motDePasse: z.string().min(12).max(200) });
 const Oubli = z.object({ email: Email, organismeId: Id.optional() });
 const Connexion = z.object({ email: Email, motDePasse: z.string().min(1).max(200), appareil: Appareil, organismeId: Id.optional() });
+const OubliSms = z.object({ email: Email, organismeId: Id.optional() });
+const OubliSmsCode = z.object({ challenge: z.string().uuid(), code: z.string().regex(/^\d{6}$/), appareil: Appareil });
 const Code = z.object({ challenge: z.string().uuid(), code: z.string().regex(/^\d{6}$/), faireConfiance: z.boolean().optional(), appareil: Appareil });
 const SeanceP = z.object({ id: Id });
 const KeyP = z.object({ key: z.string().min(3).max(80).regex(/^[a-z]:\d+(:(\d+|expose|projet))?$/) });
@@ -46,6 +48,12 @@ module.exports = ({ makeRouter, limiter, eluAuth, espace, recherche, annotations
     async (req, res) => res.json(await eluAuth.accepterInvitation(req.valid.params.token, req.valid.body.motDePasse)));
   a.post('/oubli', { summary: 'Mot de passe oublié : envoie un nouveau lien (réponse toujours identique)', tags: T, auth: false, limiter, body: Oubli },
     async (req, res) => res.status(202).json(await eluAuth.oubli(req.valid.body.email, req.valid.body.organismeId)));
+  a.post('/oubli-sms', { summary: 'Mot de passe oublié : envoie un code à 6 chiffres par SMS sur le mobile de l’élu (5 minutes)', tags: T, auth: false, limiter, body: OubliSms,
+    description: 'La réponse est toujours la même (identifiant de défi et durée), que le compte existe ou non. Au plus 5 demandes par quart d’heure et par adresse ou par IP. Chaque demande est journalisée pour l’administration.' },
+  async (req, res) => res.json(await eluAuth.oubliSms({ ...req.valid.body, ip: req.ip })));
+  a.post('/oubli-sms/code', { summary: 'Mot de passe oublié : le code SMS correct (5 minutes, 3 essais) connecte l’élu avec un jeton de 12 heures', tags: T, auth: false, limiter, body: OubliSmsCode,
+    description: 'Le jeton dure exactement 12 heures ; aucun appareil de confiance n’est mémorisé. Un e-mail d’alerte est envoyé à l’élu.' },
+  async (req, res) => res.json(await eluAuth.oubliSmsCode({ ...req.valid.body, ip: req.ip })));
   a.post('/connexion', { summary: 'Connexion, étape 1 : mot de passe. Renvoie un défi (code par mail) ou, pour un appareil de confiance, la session', tags: T, auth: false, limiter, body: Connexion,
     description: 'Cinq échecs verrouillent le compte 15 minutes. Le code à 6 chiffres est valable 10 minutes.' },
   async (req, res) => res.json(await eluAuth.connexion({ ...req.valid.body, ip: req.ip })));

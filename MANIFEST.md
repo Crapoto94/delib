@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.26 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.27 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -917,6 +917,15 @@ DMZ ─────────────────── firewall : un seul
 - **ELU-75** — **Export « mon dossier annoté »** en PDF : documents de la séance dans l'ordre de lecture, **annotations incorporées** (surlignages, dessins, numéros de notes et leur texte en fin de document), **filigrane nominatif** ; désactivable par le paramètre `elus.export_annote`. Les annotations partagées avec moi n'y figurent qu'à ma demande.
 - **ELU-76** — **Suppression** par l'élu (immédiate, y compris des partages et réponses) ; **purge** de toutes les annotations d'un élu à la demande de l'administrateur (fin de mandat, RGPD). *La purge automatique à échéance reste à faire.*
 
+### 18.4 ter Gestion des élus et mot de passe oublié par SMS (D94)
+
+- **ELU-80** — **Gestion des membres en administration** (Paramétrages › Élus) : **création à la main** (élu ou **membre non élu**), **modification** (identité, courriel, mobile, rôle, groupe, mandat), **désactivation / réactivation**, **suppression**. Les élus issus du Hub restent en lecture seule pour l'identité ; leur groupe, leur mandat et leur **mobile local** se saisissent ici et **ne sont jamais écrasés** par la synchronisation.
+- **ELU-81** — **Désactivation persistante** : un élu désactivé à la main **le reste après toute synchronisation** avec le Hub (celle-ci met à jour son identité mais ne le réactive jamais) ; seule une réactivation manuelle le rétablit. Un élu absent du Hub est désactivé automatiquement, et réactivé s'il y revient — sauf désactivation manuelle.
+- **ELU-82** — **Suppression prudente** : refusée pour un élu issu du Hub (il serait recréé : on le désactive) et pour tout élu **ayant un historique** (présences, votes, pouvoirs, rapporteur d'un acte, commissions, annotations) ; le message indique alors de le désactiver. Sinon la suppression est définitive et retire son compte d'accès.
+- **ELU-83** — **« Mot de passe oublié » par SMS** sur la page de connexion de l'espace élus : l'élu saisit son adresse e-mail, reçoit un **code à 6 chiffres par SMS** sur son mobile, valable **5 minutes** (3 essais), et **est connecté** s'il le saisit correctement, avec un **jeton de 12 heures exactement** (ni appareil de confiance, ni prolongation). La réponse est toujours la même, que le compte existe ou non (pas d'énumération) ; un **e-mail d'alerte** informe l'élu de la connexion ; au plus 5 demandes par quart d'heure et par adresse ou par IP.
+- **ELU-84** — **Journal des oublis de mot de passe** (administrateur, SCC) : chaque demande, code envoyé, code refusé, expiré, compte inconnu, mobile manquant, échec d'envoi, limite atteinte et connexion réussie est enregistré (date, élu, adresse saisie, IP), avec compteurs des dernières 24 h. Aucun code n'y figure.
+- **ELU-85** — **Passerelle SMS** (`SmsPort`) : mode **simulation** par défaut (les messages sont journalisés, jamais envoyés — le code y est lisible pour les essais) et mode **passerelle HTTP** générique (URL, jeton chiffré au repos, modèle de message) ; à raccorder au fournisseur retenu.
+
 ### 18.5 Mode séance
 
 - **ELU-40** — **Point en cours** : le SCC/la présidence avance le curseur ; la tablette de l'élu **suit automatiquement** (option « suivre la séance ») ou reste libre. Accès direct au document du point.
@@ -1705,6 +1714,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D85** | **Espace élus** : API et front distincts (PDF finalisés seulement, ni notes ni saisie), authentification par invitation + mot de passe + code par mail, mise à disposition à l'envoi de la convocation, filigrane nominatif, **téléchargement en arrière-plan** (web et APK) pour un passage instantané d'un point à l'autre, lectures hors ligne synchronisées, notes personnelles partageables, suivi en direct. *(réalisé ; annotations sur PDF et service natif d'arrière-plan de l'APK : à venir)* | 18 |
 | **D90** | **Annotations sur les PDF de l'espace élus** : surlignage, note, dessin, signet ; privées par défaut, chiffrées au repos, partage figé par groupe ou par élus nommés, réponses, ré-ancrage par citation, export annoté *(ELU-71 à ELU-76)* | 18.4 |
 | **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
+| **D94** | **Gestion des élus et mot de passe oublié par SMS** : création / édition / suppression prudente, désactivation persistante après synchronisation, code SMS à 6 chiffres (5 min) → session de 12 h, journal des oublis, passerelle SMS *(ELU-80 à ELU-85)* | 18.4 ter |
 | **D93** | **Synchronisation avec la GED** : état comparé, local → GED en un clic, vérification GED → local, archivage du cahier dès sa fin *(GED-08)* | 19.5 bis |
 | **D92** | **Amendements en séance** : dépôt, vote avant le texte, application au texte avec suivi, procès-verbal *(LIVE-14, VOT-06)* | 19.1 bis |
 | **D91** | **Lot 5** : champs personnalisés (types, obligatoire, condition, droits par rôle et par étape) et export / import JSON de la configuration en deux temps, idempotent, sans secret ni personne ; modèle « commune neutre » *(PAR-10 à PAR-12)* | 25.1 |
@@ -1733,6 +1743,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.27** | 2026-09-20 | **D94** : gestion des élus, désactivation persistante, mot de passe oublié par SMS (ELU-80 à ELU-85) |
 | **1.26** | 2026-09-20 | **D93** : synchronisation GED (GED-08) |
 | **1.25** | 2026-09-20 | **D92** : amendements (LIVE-14) |
 | **1.24** | 2026-09-20 | **D91** : lot 5 (PAR-10 à PAR-12) |

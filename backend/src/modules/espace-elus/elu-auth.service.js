@@ -16,6 +16,10 @@ const same = (a, b) => { const x = Buffer.from(String(a)); const y = Buffer.from
 const cap = (x) => String(x || '').toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
 const MAX_ECHECS = 5;
 const VERROU_MIN = 15;
+const SMS_VALIDITE_MIN = 5;   // ELU-83 : le code SMS est valable 5 minutes
+const SMS_ESSAIS = 3;
+const SMS_SESSION_HEURES = 12; // ELU-83 : jeton de 12 heures exactement
+const SMS_LIMITE = 5;          // demandes par quart d'heure, par adresse ou par IP
 
 function hashPassword(pw) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -34,7 +38,7 @@ function policy(pw) {
   return null;
 }
 
-function createEluAuth({ db, config, mail, settings, audit, log }) {
+function createEluAuth({ db, config, mail, settings, audit, log, sms }) {
   const secret = crypto.createHmac('sha256', config.jwt.secret).update('vibedelib:espace-elus').digest('hex');
   const footerOf = (cfg) => ({ line1: cfg['mail.footer1']?.value, line2: cfg['mail.footer2']?.value, line3: cfg['mail.footer3']?.value, color: cfg['mail.footerColor']?.value });
   const nomOf = (e) => `${cap(e.prenom)} ${String(e.nom || '').toUpperCase()}`.trim();
@@ -52,6 +56,8 @@ function createEluAuth({ db, config, mail, settings, audit, log }) {
     await db.run('UPDATE elu_comptes SET invitation_hash = $2, invitation_expire = now() + interval \'7 days\', invite_le = now() WHERE elu_id = $1', [eluId, sha(token)]);
     return `${await baseUrl(org)}#/invitation/${token}`;
   }
+
+  const journalOubli = (o) => db.run('INSERT INTO elu_oublis (organisme_id, elu_id, email, evenement, ip, detail) VALUES ($1,$2,$3,$4,$5,$6)', [o.organismeId ?? null, o.eluId ?? null, o.email ? String(o.email).toLowerCase().slice(0, 200) : null, o.evenement, o.ip ?? null, o.detail ?? null]);
 
   const svc = {
     hashPassword, checkPassword, policy,
@@ -110,6 +116,72 @@ function createEluAuth({ db, config, mail, settings, audit, log }) {
       return { ok: true };
     },
 
+    /**
+     * « Mot de passe oublié » par SMS (ELU-83) : envoie un code à 6 chiffres sur le mobile de l'élu (5 minutes). La réponse est TOUJOURS la même
+     * (un identifiant de défi et une durée) que le compte existe ou non : aucune énumération. Chaque cas est journalisé (ELU-84).
+     */
+    async oubliSms({ email, organismeId, ip }) {
+      const mail_ = String(email || '').trim().toLowerCase();
+      const defi = crypto.randomUUID(); const reponse = { challenge: defi, expireDans: SMS_VALIDITE_MIN * 60 };
+      const org = organismeId ?? null;
+      // limite : 5 demandes par quart d'heure et par adresse, et par IP
+      const recentes = (await db.get("SELECT count(*)::int AS n FROM elu_oublis WHERE evenement = 'demande' AND at > now() - interval '15 minutes' AND (lower(email) = $1 OR ($2::text IS NOT NULL AND ip = $2))", [mail_, ip ?? null])).n;
+      await journalOubli({ organismeId: org, email: mail_, evenement: 'demande', ip });
+      if (recentes >= SMS_LIMITE) { await journalOubli({ organismeId: org, email: mail_, evenement: 'limite', ip, detail: `${recentes} demandes en 15 minutes` }); return reponse; }
+      const rows = await db.all(`SELECT c.elu_id, c.organisme_id, c.email, e.nom, e.prenom, COALESCE(e.mobile_local, e.telephone) AS mobile FROM elu_comptes c JOIN elus e ON e.id = c.elu_id
+                                 WHERE lower(c.email) = $1 AND c.actif AND e.actif ${org ? 'AND c.organisme_id = $2' : ''}`, org ? [mail_, org] : [mail_]);
+      if (rows.length !== 1) { await journalOubli({ organismeId: org, email: mail_, evenement: 'compte_inconnu', ip, detail: rows.length > 1 ? 'plusieurs collectivités' : null }); return reponse; }
+      const c = rows[0];
+      const mobile = sms.normaliserMobile(c.mobile);
+      if (!mobile) { await journalOubli({ organismeId: c.organisme_id, eluId: c.elu_id, email: mail_, evenement: 'sans_mobile', ip }); return reponse; }
+      const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+      await db.run("UPDATE elu_codes SET utilise_le = now() WHERE elu_id = $1 AND canal = 'sms' AND utilise_le IS NULL", [c.elu_id]); // un seul code valable à la fois
+      await db.run("INSERT INTO elu_codes (id, elu_id, code_hash, expire_le, canal) VALUES ($1,$2,$3, now() + ($4 || ' minutes')::interval, 'sms')", [defi, c.elu_id, sha(`${defi}:${code}`), String(SMS_VALIDITE_MIN)]);
+      try {
+        await sms.envoyer({ organismeId: c.organisme_id, mobile, message: `VibeDélib : votre code de connexion est ${code}. Valable ${SMS_VALIDITE_MIN} minutes. Ne le communiquez à personne.` });
+        await journalOubli({ organismeId: c.organisme_id, eluId: c.elu_id, email: mail_, evenement: 'code_envoye', ip, detail: sms.masquer(mobile) });
+      } catch (e) {
+        await db.run('UPDATE elu_codes SET utilise_le = now() WHERE id = $1', [defi]);
+        await journalOubli({ organismeId: c.organisme_id, eluId: c.elu_id, email: mail_, evenement: 'echec_envoi', ip, detail: String(e.message).slice(0, 200) });
+      }
+      return reponse;
+    },
+
+    /** Vérifie le code SMS (3 essais, 5 minutes) : connecte l'élu avec un jeton de 12 heures, sans appareil de confiance. */
+    async oubliSmsCode({ challenge, code, ip, appareil }) {
+      const d = await db.get("SELECT k.*, e.organisme_id, e.email FROM elu_codes k JOIN elus e ON e.id = k.elu_id WHERE k.id = $1 AND k.canal = 'sms'", [challenge]);
+      const inconnu = () => E.unauthorized('Code invalide ou expiré : demandez-en un nouveau');
+      if (!d || d.utilise_le) throw inconnu();
+      if (new Date(d.expire_le) < new Date()) { await db.run('UPDATE elu_codes SET utilise_le = now() WHERE id = $1', [challenge]); await journalOubli({ organismeId: d.organisme_id, eluId: d.elu_id, evenement: 'code_expire', email: d.email, ip }); throw inconnu(); }
+      if (d.essais >= SMS_ESSAIS) throw inconnu();
+      if (!same(sha(`${challenge}:${String(code).trim()}`), d.code_hash)) {
+        const n = d.essais + 1;
+        await db.run('UPDATE elu_codes SET essais = $2::int, utilise_le = CASE WHEN $2::int >= $3::int THEN now() ELSE utilise_le END WHERE id = $1', [challenge, n, SMS_ESSAIS]);
+        await journalOubli({ organismeId: d.organisme_id, eluId: d.elu_id, evenement: 'code_refuse', email: d.email, ip, detail: `essai ${n}/${SMS_ESSAIS}` });
+        throw E.unauthorized(n >= SMS_ESSAIS ? 'Code incorrect : trop d’essais, demandez un nouveau code' : 'Code incorrect');
+      }
+      await db.run('UPDATE elu_codes SET utilise_le = now() WHERE id = $1', [challenge]);
+      const c = await db.get('SELECT c.*, e.nom, e.prenom FROM elu_comptes c JOIN elus e ON e.id = c.elu_id WHERE c.elu_id = $1 AND c.actif AND e.actif', [d.elu_id]);
+      if (!c) throw inconnu();
+      await db.run('UPDATE elu_comptes SET echecs = 0, verrouille_jusqu = NULL WHERE elu_id = $1', [c.elu_id]); // le code prouve la possession du mobile : le verrou du mot de passe tombe
+      await journalOubli({ organismeId: c.organisme_id, eluId: c.elu_id, email: c.email, evenement: 'code_valide', ip });
+      const session = await svc._session(c, { ip, appareil, heures: SMS_SESSION_HEURES, via: 'sms' });
+      send(c.organisme_id, c.email, 'Connexion à votre espace des élus par code SMS', `<p>Bonjour ${cap(c.prenom)},</p><p>Vous venez de vous connecter à l’espace des élus avec un <b>code reçu par SMS</b> (mot de passe oublié). Cette session dure 12 heures.</p><p>Si ce n’était pas vous, prévenez le secrétariat sans attendre.</p>`).catch(() => undefined);
+      return session;
+    },
+
+    /** Journal des oublis de mot de passe (ELU-84) pour l'administration, avec compteurs des dernières 24 h. */
+    async oublis(organismeId, { evenement, limit = 100 } = {}) {
+      const org = requireOrg(organismeId);
+      const p = [org]; let w = '';
+      if (evenement) { p.push(evenement); w = 'AND o.evenement = $2'; }
+      p.push(limit);
+      const rows = await db.all(`SELECT o.id, o.evenement, o.email, o.ip, o.detail, o.at, o.elu_id, e.nom, e.prenom FROM elu_oublis o LEFT JOIN elus e ON e.id = o.elu_id
+                                 WHERE (o.organisme_id = $1 OR (o.organisme_id IS NULL AND lower(o.email) IN (SELECT lower(email) FROM elu_comptes WHERE organisme_id = $1))) ${w} ORDER BY o.id DESC LIMIT $${p.length}`, p);
+      const cpt = await db.all("SELECT evenement, count(*)::int AS n FROM elu_oublis WHERE (organisme_id = $1 OR organisme_id IS NULL) AND at > now() - interval '24 hours' GROUP BY evenement", [org]);
+      return { items: rows.map((r) => ({ id: Number(r.id), evenement: r.evenement, email: r.email, eluId: r.elu_id, elu: r.elu_id ? nomOf(r) : null, ip: r.ip, detail: r.detail, le: r.at })), dernieres24h: Object.fromEntries(cpt.map((c) => [c.evenement, c.n])) };
+    },
+
     /** Étape 1 : mot de passe. Renvoie une session (appareil de confiance) ou un défi dont le code part par mail. */
     async connexion({ email, motDePasse, appareil, organismeId, ip }) {
       const rows = await db.all('SELECT c.*, e.nom, e.prenom FROM elu_comptes c JOIN elus e ON e.id = c.elu_id WHERE lower(c.email) = lower($1) AND c.actif AND e.actif' + (organismeId ? ' AND c.organisme_id = $2' : ''), organismeId ? [email, organismeId] : [email]);
@@ -131,7 +203,7 @@ function createEluAuth({ db, config, mail, settings, audit, log }) {
 
     /** Étape 2 : code à usage unique (5 essais). `faireConfiance` mémorise l'appareil (durée paramétrable). */
     async code({ challenge, code, faireConfiance, appareil, ip }) {
-      const d = await db.get('SELECT * FROM elu_codes WHERE id = $1', [challenge]);
+      const d = await db.get("SELECT * FROM elu_codes WHERE id = $1 AND canal = 'mail'", [challenge]);
       if (!d || d.utilise_le || new Date(d.expire_le) < new Date() || d.essais >= MAX_ECHECS) throw E.unauthorized('Code invalide ou expiré : reprenez la connexion');
       if (!same(sha(`${challenge}:${String(code).trim()}`), d.code_hash)) {
         await db.run('UPDATE elu_codes SET essais = essais + 1 WHERE id = $1', [challenge]);
@@ -147,10 +219,10 @@ function createEluAuth({ db, config, mail, settings, audit, log }) {
       return svc._session(c, { ip, appareil });
     },
 
-    async _session(c, { ip, appareil }) {
-      const heures = Number((await settings.resolve(c.organisme_id))['elus.session_heures']?.value ?? 12);
+    async _session(c, { ip, appareil, heures: imposees, via = 'mot_de_passe' }) {
+      const heures = imposees ?? Number((await settings.resolve(c.organisme_id))['elus.session_heures']?.value ?? 12);
       const jti = crypto.randomUUID(); const expire = new Date(Date.now() + heures * 3600 * 1000);
-      await db.run('INSERT INTO elu_sessions (jti, elu_id, expire_le, ip, appareil) VALUES ($1,$2,$3,$4,$5)', [jti, c.elu_id, expire, ip ?? null, appareil ? sha(appareil).slice(0, 12) : null]);
+      await db.run('INSERT INTO elu_sessions (jti, elu_id, expire_le, ip, appareil, via) VALUES ($1,$2,$3,$4,$5,$6)', [jti, c.elu_id, expire, ip ?? null, appareil ? sha(appareil).slice(0, 12) : null, via]);
       await db.run('UPDATE elu_comptes SET derniere_connexion = now() WHERE elu_id = $1', [c.elu_id]);
       const token = jwt.sign({ sub: String(c.elu_id), jti, aud: 'elus' }, secret, { algorithm: 'HS256', expiresIn: Math.floor((expire.getTime() - Date.now()) / 1000) });
       return { token, tokenType: 'Bearer', expiresAt: expire.toISOString(), elu: { id: c.elu_id, nom: nomOf(c), organismeId: c.organisme_id } };

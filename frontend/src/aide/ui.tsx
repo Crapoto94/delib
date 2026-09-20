@@ -13,6 +13,7 @@ export type Article = {
   acces: Acces;
   intro: ReactNode;
   sections: Section[];
+  document?: boolean;
 };
 
 export const Intro = ({ children }: { children: ReactNode }) => <p className="mb-4 text-[15px] leading-relaxed text-slate-700">{children}</p>;

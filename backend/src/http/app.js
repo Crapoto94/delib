@@ -26,6 +26,7 @@ const MODULES = [
   require('../modules/comments/comments.routes'),
   require('../modules/textes/textes.routes'),
   require('../modules/render/render.routes'),
+  require('../modules/docs/docs.routes'),
   require('../modules/circuit/workflow.routes'),
   require('../modules/circuit/circuits.routes'),
   require('../modules/circuit/delegations.routes'),

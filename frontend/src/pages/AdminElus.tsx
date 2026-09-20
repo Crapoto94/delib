@@ -1,11 +1,70 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Mail, UserCheck, UserX } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
-import { Badge, Field, Loading, MailSwitch, useLoad, useToast } from '../ui';
+import { Badge, ErrorBox, Field, Loading, MailSwitch, Spinner, useLoad, useToast } from '../ui';
 
 const ETAT: Record<string, { label: string; tone?: 'ok' | 'warn' | 'ko' | 'blue' }> = { aucun: { label: 'Pas d’accès' }, invite: { label: 'Invité', tone: 'warn' }, actif: { label: 'Accès actif', tone: 'ok' }, desactive: { label: 'Désactivé', tone: 'ko' } };
+
+const OUBLI: Record<string, { label: string; tone?: 'ok' | 'warn' | 'ko' | 'blue' }> = {
+  demande: { label: 'Demande' }, code_envoye: { label: 'Code envoyé', tone: 'blue' }, code_valide: { label: 'Connexion réussie', tone: 'ok' }, code_refuse: { label: 'Code refusé', tone: 'warn' },
+  code_expire: { label: 'Code expiré', tone: 'warn' }, compte_inconnu: { label: 'Compte inconnu', tone: 'warn' }, sans_mobile: { label: 'Mobile manquant', tone: 'ko' },
+  echec_envoi: { label: 'Échec d’envoi', tone: 'ko' }, limite: { label: 'Limite atteinte', tone: 'ko' },
+};
+
+/** Journal des oublis de mot de passe (ELU-84) : chaque demande de code SMS et son issue. Jamais de code. */
+function JournalOublis({ o }: { o: number }) {
+  const [ev, setEv] = useState('');
+  const j = useLoad(async () => (await api.get(orgPath(o, '/espace-elus/oublis'), { params: { evenement: ev || undefined, limit: 100 } })).data, [o, ev]);
+  return (
+    <section className="card overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3"><h3>Oublis de mot de passe</h3>
+        <select className="input !w-auto" aria-label="Filtrer par événement" value={ev} onChange={(e) => setEv(e.target.value)}><option value="">Tous les événements</option>{Object.entries(OUBLI).map(([k, x]) => <option key={k} value={k}>{x.label}</option>)}</select>
+        <button className="btn-secondary !py-1" onClick={j.reload}>Actualiser</button>
+        {j.data && <span className="ml-auto flex flex-wrap gap-1 text-[12px]" title="Dernières 24 heures">{Object.entries(j.data.dernieres24h as Record<string, number>).map(([k, n]) => <Badge key={k} tone={OUBLI[k]?.tone}>{OUBLI[k]?.label ?? k} : {n}</Badge>)}</span>}</div>
+      {j.loading && !j.data ? <Loading /> : j.error ? <div className="p-4"><ErrorBox msg={j.error} /></div> : !j.data?.items.length ? <p className="p-6 text-center text-mute">Aucun oubli de mot de passe enregistré.</p> : (
+        <div className="max-h-96 overflow-auto"><table className="w-full"><thead><tr><th>Date</th><th>Événement</th><th>Élu</th><th>Adresse saisie</th><th>IP</th><th>Détail</th></tr></thead><tbody>
+          {j.data.items.map((x: any) => (
+            <tr key={x.id}><td className="whitespace-nowrap text-[12px]">{dt(x.le, { dateStyle: 'short', timeStyle: 'medium' })}</td><td><Badge tone={OUBLI[x.evenement]?.tone}>{OUBLI[x.evenement]?.label ?? x.evenement}</Badge></td>
+              <td className="font-semibold">{x.elu ?? <span className="font-normal text-mute">—</span>}</td><td className="text-[12px]">{x.email}</td><td className="font-mono text-[11px]">{x.ip}</td><td className="text-[12px] text-mute">{x.detail}</td></tr>))}
+        </tbody></table></div>)}
+      <p className="border-t border-line px-4 py-2 text-[12px] text-mute">Aucun code n’est conservé dans ce journal. Au plus 5 demandes par quart d’heure et par adresse ou par IP.</p>
+    </section>
+  );
+}
+
+/** Passerelle SMS (ELU-85) : simulation (rien n'est envoyé) ou passerelle HTTP ; le jeton est chiffré et jamais renvoyé. */
+function SmsPasserelle({ o }: { o: number }) {
+  const { toast, node } = useToast();
+  const d = useLoad(async () => (await api.get(orgPath(o, '/espace-elus/sms'))).data, [o]);
+  const [f, setF] = useState<any>(null); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (d.data) setF({ mode: d.data.config.mode, url: d.data.config.url, expediteur: d.data.config.expediteur, modele: d.data.config.modele, jeton: '' }); }, [d.data]);
+  if (!d.data || !f) return <Loading />;
+  const enregistrer = async () => {
+    setBusy(true);
+    try { await api.put(orgPath(o, '/espace-elus/sms'), { mode: f.mode, url: f.url, expediteur: f.expediteur, modele: f.modele, ...(f.jeton ? { jeton: f.jeton } : {}) }); toast('Passerelle SMS enregistrée'); d.reload(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
+  const sim = f.mode !== 'http';
+  return (
+    <section className="card space-y-3 p-5"><h3>Passerelle SMS (mot de passe oublié)</h3>
+      <p className="max-w-3xl text-mute">Quand un élu clique sur « Mot de passe oublié », un <b>code à 6 chiffres</b> part par SMS sur son mobile (valable 5 minutes ; connexion de 12 h). Renseignez le mobile de chaque élu dans <b>Élus</b>.</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Mode"><select className="input" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="simulation">Simulation (aucun SMS n’est envoyé)</option><option value="http">Passerelle HTTP</option></select></Field>
+        {!sim && <Field label="Adresse de la passerelle" hint="Passerelle SMS de la Ville : http(s)://…/api/v1/messages"><input className="input" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://…" /></Field>}
+        {!sim && <Field label="Clé d’API / jeton" hint={d.data.config.jetonDefini ? 'Enregistré (chiffré) : laissez vide pour le conserver.' : 'Envoyé en « Authorization: Bearer », chiffré au repos.'}><input className="input" type="password" autoComplete="new-password" value={f.jeton} onChange={(e) => setF({ ...f, jeton: e.target.value })} /></Field>}
+        {!sim && <Field label="Corps de la requête (JSON)" hint="Variables : {to} {message} {expediteur}. Vide : {&quot;recipient&quot;:&quot;{to}&quot;,&quot;message&quot;:&quot;{message}&quot;}"><input className="input font-mono text-[12px]" value={f.modele} onChange={(e) => setF({ ...f, modele: e.target.value })} /></Field>}
+      </div>
+      {sim && <p className="rounded bg-warn-bg px-3 py-2 text-[13px] text-warn">Mode simulation : les codes ne sont <b>pas envoyés</b> ; ils sont lisibles ci-dessous pour les essais. À ne pas utiliser en production.</p>}
+      <div className="flex justify-end"><button className="btn-primary" disabled={busy} onClick={enregistrer}>{busy && <Spinner />} Enregistrer</button></div>
+      {d.data.journal.length > 0 && (
+        <div><h3 className="mb-1 text-[13px]">Derniers messages</h3><table className="w-full"><thead><tr><th>Date</th><th>Mobile</th><th>Mode</th><th>Statut</th><th>Message</th></tr></thead><tbody>
+          {d.data.journal.slice(0, 8).map((m: any) => <tr key={m.id}><td className="whitespace-nowrap text-[12px]">{dt(m.le, { dateStyle: 'short', timeStyle: 'medium' })}</td><td className="text-[12px]">{m.mobile}</td><td>{m.mode}</td><td><Badge tone={m.statut === 'echec' ? 'ko' : 'ok'}>{m.statut}{m.erreur ? ` (${m.erreur})` : ''}</Badge></td><td className="text-[12px] text-mute">{m.message}</td></tr>)}
+        </tbody></table></div>)}
+      {node}
+    </section>
+  );
+}
 
 /** Paramétrage de l'espace élus (ELU-61 à ELU-69) : accès des élus, mise à disposition, preuve de consultation. */
 export default function AdminElus() {
@@ -55,7 +114,10 @@ export default function AdminElus() {
           <span className="text-[12px] text-mute">Qui a consulté quoi et quand (métadonnées seulement : les notes des élus ne sont jamais accessibles).</span></div>
         {cons.data && <table className="w-full"><thead><tr><th>Élu</th><th>Documents lus</th><th>Ouvertures</th><th>Première lecture</th><th>Dernière lecture</th></tr></thead><tbody>{cons.data.map((c) => (
           <tr key={c.eluId}><td className="font-semibold">{c.nom}</td><td>{c.documentsLus}</td><td>{c.ouvertures}{c.horsLigne && <span className="ml-1 text-[11px] text-mute">(dont hors ligne)</span>}</td><td className="text-[12px]">{c.premiereLecture ? dt(c.premiereLecture) : <span className="text-mute">jamais</span>}</td><td className="text-[12px]">{c.derniereLecture ? dt(c.derniereLecture) : '—'}</td></tr>))}</tbody></table>}
-      </section>{node}
+      </section>
+
+      {isAdmin && <SmsPasserelle o={o} />}
+      <JournalOublis o={o} />{node}
     </div>
   );
 }

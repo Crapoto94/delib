@@ -8,6 +8,7 @@ import { Badge, MailSwitch, Empty, ErrorBox, Field, Loading, Modal, PageTitle, u
 import { Gabarits, Identite, Utilisateurs } from './AdminExtra';
 import AdminGed from './AdminGed';
 import AdminTdt from './AdminTdt';
+import AdminMembres from './AdminMembres';
 import { AdminChamps, AdminConfiguration } from './AdminParametrage';
 import AdminRecherche from './AdminRecherche';
 import AdminElus from './AdminElus';
@@ -126,27 +127,6 @@ function Regles() {
 }
 
 /* --------------------------------------------------------------------------------------------------------- élus */
-function Elus() {
-  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
-  const list = useLoad(async () => (await api.get(orgPath(o, '/elus'))).data.items as any[], [o]);
-  const [f, setF] = useState({ nom: '', prenom: '', email: '', role: '' });
-  const add = async (e: FormEvent) => { e.preventDefault(); try { await api.post(orgPath(o, '/elus'), { nom: f.nom, prenom: f.prenom, email: f.email || undefined, role: f.role || undefined }); setF({ nom: '', prenom: '', email: '', role: '' }); list.reload(); } catch (x) { toast(errMsg(x), 'ko'); } };
-  const sync = async () => { try { const r = (await api.post(orgPath(o, '/elus/synchronisation'))).data; toast(`Hub : ${r.created} nouveau(x), ${r.updated} mis à jour, ${r.deactivated} désactivé(s)`); list.reload(); } catch (x) { toast(errMsg(x), 'ko'); } };
-  return (
-    <div className="space-y-6">
-      <form onSubmit={add} className="card grid gap-3 p-5 md:grid-cols-5 md:items-end">
-        <Field label="Nom"><input className="input" required value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} /></Field>
-        <Field label="Prénom"><input className="input" value={f.prenom} onChange={(e) => setF({ ...f, prenom: e.target.value })} /></Field>
-        <Field label="Courriel"><input className="input" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
-        <Field label="Rôle"><input className="input" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} placeholder="Adjoint(e), conseiller(ère)…" /></Field>
-        <div className="flex gap-2"><button className="btn-primary">Ajouter</button><button type="button" className="btn-secondary" onClick={sync}><RefreshCw className="h-3.5 w-3.5" /> Hub</button></div>
-      </form>
-      <div className="card">{list.loading ? <Loading /> : !list.data?.length ? <Empty>Aucun élu. Ajoutez-en ou synchronisez depuis le Hub DSI.</Empty> : (
-        <table className="w-full"><thead><tr><th>Nom</th><th>Rôle</th><th>Courriel</th><th>Source</th></tr></thead><tbody>{list.data.map((e) => <tr key={e.id}><td className="font-semibold">{e.nomComplet}</td><td>{e.role}</td><td>{e.email}</td><td><Badge tone={e.source === 'hub' ? 'blue' : 'gray'}>{e.source}</Badge></td></tr>)}</tbody></table>)}</div>{node}
-    </div>
-  );
-}
-
 /* --------------------------------------------------------------------------------------------------- jours fériés */
 function Calendrier() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
@@ -171,7 +151,7 @@ export default function Admin() {
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
-        <Route path="collectivites" element={<Collectivites />} /><Route path="elus" element={<Elus />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="calendrier" element={<Calendrier />} />
+        <Route path="collectivites" element={<Collectivites />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="calendrier" element={<Calendrier />} />
       </Routes>
     </div>
   );
