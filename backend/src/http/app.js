@@ -36,6 +36,7 @@ const MODULES = [
   require('../modules/seances/odj.routes'),
   require('../modules/seances/cahier.routes'),
   require('../modules/seances/kpis.routes'),
+  require('../modules/convocations/convocations.routes'),
   require('../modules/users/users.routes'),
   require('../modules/ai/ai.routes'),
 ];

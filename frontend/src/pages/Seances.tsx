@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
 import Odj from './Odj';
+import Convocation from './Convocation';
 import { TeamsLink } from '../Reunions';
 import { CalendarDays, Plus } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
@@ -96,5 +97,5 @@ function SeancesList() {
 }
 
 export default function Seances() {
-  return <Routes><Route index element={<SeancesList />} /><Route path=":id" element={<Odj />} /></Routes>;
+  return <Routes><Route index element={<SeancesList />} /><Route path=":id" element={<Odj />} /><Route path=":id/convocation" element={<Convocation />} /></Routes>;
 }

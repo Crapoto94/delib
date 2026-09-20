@@ -34,6 +34,7 @@ const { createDeadlines } = require('./modules/seances/deadlines.service');
 const { createOdj } = require('./modules/seances/odj.service');
 const { createCahier } = require('./modules/seances/cahier.service');
 const { createKpis } = require('./modules/seances/kpis.service');
+const { createConvocations } = require('./modules/convocations/convocations.service');
 const { createUsers } = require('./modules/users/users.service');
 const { createAi } = require('./modules/ai/ai.service');
 const { createAiQueue } = require('./modules/ai/queue');
@@ -77,6 +78,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   late.odj = odj;
   const cahier = createCahier({ db, audit, render, odj, storage, log });
   const kpis = createKpis({ db, odj, seances });
+  const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
   const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log, queue: aiQueue });
   const users = createUsers({ db, audit, dir, organismes, access, log });
@@ -85,7 +87,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
   const scheduler = createScheduler({ db, notifications, config, log });
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, users, ai, aiQueue };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, convocations, users, ai, aiQueue };
 }
 
 module.exports = { buildContainer };

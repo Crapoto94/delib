@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, BookOpen, Download, GripVertical, Lock, Plus, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Download, Mail, GripVertical, Lock, Plus, Trash2, Undo2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -89,6 +89,7 @@ export default function Odj() {
         sub={<span>{meta.data?.teams && <span className="mr-2"><TeamsLink teams={meta.data.teams} /></span>}Format de numérotation : <code>{d.pattern}</code> · <Badge tone={arrete ? 'ok' : 'warn'}>{arrete ? `arrêté le ${dt(d.arreteAt, { dateStyle: 'short' })}` : 'en préparation — numéros provisoires'}</Badge>{d.lock && <span className="ml-2 inline-flex items-center gap-1 text-warn"><Lock className="h-3.5 w-3.5" /> en cours de modification par {d.lock.username}</span>}</span>}
         actions={<>
           {canEdit && meta.data && meta.data.statut !== 'annulee' && <button className="btn-secondary" onClick={() => setTeamsOpen(true)}>Teams…</button>}
+          {canEdit && meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/convocation`}><Mail className="h-4 w-4" /> Convocation</Link>}
           {canEdit && meta.data?.kind !== 'commission' && <button className="btn-secondary" onClick={() => setCahierOpen(true)}><BookOpen className="h-4 w-4" /> Cahier de séance</button>}
           <button className="btn-secondary" onClick={exportCsv}><Download className="h-4 w-4" /> Tableau de suivi (CSV)</button>
           {canEdit && !arrete && <button className="btn-secondary" onClick={() => previewPattern(d.pattern)}>Numérotation…</button>}

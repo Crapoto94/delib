@@ -66,20 +66,13 @@ export default function Layout() {
           <button className="rounded bg-white px-3 py-1 text-warn" onClick={stopActAs}>Revenir à mon compte ({me.impersonation.by})</button>
         </div>)}
       <header className="sticky top-0 z-30 border-b border-line bg-white">
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-2 md:px-8">
+        <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2 md:px-8">
           <NavLink to="/" className="flex items-center gap-2">
             <OrgLogo orgId={org.id} nom={org.nom} hasLogo={!!org.hasLogo} version={org.logoVersion ?? null} className="h-10" />
             <span className="leading-tight"><span className="block text-[16px] font-bold text-primary">VibeDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
           </NavLink>
-          <nav className="ml-2 flex flex-wrap gap-1" aria-label="Navigation principale">
-            <NavLink to="/" end className={tab}>Tableau de bord</NavLink>
-            <NavLink to="/dossiers" className={tab}>Actes & Dossiers</NavLink>
-            <NavLink to="/seances" className={tab}>Séances & Ordre du jour</NavLink>
-            <NavLink to="/commissions" className={tab}>Commissions</NavLink>
-            {(isAdmin || isScc) && <NavLink to="/admin" className={tab}>Administration</NavLink>}
-          </nav>
-          <form className="ml-auto flex items-center rounded bg-soft px-3" onSubmit={(e) => { e.preventDefault(); nav(`/dossiers?q=${encodeURIComponent(q)}`); }}>
-            <Search className="h-4 w-4 text-mute" /><input aria-label="Rechercher un acte" className="w-52 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher un acte, mot-clé…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <form className="ml-auto flex min-w-0 max-w-sm flex-1 items-center rounded bg-soft px-3" onSubmit={(e) => { e.preventDefault(); nav(`/dossiers?q=${encodeURIComponent(q)}`); }}>
+            <Search className="h-4 w-4 text-mute" /><input aria-label="Rechercher un acte" className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher un acte, mot-clé…" value={q} onChange={(e) => setQ(e.target.value)} />
           </form>
           {me.organismes.length > 1 && (
             <select aria-label="Organisme" className="input w-auto" value={org.id} onChange={(e) => { setOrg(Number(e.target.value)); nav('/'); }}>
@@ -102,6 +95,15 @@ export default function Layout() {
             </div>}
           </div>
         </div>
+        <div className="border-t border-line"><div className="mx-auto max-w-[1400px] px-4 md:px-8">
+        <nav className="flex gap-1 overflow-x-auto py-1" aria-label="Navigation principale">
+            <NavLink to="/" end className={tab}>Tableau de bord</NavLink>
+            <NavLink to="/dossiers" className={tab}>Actes & Dossiers</NavLink>
+            <NavLink to="/seances" className={tab}>Séances & Ordre du jour</NavLink>
+            <NavLink to="/commissions" className={tab}>Commissions</NavLink>
+            {(isAdmin || isScc) && <NavLink to="/admin" className={tab}>Administration</NavLink>}
+          </nav>
+        </div></div>
       </header>
       <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8"><Outlet /></main>
       <PdfViewerHost />
