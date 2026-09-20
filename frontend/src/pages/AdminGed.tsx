@@ -6,14 +6,16 @@ import { dt } from '../format';
 import { Badge, ErrorBox, Field, Loading, MailSwitch, Spinner, useLoad, useToast } from '../ui';
 
 /** Explorateur du plan de classement : on descend dossier par dossier (fil d'Ariane), les PDF s'ouvrent dans la visionneuse. */
-function Explorateur({ o, rev }: { o: number; rev: number }) {
+function Explorateur({ o, rev, mode, racine }: { o: number; rev: number; mode: string; racine: string }) {
   const [pile, setPile] = useState<{ id: string | null; nom: string }[]>([{ id: null, nom: 'Racine du dépôt' }]);
   const cur = pile[pile.length - 1];
   const liste = useLoad(async () => (await api.get(orgPath(o, '/ged/explorateur'), { params: cur.id ? { nodeId: cur.id } : {} })).data.items as any[], [o, cur.id, rev]);
   const { toast } = useToast();
+  const alfresco = mode === 'alfresco';
   return (
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-center gap-1 border-b border-line px-4 py-2 text-[13px]">
+        <span className="mr-2 inline-flex items-center gap-2"><Badge tone={alfresco ? 'blue' : 'warn'}>{alfresco ? 'Alfresco' : 'Simulation'}</Badge><span className="text-[11px] text-mute">{alfresco ? (racine && racine !== '-root-' ? `Dossier racine : ${racine}` : 'Dossier racine : Company Home') : 'Arborescence simulée dans VibeDélib (aucun serveur)'}</span></span>
         {pile.map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3.5 w-3.5 text-mute" />}<button className={i === pile.length - 1 ? 'font-semibold' : 'text-action hover:underline'} onClick={() => setPile(pile.slice(0, i + 1))}>{p.nom}</button></span>)}
       </div>
       {liste.loading ? <Loading /> : liste.error ? <p className="p-4 text-ko">{liste.error}</p> : !liste.data?.length ? <p className="p-6 text-center text-mute">Dossier vide.</p> : (
@@ -54,7 +56,7 @@ function StockageFichiers({ o, rev, onDone }: { o: number; rev: number; onDone: 
   if (!d) return e.error ? <ErrorBox msg={e.error} /> : <Loading />;
   const m = d.migration;
   return (
-    <section className="card space-y-3 p-5"><h3>Stockage des fichiers</h3>
+    <section className="card space-y-3 p-5"><h3 className="flex items-center gap-2">Stockage des fichiers <Badge tone={d.stockage === 'alfresco' ? 'blue' : 'ok'}>{d.stockage === 'alfresco' ? 'Alfresco' : 'Volume local'}</Badge></h3>
       <p className="max-w-4xl text-mute">Où sont enregistrés <b>tous les fichiers de l’application</b> : annexes déposées, pièces de l’ordre du jour, convocations, cahiers de séance, PDF produits, logo. Avec Alfresco, ils sont rangés dans <b>« 90 Stockage applicatif »</b> (noms techniques : ne pas les modifier à la main). Ceci est indépendant de l’<b>archivage</b> organisé ci-dessous.</p>
       <div className="grid gap-3 md:grid-cols-2" role="radiogroup" aria-label="Stockage des fichiers">
         {([['local', 'Volume local du serveur', 'Simple et rapide ; à sauvegarder avec la base.'], ['alfresco', 'Alfresco (GED)', 'Les fichiers vivent dans la GED, sauvegardée et gouvernée avec le reste. Exige une GED active et validée.']] as const).map(([k, titre, desc]) => (
@@ -141,7 +143,7 @@ export default function AdminGed() {
     <div className="space-y-6">
       <p className="max-w-4xl text-mute">Tous les documents des séances (convocation, dossiers de chaque délibération, cahier, procès-verbal, extraits du registre, accusés de réception) peuvent être <b>archivés dans une GED Alfresco</b>, classés dans un <b>plan de classement</b> numéroté par année et par séance. Un document modifié devient une <b>nouvelle version</b> du même nœud, jamais un doublon.</p>
 
-      <section className="card space-y-4 p-5"><h3>Connexion</h3>
+      <section className="card space-y-4 p-5"><h3 className="flex items-center gap-2">Connexion <Badge tone={cfg.data.mode === 'alfresco' ? 'blue' : 'warn'}>{cfg.data.mode === 'alfresco' ? `Alfresco${cfg.data.url ? ` · ${cfg.data.url}` : ''}` : 'Simulation (aucun serveur)'}</Badge></h3>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Mode" hint="La simulation garde une arborescence factice dans VibeDélib : elle permet de tout tester sans serveur Alfresco."><select className="input" value={v.mode} onChange={(e) => set({ mode: e.target.value })}><option value="simulation">Simulation (aucun serveur)</option><option value="alfresco">Alfresco</option></select></Field>
           <Field label="Dossier racine" hint="Identifiant de nœud, ou chemin relatif à Company Home (ex. /Sites/archives/documentLibrary). Vide : racine du dépôt."><input className="input" value={v.racine === '-root-' ? '' : v.racine} placeholder="Racine du dépôt" onChange={(e) => set({ racine: e.target.value })} disabled={!alf} /></Field>
@@ -163,11 +165,11 @@ export default function AdminGed() {
           </div>)}
       </section>
 
-      <section className="card space-y-3 p-5"><h3>Plan de classement</h3>
+      <section className="card space-y-3 p-5"><h3 className="flex items-center gap-2">Plan de classement <Badge tone={cfg.data.mode === 'alfresco' ? 'blue' : 'warn'}>{cfg.data.mode === 'alfresco' ? 'Dans Alfresco' : 'Simulation (dans VibeDélib)'}</Badge></h3>
         <p className="text-[13px] text-mute">Crée l’arborescence <code>VibeDélib — Collectivité / 01 Séances / année / date Instance / …</code> et <code>02 Registre des délibérations / année</code>, avec la finalité et la durée de conservation indicative de chaque dossier (à valider par le service des archives). L’opération peut être rejouée sans risque : ce qui existe n’est jamais recréé.</p>
         <div className="flex items-center gap-3"><button className="btn-primary" disabled={busy === 'plan'} onClick={creerPlan}>{busy === 'plan' ? <Spinner /> : <FolderPlus className="h-4 w-4" />} Créer le plan de classement</button>{cfg.data.planCreeLe && <span className="text-[12px] text-mute">Dernière création : {dt(cfg.data.planCreeLe)}</span>}</div>
         {plan && <div className="rounded bg-soft p-3 text-[12px]"><b>{plan.nouveaux ? `${plan.nouveaux} dossier(s) créé(s)` : 'Plan déjà complet'}</b>{plan.nouveaux > 0 && <ul className="mt-1 max-h-40 overflow-y-auto font-mono text-[11px]">{plan.dossiers.map((d: string) => <li key={d}>{d}</li>)}</ul>}</div>}
-        <Explorateur o={o} rev={rev} />
+        <Explorateur o={o} rev={rev} mode={cfg.data.mode} racine={cfg.data.racine} />
       </section>
 
       <StockageFichiers o={o} rev={rev} onDone={() => setRev((n) => n + 1)} />
