@@ -16,9 +16,12 @@ const champ = 'input !py-3 !text-[16px]';
 /** Connexion en deux étapes : mot de passe, puis code à usage unique reçu par mail (ELU-61). */
 export function Connexion() {
   const nav = useNavigate();
-  const [email, setEmail] = useState(''); const [mdp, setMdp] = useState(''); const [defi, setDefi] = useState<string | null>(null); const [code, setCode] = useState('');
+  // « Se souvenir de moi » : seule l'adresse e-mail est conservée dans ce navigateur, jamais le mot de passe
+  const memo = (() => { try { return localStorage.getItem('elus.email') || ''; } catch { return ''; } })();
+  const [souvenir, setSouvenir] = useState(!!memo);
+  const [email, setEmail] = useState(memo); const [mdp, setMdp] = useState(''); const [defi, setDefi] = useState<string | null>(null); const [code, setCode] = useState('');
   const [confiance, setConfiance] = useState(true); const [err, setErr] = useState<string | null>(null); const [msg, setMsg] = useState<string | null>(null); const [busy, setBusy] = useState(false);
-  const fin = (r: any) => { session.set({ token: r.token, expiresAt: r.expiresAt, elu: r.elu }); nav('/', { replace: true }); };
+  const fin = (r: any) => { try { if (souvenir) localStorage.setItem('elus.email', email.trim()); else localStorage.removeItem('elus.email'); } catch { /* stockage indisponible */ } session.set({ token: r.token, expiresAt: r.expiresAt, elu: r.elu }); nav('/', { replace: true }); };
   const etape1 = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr(null);
     try { const r = (await api.post('/elus-auth/connexion', { email, motDePasse: mdp, appareil: deviceId() })).data; if (r.session) fin(r.session); else setDefi(r.challenge); }
@@ -37,6 +40,7 @@ export function Connexion() {
         <form onSubmit={etape1} className="space-y-3">
           <label className="block"><span className="label">Adresse e-mail</span><input className={champ} type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
           <label className="block"><span className="label">Mot de passe</span><input className={champ} type="password" autoComplete="current-password" required value={mdp} onChange={(e) => setMdp(e.target.value)} /></label>
+          <label className="flex items-center gap-2 text-[14px]"><input type="checkbox" checked={souvenir} onChange={(e) => setSouvenir(e.target.checked)} /> Se souvenir de moi sur ce navigateur <span className="text-[12px] text-mute">(adresse e-mail seulement)</span></label>
           <button className="btn-primary w-full !py-3 !text-[16px]" disabled={busy}>Continuer</button>
           <button type="button" className="w-full text-center text-[13px] text-action" onClick={oubli}>Mot de passe oublié ?</button>
         </form>
