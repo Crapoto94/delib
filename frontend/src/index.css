@@ -86,6 +86,18 @@
   tbody tr:hover > td { background-color: rgb(var(--c-soft) / 0.55); }
 }
 
+/* Barres de défilement (UI-03) : fines, arrondies, teintées par le thème ; le menu latéral sombre a la sienne */
+* { scrollbar-width: thin; scrollbar-color: rgb(var(--c-s400) / 0.55) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: rgb(var(--c-s400) / 0.5); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--c-action) / 0.75); }
+*::-webkit-scrollbar-corner { background: transparent; }
+aside nav { scrollbar-color: rgba(255,255,255,0.28) transparent; }
+aside nav::-webkit-scrollbar { width: 8px; }
+aside nav::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.25); }
+aside nav::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.5); }
+
 /* Barre d'accent des cartes de synthèse et fil de couleur sous l'en-tête */
 .accent-bar { height: 3px; background: linear-gradient(90deg, rgb(var(--c-action)), rgb(var(--c-azur)) 55%, rgb(var(--c-ok))); }
 
