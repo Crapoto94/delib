@@ -49,7 +49,7 @@ export default function ConvocationPublique() {
   return (
     <Shell>
       <div className="mx-auto max-w-2xl space-y-4">
-        <div className="flex items-center gap-3"><OrgLogo orgId={d.organisme.id} nom={d.organisme.nom} hasLogo={d.organisme.hasLogo} version={d.organisme.logoVersion} className="h-14" /><div><div className="text-[12px] uppercase tracking-wider text-mute">{d.organisme.nom}</div><h1 className="text-[22px] font-bold text-primary">{c.modificatif ? 'Convocation modifiée' : 'Convocation'}</h1></div></div>
+        <div className="flex items-center gap-3"><OrgLogo orgId={d.organisme.id} nom={d.organisme.nom} hasLogo={d.organisme.hasLogo} version={d.organisme.logoVersion} className="h-14" /><div><div className="text-[12px] uppercase tracking-wider text-mute">{d.organisme.nom}</div><h1 className="text-[22px] font-bold text-head">{c.modificatif ? 'Convocation modifiée' : 'Convocation'}</h1></div></div>
         {d.remplacee && <div role="status" className="rounded border border-warn/30 bg-warn-bg px-4 py-3 text-warn">Une version plus récente de cette convocation (v{d.remplacee.version}) a été envoyée : consultez le dernier mail reçu.</div>}
         {d.seance.annulee && <div role="alert" className="rounded border border-ko/30 bg-ko-bg px-4 py-3 text-ko">Cette séance a été annulée.</div>}
         <section className="card p-5">
@@ -67,13 +67,13 @@ export default function ConvocationPublique() {
           <section className="card p-5"><h3>Modifications de l'ordre du jour</h3><ul className="mt-2 list-disc pl-5 text-[14px]">{c.differences.ajoutes.map((x: string) => <li key={`a${x}`}>Ajouté : {x}</li>)}{c.differences.retires.map((x: string) => <li key={`r${x}`}>Retiré : {x}</li>)}</ul></section>)}
         <section className="card p-5"><h3>Ordre du jour</h3>
           <ol className="mt-2 space-y-2 text-[14px]">{d.ordreDuJour.map((p: any, i: number) => p.kind === 'chapitre'
-            ? <li key={i} className="pt-2 text-[12px] font-bold uppercase tracking-wider text-primary">{p.titre}</li>
-            : <li key={i} className="flex gap-3"><span className="w-24 shrink-0 font-mono text-[13px] font-bold text-primary">{p.numero ?? '·'}</span><span className="min-w-0"><b>{p.titre}</b>{p.rapporteur && <span className="block text-[12px] text-mute">Rapporteur : {p.rapporteur}{p.rubrique ? ` · ${p.rubrique}` : ''}</span>}
+            ? <li key={i} className="pt-2 text-[12px] font-bold uppercase tracking-wider text-head">{p.titre}</li>
+            : <li key={i} className="flex gap-3"><span className="w-24 shrink-0 font-mono text-[13px] font-bold text-head">{p.numero ?? '·'}</span><span className="min-w-0"><b>{p.titre}</b>{p.rapporteur && <span className="block text-[12px] text-mute">Rapporteur : {p.rapporteur}{p.rubrique ? ` · ${p.rubrique}` : ''}</span>}
                 {p.description && <span className="mt-1 block whitespace-pre-wrap text-[13px] text-slate-700">{p.description}</span>}
                 {p.fichiers?.length > 0 && <span className="mt-1 flex flex-wrap gap-2">{p.fichiers.map((f: any) => <button key={f.id} className="inline-flex items-center gap-1 rounded-full bg-soft px-3 py-1 text-[12px] font-semibold hover:bg-slate-200" onClick={() => piece(f)}><Paperclip className="h-3.5 w-3.5" />{f.titre}</button>)}</span>}</span></li>)}</ol></section>
         <section className="card p-5">
           <h3>Votre réponse</h3>
-          {d.reponse && <p className="mt-2 rounded bg-emerald-50 px-3 py-2 text-ok">Vous avez répondu : <b>{d.reponse.reponse === 'present' ? 'présent(e)' : 'absent(e) excusé(e)'}</b> le {dt(d.reponse.at, { dateStyle: 'short', timeStyle: 'short' })}. Vous pouvez la modifier.</p>}
+          {d.reponse && <p className="mt-2 rounded bg-ok-bg px-3 py-2 text-ok">Vous avez répondu : <b>{d.reponse.reponse === 'present' ? 'présent(e)' : 'absent(e) excusé(e)'}</b> le {dt(d.reponse.at, { dateStyle: 'short', timeStyle: 'short' })}. Vous pouvez la modifier.</p>}
           <textarea className="input mt-3 min-h-[60px]" placeholder="Commentaire (facultatif)" value={commentaire} maxLength={500} onChange={(e) => setCommentaire(e.target.value)} />
           <div className="mt-3 flex flex-wrap gap-2">
             <button className="btn-ok" disabled={d.seance.annulee} onClick={() => post('/reponse', { reponse: 'present', commentaire }).catch((e) => setMsg(e.message))}>Je serai présent(e)</button>

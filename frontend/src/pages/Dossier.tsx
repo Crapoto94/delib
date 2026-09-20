@@ -45,9 +45,9 @@ function Frise({ circuit }: { circuit: any }) {
         n += 1;
         const cur = p.state === 'current' || (enRedaction && p.key === items[0].key); const done = p.state === 'done'; const implicite = done && p.instance?.decision === 'auto';
         return (
-          <li key={p.key} className={`min-w-[150px] flex-1 rounded-lg border p-3 ${cur ? 'border-primary bg-primary text-white' : done ? 'border-ok/30 bg-white' : 'border-line bg-white/60'}`}>
+          <li key={p.key} className={`min-w-[150px] flex-1 rounded-lg border p-3 ${cur ? 'border-primary bg-primary text-white' : done ? 'border-ok/30 bg-surface' : 'border-line bg-white/60'}`}>
             <div className="flex items-center gap-2">
-              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${done ? 'bg-ok text-white' : cur ? 'bg-action text-white ring-4 ring-action/30' : 'bg-line text-slate-600'}`}>{done ? <Check className="h-3.5 w-3.5" /> : n}</span>
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${done ? 'bg-ok-solid text-white' : cur ? 'bg-action-solid text-white ring-4 ring-action/30' : 'bg-line text-slate-600'}`}>{done ? <Check className="h-3.5 w-3.5" /> : n}</span>
               <span className="truncate text-[12px] font-bold">{p.label}</span>
             </div>
             <div className={`mt-1 truncate text-[11px] ${cur ? 'text-white/80' : 'text-mute'}`}>
@@ -168,8 +168,8 @@ function Textes({ acte, editable, onChanged, toast }: { acte: any; editable: boo
           const d = dels.find((x: any) => x.id === t.deliberationId);
           const md = previews.data?.[t.id] ?? '';
           return (
-            <button key={t.id} onClick={() => setOpen(t.id)} className="block w-full rounded-lg border border-line bg-white p-4 text-left hover:border-action hover:shadow-lift" aria-label={`Ouvrir ${KIND_LABEL[t.kind]}`}>
-              <div className="mb-1 flex items-center gap-2"><h4 className="text-[15px] font-bold text-primary">{KIND_LABEL[t.kind]}{d && dels.length > 1 ? ` — délibération ${d.ordre}` : ''}</h4>
+            <button key={t.id} onClick={() => setOpen(t.id)} className="block w-full rounded-lg border border-line bg-surface p-4 text-left hover:border-action hover:shadow-lift" aria-label={`Ouvrir ${KIND_LABEL[t.kind]}`}>
+              <div className="mb-1 flex items-center gap-2"><h4 className="text-[15px] font-bold text-head">{KIND_LABEL[t.kind]}{d && dels.length > 1 ? ` — délibération ${d.ordre}` : ''}</h4>
                 {t.empty ? <Badge tone="warn">à rédiger</Badge> : <Badge tone="ok">v{t.version}</Badge>}{t.tracking && <Badge tone="blue">suivi actif</Badge>}<span className="ml-auto text-[12px] font-semibold text-action">{editable ? 'Modifier' : 'Ouvrir'} →</span></div>
               {md ? <div className="line-clamp-4 text-[14px] leading-[22px] text-slate-700" dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} /> : <p className="text-mute">Cliquez pour rédiger ce texte.</p>}
             </button>);
@@ -207,7 +207,7 @@ function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toas
             <span className="flex h-10 w-10 items-center justify-center rounded bg-ko-bg text-[10px] font-bold text-ko">PDF</span>
             <div className="min-w-0 flex-1"><div className="truncate font-semibold">{a.titre}</div><div className="text-[12px] text-mute">{a.fichier.pages} p. · {(a.fichier.taille / 1048576).toFixed(1)} Mo · v{a.version} · {a.createdBy}</div></div>
             {a.communicable && <Badge tone="ok">Communicable</Badge>}
-            <button className="text-slate-600 hover:text-primary" aria-label="Télécharger" onClick={() => download(a)}><Download className="h-5 w-5" /></button>
+            <button className="text-slate-600 hover:text-head" aria-label="Télécharger" onClick={() => download(a)}><Download className="h-5 w-5" /></button>
             {editable && <button className="text-slate-600 hover:text-ko" aria-label="Supprimer" onClick={async () => { if (confirm(`Supprimer « ${a.titre} » ?`)) { await api.delete(orgPath(o, `/actes/${acte.id}/annexes/${a.id}`)); list.reload(); } }}><Trash2 className="h-5 w-5" /></button>}
           </li>))}</ul>
       )}
@@ -418,7 +418,7 @@ function ActesProches({ acte }: { acte: any }) {
   if (!l.data?.length) return null;
   return (
     <div className="card p-5"><h3 className="mb-2">Actes proches</h3>
-      <ul className="space-y-2 text-[13px]">{l.data.map((x) => <li key={x.acteId}><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${x.acteId}`}>{x.titre}</Link><div className="text-[11px] text-mute">#{x.numeroSuivi}{x.numero ? ` · délibération ${x.numero}` : ''}</div></li>)}</ul>
+      <ul className="space-y-2 text-[13px]">{l.data.map((x) => <li key={x.acteId}><Link className="font-semibold text-head hover:underline" to={`/dossiers/${x.acteId}`}>{x.titre}</Link><div className="text-[11px] text-mute">#{x.numeroSuivi}{x.numero ? ` · délibération ${x.numero}` : ''}</div></li>)}</ul>
     </div>
   );
 }

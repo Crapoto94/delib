@@ -11,9 +11,17 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.31.0';
+export const VERSION = '0.32.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.32.0', type: 'minor', titre: 'Nouveau design, mode sombre et menu latéral des paramétrages',
+    items: [
+      "Interface plus colorée et plus contrastée (bandeau de navigation bleu, cartes, tableaux et badges renforcés), inspirée des maquettes Stitch.",
+      "Mode sombre : Automatique (suit l'appareil), Clair ou Sombre, depuis le bouton de l'en-tête ou le menu utilisateur ; aussi dans l'espace des élus.",
+      "Paramétrages : menu latéral à gauche, groupé par thèmes, avec fil d'Ariane.",
+    ],
+  },
   {
     version: '0.31.0', type: 'minor', titre: 'Alertes de recherche et amendements dans l’espace élus',
     items: [

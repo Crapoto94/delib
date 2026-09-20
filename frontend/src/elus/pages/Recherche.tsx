@@ -23,7 +23,7 @@ export default function Recherche() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-5">
       <Link to="/" className="mb-3 inline-flex items-center gap-1 text-[13px] text-action"><ArrowLeft className="h-4 w-4" /> Retour</Link>
-      <form onSubmit={submit} className="mb-4 flex items-center gap-2 rounded bg-white p-2 shadow-card" role="search">
+      <form onSubmit={submit} className="mb-4 flex items-center gap-2 rounded bg-surface p-2 shadow-card" role="search">
         <Search className="ml-1 h-5 w-5 text-mute" />
         <input aria-label="Rechercher une délibération" className="min-w-0 flex-1 bg-transparent px-1 py-2 outline-none" autoFocus placeholder="Rechercher une délibération adoptée…" value={saisie} onChange={(e) => setSaisie(e.target.value)} />
         <button className="btn-primary" disabled={busy}>Chercher</button>
@@ -34,8 +34,8 @@ export default function Recherche() {
           <p className="mb-2 text-[13px] text-mute">{res.total} délibération{res.total > 1 ? 's' : ''} adoptée{res.total > 1 ? 's' : ''}{res.approchee ? ' (résultats approchants)' : ''}</p>
           <ul className="space-y-2">
             {res.items.map((r: any) => (
-              <li key={r.acteId} className="rounded bg-white p-4 shadow-card">
-                <Link to={`/seances/${r.seanceId}`} className="font-semibold text-primary hover:underline">{r.titre}</Link>
+              <li key={r.acteId} className="rounded bg-surface p-4 shadow-card">
+                <Link to={`/seances/${r.seanceId}`} className="font-semibold text-head hover:underline">{r.titre}</Link>
                 <div className="mt-0.5 text-[12px] text-mute">{r.numero ? `Délibération ${r.numero} · ` : ''}{r.instance}{r.dateSeance ? ` du ${dt(r.dateSeance)}` : ''}{r.resultat ? ` · ${r.resultat.libelle}` : ''}</div>
                 {/* extrait échappé côté serveur : seules les balises <mark> subsistent */}
                 {r.extrait && <p className="mt-2 text-[13px] [&_mark]:rounded [&_mark]:bg-yellow-200 [&_mark]:px-0.5" dangerouslySetInnerHTML={{ __html: r.extrait }} />}

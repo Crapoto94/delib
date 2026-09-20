@@ -20,7 +20,7 @@ function Similaires({ titre }: { titre: string }) {
   return (
     <div className="rounded border border-warn/40 bg-warn-bg p-3 text-[13px]" role="note">
       <b>Des actes proches existent déjà</b> — consultez-les avant de rédiger (vous pourrez vous en inspirer) :
-      <ul className="mt-1 list-disc pl-5">{items.map((a) => <li key={a.acteId}><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${a.acteId}`} target="_blank">{a.titre}</Link> <span className="text-mute">#{a.numeroSuivi}{a.numero ? ` · ${a.numero}` : ''}</span></li>)}</ul>
+      <ul className="mt-1 list-disc pl-5">{items.map((a) => <li key={a.acteId}><Link className="font-semibold text-head hover:underline" to={`/dossiers/${a.acteId}`} target="_blank">{a.titre}</Link> <span className="text-mute">#{a.numeroSuivi}{a.numero ? ` · ${a.numero}` : ''}</span></li>)}</ul>
     </div>
   );
 }
@@ -62,7 +62,7 @@ export default function Dossiers() {
     <div>
       <PageTitle title="Actes & Dossiers" sub="Retrouvez, rédigez et suivez vos actes." actions={<button data-tour="nouveau-dossier" className="btn-primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nouveau dossier</button>} />
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div role="tablist" className="flex rounded bg-white p-1 shadow-card">
+        <div role="tablist" className="flex rounded bg-surface p-1 shadow-card">
           {[['mine', 'Mes dossiers'], ['following', 'Ceux que je suis'], ['all', 'Tous ceux que je peux voir']].map(([k, l]) => (
             <button key={k} role="tab" aria-selected={scope === k} onClick={() => set('scope', k)} className={`rounded px-3 py-2 text-[13px] font-semibold ${scope === k ? 'bg-primary text-white' : 'text-slate-700'}`}>{l}</button>
           ))}
@@ -76,7 +76,7 @@ export default function Dossiers() {
             {list.data.items.map((a: any) => (
               <tr key={a.id} className="hover:bg-soft">
                 <td className="font-mono text-[12px]">#{a.numeroSuivi}</td>
-                <td><Link to={`/dossiers/${a.id}`} className="font-semibold text-primary hover:underline">{a.titre}</Link></td>
+                <td><Link to={`/dossiers/${a.id}`} className="font-semibold text-head hover:underline">{a.titre}</Link></td>
                 <td className="text-mute">{a.direction?.label}</td><td><AgentName u={a.redacteur} /></td><td><StatutBadge statut={a.statut} /></td><td className="text-mute">{dt(a.updatedAt, { dateStyle: 'short' })}</td>
               </tr>))}
           </tbody></table>

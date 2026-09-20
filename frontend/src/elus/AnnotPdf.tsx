@@ -96,7 +96,7 @@ function Page({ pdf, num, anns, mode, couleur, selected, onCreate, onSelect, onT
 
   const surcouche = mode === 'dessin' || mode === 'note' || mode === 'signet';
   return (
-    <div ref={wrap} className="relative w-full select-none bg-white shadow-card" data-page={num} onPointerUp={(e) => { if (e.pointerType !== 'touch') onSelection(); }}>
+    <div ref={wrap} className="relative w-full select-none bg-surface shadow-card" data-page={num} onPointerUp={(e) => { if (e.pointerType !== 'touch') onSelection(); }}>
       <canvas ref={canvas} className="block w-full" />
       {/* texte invisible : sert à sélectionner (surlignage) */}
       <div className={`absolute inset-0 overflow-hidden ${mode === 'surligner' ? 'select-text' : 'pointer-events-none'}`} style={{ lineHeight: 1 }}>
@@ -141,7 +141,7 @@ function PartageModal({ seanceId, docKey, ann, onClose, onDone }: { seanceId: nu
   };
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-900/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Partager mes annotations">
-      <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-float">
+      <div className="w-full max-w-md rounded-xl bg-surface p-4 shadow-float">
         <div className="mb-3 flex items-center justify-between"><h2 className="text-[16px]">Partager</h2><button onClick={onClose} aria-label="Fermer" className="rounded p-1 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
         {err && <p role="alert" className="mb-2 text-[13px] text-ko">{err}</p>}
         <fieldset className="mb-3 space-y-1 text-[14px]"><legend className="mb-1 text-[12px] font-semibold uppercase text-mute">Quoi</legend>
@@ -167,7 +167,7 @@ function Fiche({ a, onClose, onChange, onShare }: { a: Ann; onClose: () => void;
   const Icone = ICONE[a.kind];
   const agir = async (f: () => Promise<unknown>) => { setErr(null); try { await f(); onChange(); } catch (e) { setErr(errMsg(e)); } };
   return (
-    <div className="rounded-lg border border-line bg-white p-3 text-[14px]">
+    <div className="rounded-lg border border-line bg-surface p-3 text-[14px]">
       <div className="flex items-center gap-2 text-[12px] text-mute"><Icone className="h-4 w-4" style={{ color: a.couleur }} /><span className="font-semibold text-ink">{LIBELLE[a.kind]}</span><span>page {a.page}</span>
         {a.orpheline && <span className="rounded bg-warn-bg px-1.5 py-0.5 font-semibold text-warn">orpheline</span>}
         <button className="ml-auto rounded p-1 hover:bg-slate-100" onClick={onClose} aria-label="Fermer la fiche"><X className="h-4 w-4" /></button></div>
@@ -276,7 +276,7 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100 }: { blo
   if (!pdf) return <div className="flex flex-1 items-center justify-center p-10 text-mute"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-1 border-b border-line bg-white px-2 py-1.5" role="toolbar" aria-label="Outils d’annotation">
+      <div className="flex flex-wrap items-center gap-1 border-b border-line bg-surface px-2 py-1.5" role="toolbar" aria-label="Outils d’annotation">
         {OUTILS.map(([m, l, I]) => <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m} className={`inline-flex items-center gap-1 rounded px-2.5 py-2 text-[13px] font-semibold ${mode === m ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}><I className="h-4 w-4" /><span className="hidden sm:inline">{l}</span></button>)}
         <span className="mx-1 flex items-center gap-1" role="group" aria-label="Couleur">{COULEURS.map((c) => <button key={c} aria-label={`Couleur ${c}`} aria-pressed={couleur === c} onClick={() => setCouleur(c)} className={`h-5 w-5 rounded-full border ${couleur === c ? 'ring-2 ring-slate-800 ring-offset-1' : ''}`} style={{ background: c }} />)}</span>
         <button className="ml-auto inline-flex items-center gap-1 rounded px-2.5 py-2 text-[13px] font-semibold hover:bg-slate-100" onClick={() => setPanneau(!panneau)} aria-expanded={panneau}><PanelRight className="h-4 w-4" /> Annotations ({anns.length})</button>
@@ -284,7 +284,7 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100 }: { blo
       {/* consignes en surimpression : elles ne décalent jamais la page (le geste tombe toujours où on vise) */}
       {mode !== 'lire' && <div className="pointer-events-none relative z-30 h-0"><div className="pointer-events-auto mx-auto flex w-fit max-w-[92%] items-center gap-3 rounded-b-lg bg-slate-900/85 px-3 py-1 text-[12px] text-white shadow" role="status">
         {mode === 'surligner' ? 'Sélectionnez du texte pour le surligner.' : mode === 'dessin' ? 'Dessinez au doigt ou au stylet sur la page.' : 'Touchez la page à l’endroit voulu.'}
-        {mode === 'surligner' && selTexte && <button className="rounded bg-white px-2 py-0.5 font-semibold text-slate-900" onClick={surlignerSelection}>Surligner la sélection</button>}</div></div>}
+        {mode === 'surligner' && selTexte && <button className="rounded bg-surface px-2 py-0.5 font-semibold text-ink" onClick={surlignerSelection}>Surligner la sélection</button>}</div></div>}
       {msg && <p role="alert" className="flex items-center bg-ko-bg px-3 py-1 text-[12px] text-ko">{msg}<button className="ml-auto" onClick={() => setMsg(null)} aria-label="Fermer"><X className="h-3.5 w-3.5" /></button></p>}
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 flex-1 space-y-2 overflow-auto bg-slate-100 p-2">
@@ -293,7 +293,7 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100 }: { blo
           </div>
         </div>
         {panneau && (
-          <aside className="w-full max-w-sm shrink-0 space-y-2 overflow-y-auto border-l border-line bg-white p-2 max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-30 max-sm:max-w-full" aria-label="Annotations du document">
+          <aside className="w-full max-w-sm shrink-0 space-y-2 overflow-y-auto border-l border-line bg-surface p-2 max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-30 max-sm:max-w-full" aria-label="Annotations du document">
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary !py-1.5 text-[12px]" onClick={() => setPartage({ ann: null })}><Share2 className="h-3.5 w-3.5" /> Partager…</button>
               <button className="btn-secondary !py-1.5 text-[12px]" onClick={exporter}><Download className="h-3.5 w-3.5" /> Mon dossier annoté</button>
@@ -310,7 +310,7 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100 }: { blo
       </div>
       {brouillon && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-900/50 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={brouillon.kind === 'note' ? 'Nouvelle note' : 'Nouveau signet'}>
-          <div className="w-full max-w-md rounded-xl bg-white p-4 shadow-float">
+          <div className="w-full max-w-md rounded-xl bg-surface p-4 shadow-float">
             <h2 className="mb-2 text-[16px]">{brouillon.kind === 'note' ? 'Nouvelle note' : 'Nouveau signet'} — page {brouillon.page}</h2>
             <textarea className="input !text-[15px]" rows={4} autoFocus placeholder={brouillon.kind === 'note' ? 'Votre note…' : 'Nom du signet…'} value={brouillon.texte} onChange={(e) => setBrouillon({ ...brouillon, texte: e.target.value })} />
             <p className="mt-1 text-[12px] text-mute">Privée : vous pourrez la partager ensuite.</p>

@@ -8,6 +8,7 @@ import Accueil from './pages/Accueil';
 import Seance from './pages/Seance';
 import { Connexion, Invitation } from './pages/Acces';
 import Recherche from './pages/Recherche';
+import { ThemeToggle } from '../theme';
 
 function Cadre() {
   const nav = useNavigate();
@@ -17,11 +18,12 @@ function Cadre() {
   if (!session.token()) return <Navigate to="/connexion" replace />;
   return (
     <div className="min-h-screen bg-page">
-      <header className="flex h-14 items-center gap-3 border-b border-line bg-white px-4">
-        <span className="font-bold text-primary">VibeDélib</span><span className="text-[13px] text-mute">Espace des élus</span>
-        <span className="ml-auto hidden text-[13px] text-mute sm:inline">{elu?.nom}</span>
-        <button className="rounded p-2 text-mute hover:bg-slate-100" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
-        <button className="rounded p-2 text-mute hover:bg-slate-100" onClick={sortir} aria-label="Me déconnecter" title="Me déconnecter"><LogOut className="h-5 w-5" /></button>
+      <header className="border-b border-primary-deep/40 bg-gradient-to-r from-nav-from to-nav-to text-white shadow-lift"><div className="accent-bar" aria-hidden="true" /><div className="flex h-14 items-center gap-3 px-4">
+        <span className="font-bold">VibeDélib</span><span className="text-[13px] text-white/70">Espace des élus</span>
+        <span className="ml-auto hidden text-[13px] text-white/80 sm:inline">{elu?.nom}</span>
+        <button className="rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
+        <button className="rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={sortir} aria-label="Me déconnecter" title="Me déconnecter"><LogOut className="h-5 w-5" /></button>
+      <ThemeToggle className="text-white/80 hover:bg-white/10 hover:text-white" /></div>
       </header>
       <Outlet />
       <PdfViewerHost />

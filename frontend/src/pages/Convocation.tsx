@@ -17,12 +17,12 @@ function Kpi({ icon, title, value, sub, tone }: { icon: ReactNode; title: string
   return (
     <div className="card p-4">
       <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-mute">{icon}{title}</div>
-      <div className={`mt-1 text-[26px] font-bold leading-tight ${tone === 'ko' ? 'text-ko' : tone === 'ok' ? 'text-ok' : tone === 'warn' ? 'text-warn' : 'text-primary'}`}>{value}</div>
+      <div className={`mt-1 text-[26px] font-bold leading-tight ${tone === 'ko' ? 'text-ko' : tone === 'ok' ? 'text-ok' : tone === 'warn' ? 'text-warn' : 'text-head'}`}>{value}</div>
       {sub && <div className="mt-1 text-[12px] text-mute">{sub}</div>}
     </div>
   );
 }
-const Bar = ({ pct }: { pct: number }) => <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-action" style={{ width: `${pct}%` }} /></div>;
+const Bar = ({ pct }: { pct: number }) => <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-action-solid" style={{ width: `${pct}%` }} /></div>;
 
 /** Convocation d'une séance : envoi aux élus et aux agents de la Ville, lien personnel par convoqué, suivi (qui a lu quoi), journal et statistiques. */
 export default function Convocation() {
@@ -49,9 +49,9 @@ export default function Convocation() {
       {!versions.data?.length ? <Empty>Aucune convocation envoyée pour cette séance.</Empty> : (
         <>
           <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Versions">
-            {versions.data.map((v) => <button key={v.id} role="tab" aria-selected={cur === v.version} onClick={() => setN(v.version)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${cur === v.version ? 'border-primary bg-primary text-white' : 'border-line bg-white'}`}>
+            {versions.data.map((v) => <button key={v.id} role="tab" aria-selected={cur === v.version} onClick={() => setN(v.version)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${cur === v.version ? 'border-primary bg-primary text-white' : 'border-line bg-surface'}`}>
               {v.modificatif ? 'Modificatif' : 'Convocation'} v{v.version} · {dt(v.creeLe, { dateStyle: 'short' })}</button>)}
-            <span className="ml-auto flex rounded bg-soft p-0.5">{(['suivi', 'journal'] as const).map((k) => <button key={k} className={`rounded px-3 py-1 text-[12px] font-semibold ${tab === k ? 'bg-white shadow-card' : ''}`} onClick={() => setTab(k)}>{k === 'suivi' ? 'Suivi et statistiques' : 'Journal'}</button>)}</span>
+            <span className="ml-auto flex rounded bg-soft p-0.5">{(['suivi', 'journal'] as const).map((k) => <button key={k} className={`rounded px-3 py-1 text-[12px] font-semibold ${tab === k ? 'bg-surface shadow-card' : ''}`} onClick={() => setTab(k)}>{k === 'suivi' ? 'Suivi et statistiques' : 'Journal'}</button>)}</span>
           </div>
           {cur && (tab === 'suivi' ? <Suivi root={root} n={cur} version={versions.data.find((v) => v.version === cur)} newest={versions.data[0].version} reload={versions.reload} toast={toast} /> : <Journal root={root} n={cur} />)}
         </>)}
@@ -96,9 +96,9 @@ function Suivi({ root, n, version, newest, reload, toast }: { root: string; n: n
             <div className="flex h-32 items-end gap-2" role="img" aria-label="Histogramme des consultations par jour">{s.chronologie.map((c: any) => (
               <div key={c.jour} className="flex min-w-[28px] flex-1 flex-col items-center justify-end" title={`${c.jour} : ${c.ouvertures} ouverture(s), ${c.convocation} convocation(s), ${c.odj} ordre(s) du jour`}>
                 <div className="flex w-full flex-col-reverse overflow-hidden rounded-t" style={{ height: `${((c.ouvertures + c.convocation + c.odj) / max) * 100}%` }}>
-                  <div className="bg-slate-300" style={{ flex: c.ouvertures }} /><div className="bg-action" style={{ flex: c.convocation }} /><div className="bg-emerald-500" style={{ flex: c.odj }} /></div>
+                  <div className="bg-slate-300" style={{ flex: c.ouvertures }} /><div className="bg-action-solid" style={{ flex: c.convocation }} /><div className="bg-emerald-500" style={{ flex: c.odj }} /></div>
                 <div className="mt-1 text-[10px] text-mute">{c.jour.slice(5)}</div></div>))}</div>); })()}
-          <div className="mt-2 flex gap-3 text-[11px] text-mute"><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-slate-300" />ouvertures</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-action" />convocation</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-500" />ordre du jour</span></div>
+          <div className="mt-2 flex gap-3 text-[11px] text-mute"><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-slate-300" />ouvertures</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-action-solid" />convocation</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-500" />ordre du jour</span></div>
         </section>
         <section className="card p-4"><h3 className="mb-2 text-[14px]">Par public</h3>
           <table className="w-full text-[13px]"><thead><tr><th>Public</th><th>Convoqués</th><th>Convocation lue</th><th>Ordre du jour lu</th><th>Réponses</th></tr></thead><tbody>
@@ -109,7 +109,7 @@ function Suivi({ root, n, version, newest, reload, toast }: { root: string; n: n
 
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3"><h3 className="text-[14px]">Convoqués</h3>
-          <div className="flex gap-1">{([['tous', 'Tous'], ['non_lecteurs', `Non-lecteurs (${s.nonLecteurs.length})`], ['elus', 'Élus'], ['agents', 'Agents']] as const).map(([k, l]) => <button key={k} onClick={() => setFiltre(k)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${filtre === k ? 'border-primary bg-primary text-white' : 'border-line bg-white'}`}>{l}</button>)}</div>
+          <div className="flex gap-1">{([['tous', 'Tous'], ['non_lecteurs', `Non-lecteurs (${s.nonLecteurs.length})`], ['elus', 'Élus'], ['agents', 'Agents']] as const).map(([k, l]) => <button key={k} onClick={() => setFiltre(k)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${filtre === k ? 'border-primary bg-primary text-white' : 'border-line bg-surface'}`}>{l}</button>)}</div>
           <span className="ml-auto flex gap-2">
             {n === newest && <button className="btn-secondary !py-1" disabled={busy || !s.nonLecteurs.length} onClick={() => relancer('non_lecteurs')}>{busy && <Spinner />}<BellRing className="h-3.5 w-3.5" /> Relancer les non-lecteurs ({s.nonLecteurs.length})</button>}
             <button className="btn-secondary !py-1" onClick={csv}><Download className="h-3.5 w-3.5" /> Preuve (CSV)</button></span>

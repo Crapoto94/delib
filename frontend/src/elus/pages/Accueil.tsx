@@ -40,15 +40,15 @@ export default function Accueil() {
           <p className="text-white/90">{dt(pr.dateSeance, { dateStyle: 'full', timeStyle: 'short' })}{pr.lieu ? ` · ${pr.lieu}` : ''}</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <span className="rounded bg-white/15 px-3 py-1 text-[14px] font-bold">{pr.joursRestants > 0 ? `J-${pr.joursRestants}` : pr.joursRestants === 0 ? 'Aujourd’hui' : 'En cours'}</span>
-            {pr.nonLus > 0 && <span className="rounded bg-warn px-3 py-1 text-[13px] font-semibold">{pr.nonLus} document(s) à consulter</span>}
+            {pr.nonLus > 0 && <span className="rounded bg-warn-solid px-3 py-1 text-[13px] font-semibold">{pr.nonLus} document(s) à consulter</span>}
             <span className="bg-white/95 rounded-full"><EtatTelechargement /></span>
           </div>
-          <Link to={`/seances/${pr.id}`} className="mt-4 inline-block rounded-lg bg-white px-5 py-3 text-[16px] font-bold text-primary">Ouvrir les documents de la séance</Link>
+          <Link to={`/seances/${pr.id}`} className="mt-4 inline-block rounded-lg bg-surface px-5 py-3 text-[16px] font-bold text-head">Ouvrir les documents de la séance</Link>
         </section>
-      ) : <section className="rounded-xl border border-line bg-white p-6 text-mute">Aucune séance n’est à votre disposition pour le moment. Vous serez prévenu(e) par e-mail à l’envoi de la convocation.</section>}
+      ) : <section className="rounded-xl border border-line bg-surface p-6 text-mute">Aucune séance n’est à votre disposition pour le moment. Vous serez prévenu(e) par e-mail à l’envoi de la convocation.</section>}
       <section>
         <h2 className="mb-2 text-[18px]">Mes séances</h2>
-        <ul className="divide-y divide-line rounded-xl border border-line bg-white">
+        <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
           {a.seances.map((s: any) => (
             <li key={s.id}><Link to={`/seances/${s.id}`} className="flex items-center gap-3 px-4 py-4 hover:bg-soft"><CalendarDays className="h-5 w-5 text-action" />
               <div className="min-w-0 flex-1"><div className="font-semibold">{s.instance}</div><div className="text-[13px] text-mute">{dt(s.dateSeance, { dateStyle: 'full', timeStyle: 'short' })}</div></div>

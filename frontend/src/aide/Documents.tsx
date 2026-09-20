@@ -25,7 +25,7 @@ function RenduMarkdown({ md }: { md: string }) {
     if (niveau === 1) return; // le titre du document est déjà affiché par la carte
     noeuds.push(niveau === 2
       ? <h3 key={noeuds.length} className="mt-6">{m[2]}</h3>
-      : <h4 key={noeuds.length} className="mt-4 text-[15px] font-bold text-primary">{m[2]}</h4>);
+      : <h4 key={noeuds.length} className="mt-4 text-[15px] font-bold text-head">{m[2]}</h4>);
   });
   vider();
   return <div>{noeuds}</div>;
@@ -59,7 +59,7 @@ export default function Documents() {
         <section key={d.kind} className="card p-5">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileCode2 className="h-5 w-5" /></span>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-head"><FileCode2 className="h-5 w-5" /></span>
               <div><h2 className="text-[18px]">{d.titre}</h2><p className="text-[13px] text-mute">{d.resume}</p></div>
             </div>
             <div className="flex gap-2">

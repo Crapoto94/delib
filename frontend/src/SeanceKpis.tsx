@@ -29,14 +29,14 @@ function Card({ icon, title, value, sub, tone, onClick, active }: { icon: ReactN
   const cls = `card p-4 text-left ${onClick ? 'cursor-pointer transition hover:shadow-float' : ''} ${active ? 'ring-2 ring-action' : ''}`;
   const body = (<>
     <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-mute">{icon}{title}</div>
-    <div className={`mt-1 text-[28px] font-bold leading-tight ${tone === 'ko' ? 'text-ko' : tone === 'ok' ? 'text-ok' : tone === 'warn' ? 'text-warn' : 'text-primary'}`}>{value}</div>
+    <div className={`mt-1 text-[28px] font-bold leading-tight ${tone === 'ko' ? 'text-ko' : tone === 'ok' ? 'text-ok' : tone === 'warn' ? 'text-warn' : 'text-head'}`}>{value}</div>
     {sub && <div className="mt-1 text-[12px] text-mute">{sub}</div>}
     {onClick && <div className="mt-2 text-[11px] font-semibold text-action">{active ? 'Masquer le détail' : 'Voir le détail'}</div>}
   </>);
   return onClick ? <button type="button" className={cls} onClick={onClick} aria-expanded={active}>{body}</button> : <div className={cls}>{body}</div>;
 }
 
-const Bar = ({ pct, cls = 'bg-action' }: { pct: number; cls?: string }) => (
+const Bar = ({ pct, cls = 'bg-action-solid' }: { pct: number; cls?: string }) => (
   <div className="h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div className={`h-full rounded-full ${cls}`} style={{ width: `${pct}%` }} /></div>
 );
 
@@ -47,9 +47,9 @@ function ActesTable({ items }: { items: Item[] }) {
     <table className="w-full"><thead><tr><th>N°</th><th>Dossier</th><th>Direction</th><th>État</th><th>Étape et valideurs</th><th>Échéance</th></tr></thead><tbody>
       {items.map((a) => (
         <tr key={a.acteId} className={a.enRetard ? 'bg-ko-bg/40' : ''}>
-          <td className="whitespace-nowrap">{a.numero ? <span className="font-mono text-[13px] font-bold text-primary" title="Numéro à l'ordre du jour (provisoire tant que l'ordre du jour n'est pas arrêté)">{a.numero}</span> : <span className="text-mute" title="Pas encore à l'ordre du jour">—</span>}
+          <td className="whitespace-nowrap">{a.numero ? <span className="font-mono text-[13px] font-bold text-head" title="Numéro à l'ordre du jour (provisoire tant que l'ordre du jour n'est pas arrêté)">{a.numero}</span> : <span className="text-mute" title="Pas encore à l'ordre du jour">—</span>}
             <div className="text-[11px] text-mute">dossier #{a.numeroSuivi}</div></td>
-          <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${a.acteId}`}>{a.titre}</Link>{a.dansOdj && <span className="ml-2 align-middle"><Badge tone="ok">à l'ordre du jour</Badge></span>}</td>
+          <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${a.acteId}`}>{a.titre}</Link>{a.dansOdj && <span className="ml-2 align-middle"><Badge tone="ok">à l'ordre du jour</Badge></span>}</td>
           <td className="text-[12px] text-mute">{a.direction}</td>
           <td><Badge tone={ETAT[a.etat].tone}>{ETAT[a.etat].label}</Badge></td>
           <td className="text-[12px]">{a.etape ?? '—'}{a.holders.length > 0 && <div className="text-mute">chez <AgentNames list={a.holders} /></div>}</td>
@@ -112,8 +112,8 @@ export default function SeanceKpis({ seanceId, rev }: { seanceId: number; rev: s
               className={`card p-3 text-left ${c.restants.length ? 'cursor-pointer hover:shadow-float' : ''} ${is('commission', c.id) ? 'ring-2 ring-action' : ''}`}>
               <div className="flex items-start justify-between gap-2"><b className="text-[13px] leading-tight">{c.nom}</b>
                 {c.prochaineReunion ? <Badge tone={c.prochaineReunion.jours <= 7 ? 'warn' : 'blue'}>{cd(c.prochaineReunion.jours)}</Badge> : <Badge>pas de réunion</Badge>}</div>
-              <div className="mt-2 text-[12px] text-mute"><b className="text-[15px] text-primary">{c.termines}</b> / {c.prevus} actes terminés (avis rendu)</div>
-              <div className="mt-1"><Bar pct={c.tauxRealisation} cls={c.tauxRealisation === 100 ? 'bg-emerald-500' : 'bg-action'} /></div>
+              <div className="mt-2 text-[12px] text-mute"><b className="text-[15px] text-head">{c.termines}</b> / {c.prevus} actes terminés (avis rendu)</div>
+              <div className="mt-1"><Bar pct={c.tauxRealisation} cls={c.tauxRealisation === 100 ? 'bg-emerald-500' : 'bg-action-solid'} /></div>
               <div className="mt-1 text-[11px] text-mute">{c.prochaineReunion ? `Réunion le ${dt(c.prochaineReunion.date, { dateStyle: 'long' })}` : 'Aucune réunion planifiée'}</div>
             </button>))}</div>
         </div>)}

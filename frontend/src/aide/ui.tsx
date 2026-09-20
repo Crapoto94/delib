@@ -35,7 +35,7 @@ export function Etape({ n, titre, children }: { n: number; titre: string; childr
     <li className="flex gap-3">
       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-bold text-white">{n}</span>
       <div>
-        <div className="font-semibold text-slate-800">{titre}</div>
+        <div className="font-semibold text-ink">{titre}</div>
         {children && <div className="mt-0.5 text-[13px] leading-relaxed text-slate-600">{children}</div>}
       </div>
     </li>
@@ -73,7 +73,7 @@ export function Flux({ etapes }: { etapes: string[] }) {
     <div className="flex flex-col gap-1 md:flex-row md:flex-wrap md:items-center">
       {etapes.map((e, i) => (
         <div key={i} className="flex items-center gap-1">
-          <span className="rounded border border-line bg-white px-2.5 py-1 text-[12px] font-semibold text-primary">{e}</span>
+          <span className="rounded border border-line bg-surface px-2.5 py-1 text-[12px] font-semibold text-head">{e}</span>
           {i < etapes.length - 1 && <span aria-hidden className="rotate-90 px-1 text-mute md:rotate-0">→</span>}
         </div>
       ))}
@@ -93,18 +93,18 @@ export function Tableau({ entetes, lignes }: { entetes: ReactNode[]; lignes: Rea
 }
 
 export const BoutonUI = ({ children }: { children: ReactNode }) => (
-  <span className="whitespace-nowrap rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[12px] font-semibold text-slate-700">{children}</span>
+  <span className="whitespace-nowrap rounded border border-slate-300 bg-surface px-1.5 py-0.5 text-[12px] font-semibold text-slate-700">{children}</span>
 );
 
 export const Cle = ({ children }: { children: ReactNode }) => <kbd className="rounded border border-slate-300 bg-slate-50 px-1 text-[12px]">{children}</kbd>;
 
-export const Terme = ({ children }: { children: ReactNode }) => <b className="text-slate-800">{children}</b>;
+export const Terme = ({ children }: { children: ReactNode }) => <b className="text-ink">{children}</b>;
 
 export const DefListe = ({ items }: { items: [ReactNode, ReactNode][] }) => (
   <dl className="mb-4 divide-y divide-line rounded-lg border border-line">
     {items.map(([t, d], i) => (
       <div key={i} className="grid gap-1 px-4 py-3 md:grid-cols-[12rem_1fr] md:gap-4">
-        <dt className="font-semibold text-slate-800">{t}</dt>
+        <dt className="font-semibold text-ink">{t}</dt>
         <dd className="text-[13px] leading-relaxed text-slate-600">{d}</dd>
       </div>
     ))}

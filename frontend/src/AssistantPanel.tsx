@@ -80,7 +80,7 @@ export default function AssistantPanel({ acte, t, canEdit, beforeApply, afterApp
       {canEdit ? (
         <div className="grid grid-cols-2 gap-2 border-b border-line p-3">
           {OUTILS.filter((x) => ia[x.type]).map((x) => (
-            <button key={x.type} title={x.hint + (x.scope === 'texte' ? ' — sur ce texte' : '')} className="flex items-start gap-2 rounded border border-line bg-white p-2 text-left hover:border-action hover:bg-soft disabled:opacity-60" disabled={!!busy} onClick={() => run(x)}>
+            <button key={x.type} title={x.hint + (x.scope === 'texte' ? ' — sur ce texte' : '')} className="flex items-start gap-2 rounded border border-line bg-surface p-2 text-left hover:border-action hover:bg-soft disabled:opacity-60" disabled={!!busy} onClick={() => run(x)}>
               <x.icon className="mt-0.5 h-4 w-4 shrink-0 text-action" />
               <span className="min-w-0"><span className="block text-[12px] font-semibold leading-4">{busy === x.type && <Spinner />} {x.label}</span><span className="block text-[10px] text-mute">{x.scope === 'texte' ? 'ce texte' : 'tout le dossier'}</span></span>
             </button>))}

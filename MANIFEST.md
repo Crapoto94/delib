@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.31 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.32 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1350,6 +1350,9 @@ Cible : un agent qui rédige 2 à 3 actes par an doit y arriver **sans formation
 
 - **UI-01** — Le menu de paramétrage s'appelle **« Paramétrages »** (et non « Administration »).
 - **UI-02** — **Partout** où un agent est affiché, c'est **« Prénom NOM »** (jamais l'identifiant de connexion) : listes, frise du circuit, tableaux de bord, commentaires, modifications suivies, secrétaires de commission, bandeau « Afficher en tant que ».
+- **UI-03** — **Thème, couleurs et contrastes (D99)** : l'interface n'est **pas « plate »** : fond de page teinté, en-tête à **bandeau de navigation bleu institutionnel** (Stitch), cartes à surfaces tonales et ombres, en-têtes de tableaux teintés, badges et boutons plus contrastés, accents de couleur d'état (vert / ambre / framboise). Les couleurs sont des **jetons** (variables CSS, canaux RGB) consommés par Tailwind : aucune couleur en dur dans les écrans.
+- **UI-04** — **Mode sombre (D99)** : trois réglages — **Automatique** (suit le système, par défaut), **Clair**, **Sombre** — via un bouton soleil / lune / écran dans l'en-tête de l'application des agents **et** de l'espace des élus (et sur les pages de connexion). Le choix est mémorisé **sur l'appareil** (pas de clignotement au chargement). Contrastes **WCAG AA** dans les deux thèmes ; textes des actes, éditeur, PDF et documents restent lisibles.
+- **UI-05** — **Menu latéral des paramétrages (D100)** : les paramétrages s'ouvrent dans un **menu latéral à gauche** (comme le hub DSI), **groupé par thèmes** (Organisme, Circuits et rédaction, Séances et élus, Intégrations, Données et sécurité, Plateforme), avec icônes, entrée active mise en évidence, **fil d'Ariane** (Paramétrages › page). Sur mobile, le menu se replie en liste déroulante. Les onglets et leurs droits (admin, SCC, plateforme) sont inchangés.
 
 ### 23.1 Conception graphique avec Stitch
 
@@ -1741,6 +1744,8 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D90** | **Annotations sur les PDF de l'espace élus** : surlignage, note, dessin, signet ; privées par défaut, chiffrées au repos, partage figé par groupe ou par élus nommés, réponses, ré-ancrage par citation, export annoté *(ELU-71 à ELU-76)* | 18.4 |
 | **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
 | **D98** | **Alertes de recherche** : cloche sur une recherche enregistrée, vérification horaire avec les droits de la personne, notification dans l'application *(REC-29)* | 20.1 |
+| **D99** | **Thème** : couleurs et contrastes renforcés (inspirés des exports Stitch), jetons en variables CSS, **mode sombre** automatique / clair / sombre mémorisé sur l'appareil | UI-03, UI-04 |
+| **D100** | **Menu latéral** des paramétrages (à gauche, groupé, avec fil d'Ariane) au lieu des onglets horizontaux | UI-05 |
 | **D97** | **API externe et clés d'accès** : lecture seule, clés hachées à affichage unique, portées distinguant actes exécutoires / adoptés / en cours, IP autorisées, limite de débit, synchronisation incrémentale *(EXT-01 à EXT-06)* | 24 bis |
 | **D96** | **Sauvegarde vers un dossier réseau** : export logique cohérent en NDJSON, fichiers incrémentaux, destination UNC avec identifiants chiffrés, planification nocturne, rétention, journal, restauration outillée *(SAV-01 à SAV-07)* | 29.1 |
 | **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |
@@ -1773,6 +1778,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.32** | 2026-09-20 | **D99** : thème coloré et mode sombre (UI-03, UI-04) ; **D100** : menu latéral des paramétrages (UI-05) |
 | **1.31** | 2026-09-20 | **D98** : alertes de recherche (REC-29) ; amendements dans l'espace élus (ELU-41) |
 | **1.30** | 2026-09-20 | **D97** : API externe et clés d'accès (EXT-01 à EXT-06) |
 | **1.29** | 2026-09-20 | **D96** : sauvegarde vers dossier réseau (SAV-01 à SAV-07) |

@@ -49,13 +49,13 @@ function HorsDelai() {
       <section className="card"><div className="border-b border-line px-5 py-3"><h3>Demandes de dérogation en attente</h3></div>
         {der.loading ? <Loading /> : !der.data?.length ? <Empty>Aucune demande en attente.</Empty> : (
           <table className="w-full"><thead><tr><th>Acte</th><th>Demandeur</th><th>Motif</th><th /></tr></thead><tbody>{der.data.map((x) => (
-            <tr key={x.id}><td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${x.acteId}`}>#{x.acte.numeroSuivi} {x.acte.titre}</Link></td><td>{x.demandeur}</td><td>{x.motif}</td>
+            <tr key={x.id}><td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${x.acteId}`}>#{x.acte.numeroSuivi} {x.acte.titre}</Link></td><td>{x.demandeur}</td><td>{x.motif}</td>
               <td className="whitespace-nowrap text-right"><button className="btn-ok mr-2" onClick={() => decide(x, 'accordee')}>Accorder</button><button className="btn-ko" onClick={() => decide(x, 'refusee')}>Refuser</button></td></tr>))}</tbody></table>)}
       </section>
       <section className="card"><div className="border-b border-line px-5 py-3"><h3>Actes hors délai (bloqués)</h3></div>
         {list.loading ? <Loading /> : !list.data?.length ? <Empty>Aucun acte hors délai.</Empty> : (
           <table className="w-full"><thead><tr><th>Acte</th><th>Rédacteur</th><th>Date limite</th><th>Séance</th><th /></tr></thead><tbody>{list.data.map((x) => (
-            <tr key={x.acteId}><td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${x.acteId}`}>#{x.numeroSuivi} {x.titre}</Link></td><td><AgentName u={x.redacteur} /></td>
+            <tr key={x.acteId}><td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${x.acteId}`}>#{x.numeroSuivi} {x.titre}</Link></td><td><AgentName u={x.redacteur} /></td>
               <td><Badge tone="ko">{d(x.dateLimiteRedaction)}</Badge></td><td>{d(x.dateSeance)}</td>
               <td className="text-right">{x.derogation ? <Badge tone="ok">Dérogation en vigueur</Badge> : <button className="btn-secondary" onClick={() => report(x.acteId)}>Reporter</button>}</td></tr>))}</tbody></table>)}
       </section>{node}
@@ -75,9 +75,9 @@ function SeancesList() {
   return (
     <div>
       <PageTitle title="Séances & Ordre du jour" sub="Calendrier des instances, dates clés et actes en attente." actions={isScc && <button className="btn-primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nouvelle séance</button>} />
-      <div className="mb-4 flex w-fit rounded bg-white p-1 shadow-card" role="tablist">{([['avenir', 'À venir'], ['passees', 'Séances passées'], ...(isScc ? [['hors', 'Hors délai & dérogations']] : [])] as [string, string][]).map(([k, l]) => (
+      <div className="mb-4 flex w-fit rounded bg-surface p-1 shadow-card" role="tablist">{([['avenir', 'À venir'], ['passees', 'Séances passées'], ...(isScc ? [['hors', 'Hors délai & dérogations']] : [])] as [string, string][]).map(([k, l]) => (
         <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k as any)} className={`rounded px-3 py-2 text-[13px] font-semibold ${tab === k ? 'bg-primary text-white' : ''}`}>{l}</button>))}</div>
-      {tab !== 'hors' && <div className="mb-4 flex gap-2" role="group" aria-label="Nature de l'instance">{([['', 'Toutes'], ['conseil', 'Conseil municipal'], ['commission', 'Commissions']] as const).map(([k, l]) => <button key={k} onClick={() => setKind(k)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${kind === k ? 'border-primary bg-primary text-white' : 'border-line bg-white'}`}>{l}</button>)}</div>}
+      {tab !== 'hors' && <div className="mb-4 flex gap-2" role="group" aria-label="Nature de l'instance">{([['', 'Toutes'], ['conseil', 'Conseil municipal'], ['commission', 'Commissions']] as const).map(([k, l]) => <button key={k} onClick={() => setKind(k)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${kind === k ? 'border-primary bg-primary text-white' : 'border-line bg-surface'}`}>{l}</button>)}</div>}
       {tab === 'hors' ? <HorsDelai /> : list.loading ? <Loading /> : !list.data?.length ? <div className="card"><Empty>{tab === 'passees' ? 'Aucune séance passée.' : 'Aucune séance à venir.'}</Empty></div> : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{list.data.map((s) => {
           const j = daysUntil(s.dateSeance); const lim = daysUntil(s.dateLimiteRedaction);

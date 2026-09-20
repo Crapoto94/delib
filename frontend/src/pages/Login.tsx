@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { ThemeToggle } from '../theme';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { errMsg } from '../api';
@@ -20,8 +21,9 @@ export default function Login() {
     try { await login(u, p, local); try { if (souvenir) localStorage.setItem('vd.login', u.trim()); else localStorage.removeItem('vd.login'); } catch { /* stockage indisponible */ } nav('/'); } catch (x: any) { setErr(x?.response?.status === 401 ? 'Identifiant ou mot de passe incorrect.' : errMsg(x)); } finally { setBusy(false); }
   };
   return (
-    <div className="flex min-h-screen items-center justify-center bg-soft p-4">
-      <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-8">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-nav-from to-nav-to p-4">
+      <div className="absolute right-3 top-3"><ThemeToggle className="text-white/80 hover:bg-white/10 hover:text-white" /></div>
+      <form onSubmit={submit} className="card w-full max-w-sm space-y-4 border-t-4 border-t-action-solid p-8 shadow-float">
         <div className="text-center">
           <div className="mb-3 flex justify-center"><OrgLogo orgId={brand?.organismeId ?? null} nom={brand?.nom ?? 'Vd'} hasLogo={!!brand?.hasLogo} version={brand?.logoVersion ?? null} className="h-16" /></div>
           <h2>VibeDélib</h2><p className="text-mute">{brand?.nom ?? ''} · gestion des délibérations</p>

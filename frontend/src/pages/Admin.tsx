@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { RefreshCw, Trash2 } from 'lucide-react';
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { ArrowLeftRight, Bell, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileText, GitBranch, HardDrive, KeyRound, Landmark, ListPlus, Menu, Network, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, Users, type LucideIcon } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -112,7 +112,7 @@ function Regles() {
     <div className="space-y-6">
       {dash.data && <div className="grid gap-4 md:grid-cols-4">
         {[['Envoyés (7 j)', dash.data.last7Days.sent ?? 0], ['En échec', dash.data.last7Days.failed ?? 0], ['Actes sans titulaire', dash.data.blocked.length], ['Bloqués > 10 j', dash.data.stuckMoreThan10Days.length]].map(([l, v]) => (
-          <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-primary">{v}</div></div>))}</div>}
+          <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-head">{v}</div></div>))}</div>}
       <div className="card">{r.loading ? <Loading /> : (
         <table className="w-full"><thead><tr><th>Règle</th><th>Type</th><th>Famille</th><th>État</th><th title="Décoché : la notification reste dans l’outil, aucun mail n’est envoyé">Par e-mail</th><th /></tr></thead><tbody>{r.data.items.map((x: any) => (
           <tr key={x.code}><td><b>{x.nom}</b><div className="text-[11px] text-mute">{x.code}{x.origin === 'organisme' && ' · personnalisée'}</div></td><td>{x.kind === 'event' ? 'Événement' : 'Relance'}</td><td>{r.data.families[x.family]?.label}</td>
@@ -142,20 +142,79 @@ function Calendrier() {
   );
 }
 
+type Entree = { k: string; label: string; icon: LucideIcon };
+export type Groupe = { titre: string; entrees: Entree[] };
+
+/** Menu latéral des paramétrages (UI-05, D100) : entrées groupées par thème, selon les droits de la personne. */
+export function menu(isAdmin: boolean, plateforme: boolean): Groupe[] {
+  const g: Groupe[] = [
+    { titre: 'Organisme', entrees: [
+      { k: 'identite', label: 'Identité & logo', icon: Building2 }, { k: 'utilisateurs', label: 'Utilisateurs & rôles', icon: Users },
+      { k: 'titulaires', label: 'Titulaires & droits', icon: ShieldCheck }, { k: 'calendrier', label: 'Jours fériés', icon: CalendarDays }] },
+    { titre: 'Circuits et rédaction', entrees: [
+      { k: 'circuits', label: 'Circuits', icon: GitBranch }, { k: 'gabarits', label: 'Gabarits PDF', icon: FileText },
+      ...(isAdmin ? [{ k: 'champs', label: 'Champs personnalisés', icon: ListPlus }] : []),
+      { k: 'notifications', label: 'Notifications & relances', icon: Bell }, { k: 'ia', label: 'Assistant IA', icon: Sparkles }] },
+    { titre: 'Séances et élus', entrees: [
+      { k: 'elus', label: 'Élus', icon: Landmark }, { k: 'espace-elus', label: 'Espace élus', icon: Smartphone }] },
+    { titre: 'Intégrations', entrees: [
+      { k: 'tdt', label: 'Télétransmission (TDT)', icon: Send }, { k: 'ged', label: 'GED (Alfresco)', icon: HardDrive },
+      ...(isAdmin ? [{ k: 'cles', label: 'Clés API', icon: KeyRound }, { k: 'recherche', label: 'Recherche', icon: Search }] : [])] },
+    ...(isAdmin ? [{ titre: 'Données et conformité', entrees: [{ k: 'rgpd', label: 'RGPD', icon: Scale }, { k: 'configuration', label: 'Export / import', icon: ArrowLeftRight }] }] : []),
+    ...(plateforme ? [{ titre: 'Plateforme', entrees: [{ k: 'collectivites', label: 'Collectivités', icon: Network }, { k: 'sauvegarde', label: 'Sauvegarde', icon: DatabaseBackup }] }] : []),
+  ];
+  return g;
+}
+
+/** Colonne du menu (UI-05) : liste déroulante sur mobile, colonne fixe sous l'en-tête sur poste. */
+export function MenuLateral({ groupes }: { groupes: Groupe[] }) {
+  const [ouvert, setOuvert] = useState(false);
+  const lien = ({ isActive }: { isActive: boolean }) => `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors ${isActive ? 'bg-action-solid text-white shadow-lift' : 'text-side-text hover:bg-white/10 hover:text-white'}`;
+  return (
+    <aside className="md:sticky md:top-[7.5rem] md:self-start">
+      <div className="rounded-xl bg-side shadow-lift">
+        <button type="button" aria-expanded={ouvert} onClick={() => setOuvert(!ouvert)} className="flex w-full items-center gap-2 px-4 py-3 text-[13px] font-bold text-white md:hidden"><Menu className="h-4 w-4" /> Menu des paramétrages<ChevronDown className={`ml-auto h-4 w-4 transition-transform ${ouvert ? 'rotate-180' : ''}`} /></button>
+        <div className="hidden items-center gap-2 border-b border-white/10 px-4 py-3 text-white md:flex"><Settings2 className="h-5 w-5 text-azur" /><span className="text-[14px] font-bold tracking-tight">Paramétrages</span></div>
+        <nav aria-label="Paramétrages" className={`max-h-[calc(100vh-13rem)] space-y-4 overflow-y-auto p-3 md:block ${ouvert ? 'block' : 'hidden'}`}>
+          {groupes.map((x) => (
+            <div key={x.titre}>
+              <div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-side-text/70">{x.titre}</div>
+              <div className="space-y-0.5">
+                {x.entrees.map((e) => (
+                  <NavLink key={e.k} to={`/admin/${e.k}`} className={lien} onClick={() => setOuvert(false)}>
+                    {({ isActive }) => (<><e.icon className="h-[18px] w-[18px] shrink-0" /><span className="min-w-0 flex-1 truncate">{e.label}</span>{isActive && <span aria-hidden="true" className="absolute right-0 h-5 w-1 rounded-l bg-white" />}</>)}
+                  </NavLink>))}
+              </div>
+            </div>))}
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
 export default function Admin() {
   const { isAdmin, me } = useAuth();
-  const tabs = [['identite', 'Identité & logo'], ['utilisateurs', 'Utilisateurs & rôles'], ['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['gabarits', 'Gabarits PDF'], ['notifications', 'Notifications & relances'], ['ia', 'Assistant IA'], ['elus', 'Élus'], ['espace-elus', 'Espace élus'], ['tdt', 'Télétransmission (TDT)'], ['ged', 'GED (Alfresco)'], ...(isAdmin ? [['champs', 'Champs personnalisés'], ['cles', 'Clés API'], ['recherche', 'Recherche'], ['rgpd', 'RGPD'], ['configuration', 'Export / import']] : []), ['calendrier', 'Jours fériés'], ...(me?.isPlatformAdmin ? [['collectivites', 'Collectivités'], ['sauvegarde', 'Sauvegarde']] : [])];
+  const { pathname } = useLocation();
+  const groupes = menu(isAdmin, !!me?.isPlatformAdmin);
+  const courante = pathname.split('/')[2] ?? '';
+  const actuelle = groupes.flatMap((x) => x.entrees.map((e) => ({ ...e, groupe: x.titre }))).find((e) => e.k === courante);
   return (
     <div>
       <PageTitle title="Paramétrages" sub={isAdmin ? "Paramétrage de l'organisme." : "Paramétrage accessible au SCC."} />
-      <nav className="mb-6 flex flex-wrap gap-1 border-b border-line" aria-label="Paramétrages">{tabs.map(([k, l]) => (
-        <NavLink key={k} to={`/admin/${k}`} className={({ isActive }) => `-mb-px border-b-2 px-4 py-2 text-[13px] font-semibold ${isActive ? 'border-primary text-primary' : 'border-transparent text-mute hover:text-ink'}`}>{l}</NavLink>))}</nav>
-      <Routes>
+      <div className="grid gap-6 md:grid-cols-[250px_minmax(0,1fr)]">
+        <MenuLateral groupes={groupes} />
+        <div className="min-w-0">
+          <div className="mb-4 flex items-center gap-1 text-[13px] font-semibold text-mute" aria-label="Fil d'Ariane">
+            <span>Paramétrages</span>{actuelle && <><ChevronRight className="h-3.5 w-3.5" /><span>{actuelle.groupe}</span><ChevronRight className="h-3.5 w-3.5" /><span className="text-head">{actuelle.label}</span></>}
+          </div>
+          <Routes>
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
         <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} /><Route path="calendrier" element={<Calendrier />} />
       </Routes>
+        </div>
+      </div>
     </div>
   );
 }

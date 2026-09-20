@@ -13,6 +13,7 @@ import { PdfViewerHost } from './PdfViewer';
 import { useAuth } from './auth';
 import { api, org as orgPath } from './api';
 import { dt } from './format';
+import { ThemeSwitch, ThemeToggle } from './theme';
 
 function Bells({ orgId }: { orgId: number }) {
   const [data, setData] = useState<any>({ unread: 0, items: [] });
@@ -29,7 +30,7 @@ function Bells({ orgId }: { orgId: number }) {
     <div className="relative">
       <button className="relative rounded p-2 hover:bg-slate-100" aria-label={`Notifications (${data.unread} non lues)`} onClick={() => { setOpen(!open); load(); }}>
         <Bell className="h-5 w-5" />
-        {data.unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ko px-1 text-[10px] font-bold text-white">{data.unread}</span>}
+        {data.unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ko-solid px-1 text-[10px] font-bold text-white">{data.unread}</span>}
       </button>
       {open && (
         <div className="card absolute right-0 z-40 mt-2 w-96 max-w-[90vw] shadow-float">
@@ -51,7 +52,7 @@ function Bells({ orgId }: { orgId: number }) {
   );
 }
 
-const tab = ({ isActive }: { isActive: boolean }) => `rounded px-3 py-2 text-[13px] font-semibold ${isActive ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`;
+const tab = ({ isActive }: { isActive: boolean }) => `rounded px-3 py-2 text-[13px] font-semibold transition-colors ${isActive ? 'bg-action-solid text-white shadow-lift' : 'text-white/80 hover:bg-white/10 hover:text-white'}`;
 
 export default function Layout() {
   const { me, org, setOrg, logout, isAdmin, isScc, startActAs, stopActAs } = useAuth();
@@ -76,15 +77,16 @@ export default function Layout() {
   return (
     <div className="min-h-screen pb-16">
       {me.impersonation && (
-        <div role="status" className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-3 bg-warn px-4 py-2 text-[13px] font-semibold text-white">
+        <div role="status" className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-3 bg-warn-solid px-4 py-2 text-[13px] font-semibold text-white">
           <Eye className="h-4 w-4" /> Vous voyez VibeDélib en tant que <AgentName u={me.username} /> — vos actions sont faites avec ses droits et journalisées à votre nom.
-          <button className="rounded bg-white px-3 py-1 text-warn" onClick={stopActAs}>Revenir à mon compte (<AgentName u={me.impersonation.by} />)</button>
+          <button className="rounded bg-surface px-3 py-1 text-warn" onClick={stopActAs}>Revenir à mon compte (<AgentName u={me.impersonation.by} />)</button>
         </div>)}
-      <header className="sticky top-0 z-30 border-b border-line bg-white">
+      <header className="sticky top-0 z-30 border-b border-line bg-surface shadow-card">
+        <div className="accent-bar" aria-hidden="true" />
         <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2 md:px-8">
           <NavLink to="/" className="flex items-center gap-2">
             <OrgLogo orgId={org.id} nom={org.nom} hasLogo={!!org.hasLogo} version={org.logoVersion ?? null} className="h-10" />
-            <span className="leading-tight"><span className="block text-[16px] font-bold text-primary">VibeDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
+            <span className="leading-tight"><span className="block text-[16px] font-bold text-head">VibeDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
           </NavLink>
           <form data-tour="recherche" className="ml-auto flex min-w-0 max-w-sm flex-1 items-center rounded bg-soft px-3" onSubmit={(e) => { e.preventDefault(); nav(`/recherche?q=${encodeURIComponent(q)}`); }}>
             <Search className="h-4 w-4 text-mute" /><input id="recherche-globale" aria-label="Rechercher un acte" title="Raccourci : /" className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher (raccourci /)…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -96,6 +98,7 @@ export default function Layout() {
           )}
           <AiChip />
           <AideMenu />
+          <ThemeToggle />
           <span data-tour="notifications"><Bells orgId={org.id} /></span>
           <div className="relative" ref={ref} data-tour="menu-utilisateur">
             <button className="flex items-center gap-2 rounded p-1 hover:bg-slate-100" onClick={() => setMenu(!menu)} aria-haspopup="menu" aria-expanded={menu}>
@@ -105,6 +108,7 @@ export default function Layout() {
             </button>
             {menu && <div role="menu" className="card absolute right-0 z-40 mt-2 w-56 p-1 shadow-float">
               {me.canImpersonate && !me.impersonation && <button role="menuitem" onClick={() => { setMenu(false); setAsOpen(true); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft"><Eye className="h-4 w-4" /> Afficher en tant que…</button>}
+              <div className="px-2 pb-2 pt-1"><span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-mute">Apparence</span><ThemeSwitch /></div>
               <NavLink role="menuitem" to="/delegations" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Mes délégations</NavLink>
               <NavLink role="menuitem" to="/preferences" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Mes notifications</NavLink>
               <NavLink role="menuitem" to="/nouveautes" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Nouveautés</NavLink>
@@ -113,7 +117,7 @@ export default function Layout() {
             </div>}
           </div>
         </div>
-        <div className="border-t border-line"><div className="mx-auto max-w-[1400px] px-4 md:px-8">
+        <div className="bg-gradient-to-r from-nav-from to-nav-to"><div className="mx-auto max-w-[1400px] px-4 md:px-8">
         <nav className="flex gap-1 overflow-x-auto py-1" aria-label="Navigation principale">
             <NavLink to="/" end className={tab} data-tour="nav-dashboard">Tableau de bord</NavLink>
             <NavLink to="/dossiers" className={tab} data-tour="nav-dossiers">Actes & Dossiers</NavLink>
@@ -135,7 +139,7 @@ export default function Layout() {
             <button className="btn-primary" disabled={!asUser} onClick={async () => { try { await startActAs(asUser); } catch (e: any) { toast(e?.response?.data?.error || 'Impossible', 'ko'); } }}>Afficher</button></div>
         </Modal>)}
       {toastNode}
-      <footer className="fixed bottom-0 left-0 right-0 border-t border-line bg-white px-6 py-2 text-[11px] text-mute">
+      <footer className="fixed bottom-0 left-0 right-0 border-t border-line bg-surface px-6 py-2 text-[11px] text-mute">
         Ville d'Ivry-sur-Seine · VibeDélib — version {VERSION}
       </footer>
     </div>

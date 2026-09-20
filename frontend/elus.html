@@ -6,8 +6,9 @@
     <meta name="theme-color" content="#0F2942" />
     <link rel="manifest" href="./elus-manifest.webmanifest" />
     <title>VibeDélib — Espace des élus</title>
+      <script>try{var t=localStorage.getItem("vd-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
   </head>
-  <body class="bg-page text-ink">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/elus/main.tsx"></script>
   </body>

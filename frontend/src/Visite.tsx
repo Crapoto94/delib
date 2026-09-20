@@ -107,7 +107,7 @@ function Boite({ etape, i, n, onPrev, onNext, onQuit, onAction, occupe }: { etap
   return (
     <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-labelledby="visite-titre">
       {rect ? <div className="pointer-events-none fixed rounded-md ring-2 ring-white transition-all motion-reduce:transition-none" style={{ top: rect.top - 4, left: rect.left - 4, width: rect.width + 8, height: rect.height + 8, boxShadow: '0 0 0 9999px rgba(15,23,42,.6)' }} /> : <div className="fixed inset-0 bg-slate-900/60" />}
-      <div ref={boite} className={`fixed max-h-[88vh] w-[min(92vw,30rem)] overflow-y-auto rounded-lg bg-white p-5 shadow-float ${centre ? 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`} style={centre ? undefined : { top: pos?.top ?? -9999, left: pos?.left ?? -9999 }}>
+      <div ref={boite} className={`fixed max-h-[88vh] w-[min(92vw,30rem)] overflow-y-auto rounded-lg bg-surface p-5 shadow-float ${centre ? 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`} style={centre ? undefined : { top: pos?.top ?? -9999, left: pos?.left ?? -9999 }}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-mute">Étape {i + 1} sur {n}</span>
           <button className="rounded p-1 text-mute hover:bg-soft" onClick={onQuit} aria-label="Quitter la visite"><X className="h-4 w-4" /></button>
@@ -181,8 +181,8 @@ export default function Visite({ ouverte, onFermer }: { ouverte: boolean; onFerm
   if (phase === 'accueil') {
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4" role="dialog" aria-modal="true" aria-labelledby="visite-accueil">
-        <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-float">
-          <div className="mb-2 flex items-center gap-2 text-primary"><PartyPopper className="h-6 w-6" /><span className="text-[12px] font-semibold uppercase tracking-wide">{nouveautes ? 'Nouveautés' : reprise ? 'Reprendre la visite' : 'Première connexion'}</span></div>
+        <div className="w-full max-w-md rounded-lg bg-surface p-6 shadow-float">
+          <div className="mb-2 flex items-center gap-2 text-head"><PartyPopper className="h-6 w-6" /><span className="text-[12px] font-semibold uppercase tracking-wide">{nouveautes ? 'Nouveautés' : reprise ? 'Reprendre la visite' : 'Première connexion'}</span></div>
           <h2 id="visite-accueil" className="mb-2 text-[20px]">{nouveautes ? 'Du nouveau dans VibeDélib' : `Bienvenue${me?.displayName ? `, ${me.displayName.split(' ').slice(-1)[0]}` : ''} !`}</h2>
           <p className="text-slate-700">{nouveautes ? 'De nouvelles fonctions sont arrivées. Une visite rapide (2 minutes) vous les présente.' : 'Une visite guidée de 5 minutes vous montre l’essentiel, adaptée à vos rôles. Vous pouvez l’ignorer maintenant — elle reste disponible dans votre menu (« Revoir la visite »).'}</p>
           <div className="mt-5 flex justify-end gap-2">
@@ -198,11 +198,11 @@ export default function Visite({ ouverte, onFermer }: { ouverte: boolean; onFerm
     const gagnes = Array.from(new Set(etapes.filter((s) => s.id !== 'fin' && faites.includes(s.id)).map((s) => s.badge)));
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4" role="dialog" aria-modal="true" aria-labelledby="visite-titre">
-        <div className="w-full max-w-md rounded-lg bg-white p-6 text-center shadow-float">
-          <PartyPopper className="mx-auto h-10 w-10 text-primary" />
+        <div className="w-full max-w-md rounded-lg bg-surface p-6 text-center shadow-float">
+          <PartyPopper className="mx-auto h-10 w-10 text-head" />
           <h2 id="visite-titre" className="mt-2 text-[20px]">{etape.titre}</h2>
           <p className="mt-1 text-slate-700">{etape.texte}</p>
-          <ul className="mt-4 flex flex-wrap justify-center gap-2">{gagnes.map((b) => <li key={b} className="rounded-full bg-primary/10 px-3 py-1 text-[13px] font-semibold text-primary">{BADGES[b]}</li>)}</ul>
+          <ul className="mt-4 flex flex-wrap justify-center gap-2">{gagnes.map((b) => <li key={b} className="rounded-full bg-primary/10 px-3 py-1 text-[13px] font-semibold text-head">{BADGES[b]}</li>)}</ul>
           <div className="mt-5 flex justify-center gap-2"><button className="btn-secondary" onClick={precedent}>Précédent</button><button className="btn-primary" autoFocus onClick={suivant}>Terminer</button></div>
         </div>
       </div>

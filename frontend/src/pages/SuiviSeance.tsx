@@ -12,12 +12,12 @@ type Presence = 'en_salle' | 'sorti' | 'absent' | 'excuse';
 type Choix = 'pour' | 'contre' | 'abstention' | 'nppv';
 
 const PRESENCE: { v: Presence; label: string; on: string }[] = [
-  { v: 'en_salle', label: 'En salle', on: 'bg-ok text-white border-ok' }, { v: 'sorti', label: 'Sorti', on: 'bg-warn text-white border-warn' },
+  { v: 'en_salle', label: 'En salle', on: 'bg-ok-solid text-white border-ok' }, { v: 'sorti', label: 'Sorti', on: 'bg-warn-solid text-white border-warn' },
   { v: 'absent', label: 'Absent', on: 'bg-slate-500 text-white border-slate-500' }, { v: 'excuse', label: 'Excusé', on: 'bg-slate-400 text-white border-slate-400' },
 ];
 const VOTE: { v: Choix; label: string; on: string; row: string }[] = [
-  { v: 'pour', label: 'Pour', on: 'bg-ok text-white border-ok', row: 'bg-ok-bg' }, { v: 'contre', label: 'Contre', on: 'bg-ko text-white border-ko', row: 'bg-ko-bg' },
-  { v: 'abstention', label: 'Abst.', on: 'bg-warn text-white border-warn', row: 'bg-warn-bg' }, { v: 'nppv', label: 'NPPV', on: 'bg-slate-600 text-white border-slate-600', row: 'bg-slate-100' },
+  { v: 'pour', label: 'Pour', on: 'bg-ok-solid text-white border-ok', row: 'bg-ok-bg' }, { v: 'contre', label: 'Contre', on: 'bg-ko-solid text-white border-ko', row: 'bg-ko-bg' },
+  { v: 'abstention', label: 'Abst.', on: 'bg-warn-solid text-white border-warn', row: 'bg-warn-bg' }, { v: 'nppv', label: 'NPPV', on: 'bg-slate-600 text-white border-slate-600', row: 'bg-slate-100' },
 ];
 const RESULTAT: Record<string, { label: string; tone: 'ok' | 'ko' }> = {
   adopte_unanimite: { label: 'Adoptée à l’unanimité', tone: 'ok' }, adopte_majorite: { label: 'Adoptée à la majorité', tone: 'ok' }, adopte_preponderante: { label: 'Adoptée (voix prépondérante du président)', tone: 'ok' },
@@ -38,7 +38,7 @@ function Seg<T extends string>({ value, options, onChange, disabled, size = 'md'
     <span className="inline-flex overflow-hidden rounded border border-slate-300" role="group">
       {options.map((o) => (
         <button key={o.v} type="button" disabled={disabled} aria-pressed={value === o.v} onClick={() => onChange(o.v)}
-          className={`border-r border-slate-300 last:border-r-0 ${size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-[12px]'} font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${value === o.v ? o.on : 'bg-white text-slate-700 hover:bg-slate-50'}`}>{o.label}</button>))}
+          className={`border-r border-slate-300 last:border-r-0 ${size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-[12px]'} font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${value === o.v ? o.on : 'bg-surface text-slate-700 hover:bg-slate-50'}`}>{o.label}</button>))}
     </span>
   );
 }
@@ -125,7 +125,7 @@ export default function SuiviSeance() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[12px] text-mute"><Link to={`/seances/${sid}`} className="hover:underline">← Ordre du jour</Link></div>
-          <h1 className="flex items-center gap-3">Suivi de séance<span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${live ? 'bg-ok-bg text-ok-text' : 'bg-ko-bg text-ko'}`} title={live ? 'Cette page se met à jour automatiquement' : 'Connexion perdue : nouvelle tentative…'}><span className={`h-2 w-2 rounded-full ${live ? 'animate-pulse bg-ok' : 'bg-ko'}`} />{live ? 'En direct' : 'Hors ligne'}</span></h1>
+          <h1 className="flex items-center gap-3">Suivi de séance<span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${live ? 'bg-ok-bg text-ok-text' : 'bg-ko-bg text-ko'}`} title={live ? 'Cette page se met à jour automatiquement' : 'Connexion perdue : nouvelle tentative…'}><span className={`h-2 w-2 rounded-full ${live ? 'animate-pulse bg-ok-solid' : 'bg-ko-solid'}`} />{live ? 'En direct' : 'Hors ligne'}</span></h1>
           <p className="text-mute">{s.seance.instance} · {dt(s.seance.dateSeance, { dateStyle: 'full', timeStyle: 'short' })}{s.seance.lieu ? ` · ${s.seance.lieu}` : ''}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -134,7 +134,7 @@ export default function SuiviSeance() {
           {can && t.statut !== 'non_ouverte' && (
             <details className="relative">
               <summary className="btn-secondary cursor-pointer list-none"><FileText className="h-4 w-4" /> Pièces de séance</summary>
-              <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-line bg-white p-1 shadow-lift">
+              <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-line bg-surface p-1 shadow-lift">
                 <button className="block w-full rounded px-3 py-2 text-left text-[13px] hover:bg-soft" onClick={() => piece('/proces-verbal', 'Procès-verbal de séance')}>Procès-verbal{!close && <span className="text-mute"> (projet)</span>}</button>
                 <button className="block w-full rounded px-3 py-2 text-left text-[13px] hover:bg-soft" onClick={() => piece('/proces-verbal?notes=false', 'Procès-verbal (sans les observations)')}>Procès-verbal sans les observations du secrétariat</button>
                 <button className="block w-full rounded px-3 py-2 text-left text-[13px] hover:bg-soft" onClick={() => piece('/liste-deliberations', 'Liste des délibérations')}>Liste des délibérations</button>
@@ -198,7 +198,7 @@ export default function SuiviSeance() {
                         {s.groupes.map((g: any) => {
                           const eligibles = g.elus.filter((e: any) => e.droit !== 'aucun').length; const pour = g.elus.filter((e: any) => e.vote === 'pour').length;
                           return (
-                            <div key={g.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-line bg-white px-2 py-1">
+                            <div key={g.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-line bg-surface px-2 py-1">
                               <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.couleur || '#94A3B8' }} />
                               <span className="min-w-0 flex-1 truncate text-[12px] font-semibold" title={g.nom}>{g.nom} <span className="font-normal text-mute">({eligibles} votant{eligibles > 1 ? 's' : ''}{pour ? ` · ${pour} pour` : ''})</span></span>
                               <Seg size="sm" value={null} disabled={!editable || !eligibles} options={VOTE} onChange={(v) => bulkVote(g, v)} />
@@ -372,7 +372,7 @@ function Amendements({ s, c, editable, can, root, act, onEtat }: { s: any; c: an
   const enCours = c.etat === 'en_cours';
   const voterGroupe = (a: any, g: any, choix: Choix | null) => act(() => api.put(`${root}/amendements/${a.id}/votes`, { votes: g.elus.filter((e: any) => e.droit !== 'aucun').map((e: any) => ({ eluId: e.id, choix })) }));
   return (
-    <div className="mt-3 rounded border border-line bg-white p-3" aria-label="Amendements du point">
+    <div className="mt-3 rounded border border-line bg-surface p-3" aria-label="Amendements du point">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[13px] font-semibold uppercase tracking-wider text-mute">Amendements{liste.length ? ` (${liste.length})` : ''}</h3>
         {can && !c.clos && c.kind === 'deliberation' && <button className="btn-secondary !py-1" disabled={!editable} onClick={() => setDepot(true)}>Déposer un amendement</button>}
@@ -390,7 +390,7 @@ function Amendements({ s, c, editable, can, root, act, onEtat }: { s: any; c: an
                   {can && a.textePropose !== undefined && <button className="ml-auto text-[12px] text-action" onClick={() => setOuvert(ouvertA ? null : a.id)}>{ouvertA ? 'Masquer le texte' : 'Voir le texte proposé'}</button>}
                 </div>
                 {a.motif && <p className="mt-1 text-[12px] text-mute">Motif : {a.motif}</p>}
-                {ouvertA && <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[12px]">{a.textePropose}</pre>}
+                {ouvertA && <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-surface p-2 text-[12px]">{a.textePropose}</pre>}
                 {can && a.statut === 'depose' && (
                   <div className="mt-2">
                     {enCours ? (
@@ -399,7 +399,7 @@ function Amendements({ s, c, editable, can, root, act, onEtat }: { s: any; c: an
                           {s.groupes.map((g: any) => {
                             const eligibles = g.elus.filter((e: any) => e.droit !== 'aucun'); const pour = eligibles.filter((e: any) => a.votes?.[e.id] === 'pour').length;
                             return (
-                              <div key={g.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-line bg-white px-2 py-1">
+                              <div key={g.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-line bg-surface px-2 py-1">
                                 <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.couleur || '#94A3B8' }} />
                                 <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{g.nom} <span className="font-normal text-mute">({eligibles.length}{pour ? ` · ${pour} pour` : ''})</span></span>
                                 <Seg size="sm" value={null} disabled={!editable || !eligibles.length} options={VOTE} onChange={(v) => voterGroupe(a, g, v)} />

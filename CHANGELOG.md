@@ -9,6 +9,11 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.32.0 — Nouveau design, mode sombre et menu latéral des paramétrages
+- Interface plus colorée et plus contrastée (bandeau de navigation bleu, cartes, tableaux et badges renforcés), inspirée des maquettes Stitch.
+- Mode sombre : Automatique (suit l'appareil), Clair ou Sombre, depuis le bouton de l'en-tête ou le menu utilisateur ; aussi dans l'espace des élus.
+- Paramétrages : menu latéral à gauche, groupé par thèmes, avec fil d'Ariane.
+
 ## 0.31.0 — Alertes de recherche et amendements dans l'espace élus
 - Cloche « Me prévenir quand un nouvel acte correspond » sur une recherche enregistrée : vérification au plus horaire, avec les droits de la personne, notification dans l'application.
 - Amendements consultables dans l'espace élus (ELU-41).

@@ -59,7 +59,7 @@ function Toolbar({ editor, mode }: { editor: Editor; mode: EditorMode }) {
     return true;
   }).run();
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b border-line bg-white px-3 py-2" role="toolbar" aria-label="Mise en forme">
+    <div className="flex flex-wrap items-center gap-1 border-b border-line bg-surface px-3 py-2" role="toolbar" aria-label="Mise en forme">
       <Btn title="Annuler" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}><Undo2 className="h-4 w-4" /></Btn>
       <Btn title="Rétablir" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()}><Redo2 className="h-4 w-4" /></Btn>
       <span className="mx-1 h-5 w-px bg-line" />
@@ -110,7 +110,7 @@ export default function RichEditor({ value, onChange, mode, readOnly, placeholde
     <div className="flex h-full flex-col">
       {!readOnly && <Toolbar editor={editor} mode={mode} />}
       <div className="flex-1 overflow-auto bg-soft p-4 md:p-8" onClick={() => editor.chain().focus().run()}>
-        <div className="mx-auto min-h-[70vh] max-w-[820px] rounded-lg border border-line bg-white px-6 py-8 shadow-card md:px-14"><EditorContent editor={editor} /></div>
+        <div className="mx-auto min-h-[70vh] max-w-[820px] rounded-lg border border-line bg-surface px-6 py-8 shadow-card md:px-14"><EditorContent editor={editor} /></div>
       </div>
     </div>
   );

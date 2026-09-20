@@ -36,12 +36,12 @@ export default function AdminRgpd() {
 
       <section className="grid gap-4 md:grid-cols-4">
         {[['Actes', etat.data?.actes ?? 0], ['Archivés (intermédiaire)', etat.data?.archivesIntermediaires ?? 0], ['Entrées d’audit', etat.data?.auditEntrees ?? 0], ['Pseudonymes', etat.data?.pseudonymes ?? 0]].map(([l, v]) => (
-          <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-primary">{v}</div></div>))}
+          <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-head">{v}</div></div>))}
       </section>
       <p className="text-[13px] text-mute">Durées de conservation par défaut : actes {etat.data?.retention.annees} ans, journaux {etat.data?.retention.mois} mois. Modifiables par les paramètres <code>rgpd.retention_actes_annees</code> et <code>rgpd.retention_logs_mois</code>.</p>
 
       <section className="card p-5">
-        <div className="mb-2 flex items-center gap-2"><Archive className="h-5 w-5 text-primary" /><h3>Archivage intermédiaire</h3></div>
+        <div className="mb-2 flex items-center gap-2"><Archive className="h-5 w-5 text-head" /><h3>Archivage intermédiaire</h3></div>
         <p className="mb-3 text-mute">Sort de l'usage courant les actes terminés et anciens (listes actives, recherche) <b>sans les supprimer</b> : l'acte reste conservé pour la preuve. L'opération est tracée.</p>
         <div className="grid gap-3 md:grid-cols-3 md:items-end">
           <Field label="Actes modifiés avant le"><input type="date" className="input" value={seuilActes} onChange={(e) => setSeuilActes(e.target.value)} /></Field>
@@ -55,7 +55,7 @@ export default function AdminRgpd() {
       </section>
 
       <section className="card p-5">
-        <div className="mb-2 flex items-center gap-2"><UserX className="h-5 w-5 text-primary" /><h3>Pseudonymisation des actions et journaux</h3></div>
+        <div className="mb-2 flex items-center gap-2"><UserX className="h-5 w-5 text-head" /><h3>Pseudonymisation des actions et journaux</h3></div>
         <p className="mb-3 text-mute">Remplace les identités et adresses IP des entrées d'audit anciennes par des <b>pseudonymes stables</b>. Le journal d'audit reste <b>immuable</b> ; la correspondance est conservée à part, pour une ré-identification par une personne habilitée.</p>
         <div className="grid gap-3 md:grid-cols-3 md:items-end">
           <Field label="Entrées d'audit antérieures au"><input type="date" className="input" value={seuilLogs} onChange={(e) => setSeuilLogs(e.target.value)} /></Field>
@@ -76,7 +76,7 @@ export default function AdminRgpd() {
       </section>
 
       <section className="card p-5">
-        <div className="mb-2 flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h3>Correspondance des pseudonymes</h3></div>
+        <div className="mb-2 flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-head" /><h3>Correspondance des pseudonymes</h3></div>
         <p className="mb-3 text-[13px] text-mute">À conserver avec les mêmes précautions qu'une donnée personnelle : elle permet de ré-identifier une action pseudonymisée.</p>
         {pseudos.loading ? <Loading /> : !pseudos.data?.length ? <Empty>Aucun pseudonyme.</Empty> : (
           <table className="w-full"><thead><tr><th>Type</th><th>Valeur d'origine</th><th>Pseudonyme</th><th>Créé le</th></tr></thead><tbody>

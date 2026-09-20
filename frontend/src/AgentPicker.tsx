@@ -66,7 +66,7 @@ export function AgentList({ value, onChange }: { value: string[]; onChange: (v: 
   return (
     <div>
       <ul className="mb-2 flex flex-wrap gap-1">{value.map((u) => (
-        <li key={u} className="flex items-center gap-1 rounded-full bg-soft py-0.5 pl-3 pr-1 text-[12px]">@{u}<button type="button" aria-label={`Retirer ${u}`} className="rounded-full px-1.5 text-mute hover:bg-white hover:text-ko" onClick={() => onChange(value.filter((x) => x !== u))}>×</button></li>))}
+        <li key={u} className="flex items-center gap-1 rounded-full bg-soft py-0.5 pl-3 pr-1 text-[12px]">@{u}<button type="button" aria-label={`Retirer ${u}`} className="rounded-full px-1.5 text-mute hover:bg-surface hover:text-ko" onClick={() => onChange(value.filter((x) => x !== u))}>×</button></li>))}
         {!value.length && <li className="text-[12px] text-mute">Aucun membre.</li>}</ul>
       <AgentPicker value={draft} label="Ajouter un membre" placeholder="Ajouter : tapez @nom…" onChange={(u) => { if (u && !value.includes(u)) { onChange([...value, u]); setDraft(''); setTimeout(() => setDraft(''), 0); } }} />
     </div>

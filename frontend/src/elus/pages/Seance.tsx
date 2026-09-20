@@ -22,7 +22,7 @@ function Lecteur({ doc, seanceId }: { doc: Pick<Doc, 'key' | 'version' | 'url'> 
   }, [doc.key, doc.version, doc.url, seanceId]);
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-slate-100">
-      <div className="flex items-center gap-2 border-b border-line bg-white px-3 py-2 text-[13px]">
+      <div className="flex items-center gap-2 border-b border-line bg-surface px-3 py-2 text-[13px]">
         <FileText className="h-4 w-4 text-mute" /><span className="min-w-0 flex-1 truncate font-semibold">{doc.titre}</span>
         {blob && <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${local ? 'bg-ok-bg text-ok-text' : 'bg-slate-200 text-slate-700'}`}>{local ? 'sur l’appareil' : 'en ligne'}</span>}
         <button className="rounded p-2 hover:bg-slate-100" aria-label="Réduire" onClick={() => setZoom((z) => Math.max(60, z - 20))}><Minus className="h-4 w-4" /></button>
@@ -35,12 +35,12 @@ function Lecteur({ doc, seanceId }: { doc: Pick<Doc, 'key' | 'version' | 'url'> 
 }
 
 const CIBLE_AM: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Visas et considérants', dispositif: 'Dispositif' };
-const STATUT_AM: Record<string, { label: string; classe: string }> = { a_voter: { label: 'À voter', classe: 'bg-action text-white' }, adopte: { label: 'Adopté', classe: 'bg-ok text-white' }, rejete: { label: 'Rejeté', classe: 'bg-ko text-white' }, retire: { label: 'Retiré', classe: 'bg-warn text-white' }, traite: { label: 'Voté', classe: 'bg-slate-500 text-white' } };
+const STATUT_AM: Record<string, { label: string; classe: string }> = { a_voter: { label: 'À voter', classe: 'bg-action-solid text-white' }, adopte: { label: 'Adopté', classe: 'bg-ok-solid text-white' }, rejete: { label: 'Rejeté', classe: 'bg-ko-solid text-white' }, retire: { label: 'Retiré', classe: 'bg-warn-solid text-white' }, traite: { label: 'Voté', classe: 'bg-slate-500 text-white' } };
 
 /** Amendements du point : le texte proposé arrive en temps réel, avant le vote (ELU-41). */
 function AmendementsElus({ liste }: { liste: any[] }) {
   return (
-    <section className="rounded-xl border border-line bg-white p-4" aria-label="Amendements du point">
+    <section className="rounded-xl border border-line bg-surface p-4" aria-label="Amendements du point">
       <h2 className="mb-2 text-[15px]">Amendements ({liste.length})</h2>
       <ul className="space-y-2">
         {liste.map((a) => {
@@ -49,7 +49,7 @@ function AmendementsElus({ liste }: { liste: any[] }) {
             <li key={a.id} className="rounded-lg border border-line bg-soft p-3">
               <div className="flex flex-wrap items-center gap-2"><b>Amendement n° {a.numero}</b><span className="text-[13px] text-mute">{a.auteur} · {CIBLE_AM[a.cible]}</span><span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${st.classe}`}>{st.label}</span></div>
               {a.motif && <p className="mt-1 text-[13px] text-mute">Motif : {a.motif}</p>}
-              <details className="mt-1" open={a.statut === 'a_voter'}><summary className="cursor-pointer text-[13px] font-semibold text-action">Texte proposé</summary><pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[13px]">{a.texte}</pre></details>
+              <details className="mt-1" open={a.statut === 'a_voter'}><summary className="cursor-pointer text-[13px] font-semibold text-action">Texte proposé</summary><pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-surface p-2 text-[13px]">{a.texte}</pre></details>
             </li>);
         })}
       </ul>
@@ -69,7 +69,7 @@ function Notes({ seanceId, itemId, moi }: { seanceId: number; itemId: number; mo
   return (
     <div className="space-y-3">
       {notes.map((n) => (
-        <div key={n.id} className="rounded-lg border border-line bg-white p-3 text-[14px]">
+        <div key={n.id} className="rounded-lg border border-line bg-surface p-3 text-[14px]">
           <div className="flex items-center gap-2 text-[11px] text-mute"><span>{n.miennes ? (n.partage === 'prive' ? 'Note privée' : n.partage === 'groupe' ? 'Partagée avec mon groupe' : 'Partagée avec des élus') : `Partagée par ${n.auteur}`}</span>
             {n.miennes && <button className="ml-auto text-ko" aria-label="Supprimer la note" onClick={async () => { await api.delete(`/elus/notes/${n.id}`); void charger(); }}><Trash2 className="h-4 w-4" /></button>}</div>
           <p className="mt-1 whitespace-pre-wrap">{n.texte}</p>
@@ -81,7 +81,7 @@ function Notes({ seanceId, itemId, moi }: { seanceId: number; itemId: number; mo
           <select className="input !w-auto !py-2" value={partage} onChange={(e) => setPartage(e.target.value as any)}><option value="prive">Privée</option><option value="groupe">Partager avec mon groupe</option><option value="elus">Partager avec des élus…</option></select>
           <button className="btn-primary ml-auto !py-2" disabled={!texte.trim() || (partage === 'elus' && !avec.length)} onClick={ajouter}>Enregistrer</button>
         </div>
-        {partage === 'elus' && <div className="max-h-40 overflow-y-auto rounded border border-line bg-white p-2 text-[13px]">{collegues.map((c) => (
+        {partage === 'elus' && <div className="max-h-40 overflow-y-auto rounded border border-line bg-surface p-2 text-[13px]">{collegues.map((c) => (
           <label key={c.id} className="flex items-center gap-2 py-1"><input type="checkbox" checked={avec.includes(c.id)} onChange={(e) => setAvec(e.target.checked ? [...avec, c.id] : avec.filter((x) => x !== c.id))} />{c.nom}{c.groupe && <span className="text-mute"> · {c.groupe}</span>}</label>))}</div>}
       </div>
     </div>
@@ -147,19 +147,19 @@ export default function Seance() {
 
   return (
     <div className="flex h-[calc(100vh-56px)] flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-white px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
         <Link to="/" className="rounded p-2 hover:bg-slate-100" aria-label="Retour"><ChevronLeft className="h-5 w-5" /></Link>
         <div className="min-w-0 flex-1"><div className="truncate font-bold">{s.instance}</div><div className="truncate text-[12px] text-mute">{dt(s.dateSeance, { dateStyle: 'full', timeStyle: 'short' })}</div></div>
         <EtatTelechargement />
-        {s.suivreLaSeance && <button className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold ${suivre ? 'bg-ko text-white' : 'bg-slate-100 text-slate-700'}`} onClick={() => setSuivre(!suivre)} aria-pressed={suivre}><Radio className="h-3.5 w-3.5" /> {suivre ? 'Je suis la séance' : 'Suivre la séance'}</button>}
+        {s.suivreLaSeance && <button className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold ${suivre ? 'bg-ko-solid text-white' : 'bg-slate-100 text-slate-700'}`} onClick={() => setSuivre(!suivre)} aria-pressed={suivre}><Radio className="h-3.5 w-3.5" /> {suivre ? 'Je suis la séance' : 'Suivre la séance'}</button>}
         <button className="rounded p-2 hover:bg-slate-100 md:hidden" onClick={() => setRail(!rail)} aria-label="Ordre du jour"><BookOpen className="h-5 w-5" /></button>
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <nav className={`${rail ? 'absolute inset-x-0 top-[120px] z-30 max-h-[70vh] shadow-float' : 'hidden'} w-full shrink-0 overflow-y-auto border-r border-line bg-white md:static md:block md:max-h-none md:w-80 md:shadow-none`} aria-label="Ordre du jour">
+        <nav className={`${rail ? 'absolute inset-x-0 top-[120px] z-30 max-h-[70vh] shadow-float' : 'hidden'} w-full shrink-0 overflow-y-auto border-r border-line bg-surface md:static md:block md:max-h-none md:w-80 md:shadow-none`} aria-label="Ordre du jour">
           {s.documents.length > 0 && <div className="border-b border-line">
             <div className="bg-soft px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-mute">Documents de la séance</div>
-            {s.documents.map((d: any) => <button key={d.key} onClick={() => { setSel({ kind: 'doc', key: d.key }); setRail(false); }} className={`flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] ${sel?.kind === 'doc' && sel.key === d.key ? 'bg-primary text-white' : 'hover:bg-soft'}`}><FileText className="h-4 w-4 shrink-0" />{d.titre}{d.modifie && <span className="ml-auto rounded bg-warn px-1.5 text-[10px] font-bold text-white">modifié</span>}</button>)}</div>}
+            {s.documents.map((d: any) => <button key={d.key} onClick={() => { setSel({ kind: 'doc', key: d.key }); setRail(false); }} className={`flex w-full items-center gap-2 px-4 py-3 text-left text-[14px] ${sel?.kind === 'doc' && sel.key === d.key ? 'bg-primary text-white' : 'hover:bg-soft'}`}><FileText className="h-4 w-4 shrink-0" />{d.titre}{d.modifie && <span className="ml-auto rounded bg-warn-solid px-1.5 text-[10px] font-bold text-white">modifié</span>}</button>)}</div>}
           <div className="bg-soft px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-mute">Ordre du jour</div>
           <ol>{s.points.map((p: any) => p.kind === 'chapitre' ? <li key={p.id} className="bg-slate-100 px-4 py-1.5 text-[11px] font-bold uppercase text-mute">{p.titre}</li> : (
             <li key={p.id}><button onClick={() => { setSel({ kind: 'point', id: p.id }); setRail(false); }} disabled={false}
@@ -167,11 +167,11 @@ export default function Seance() {
               <span className="mt-0.5 w-12 shrink-0 font-mono text-[11px] opacity-80">{p.numero ?? '·'}</span>
               <span className="min-w-0 flex-1"><span className={`line-clamp-2 ${p.retire ? 'line-through' : ''}`}>{p.titre}</span>
                 <span className="mt-0.5 flex flex-wrap gap-1">
-                  {p.retire && <span className="rounded bg-warn px-1.5 text-[10px] font-bold text-white">retiré</span>}
-                  {p.documents.some((d: any) => d.modifie) && <span className="rounded bg-warn px-1.5 text-[10px] font-bold text-white">modifié</span>}
-                  {etatDirect(p.id)?.etat === 'en_cours' && <span className="rounded bg-ko px-1.5 text-[10px] font-bold text-white">en cours</span>}
-                  {etatDirect(p.id)?.issue === 'adopte' && <span className="rounded bg-ok px-1.5 text-[10px] font-bold text-white">adoptée</span>}
-                  {etatDirect(p.id)?.issue === 'rejete' && <span className="rounded bg-ko px-1.5 text-[10px] font-bold text-white">rejetée</span>}
+                  {p.retire && <span className="rounded bg-warn-solid px-1.5 text-[10px] font-bold text-white">retiré</span>}
+                  {p.documents.some((d: any) => d.modifie) && <span className="rounded bg-warn-solid px-1.5 text-[10px] font-bold text-white">modifié</span>}
+                  {etatDirect(p.id)?.etat === 'en_cours' && <span className="rounded bg-ko-solid px-1.5 text-[10px] font-bold text-white">en cours</span>}
+                  {etatDirect(p.id)?.issue === 'adopte' && <span className="rounded bg-ok-solid px-1.5 text-[10px] font-bold text-white">adoptée</span>}
+                  {etatDirect(p.id)?.issue === 'rejete' && <span className="rounded bg-ko-solid px-1.5 text-[10px] font-bold text-white">rejetée</span>}
                 </span></span>
               <span className="flex shrink-0 items-center gap-1">{p.favori && <Star className="h-4 w-4 fill-warn text-warn" />}{p.lu && <span className="text-[11px] opacity-70">✓</span>}</span>
             </button></li>))}</ol>
@@ -180,7 +180,7 @@ export default function Seance() {
         <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:p-4">
           {courant ? (
             <>
-              <div className="rounded-xl border border-line bg-white p-4">
+              <div className="rounded-xl border border-line bg-surface p-4">
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1"><div className="font-mono text-[12px] text-mute">{courant.numero ?? ''}</div><h1 className="text-[20px] leading-snug">{courant.titre}</h1>
                     <p className="mt-1 text-[13px] text-mute">{courant.rapporteur ? `Rapporteur : ${courant.rapporteur}` : ''}{courant.rubrique ? ` · ${courant.rubrique}` : ''}</p></div>
@@ -191,16 +191,16 @@ export default function Seance() {
                 {courant.retire && <p className="mt-2 rounded bg-warn-bg p-2 text-[13px] text-warn">Ce point a été retiré de l’ordre du jour{courant.retireMotif ? ` : ${courant.retireMotif}` : ''}.</p>}
                 {courant.avisCommissions.length > 0 && <ul className="mt-2 flex flex-wrap gap-2">{courant.avisCommissions.map((a: any, i: number) => <li key={i} className="rounded-full bg-slate-100 px-3 py-1 text-[12px]">Commission {a.commission} : <b>{a.avis}</b></li>)}</ul>}
                 {docsPoint.length > 0 && <div className="mt-3 flex flex-wrap gap-2" role="tablist">{docsPoint.map((d) => (
-                  <button key={d.key} role="tab" aria-selected={docCourant?.key === d.key} onClick={() => setDocKey(d.key)} className={`rounded-lg border px-4 py-2 text-[14px] font-semibold ${docCourant?.key === d.key ? 'border-primary bg-primary text-white' : 'border-line bg-white'}`}>
-                    {d.type === 'annexe' || d.type === 'piece' ? d.titre : TYPE_LABEL[d.type] ?? d.titre}{d.modifie && <span className="ml-2 rounded bg-warn px-1.5 text-[10px] text-white">modifié</span>}</button>))}</div>}
+                  <button key={d.key} role="tab" aria-selected={docCourant?.key === d.key} onClick={() => setDocKey(d.key)} className={`rounded-lg border px-4 py-2 text-[14px] font-semibold ${docCourant?.key === d.key ? 'border-primary bg-primary text-white' : 'border-line bg-surface'}`}>
+                    {d.type === 'annexe' || d.type === 'piece' ? d.titre : TYPE_LABEL[d.type] ?? d.titre}{d.modifie && <span className="ml-2 rounded bg-warn-solid px-1.5 text-[10px] text-white">modifié</span>}</button>))}</div>}
               </div>
               {suivre && (direct?.amendements ?? []).some((a: any) => a.itemId === courant.id) && <AmendementsElus liste={(direct.amendements as any[]).filter((a) => a.itemId === courant.id)} />}
-              {notes && <div className="rounded-xl border border-line bg-white p-4"><Notes seanceId={sid} itemId={courant.id} moi /></div>}
+              {notes && <div className="rounded-xl border border-line bg-surface p-4"><Notes seanceId={sid} itemId={courant.id} moi /></div>}
             </>
           ) : sel?.kind === 'doc' && docCourant ? <h1 className="text-[20px]">{docCourant.titre}</h1> : null}
 
           {docCourant ? <div className="flex min-h-[60vh] flex-1 flex-col"><Lecteur key={docCourant.key} seanceId={sid} doc={{ key: docCourant.key, version: docCourant.version, titre: docCourant.titre, url: `/api/v1/elus/documents/${encodeURIComponent(docCourant.key)}` }} /></div>
-            : courant && !courant.retire ? <p className="rounded-xl border border-line bg-white p-6 text-mute">Aucun document pour ce point.</p> : null}
+            : courant && !courant.retire ? <p className="rounded-xl border border-line bg-surface p-6 text-mute">Aucun document pour ce point.</p> : null}
 
           {courant && (
             <div className="sticky bottom-0 -mx-3 flex items-center gap-2 border-t border-line bg-white/95 px-3 py-2 backdrop-blur md:-mx-4 md:px-4">

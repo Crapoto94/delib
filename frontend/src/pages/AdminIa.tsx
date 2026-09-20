@@ -88,7 +88,7 @@ export default function AdminIa() {
       <Prompts />
       <p className="text-mute">Toute interrogation de l'IA se fait <b>en arrière plan</b>, dans une file d'attente : les agents continuent à travailler et voient un indicateur d'avancement. Ces limites évitent de surcharger l'IA.</p>
       <div className="grid gap-4 md:grid-cols-4">{[['En attente', ov.data.queued], ['En cours', ov.data.running], ['Terminées (24 h)', ov.data.done], ['En échec (24 h)', ov.data.errors]].map(([l, v]) => (
-        <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-primary">{v}</div></div>))}</div>
+        <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-head">{v}</div></div>))}</div>
       <section className="card p-5"><h3 className="mb-3">Limites</h3>
         <div className="grid gap-4 md:grid-cols-2">{LIMITS.map(([k, l, h]) => (
           <Field key={k} label={l} hint={`${h} Défaut : ${ov.data.defaults[k]}.`}><input className="input" type="number" min={k === 'intervalle_ms' ? 0 : 1} value={cur(k)} onChange={(e) => setVals({ ...vals, [k]: e.target.value })} /></Field>))}</div>

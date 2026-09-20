@@ -48,7 +48,7 @@ export function AiChip() {
   return (
     <div className="relative">
       <button className="flex items-center gap-2 rounded-full bg-action/10 px-3 py-1.5 text-[12px] font-semibold text-action" onClick={() => setOpen(!open)} aria-label={`IA en cours : ${active.length} demande(s)`}>
-        <Sparkles className="h-4 w-4 animate-pulse" /> IA {running ? 'au travail' : 'en attente'} <span className="rounded-full bg-action px-1.5 text-white">{active.length}</span>
+        <Sparkles className="h-4 w-4 animate-pulse" /> IA {running ? 'au travail' : 'en attente'} <span className="rounded-full bg-action-solid px-1.5 text-white">{active.length}</span>
       </button>
       {open && (
         <div className="card absolute right-0 z-40 mt-2 w-80 p-3 shadow-float">
@@ -66,7 +66,7 @@ export function Progress({ job }: { job: AiJob }) {
   const pct = job.status === 'queued' ? 0 : job.total ? Math.round((job.progress / job.total) * 100) : 10;
   return (
     <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-      <div className={`h-full rounded-full bg-action transition-all ${job.status === 'running' && !job.total ? 'animate-pulse' : ''}`} style={{ width: `${Math.max(pct, job.status === 'running' ? 8 : 0)}%` }} />
+      <div className={`h-full rounded-full bg-action-solid transition-all ${job.status === 'running' && !job.total ? 'animate-pulse' : ''}`} style={{ width: `${Math.max(pct, job.status === 'running' ? 8 : 0)}%` }} />
     </div>
   );
 }

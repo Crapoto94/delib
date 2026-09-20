@@ -39,9 +39,9 @@ export default function Teletransmission() {
       {t && (
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
           {([['À préparer', t.aPreparer], ['Préparées', t.preparees], ['À confirmer', t.enAttenteConfirmation], ['En attente d’AR', t.enAttenteAr], ['Acquittées', t.acquittees], ['En erreur', t.enErreur], ['Documents préfecture', t.documentsATraiter]] as const).map(([l, v]) => (
-            <div key={l} className="card p-3"><div className="text-[11px] uppercase tracking-wider text-mute">{l}</div><div className={`text-[24px] font-bold ${(l === 'En erreur' || l === 'Documents préfecture') && v > 0 ? 'text-ko' : 'text-primary'}`}>{v}</div></div>))}
+            <div key={l} className="card p-3"><div className="text-[11px] uppercase tracking-wider text-mute">{l}</div><div className={`text-[24px] font-bold ${(l === 'En erreur' || l === 'Documents préfecture') && v > 0 ? 'text-ko' : 'text-head'}`}>{v}</div></div>))}
         </div>)}
-      <div className="mb-4 flex w-fit max-w-full overflow-x-auto rounded bg-white p-1 shadow-card" role="tablist">{TABS.filter(([k]) => k !== 'params' || isAdmin).map(([k, l]) => (
+      <div className="mb-4 flex w-fit max-w-full overflow-x-auto rounded bg-surface p-1 shadow-card" role="tablist">{TABS.filter(([k]) => k !== 'params' || isAdmin).map(([k, l]) => (
         <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`whitespace-nowrap rounded px-3 py-2 text-[13px] font-semibold ${tab === k ? 'bg-primary text-white' : ''}`}>{l}</button>))}</div>
 
       {tab === 'lot' && <Lot root={root} cfg={cfg.data} onDone={bump} toast={toast} />}

@@ -200,7 +200,7 @@ function Editor({ o, c, version, toast, onClose }: { o: number; c: any; version:
         </span>
       </div>
       {ctl && (
-        <div role="status" className={`rounded border px-4 py-3 ${ctl.ok ? 'border-ok/30 bg-emerald-50 text-ok' : 'border-ko/30 bg-ko-bg text-ko'}`}>
+        <div role="status" className={`rounded border px-4 py-3 ${ctl.ok ? 'border-ok/30 bg-ok-bg text-ok' : 'border-ko/30 bg-ko-bg text-ko'}`}>
           {ctl.ok ? <b>Circuit cohérent : prêt à être publié.</b> : <><b>{ctl.errors.length} erreur(s) à corriger :</b><ul className="mt-1 list-disc pl-5">{ctl.errors.map((e: any, i: number) => <li key={i}>{e.message}</li>)}</ul></>}
           {ctl.warnings?.length > 0 && <ul className="mt-1 list-disc pl-5 text-warn">{ctl.warnings.map((e: any, i: number) => <li key={i}><TriangleAlert className="mr-1 inline h-3.5 w-3.5" />{e.message}</li>)}</ul>}
         </div>)}

@@ -30,8 +30,8 @@ export function AideMenu() {
           <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-mute">Aides disponibles pour votre profil</div>
           {dispo.map((a) => (
             <NavLink key={a.code} role="menuitem" to={`/aide/${a.code}`} onClick={() => setOpen(false)} className="flex items-start gap-3 rounded px-3 py-2 hover:bg-soft">
-              <a.Icone className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span><span className="block text-[13px] font-semibold text-slate-800">{a.titre}</span><span className="block text-[12px] text-mute">{a.resume}</span></span>
+              <a.Icone className="mt-0.5 h-4 w-4 shrink-0 text-head" />
+              <span><span className="block text-[13px] font-semibold text-ink">{a.titre}</span><span className="block text-[12px] text-mute">{a.resume}</span></span>
             </NavLink>
           ))}
           <div className="mt-1 border-t border-line pt-1">
@@ -46,7 +46,7 @@ export function AideMenu() {
 function CarteArticle({ a }: { a: Article }) {
   return (
     <Link to={`/aide/${a.code}`} className="card group flex flex-col p-5 transition-shadow hover:shadow-lift">
-      <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><a.Icone className="h-5 w-5" /></span>
+      <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-head"><a.Icone className="h-5 w-5" /></span>
       <h3 className="mb-1">{a.titre}</h3>
       <p className="flex-1 text-[13px] leading-relaxed text-mute">{a.resume}</p>
       <span className="mt-4 inline-flex items-center gap-1 text-[13px] font-semibold text-action">Ouvrir l'aide <ArrowRight className="h-4 w-4" /></span>
@@ -93,7 +93,7 @@ function Sommaire({ article, dispo }: { article: Article; dispo: Article[] }) {
       <nav className="card p-3" aria-label="Aides">
         <div className="mb-1 px-2 text-[11px] font-bold uppercase tracking-wider text-mute">Les aides</div>
         {dispo.map((a) => (
-          <NavLink key={a.code} to={`/aide/${a.code}`} className={({ isActive }) => `flex items-center gap-2 rounded px-2 py-1.5 text-[13px] font-semibold ${isActive ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-soft'}`}>
+          <NavLink key={a.code} to={`/aide/${a.code}`} className={({ isActive }) => `flex items-center gap-2 rounded px-2 py-1.5 text-[13px] font-semibold ${isActive ? 'bg-primary/10 text-head' : 'text-slate-700 hover:bg-soft'}`}>
             <a.Icone className="h-4 w-4" />{a.titre}
           </NavLink>
         ))}
@@ -126,7 +126,7 @@ function ArticlePage({ article, dispo }: { article: Article; dispo: Article[] })
         <aside className="order-2 lg:order-1"><div className="lg:sticky lg:top-28">{<Sommaire article={article} dispo={dispo} />}</div></aside>
         <article className="order-1 max-w-3xl lg:order-2">
           <div className="mb-6 flex items-start gap-3 border-b border-line pb-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><article.Icone className="h-6 w-6" /></span>
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-head"><article.Icone className="h-6 w-6" /></span>
             <div><h1 className="text-[26px] leading-tight">{article.titre}</h1><p className="mt-1 text-mute">{ACCES_LABEL[article.acces]}</p></div>
           </div>
           {article.intro}

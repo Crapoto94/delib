@@ -7,7 +7,7 @@ import { docToMd, mdToHtml } from './mdconv';
 
 const Btn = ({ on, active, label, children, disabled }: { on: () => void; active?: boolean; label: string; children: React.ReactNode; disabled?: boolean }) => (
   <button type="button" title={label} aria-label={label} disabled={disabled} onMouseDown={(e) => e.preventDefault()} onClick={on}
-    className={`rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-30 ${active ? 'bg-slate-200 text-primary' : ''}`}>{children}</button>
+    className={`rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-30 ${active ? 'bg-slate-200 text-head' : ''}`}>{children}</button>
 );
 function Bar({ ed }: { ed: Editor }) {
   return (
@@ -39,5 +39,5 @@ export default function NotesEditor({ value, onChange, placeholder, label }: { v
   // valeur modifiée de l'extérieur (changement de point, autre poste) : on ne touche pas au curseur sinon
   useEffect(() => { if (editor && value !== last.current) { last.current = value; editor.commands.setContent(mdToHtml(value), false); } }, [value, editor]);
   if (!editor) return null;
-  return <div className="overflow-hidden rounded border border-slate-300 bg-white focus-within:border-action"><Bar ed={editor} /><EditorContent editor={editor} /></div>;
+  return <div className="overflow-hidden rounded border border-slate-300 bg-surface focus-within:border-action"><Bar ed={editor} /><EditorContent editor={editor} /></div>;
 }

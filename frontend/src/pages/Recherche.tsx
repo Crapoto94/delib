@@ -73,7 +73,7 @@ export default function Recherche() {
               <div className="flex flex-wrap gap-1">
                 {Object.entries(criteres).map(([k, v]) => {
                   const lib = d?.facettes?.[k]?.find((f: any) => String(f.valeur) === v)?.libelle ?? v;
-                  return <button key={k} onClick={() => set({ [k]: null })} className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-[12px] font-semibold text-primary">{lib}<X className="h-3 w-3" /></button>;
+                  return <button key={k} onClick={() => set({ [k]: null })} className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-[12px] font-semibold text-head">{lib}<X className="h-3 w-3" /></button>;
                 })}
               </div>
             </div>)}
@@ -86,7 +86,7 @@ export default function Recherche() {
                 <ul className="space-y-0.5">
                   {items.slice(0, 8).map((f) => (
                     <li key={String(f.valeur)}>
-                      <button onClick={() => toggle(k, String(f.valeur))} aria-pressed={criteres[k] === String(f.valeur)} className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-[13px] hover:bg-soft ${criteres[k] === String(f.valeur) ? 'bg-primary/10 font-semibold text-primary' : ''}`}>
+                      <button onClick={() => toggle(k, String(f.valeur))} aria-pressed={criteres[k] === String(f.valeur)} className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-[13px] hover:bg-soft ${criteres[k] === String(f.valeur) ? 'bg-primary/10 font-semibold text-head' : ''}`}>
                         <span className="truncate">{f.libelle}</span><span className="text-[11px] text-mute">{f.n}</span>
                       </button>
                     </li>))}
@@ -98,7 +98,7 @@ export default function Recherche() {
             {!saved.data?.length ? <p className="text-[12px] text-mute">Aucune recherche enregistrée.</p> : (
               <ul className="space-y-0.5">{saved.data.map((r: any) => (
                 <li key={r.id} className="flex items-center gap-1"><button className="flex-1 truncate rounded px-2 py-1 text-left text-[13px] hover:bg-soft" onClick={() => ouvrir(r)}>{r.nom}</button>
-                  <button aria-label={alertes.data?.get(r.id) ? `Couper l’alerte « ${r.nom} »` : `Me prévenir des nouveaux actes « ${r.nom} »`} title={alertes.data?.get(r.id) ? 'Alerte active : cliquer pour couper' : 'Me prévenir quand un nouvel acte correspond'} aria-pressed={!!alertes.data?.get(r.id)} className={`rounded p-1 hover:bg-soft ${alertes.data?.get(r.id) ? 'text-primary' : 'text-mute'}`} onClick={() => basculerAlerte(r)}>{alertes.data?.get(r.id) ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}</button>
+                  <button aria-label={alertes.data?.get(r.id) ? `Couper l’alerte « ${r.nom} »` : `Me prévenir des nouveaux actes « ${r.nom} »`} title={alertes.data?.get(r.id) ? 'Alerte active : cliquer pour couper' : 'Me prévenir quand un nouvel acte correspond'} aria-pressed={!!alertes.data?.get(r.id)} className={`rounded p-1 hover:bg-soft ${alertes.data?.get(r.id) ? 'text-head' : 'text-mute'}`} onClick={() => basculerAlerte(r)}>{alertes.data?.get(r.id) ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}</button>
                   <button aria-label={`Supprimer « ${r.nom} »`} className="rounded p-1 text-mute hover:bg-soft" onClick={() => supprimer(r.id)}><X className="h-3 w-3" /></button></li>))}</ul>)}
           </div>
         </aside>
@@ -123,7 +123,7 @@ export default function Recherche() {
                   {d.items.map((r: any) => (
                     <li key={r.acteId} className="card p-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Link to={`/dossiers/${r.acteId}`} className="text-[15px] font-semibold text-primary hover:underline">{r.titre}</Link>
+                        <Link to={`/dossiers/${r.acteId}`} className="text-[15px] font-semibold text-head hover:underline">{r.titre}</Link>
                         <StatutBadge statut={r.statut} />
                         {r.resultat && <Badge tone={r.resultat.code.startsWith('adopte') ? 'ok' : 'ko'}>{r.resultat.libelle}</Badge>}
                       </div>

@@ -1,10 +1,12 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, deviceId, errMsg, session } from '../api';
+import { ThemeToggle } from '../../theme';
 
 const Cadre = ({ titre, children }: { titre: string; children: ReactNode }) => (
-  <div className="flex min-h-screen items-center justify-center bg-page px-4">
-    <div className="w-full max-w-md rounded-xl border border-line bg-white p-6 shadow-lift">
+  <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-nav-from to-nav-to px-4">
+    <div className="absolute right-3 top-3"><ThemeToggle className="text-white/80 hover:bg-white/10 hover:text-white" /></div>
+    <div className="w-full max-w-md rounded-xl border border-line border-t-4 border-t-action-solid bg-surface p-6 shadow-float">
       <div className="mb-5 text-center"><div className="text-[13px] font-semibold uppercase tracking-widest text-mute">VibeDélib</div><h1 className="mt-1 text-[24px]">{titre}</h1></div>
       {children}
     </div>

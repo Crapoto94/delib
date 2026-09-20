@@ -13,9 +13,9 @@ export default function Nouveautes() {
         {VERSIONS.map((v) => (
           <li key={v.version} className="card p-5">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[15px] font-bold text-primary">{v.version}</span>
+              <span className="font-mono text-[15px] font-bold text-head">{v.version}</span>
               <Badge tone={v.type === 'minor' ? 'blue' : 'gray'}>{v.type === 'minor' ? 'Nouveauté' : 'Correctif'}</Badge>
-              <span className="font-semibold text-slate-800">{v.titre}</span>
+              <span className="font-semibold text-ink">{v.titre}</span>
               {v.version === VERSION && <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-ok"><Sparkles className="h-3.5 w-3.5" /> Actuelle</span>}
             </div>
             <ul className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-slate-700">

@@ -89,7 +89,7 @@ export function DeleteSeanceModal({ seance, onClose, onDone }: { seance: any; on
               <Field label="Motif (facultatif, conservé dans l’historique des dossiers)"><input className="input" value={motif} onChange={(e) => setMotif(e.target.value)} placeholder="Séance annulée, remplacée par…" /></Field>
             </>)}
           <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Annuler</button>
-            {d.supprimable && <button className="btn-primary !bg-ko" disabled={busy || (d.convocations > 0 && !ok) || (nActes > 0 && destination === 'prochaine' && !d.suivante)} onClick={submit}>Supprimer la séance</button>}</div>
+            {d.supprimable && <button className="btn-primary !bg-ko-solid" disabled={busy || (d.convocations > 0 && !ok) || (nActes > 0 && destination === 'prochaine' && !d.suivante)} onClick={submit}>Supprimer la séance</button>}</div>
         </div>)}
     </Modal>
   );

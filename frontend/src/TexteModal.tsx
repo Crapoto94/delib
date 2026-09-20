@@ -80,9 +80,9 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   return (
     <div className="relative flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-wrap items-center gap-3 border-b border-line bg-white px-4 py-2 text-[12px]">
+        <div className="flex flex-wrap items-center gap-3 border-b border-line bg-surface px-4 py-2 text-[12px]">
           {view.tracking && <div className="flex rounded bg-soft p-0.5">{([['edition', canEdit ? 'Éditer' : 'Lire'], ['suivi', 'Modifications suivies'], ['propre', 'Version propre']] as const).map(([k, l]) =>
-            <button key={k} className={`rounded px-2 py-1 font-semibold ${mode === k ? 'bg-white shadow-card' : ''}`} onClick={async () => { await commit(); setMode(k); }}>{l}</button>)}</div>}
+            <button key={k} className={`rounded px-2 py-1 font-semibold ${mode === k ? 'bg-surface shadow-card' : ''}`} onClick={async () => { await commit(); setMode(k); }}>{l}</button>)}</div>}
           {canEdit && <span className={state === 'error' ? 'font-semibold text-ko' : 'text-mute'}>{state === 'saving' ? 'Enregistrement…' : state === 'dirty' ? 'Modifications en attente…' : state === 'error' ? 'Non enregistré' : `✓ Enregistré · version ${view.version}`}</span>}
           {!canEdit && <span className="text-mute">Lecture seule à ce stade du circuit.</span>}
           <span className="ml-auto flex gap-2">{assistantOn && <button className="btn-secondary !py-1 lg:!hidden" onClick={() => setDrawer(!drawer)} aria-expanded={drawer}><Sparkles className="h-3.5 w-3.5" /> Assistant IA</button>}
@@ -91,11 +91,11 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
         {conflict && <div role="alert" className="border-b border-warn/30 bg-warn-bg px-4 py-2 text-warn">Ce texte a été modifié par quelqu'un d'autre. <button className="font-semibold underline" onClick={async () => { latest.current.dirty = false; setConflict(false); await load(); }}>Recharger sa version</button> (vos dernières frappes seront perdues).</div>}
         <div className="min-h-0 flex-1">
           {editing ? <RichEditor value={text} onChange={change} mode={t.kind as EditorMode} placeholder={PLACEHOLDER[t.kind]} />
-            : <div className="h-full overflow-auto bg-soft p-4 md:p-8"><div className="mx-auto min-h-[60vh] max-w-[820px] rounded-lg border border-line bg-white px-6 py-8 md:px-14">
+            : <div className="h-full overflow-auto bg-soft p-4 md:p-8"><div className="mx-auto min-h-[60vh] max-w-[820px] rounded-lg border border-line bg-surface px-6 py-8 md:px-14">
               {view.markdown ? (mode === 'suivi' && view.tracking ? <SpanView spans={view.spans} /> : <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{mode === 'propre' ? view.markdown : view.markdown}</div>) : <span className="text-mute">Texte vide.</span>}</div></div>}
         </div>
       </div>
-      <aside className={`${!assistantOn && !view.tracking ? '!hidden' : ''} ${drawer ? 'absolute inset-y-0 right-0 z-10 flex shadow-float' : 'hidden'} w-80 shrink-0 flex-col overflow-hidden border-l border-line bg-white lg:static lg:flex lg:shadow-none`} aria-label="Assistant et modifications suivies">
+      <aside className={`${!assistantOn && !view.tracking ? '!hidden' : ''} ${drawer ? 'absolute inset-y-0 right-0 z-10 flex shadow-float' : 'hidden'} w-80 shrink-0 flex-col overflow-hidden border-l border-line bg-surface lg:static lg:flex lg:shadow-none`} aria-label="Assistant et modifications suivies">
         {view.tracking && assistantOn && <div className="flex shrink-0 border-b border-line" role="tablist">{([['assistant', 'Assistant IA'], ['suivi', `Modifications${tracking ? ` (${view.changes.length})` : ''}`]] as const).map(([k, l]) =>
           <button key={k} role="tab" aria-selected={side === k} onClick={() => setSide(k)} className={`flex-1 px-3 py-2 text-[12px] font-semibold ${side === k ? 'border-b-2 border-action text-action' : 'text-mute'}`}>{l}</button>)}</div>}
         {assistantOn && (side === 'assistant' || !view.tracking) && (
@@ -144,8 +144,8 @@ export default function TexteModal({ acte, texts, initialId, editable, onClose, 
   const cur = texts.find((t) => t.id === id) ?? texts[0];
   return (
     <div className="fixed inset-x-0 bottom-0 z-20 flex flex-col bg-page" style={{ top }} role="dialog" aria-modal="true" aria-label="Rédaction du dossier">
-      <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-2">
-        <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase tracking-wider text-mute">Dossier #{acte.numeroSuivi}</div><div className="truncate font-bold text-primary">{acte.titre}</div></div>
+      <header className="flex items-center gap-3 border-b border-line bg-surface px-4 py-2">
+        <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase tracking-wider text-mute">Dossier #{acte.numeroSuivi}</div><div className="truncate font-bold text-head">{acte.titre}</div></div>
         <nav className="ml-4 flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="Textes du dossier">
           {texts.map((t) => <button key={t.id} onClick={async () => { await flush.current?.(); setId(t.id); }} className={`whitespace-nowrap rounded px-3 py-2 text-[13px] font-semibold ${cur.id === t.id ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}>
             {label(t)}{t.empty && <span className="ml-1 text-warn" title="Texte vide">●</span>}</button>)}

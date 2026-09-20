@@ -36,7 +36,7 @@ function Fiche({ username, onClose, onChanged }: { username: string; onClose: ()
         <div className="space-y-5">
           <div className="flex items-center gap-4">
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-lg font-bold text-white">{f.data.agent.displayName.split(' ').map((x: string) => x[0]).slice(0, 2).join('').toUpperCase()}</span>
-            <div><div className="text-[18px] font-bold text-primary">{f.data.agent.displayName}</div><div className="text-mute">{f.data.agent.poste || '—'} · {f.data.agent.direction?.label || 'direction inconnue'}{f.data.agent.service ? ` › ${f.data.agent.service.label}` : ''}</div>
+            <div><div className="text-[18px] font-bold text-head">{f.data.agent.displayName}</div><div className="text-mute">{f.data.agent.poste || '—'} · {f.data.agent.direction?.label || 'direction inconnue'}{f.data.agent.service ? ` › ${f.data.agent.service.label}` : ''}</div>
               <div className="text-[12px] text-mute">{f.data.agent.email} · identifiant <code>{f.data.agent.username}</code> · dernière connexion {dt(f.data.agent.lastLoginAt)}</div></div>
           </div>
           <section><h3 className="mb-2">Rôles dans {org!.nom}</h3>
@@ -69,7 +69,7 @@ export function Utilisateurs() {
     <div className="space-y-4">
       <p className="text-mute">Les agents qui se sont déjà connectés à l'application. Recherchez par nom, identifiant ou e-mail (l'annuaire RH est aussi interrogé) pour attribuer ou retirer des rôles.</p>
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex min-w-[280px] flex-1 items-center rounded border border-slate-300 bg-white px-3"><Search className="h-4 w-4 text-mute" /><input autoFocus className="w-full bg-transparent px-2 py-3 outline-none" placeholder="Filtrer ou rechercher un utilisateur…" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Rechercher un utilisateur" /></div>
+        <div className="flex min-w-[280px] flex-1 items-center rounded border border-slate-300 bg-surface px-3"><Search className="h-4 w-4 text-mute" /><input autoFocus className="w-full bg-transparent px-2 py-3 outline-none" placeholder="Filtrer ou rechercher un utilisateur…" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Rechercher un utilisateur" /></div>
         <label className="flex items-center gap-2"><input type="checkbox" checked={avecRole} onChange={(e) => setAvecRole(e.target.checked)} /> Seulement ceux qui ont un rôle</label>
         {res.data && <span className="text-[12px] text-mute">{res.data.length} utilisateur(s)</span>}
       </div>
@@ -117,7 +117,7 @@ export function Gabarits() {
       <nav aria-label="Gabarits" className="card h-fit p-2">
         {list.data!.map((t) => (
           <button key={t.docType} onClick={() => setSel(t.docType)} className={`flex w-full items-center justify-between rounded px-3 py-2 text-left text-[13px] font-semibold ${sel === t.docType ? 'bg-primary text-white' : 'hover:bg-soft'}`}>
-            <span className="flex items-center gap-2"><FileText className="h-4 w-4" />{DOCS[t.docType] ?? t.docType}</span>{t.personnalise && <span className={`h-2 w-2 rounded-full ${sel === t.docType ? 'bg-white' : 'bg-action'}`} title="Personnalisé" />}
+            <span className="flex items-center gap-2"><FileText className="h-4 w-4" />{DOCS[t.docType] ?? t.docType}</span>{t.personnalise && <span className={`h-2 w-2 rounded-full ${sel === t.docType ? 'bg-surface' : 'bg-action-solid'}`} title="Personnalisé" />}
           </button>))}
       </nav>
       <div className="space-y-5">
