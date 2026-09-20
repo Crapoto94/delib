@@ -37,6 +37,14 @@ module.exports = ({ makeRouter, ged }) => {
   r.post('/seances/:id/archivage', { summary: 'Archive (ou met à jour) tous les documents d\'une séance en GED : idempotent, nouvelle version si un document a changé', tags: T, org: true, roles: ARCH, params: PS,
     description: 'Convocation, ordre du jour, exposé, projet et annexes de chaque délibération, cahier, procès-verbal, liste, extraits du registre, accusés de réception. Un échec sur un document n\'arrête pas les autres et reste rejouable.' },
   async (req, res) => res.json(await ged.archiverSeance(req.ctx, req.org.id, req.valid.params.id)));
+  r.get('/synchronisation', { summary: 'État comparé VibeDélib / GED, séance par séance : à archiver, à mettre à jour, en erreur, manquants, synchronisés', tags: T, org: true, roles: ARCH, params: P },
+    async (req, res) => res.json(await ged.etatSynchro(req.ctx, req.org.id)));
+  r.post('/synchronisation', { summary: 'Synchronise vers la GED (local → GED) : dépose ce qui manque ou a changé, pour les séances indiquées ou toutes', tags: T, org: true, roles: ARCH, params: P,
+    body: z.object({ seanceIds: z.array(Id).max(100).optional() }).optional(),
+    description: 'Idempotent et rejouable. Un échec sur une séance n’arrête pas les autres ; le compte rendu indique ce qui a été déposé, mis à jour ou refusé.' },
+  async (req, res) => res.json(await ged.synchroniser(req.ctx, req.org.id, req.valid.body || {})));
+  r.post('/verification', { summary: 'Vérifie (GED → local) que chaque document déposé existe toujours dans la GED ; les absents sont marqués « manquants » et seront redéposés', tags: T, org: true, roles: ARCH, params: P },
+    async (req, res) => res.json(await ged.verifier(req.ctx, req.org.id)));
   r.get('/documents', { summary: 'Documents déposés en GED (chemin, nœud, version, date, statut)', tags: T, org: true, roles: ARCH, params: P, query: DocQ }, async (req, res) => res.json(await ged.documents(req.ctx, req.org.id, req.valid.query)));
 
   return [r];

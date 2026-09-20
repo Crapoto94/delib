@@ -59,8 +59,29 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
     });
   }
 
+  /** Amendements de la séance ; pour le point en cours : votes de chacun (saisie) — jamais le texte proposé aux non-habilités. */
+  async function amendementsDe(seanceId, courantId, ids, dr, peutSaisir) {
+    const rows = await db.all('SELECT * FROM seance_amendements WHERE seance_id = $1 ORDER BY item_id, numero', [seanceId]);
+    const votes = new Map();
+    const enCours = rows.filter((r) => r.item_id === courantId && r.statut === 'depose').map((r) => r.id);
+    if (enCours.length) for (const v of await db.all('SELECT amendement_id, elu_id, choix FROM seance_amendement_votes WHERE amendement_id = ANY($1::int[])', [enCours])) {
+      if (!votes.has(v.amendement_id)) votes.set(v.amendement_id, new Map());
+      votes.get(v.amendement_id).set(v.elu_id, v.choix);
+    }
+    return rows.map((r) => {
+      const live = r.statut === 'depose' && votes.has(r.id) ? rules.decompte(ids, dr, votes.get(r.id)) : (r.statut === 'depose' && r.item_id === courantId ? rules.decompte(ids, dr, new Map()) : null);
+      return {
+        id: r.id, itemId: r.item_id, numero: r.numero, auteur: r.auteur_libelle, auteurEluId: r.auteur_elu_id, auteurGroupeId: r.auteur_groupe_id, cible: r.cible, deliberationId: r.deliberation_id,
+        statut: r.statut, motif: r.motif, resultat: r.resultat, decompte: r.votants !== null ? { pour: r.pour, contre: r.contre, abstention: r.abstention, nppv: r.nppv, absents: r.absents, votants: r.votants } : null,
+        ...(peutSaisir ? { textePropose: r.texte_propose, decompteLive: live && { pour: live.pour, contre: live.contre, abstention: live.abstention, nppv: live.nppv, absents: live.absents, manquants: live.manquants }, votes: votes.has(r.id) ? Object.fromEntries(votes.get(r.id)) : {} } : {}),
+      };
+    });
+  }
+
   const svc = {
     rules,
+    /** Briques partagées avec les amendements (mêmes règles de présence, de pouvoir et de vote que les points). */
+    internals: { membres, presencesOf, procurationsOf, journal, nomDe, itemOf },
 
     /** Données brutes de la séance (procès-verbal, extraits du registre) : aucun filtrage par rôle, l'appelant a déjà contrôlé les droits. `null` si la séance n'a pas été ouverte. */
     async donnees(ctx, organismeId, seanceId) {
@@ -75,7 +96,8 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
         votes.get(r.item_id).set(r.elu_id, { choix: r.choix, mandataire: r.mandataire_elu_id });
       }
       const journalRows = (await db.all('SELECT id, item_id, elu_id, type, detail, actor, at FROM seance_journal WHERE seance_id = $1 ORDER BY id', [seanceId])).map((r) => ({ ...r, id: Number(r.id) }));
-      return { seance: s, tenue: t, membres: membresList, presences, procurations: procs, points, votes, journal: journalRows };
+      const amendements = await db.all('SELECT * FROM seance_amendements WHERE seance_id = $1 ORDER BY item_id, numero', [seanceId]);
+      return { seance: s, tenue: t, membres: membresList, presences, procurations: procs, points, votes, journal: journalRows, amendements };
     },
 
     async etat(ctx, organismeId, seanceId) {
@@ -110,6 +132,7 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
       }
       // sans groupe en dernier
       groupes.sort((a, b) => (a.id === 0) - (b.id === 0));
+      const amendements = await amendementsDe(seanceId, courant?.id ?? null, ids, dr, peutSaisir);
       const live = courant ? rules.decompte(ids, dr, votes) : null;
       const enSalle = ms.filter((m) => presences.get(m.id)?.enSalle).length;
       const out = {
@@ -118,7 +141,7 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
           statut: t.statut, version: t.version, pointCourantId: t.point_courant_id, presidentId: t.president_elu_id, secretaireId: t.secretaire_elu_id,
           ouverteAt: t.ouverte_at, closeAt: t.close_at,
         },
-        points, groupes, procurations: procs.map((p) => ({ mandantId: p.mandant, mandataireId: p.mandataire })),
+        points, amendements, groupes, procurations: procs.map((p) => ({ mandantId: p.mandant, mandataireId: p.mandataire })),
         quorum: rules.quorum(ms.length, enSalle),
         courant: courant ? { ...courant, clos: !!clos, decompteLive: live && { pour: live.pour, contre: live.contre, abstention: live.abstention, nppv: live.nppv, absents: live.absents, votants: live.votants, manquants: live.manquants.length } } : null,
       };
@@ -358,6 +381,8 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
       let etat; let extra = {};
       if (issue === 'vote') {
         if (p?.etat !== 'en_cours') throw E.conflict("Ouvrez d'abord le point (il n'est pas en cours de débat)");
+        const restants = (await q.get("SELECT count(*)::int AS n FROM seance_amendements WHERE item_id = $1 AND statut = 'depose'", [itemId])).n;
+        if (restants) throw E.conflict(`${restants} amendement(s) restent à voter ou à retirer avant le vote du texte`);
         const ms = await membres(q, o, s); const ids = ms.map((m) => m.id);
         const dr = rules.droits(ids, await presencesOf(q, seanceId), await procurationsOf(q, seanceId));
         const votes = await votesOf(q, itemId);

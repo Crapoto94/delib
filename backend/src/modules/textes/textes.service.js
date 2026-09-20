@@ -51,6 +51,34 @@ function createTextes({ db, audit, actes, acl, bus }) {
     return S.rebuildSpans(versions);
   }
 
+  /** Cœur de l'enregistrement d'un texte (sans contrôle d'accès : fait par l'appelant). */
+  async function applyCommit(ctx, acte, t, { markdown, reason = null }) {
+    const next = S.normalize(markdown);
+    if (next.length > MAX_CHARS) throw E.badRequest(`Texte trop long (maximum ${MAX_CHARS} caractères)`);
+    const old = S.normalize(t.markdown);
+    if (next === old) { await db.run('DELETE FROM text_drafts WHERE text_id = $1 AND username = $2', [t.id, ctx.username]); return { changed: false, version: t.version_no }; }
+
+    let spans; let cid = null;
+    if (!t.tracking) spans = S.initialSpans(next);
+    else {
+      const who = await authorFor(t.id, ctx);
+      let prev = t.spans;
+      if (!S.isConsistent(prev, old)) prev = await rebuild(t);
+      cid = require('crypto').randomBytes(6).toString('hex');
+      spans = S.applyDiffToSpans(prev, old, next, who, { cid });
+    }
+    const version = t.version_no + 1;
+    await db.tx(async (q) => {
+      await q.run('UPDATE tracked_texts SET markdown = $2, spans = $3::jsonb, version_no = $4, updated_by = $5 WHERE id = $1', [t.id, next, JSON.stringify(spans), version, ctx.username]);
+      await q.run('INSERT INTO text_versions (text_id, version_no, markdown, spans, author, step_key, reason) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7)',
+        [t.id, version, next, JSON.stringify(spans), ctx.username, acte.current_step_key, reason]);
+      await q.run('DELETE FROM text_drafts WHERE text_id = $1 AND username = $2', [t.id, ctx.username]);
+    });
+    await audit.log(ctx, { organismeId: acte.organisme_id, action: 'texte.commit', entity: 'tracked_texts', entityId: t.id, after: { acteId: acte.id, kind: t.kind, version, tracking: t.tracking, cid } });
+    await bus.emit('text.committed', { organismeId: acte.organisme_id, acteId: acte.id, textId: t.id, version, ctx });
+    return { changed: true, version, tracking: t.tracking, changes: t.tracking ? S.listChanges(spans).filter((c) => c.cid === cid) : [] };
+  }
+
   const svc = {
     KINDS,
 
@@ -91,30 +119,20 @@ function createTextes({ db, audit, actes, acl, bus }) {
       const { acte, t } = await load(ctx, organismeId, acteId, textId, { edit: true });
       if (t.lock_user && t.lock_user !== ctx.username && new Date(t.lock_until) > new Date()) throw E.conflict(`Texte en cours de modification par ${t.lock_user}`, { lock: { user: t.lock_user, until: t.lock_until } });
       if (baseVersion !== t.version_no) throw E.conflict('Le texte a été modifié depuis votre lecture', { currentVersion: t.version_no, markdown: t.markdown });
-      const next = S.normalize(markdown);
-      if (next.length > MAX_CHARS) throw E.badRequest(`Texte trop long (maximum ${MAX_CHARS} caractères)`);
-      const old = S.normalize(t.markdown);
-      if (next === old) { await db.run('DELETE FROM text_drafts WHERE text_id = $1 AND username = $2', [t.id, ctx.username]); return { changed: false, version: t.version_no }; }
+      return applyCommit(ctx, acte, t, { markdown, reason });
+    },
 
-      let spans; let cid = null;
-      if (!t.tracking) spans = S.initialSpans(next);
-      else {
-        const who = await authorFor(t.id, ctx);
-        let prev = t.spans;
-        if (!S.isConsistent(prev, old)) prev = await rebuild(t);
-        cid = require('crypto').randomBytes(6).toString('hex');
-        spans = S.applyDiffToSpans(prev, old, next, who, { cid });
-      }
-      const version = t.version_no + 1;
-      await db.tx(async (q) => {
-        await q.run('UPDATE tracked_texts SET markdown = $2, spans = $3::jsonb, version_no = $4, updated_by = $5 WHERE id = $1', [t.id, next, JSON.stringify(spans), version, ctx.username]);
-        await q.run('INSERT INTO text_versions (text_id, version_no, markdown, spans, author, step_key, reason) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7)',
-          [t.id, version, next, JSON.stringify(spans), ctx.username, acte.current_step_key, reason]);
-        await q.run('DELETE FROM text_drafts WHERE text_id = $1 AND username = $2', [t.id, ctx.username]);
-      });
-      await audit.log(ctx, { organismeId: acte.organisme_id, action: 'texte.commit', entity: 'tracked_texts', entityId: t.id, after: { acteId: acte.id, kind: t.kind, version, tracking: t.tracking, cid } });
-      await bus.emit('text.committed', { organismeId: acte.organisme_id, acteId: acte.id, textId: t.id, version, ctx });
-      return { changed: true, version, tracking: t.tracking, changes: t.tracking ? S.listChanges(spans).filter((c) => c.cid === cid) : [] };
+    /**
+     * Applique un amendement adopté en séance (VOT-06) : le texte de la partie visée est remplacé, avec suivi des modifications si le suivi est actif,
+     * au nom de l'amendement. Ne passe pas par les droits d'édition (l'acte est inscrit à l'ordre du jour) : l'appelant a déjà contrôlé la séance.
+     */
+    async amender(ctx, organismeId, acteId, { deliberationId = null, kind, markdown, reason }) {
+      const acte = await actes.load(ctx, organismeId, acteId);
+      const t = await db.get('SELECT * FROM tracked_texts WHERE acte_id = $1 AND kind = $2 AND deliberation_id IS NOT DISTINCT FROM $3', [acte.id, kind, kind === 'expose' ? null : deliberationId]);
+      if (!t) throw E.notFound('Texte introuvable');
+      const avant = t.markdown;
+      const r = await applyCommit(ctx, acte, t, { markdown, reason });
+      return { ...r, avant, version: r.version };
     },
 
     // ---- brouillon privé et verrou souple -------------------------------------------------------------------------------

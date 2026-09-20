@@ -29,6 +29,47 @@ function Explorateur({ o, rev }: { o: number; rev: number }) {
   );
 }
 
+/** Synchronisation VibeDélib ↔ GED (GED-08) : ce qui est produit localement face à ce qui est déposé, avec mise à niveau en un clic. */
+function Synchronisation({ o, rev, onDone }: { o: number; rev: number; onDone: () => void }) {
+  const { toast, node } = useToast();
+  const etat = useLoad(async () => (await api.get(orgPath(o, '/ged/synchronisation'))).data, [o, rev]);
+  const [busy, setBusy] = useState<string | null>(null); const [rapport, setRapport] = useState<any>(null);
+  const lancer = async (cle: string, corps?: any) => {
+    setBusy(cle); setRapport(null);
+    try { const r = (await api.post(orgPath(o, '/ged/synchronisation'), corps || {})).data; setRapport({ type: 'sync', ...r }); toast(r.erreurs ? `${r.erreurs} erreur(s) : rejouable` : `${r.deposes} déposé(s), ${r.nouvellesVersions} nouvelle(s) version(s)`, r.erreurs ? 'ko' : 'ok'); etat.reload(); onDone(); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); }
+  };
+  const verifier = async () => {
+    setBusy('verif'); setRapport(null);
+    try { const r = (await api.post(orgPath(o, '/ged/verification'))).data; setRapport({ type: 'verif', ...r }); toast(r.manquants.length ? `${r.manquants.length} document(s) absent(s) de la GED` : 'Tout est bien dans la GED'); etat.reload(); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); }
+  };
+  const d = etat.data;
+  return (
+    <section className="card space-y-3 p-5"><h3>Synchronisation avec la GED</h3>
+      <p className="text-mute">VibeDélib reste la source : <b>« Synchroniser »</b> dépose dans la GED ce qui n’y est pas encore ou a changé depuis (en nouvelle version). <b>« Vérifier la GED »</b> contrôle que chaque document déposé s’y trouve toujours ; les absents sont marqués et redéposés à la synchronisation suivante.{d && !d.autoArchivage && <> L’archivage automatique est désactivé : rien ne part tout seul.</>}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="btn-primary" disabled={!!busy || !d || d.aFaire === 0} onClick={() => lancer('tout')}>{busy === 'tout' && <Spinner />} Tout synchroniser{d ? ` (${d.aFaire} à faire)` : ''}</button>
+        <button className="btn-secondary" disabled={!!busy} onClick={verifier}>{busy === 'verif' && <Spinner />} Vérifier la GED</button>
+        <button className="btn-secondary" disabled={!!busy} onClick={etat.reload}>Actualiser</button>
+      </div>
+      {etat.loading && !d ? <Loading /> : etat.error ? <ErrorBox msg={etat.error} /> : d && (
+        <div className="overflow-x-auto"><table className="w-full"><thead><tr><th>Séance</th><th>Documents</th><th>À archiver</th><th>À mettre à jour</th><th>En erreur</th><th>Manquants</th><th>Synchronisés</th><th /></tr></thead><tbody>
+          {d.seances.filter((x: any) => x.documents > 0).map((x: any) => (
+            <tr key={x.seanceId}><td className="font-semibold">{x.instance} — {dt(x.dateSeance)}</td><td>{x.documents}</td>
+              <td>{x.aArchiver ? <Badge tone="warn">{x.aArchiver}</Badge> : 0}</td><td>{x.aMettreAJour ? <Badge tone="warn">{x.aMettreAJour}</Badge> : 0}</td>
+              <td>{x.enErreur ? <Badge tone="ko">{x.enErreur}</Badge> : 0}</td><td>{x.manquants ? <Badge tone="ko">{x.manquants}</Badge> : 0}</td><td>{x.synchronises ? <Badge tone="ok">{x.synchronises}</Badge> : 0}</td>
+              <td className="text-right"><button className="btn-secondary !py-1" disabled={!!busy || x.aFaire === 0} onClick={() => lancer(`s${x.seanceId}`, { seanceIds: [x.seanceId] })}>{busy === `s${x.seanceId}` && <Spinner />} Synchroniser</button></td></tr>))}
+          {!d.seances.some((x: any) => x.documents > 0) && <tr><td colSpan={8} className="p-6 text-center text-mute">Aucun document à archiver pour l’instant.</td></tr>}
+        </tbody></table></div>)}
+      {rapport?.type === 'sync' && <div className="flex flex-wrap gap-2 text-[13px]"><Badge tone="ok">{rapport.deposes} déposé(s)</Badge><Badge tone="blue">{rapport.nouvellesVersions} nouvelle(s) version(s)</Badge>{rapport.erreurs > 0 && <Badge tone="ko">{rapport.erreurs} erreur(s)</Badge>}
+        {rapport.seances.filter((x: any) => x.erreur).map((x: any) => <span key={x.seanceId} className="text-ko">{x.instance} : {x.erreur}</span>)}</div>}
+      {rapport?.type === 'verif' && <div className="text-[13px]">{rapport.verifies} document(s) vérifié(s). {rapport.manquants.length === 0 ? <Badge tone="ok">Tout est présent dans la GED</Badge> : <><Badge tone="ko">{rapport.manquants.length} absent(s)</Badge><ul className="mt-1 list-disc pl-5 text-mute">{rapport.manquants.map((m: any, i: number) => <li key={i}>{m.nom}</li>)}</ul></>}{rapport.erreurs > 0 && <div className="text-warn">{rapport.erreurs} vérification(s) impossible(s) (GED injoignable ?)</div>}</div>}
+      {node}
+    </section>
+  );
+}
+
 /** Paramétrage de la GED Alfresco (GED-01 à GED-07) : connexion, test, plan de classement, archivage des séances. */
 export default function AdminGed() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
@@ -79,6 +120,8 @@ export default function AdminGed() {
         {plan && <div className="rounded bg-soft p-3 text-[12px]"><b>{plan.nouveaux ? `${plan.nouveaux} dossier(s) créé(s)` : 'Plan déjà complet'}</b>{plan.nouveaux > 0 && <ul className="mt-1 max-h-40 overflow-y-auto font-mono text-[11px]">{plan.dossiers.map((d: string) => <li key={d}>{d}</li>)}</ul>}</div>}
         <Explorateur o={o} rev={rev} />
       </section>
+
+      <Synchronisation o={o} rev={rev} onDone={() => setRev((n) => n + 1)} />
 
       <section className="card space-y-3 p-5"><h3>Archivage d’une séance</h3>
         <div className="flex flex-wrap items-end gap-3">

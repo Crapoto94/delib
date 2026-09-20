@@ -19,7 +19,7 @@ const NON_VALIDES = ['brouillon', 'en_circuit', 'modification_demandee', 'valide
 const AVIS = { favorable: 'Favorable', defavorable: 'Défavorable', reserve: 'Favorable avec réserves', sans_avis: 'Sans avis' };
 const sha = (x) => crypto.createHash('sha256').update(typeof x === 'string' || Buffer.isBuffer(x) ? x : JSON.stringify(x)).digest('hex');
 
-function createCahier({ db, audit, render, odj, storage, log }) {
+function createCahier({ db, audit, render, odj, storage, log, bus }) {
   const seanceRow = async (org, id) => {
     const s = await db.get('SELECT s.*, i.nom AS instance_nom, i.kind AS instance_kind FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2', [id, requireOrg(org)]);
     if (!s) throw E.notFound('Séance introuvable');
@@ -207,6 +207,7 @@ function createCahier({ db, audit, render, odj, storage, log }) {
         const f = await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,$7) RETURNING id`,
           [org, put.key, `cahier-seance-${s.id}-v${build.version_no}.pdf`, put.size, out.pages, put.sha256, ctx.username]);
         await db.run("UPDATE cahier_builds SET statut = 'done', file_id = $2, pages = $3, sha256 = $4, snapshot = $5::jsonb, step_label = 'Terminé', progress = total, finished_at = now() WHERE id = $1", [build.id, f.id, out.pages, put.sha256, JSON.stringify(out.snapshot)]);
+        Promise.resolve(bus?.emit?.('cahier.built', { organismeId: org, seanceId: s.id })).catch(() => undefined); // archivage automatique en GED (facultatif)
       } catch (e) {
         await db.run("UPDATE cahier_builds SET statut = 'error', error = $2, finished_at = now() WHERE id = $1", [build.id, String(e.message).slice(0, 500)]);
         throw e;

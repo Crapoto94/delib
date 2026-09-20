@@ -223,6 +223,77 @@ function createGed({ db, audit, config, log, adapters, render, tenue, pv, tlt, s
       } catch (e) { log?.error({ err: e.message, seance: p.seanceId }, 'archivage automatique GED en échec'); return null; }
     },
 
+    // ------------------------------------------------------------------------------------------ synchronisation (GED-08, D93)
+    /**
+     * État comparé, séance par séance : ce que VibeDélib produit (documents locaux) face à ce qui est déposé en GED.
+     * `aArchiver` : jamais déposé ; `aMettreAJour` : déposé mais modifié depuis ; `enErreur` / `manquants` : à rejouer ; `synchronises` : identique en GED.
+     */
+    async etatSynchro(ctx, organismeId) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org);
+      const liste = await db.all(
+        `SELECT s.id, s.date_seance, s.statut, i.nom AS instance_nom FROM seances s JOIN instances i ON i.id = s.instance_id
+         WHERE s.organisme_id = $1 AND s.statut <> 'annulee' ORDER BY s.date_seance DESC LIMIT 60`, [org]);
+      const deposes = new Map();
+      for (const r of await db.all('SELECT doc_key, sha256, statut, mode, chemin, nom FROM ged_documents WHERE organisme_id = $1', [org])) deposes.set(r.doc_key, r);
+      const out = [];
+      for (const s of liste) {
+        let docs;
+        try { docs = (await svc.documentsSeance(SYS(org, ctx.username), org, s.id)).docs; } catch { docs = []; }
+        const c = { aArchiver: 0, aMettreAJour: 0, enErreur: 0, manquants: 0, synchronises: 0 };
+        for (const d of docs) {
+          const ex = deposes.get(d.key);
+          if (!ex) c.aArchiver++;
+          else if (ex.statut === 'erreur') c.enErreur++;
+          else if (ex.statut === 'manquant') c.manquants++;
+          else if (ex.sha256 !== d.empreinte || ex.mode !== cfg.mode || ex.nom !== d.nom) c.aMettreAJour++;
+          else c.synchronises++;
+        }
+        out.push({ seanceId: s.id, instance: s.instance_nom, dateSeance: s.date_seance, statut: s.statut, documents: docs.length, ...c, aFaire: c.aArchiver + c.aMettreAJour + c.enErreur + c.manquants });
+      }
+      return { mode: cfg.mode, actif: cfg.actif, autoArchivage: cfg.autoArchivage, seances: out, aFaire: out.reduce((n, x) => n + x.aFaire, 0) };
+    },
+
+    /**
+     * Local → GED : dépose (ou met à jour, en nouvelle version) tout ce qui n'y est pas encore, pour les séances indiquées (toutes sinon).
+     * Idempotent et rejouable ; un échec sur une séance n'arrête pas les autres.
+     */
+    async synchroniser(ctx, organismeId, { seanceIds } = {}) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); prerequis(cfg);
+      const etat = await svc.etatSynchro(ctx, org);
+      const cibles = etat.seances.filter((x) => x.aFaire > 0 && (!seanceIds?.length || seanceIds.includes(x.seanceId)));
+      const out = { seances: [], deposes: 0, nouvellesVersions: 0, erreurs: 0 };
+      for (const x of cibles) {
+        try {
+          const r = await svc.archiverSeance(ctx, org, x.seanceId);
+          out.deposes += r.deposes; out.nouvellesVersions += r.nouvellesVersions; out.erreurs += r.erreurs;
+          out.seances.push({ seanceId: x.seanceId, instance: x.instance, dateSeance: x.dateSeance, deposes: r.deposes, nouvellesVersions: r.nouvellesVersions, inchanges: r.inchanges, erreurs: r.erreurs });
+        } catch (e) { out.erreurs++; out.seances.push({ seanceId: x.seanceId, instance: x.instance, dateSeance: x.dateSeance, erreur: e.message }); }
+      }
+      await audit.log(ctx, { organismeId: org, action: 'ged.synchronisation', entity: 'ged_documents', after: { seances: cibles.length, deposes: out.deposes, nouvellesVersions: out.nouvellesVersions, erreurs: out.erreurs } });
+      return out;
+    },
+
+    /**
+     * GED → local : vérifie que chaque document déposé existe toujours dans la GED (supprimé ou déplacé à la main, dépôt réinitialisé…).
+     * Les absents sont marqués « manquant » : la prochaine synchronisation les redépose depuis VibeDélib, qui reste la source.
+     */
+    async verifier(ctx, organismeId) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); prerequis(cfg);
+      const ad = adapterOf(cfg);
+      const rows = await db.all("SELECT id, nom, chemin, node_id, seance_id FROM ged_documents WHERE organisme_id = $1 AND statut = 'ok' AND node_id IS NOT NULL AND mode = $2", [org, cfg.mode]);
+      const out = { verifies: rows.length, manquants: [], erreurs: 0 };
+      for (const r of rows) {
+        try {
+          if (!(await ad.existe(cfg, r.node_id))) {
+            await db.run("UPDATE ged_documents SET statut = 'manquant', erreur = 'Absent de la GED lors de la vérification' WHERE id = $1", [r.id]);
+            out.manquants.push({ nom: r.nom, chemin: r.chemin, seanceId: r.seance_id });
+          }
+        } catch { out.erreurs++; }
+      }
+      await audit.log(ctx, { organismeId: org, action: 'ged.verification', entity: 'ged_documents', after: { verifies: out.verifies, manquants: out.manquants.length, erreurs: out.erreurs } });
+      return out;
+    },
+
     async documents(ctx, organismeId, { seanceId } = {}) {
       const org = requireOrg(organismeId); const p = [org]; let w = '';
       if (seanceId) { p.push(seanceId); w = 'AND seance_id = $2'; }

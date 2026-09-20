@@ -244,3 +244,53 @@ describe('adaptateur Alfresco (API REST v1)', () => {
     expect(r).toMatchObject({ ok: false }); expect(r.message).toMatch(/Identifiants refusés/);
   });
 });
+
+describe('synchronisation avec la GED (GED-08)', () => {
+  const sync = () => as(admin).get(G('/synchronisation'));
+  const ligne = async () => (await sync()).body.seances.find((x) => x.seanceId === seance.id);
+
+  it('état comparé, synchronisation locale → GED idempotente, vérification GED → local et redépôt des manquants', async () => {
+    expect((await as(admin).put(G('/config'), { mode: 'simulation', actif: true, autoArchivage: false, racine: '', url: '', utilisateur: '' })).status).toBe(200);
+    await env.db.run('DELETE FROM ged_documents WHERE seance_id = $1', [seance.id]);
+    const avant = await ligne();
+    expect(avant.documents).toBeGreaterThan(0); expect(avant).toMatchObject({ aArchiver: avant.documents, synchronises: 0 });
+
+    const r = await as(admin).post(G('/synchronisation'), { seanceIds: [seance.id] });
+    expect(r.status).toBe(200); expect(r.body.erreurs).toBe(0);
+    expect(r.body.seances[0]).toMatchObject({ seanceId: seance.id }); expect(r.body.deposes + r.body.nouvellesVersions).toBeGreaterThan(0);
+    expect(await ligne()).toMatchObject({ aArchiver: 0, aMettreAJour: 0, enErreur: 0, manquants: 0, synchronises: avant.documents, aFaire: 0 });
+    const rejoue = await as(admin).post(G('/synchronisation'), { seanceIds: [seance.id] });
+    expect(rejoue.body).toMatchObject({ seances: [], deposes: 0, nouvellesVersions: 0 }); // rien à faire : idempotent
+
+    // vérification : tout est présent, puis un document disparaît de la GED
+    const v1 = (await as(admin).post(G('/verification'))).body; expect(v1.manquants).toEqual([]);
+    const un = await env.db.get('SELECT id, node_id, nom FROM ged_documents WHERE seance_id = $1 ORDER BY id LIMIT 1', [seance.id]);
+    await env.db.run('DELETE FROM ged_sim_nodes WHERE id = $1', [un.node_id]);
+    const v2 = (await as(admin).post(G('/verification'))).body;
+    expect(v2.manquants.map((m) => m.nom)).toEqual([un.nom]);
+    expect((await ligne()).manquants).toBe(1);
+
+    const r3 = await as(admin).post(G('/synchronisation'), {});
+    expect(r3.body.erreurs).toBe(0); expect(r3.body.deposes + r3.body.nouvellesVersions).toBe(1); // redéposé depuis VibeDélib
+    expect(await ligne()).toMatchObject({ manquants: 0, aFaire: 0 });
+  });
+
+  it('un document modifié depuis son dépôt est signalé « à mettre à jour » ; réservé aux archivistes', async () => {
+    const d = await env.db.get('SELECT id FROM ged_documents WHERE seance_id = $1 ORDER BY id LIMIT 1', [seance.id]);
+    await env.db.run("UPDATE ged_documents SET sha256 = 'ancien' WHERE id = $1", [d.id]);
+    expect((await ligne()).aMettreAJour).toBe(1);
+    expect((await as(t.dupont).get(G('/synchronisation'))).status).toBe(403);
+    expect((await as(t.dupont).post(G('/synchronisation'), {})).status).toBe(403);
+    expect((await as(admin).post(G('/synchronisation'), {})).body.nouvellesVersions).toBe(1);
+    expect((await ligne()).aFaire).toBe(0);
+  });
+
+  it('un cahier de séance terminé part en GED sans attendre la clôture (archivage automatique)', async () => {
+    await as(admin).put(G('/config'), { autoArchivage: true });
+    await env.db.run('DELETE FROM ged_documents WHERE seance_id = $1', [seance.id]);
+    await env.c.bus.emit('cahier.built', { organismeId: ville.id, seanceId: seance.id });
+    for (let i = 0; i < 40 && !(await env.db.get('SELECT 1 AS x FROM ged_documents WHERE seance_id = $1', [seance.id])); i++) await sleep(100);
+    expect((await ligne()).synchronises).toBeGreaterThan(0);
+    await as(admin).put(G('/config'), { autoArchivage: false });
+  });
+});

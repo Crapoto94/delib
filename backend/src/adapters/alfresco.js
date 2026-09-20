@@ -95,6 +95,15 @@ function createAlfresco({ tls, http: injected } = {}) {
       return (r.data?.list?.entries || []).map(({ entry: n }) => ({ id: n.id, nom: n.name, dossier: !!n.isFolder, taille: n.content?.sizeInBytes ?? null, version: n.properties?.['cm:versionLabel'] ?? null, modifieLe: n.modifiedAt, description: n.properties?.['cm:description'] ?? null }));
     },
 
+    /** Le nœud existe-t-il encore dans la GED ? (vérification, sans télécharger le contenu) */
+    async existe(cfg, nodeId) {
+      const http = clientOf(cfg);
+      const r = await http.get(`${API}/nodes/${nodeId}`, { params: { fields: 'id' } }).catch((e) => { throw failNet(e); });
+      if (r.status === 200) return true;
+      if (r.status === 404) return false;
+      throw E.upstream(explain(r));
+    },
+
     async contenu(cfg, nodeId) {
       const http = clientOf(cfg);
       const r = await http.get(`${API}/nodes/${nodeId}/content`, { responseType: 'arraybuffer' }).catch((e) => { throw failNet(e); });

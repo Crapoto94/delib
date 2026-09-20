@@ -21,7 +21,16 @@ const Scrutin = z.object({ scrutin: z.enum(['main_levee', 'public', 'secret', 'u
 const Votes = z.object({ votes: z.array(z.object({ eluId: Id, choix: z.enum(CHOIX).nullable() })).min(1).max(400) });
 const Cloture = z.object({ issue: z.enum(['vote', 'sans_vote', 'retire', 'ajourne']), motif: z.string().trim().max(500).optional() });
 
-module.exports = ({ makeRouter, tenue }) => {
+const PA = PS.extend({ amendId: Id });
+const Amendement = z.object({
+  cible: z.enum(['expose', 'visas', 'dispositif']), textePropose: z.string().min(1).max(100000).describe('Texte COMPLET de la partie visée, tel qu\'il serait après amendement'),
+  auteurEluId: Id.optional(), auteurGroupeId: Id.optional(), auteurLibelle: z.string().trim().max(160).optional(), motif: z.string().trim().max(2000).optional(),
+  scrutin: z.enum(['main_levee', 'public', 'secret', 'unanimite']).optional(),
+}).refine((d) => d.auteurEluId || d.auteurGroupeId || d.auteurLibelle, { message: 'Indiquez l\'auteur de l\'amendement' });
+const AmendCloture = z.object({ issue: z.enum(['vote', 'retire']) });
+const CibleQ = z.object({ cible: z.enum(['expose', 'visas', 'dispositif']) });
+
+module.exports = ({ makeRouter, tenue, amendements }) => {
   const r = makeRouter('/api/v1/organismes/:orgId/seances/:id/tenue');
   const T = ['suivi de séance'];
 
@@ -66,6 +75,17 @@ module.exports = ({ makeRouter, tenue }) => {
   async (req, res) => res.json(await tenue.cloturerPoint(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, req.valid.body)));
   r.post('/points/:itemId/reouverture', { summary: 'Rouvre un point clos pour le corriger (motif obligatoire)', tags: T, org: true, roles: ADMIN, params: PI, body: Motif },
     async (req, res) => res.json(await tenue.rouvrirPoint(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, req.valid.body.motif)));
+
+  // ------------------------------------------------------------------------------------------ amendements (VOT-06, LIVE-14)
+  r.get('/points/:itemId/amendements/texte', { summary: 'Texte actuel de la partie visée (pour préremplir un amendement)', tags: T, org: true, roles: ADMIN, params: PI, query: CibleQ },
+    async (req, res) => res.json(await amendements.texteActuel(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, req.valid.query.cible)));
+  r.post('/points/:itemId/amendements', { summary: 'Dépose un amendement sur un point (auteur : élu, groupe ou libellé libre ; texte complet proposé)', tags: T, org: true, roles: ADMIN, params: PI, body: Amendement, responses: { 200: 'État de la séance' },
+    description: 'Un amendement est voté AVANT le texte ; adopté, il modifie le texte de la délibération avec suivi des modifications. Le point ne peut pas être voté tant qu\'un amendement reste à traiter.' },
+  async (req, res) => res.json(await amendements.deposer(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, req.valid.body)));
+  r.put('/amendements/:amendId/votes', { summary: 'Votes sur un amendement (par élu ou par groupe ; `choix: null` efface)', tags: T, org: true, roles: ADMIN, params: PA, body: Votes },
+    async (req, res) => res.json(await amendements.voter(req.ctx, req.org.id, req.valid.params.id, req.valid.params.amendId, req.valid.body.votes)));
+  r.post('/amendements/:amendId/cloture', { summary: 'Clôt un amendement : vote (adopté = texte modifié avec suivi) ou retrait', tags: T, org: true, roles: ADMIN, params: PA, body: AmendCloture },
+    async (req, res) => res.json(await amendements.cloturer(req.ctx, req.org.id, req.valid.params.id, req.valid.params.amendId, req.valid.body)));
 
   return [r];
 };

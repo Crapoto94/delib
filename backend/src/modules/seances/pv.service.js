@@ -88,6 +88,10 @@ function createPv({ db, audit, render, odj, tenue, actes }) {
         if (p.acte) body.push(`Dossier n° ${p.acte.numeroSuivi}${p.acte.rapporteur ? ` — rapporteur : ${p.acte.rapporteur}` : ''}.`);
         if (notes && p.notes?.trim()) body.push('', '*Observations du secrétariat*', p.notes.trim()); // notes saisies dans l'éditeur (Markdown : gras, listes)
         body.push('');
+        for (const a of (d.amendements || []).filter((x) => x.item_id === p.id)) { // amendements votés avant le texte
+          const sort = a.statut === 'adopte' ? 'adopté' : a.statut === 'rejete' ? 'rejeté' : a.statut === 'retire' ? 'retiré' : 'non traité';
+          body.push(`*Amendement n° ${a.numero}* (${a.auteur_libelle}) — ${a.cible === 'dispositif' ? 'dispositif' : a.cible === 'visas' ? 'visas et considérants' : 'exposé des motifs'} : **${sort}**${a.votants !== null ? ` (pour : ${a.pour}, contre : ${a.contre}, abstentions : ${a.abstention}, ne prennent pas part au vote : ${a.nppv})` : ''}.`);
+        }
         if (p.etat === 'traite') body.push(...voteLines(d, p, map), `**Résultat : ${RESULTAT[p.resultat] || ''}**`);
         else body.push(ETAT[p.etat] || '');
         body.push('');

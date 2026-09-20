@@ -64,6 +64,8 @@ function createGedSimulateur({ db }) {
       return rows.map((r) => ({ id: r.id, nom: r.nom, dossier: r.dossier, taille: r.taille, version: r.dossier ? null : `${r.version}.0`, modifieLe: r.updated_at, description: r.description }));
     },
 
+    async existe(cfg, nodeId) { return !!(await db.get('SELECT 1 AS x FROM ged_sim_nodes WHERE id = $1 AND organisme_id = $2', [nodeId, cfg.organismeId])); },
+
     async contenu(cfg, nodeId) {
       const r = await db.get('SELECT contenu FROM ged_sim_nodes WHERE id = $1 AND organisme_id = $2 AND NOT dossier', [nodeId, cfg.organismeId]);
       return r?.contenu ?? null;

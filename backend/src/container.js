@@ -12,6 +12,7 @@ const { createDirectoryService } = require('./modules/directory/directory.servic
 const { createOrganismes } = require('./modules/organismes/organismes.service');
 const { createSettings } = require('./modules/settings/settings.service');
 const { createOnboarding } = require('./modules/me/onboarding.service');
+const { createAmendements } = require('./modules/seances/amendements.service');
 const { createEntrainement } = require('./modules/me/entrainement.service');
 const { createBus, createStorage } = require('./shared/infra');
 const { createReferentiels } = require('./modules/referentiels/referentiels.service');
@@ -96,7 +97,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   late.deadlines = deadlines;
   const odj = createOdj({ db, audit, actes, acl, titulaires, settings, bus, late, storage });
   late.odj = odj;
-  const cahier = createCahier({ db, audit, render, odj, storage, log });
+  const cahier = createCahier({ db, audit, render, odj, storage, log, bus });
   const kpis = createKpis({ db, odj, seances });
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
   const pv = createPv({ db, audit, render, odj, tenue, actes });
@@ -115,9 +116,11 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   // GED : simulateur persistant par défaut, Alfresco (REST v1) choisi par organisme ; adaptateurs injectables pour les tests
   const ged = createGed({ db, audit, config, log, adapters: gedAdapters || { simulateur: createGedSimulateur({ db }), alfresco: createAlfresco({ tls: config.tls }) }, render, tenue, pv, tlt, storage, cahier });
   bus.on('tenue.close', (p) => ged.auto(p));
+  bus.on('cahier.built', (p) => ged.auto(p)); // un cahier terminé part en GED sans attendre la clôture de la séance
   const eluAuth = createEluAuth({ db, config, mail, settings, audit, log });
   const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log });
   const annotations = createAnnotations({ db, audit, config, espace, settings });
+  const amendements = createAmendements({ db, audit, tenue, textes });
   const entrainement = createEntrainement({ db, actes, textes, audit });
   const configuration = createConfiguration({ db, audit, settings, circuits, champs });
   const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
@@ -125,7 +128,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, entrainement, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, entrainement, amendements, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

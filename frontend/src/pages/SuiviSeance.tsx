@@ -28,7 +28,7 @@ const ETAT: Record<string, { label: string; tone?: 'ok' | 'ko' | 'warn' | 'blue'
 };
 const JOURNAL: Record<string, string> = {
   ouverture: 'Ouverture de la séance', cloture: 'Clôture de la séance', deverrouillage: 'Déverrouillage', arrivee: 'Arrivée', sortie: 'Sortie de salle', retour: 'Retour en salle', absent: 'Marqué absent', excuse: 'Marqué excusé',
-  pouvoir: 'Pouvoir donné', pouvoir_retire: 'Pouvoir retiré', point: 'Point en cours', point_clos: 'Point clos', point_rouvert: 'Point rouvert', bureau: 'Bureau de séance',
+  pouvoir: 'Pouvoir donné', pouvoir_retire: 'Pouvoir retiré', point: 'Point en cours', point_clos: 'Point clos', point_rouvert: 'Point rouvert', bureau: 'Bureau de séance', amendement_depose: 'Amendement déposé', amendement_clos: 'Amendement clos',
 };
 const nom = (e: { prenom?: string; nom: string }) => `${e.prenom ? `${e.prenom} ` : ''}${e.nom.toUpperCase()}`.trim();
 const hour = (d: string) => dt(d, { timeStyle: 'medium' });
@@ -209,6 +209,8 @@ export default function SuiviSeance() {
                     </div>)}
                   {enCours && c.decompteLive?.manquants > 0 && <p className="mt-2 text-[12px] text-warn">{c.decompteLive.manquants} élu(s) en salle n’ont pas encore de vote saisi ({voter - c.decompteLive.manquants}/{voter}).</p>}
 
+                  {c.kind === 'deliberation' && <Amendements s={s} c={c} editable={editable} can={can} root={root} act={act} onEtat={apply} />}
+
                   {can && (
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
                       <button className="btn-secondary" disabled={!editable} onClick={() => put('/courant', { sens: 'precedent' })}><ArrowLeft className="h-4 w-4" /> Précédent</button>
@@ -313,6 +315,110 @@ export default function SuiviSeance() {
         </div>)}
 
       {motif && <MotifModal titre={motif.titre} onClose={() => setMotif(null)} onOk={async (m) => { await motif.ok(m); setMotif(null); }} />}
+    </div>
+  );
+}
+
+const CIBLE: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Visas et considérants', dispositif: 'Dispositif' };
+const AM_STATUT: Record<string, { label: string; tone?: 'ok' | 'ko' | 'warn' | 'blue' }> = { depose: { label: 'À voter', tone: 'blue' }, adopte: { label: 'Adopté', tone: 'ok' }, rejete: { label: 'Rejeté', tone: 'ko' }, retire: { label: 'Retiré', tone: 'warn' } };
+
+/** Dépôt d'un amendement : auteur (élu, groupe ou libre), partie visée, texte complet proposé (prérempli avec le texte actuel). */
+function DepotAmendement({ root, point, groupes, elus, onClose, onDone }: { root: string; point: any; groupes: any[]; elus: any[]; onClose: () => void; onDone: (etat: any) => void }) {
+  const [auteur, setAuteur] = useState('elu:' + (elus[0]?.id ?? '')); const [libre, setLibre] = useState('');
+  const [cible, setCible] = useState('dispositif'); const [texte, setTexte] = useState(''); const [actuel, setActuel] = useState('');
+  const [motif, setMotif] = useState(''); const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  useEffect(() => { // le texte actuel de la partie visée sert de point de départ : on modifie ce qui change
+    let annule = false; setTexte('');
+    api.get(`${root}/points/${point.id}/amendements/texte`, { params: { cible } }).then((r) => { if (!annule) { setActuel(r.data.markdown); setTexte(r.data.markdown); } }).catch((e) => { if (!annule) setErr(errMsg(e)); });
+    return () => { annule = true; };
+  }, [root, point.id, cible]);
+  const valider = async () => {
+    setBusy(true); setErr(null);
+    const [type, id] = auteur.split(':');
+    try {
+      const r = await api.post(`${root}/points/${point.id}/amendements`, { cible, textePropose: texte, motif: motif || undefined,
+        ...(type === 'elu' ? { auteurEluId: Number(id) } : type === 'groupe' ? { auteurGroupeId: Number(id) } : { auteurLibelle: libre }) });
+      onDone(r.data); onClose();
+    } catch (e) { setErr(errMsg(e)); setBusy(false); }
+  };
+  return (
+    <Modal title={`Déposer un amendement — ${point.numero ? `point ${point.numero}` : 'point en cours'}`} onClose={onClose} wide>
+      <div className="space-y-3">
+        <ErrorBox msg={err} />
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Auteur"><select className="input" value={auteur} onChange={(e) => setAuteur(e.target.value)}>
+            <optgroup label="Élu">{elus.map((e) => <option key={e.id} value={`elu:${e.id}`}>{nom(e)}</option>)}</optgroup>
+            <optgroup label="Groupe">{groupes.filter((g) => g.id).map((g) => <option key={g.id} value={`groupe:${g.id}`}>Groupe {g.nom}</option>)}</optgroup>
+            <option value="libre:">Autre (à préciser)…</option></select></Field>
+          <Field label="Partie visée"><select className="input" value={cible} onChange={(e) => setCible(e.target.value)}>{Object.entries(CIBLE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+        </div>
+        {auteur.startsWith('libre') && <Field label="Auteur (libellé)"><input className="input" value={libre} onChange={(e) => setLibre(e.target.value)} /></Field>}
+        <Field label="Texte complet après amendement" hint="Modifiez le texte ci-dessous : c’est ce texte qui remplacera l’actuel si l’amendement est adopté (les changements seront suivis).">
+          <textarea className="input h-56 font-mono text-[13px]" value={texte} onChange={(e) => setTexte(e.target.value)} /></Field>
+        <Field label="Motif (facultatif)"><input className="input" value={motif} onChange={(e) => setMotif(e.target.value)} placeholder="Ex. réduire le montant de la subvention" /></Field>
+        <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Annuler</button>
+          <button className="btn-primary" disabled={busy || !texte.trim() || texte.trim() === actuel.trim() || (auteur.startsWith('libre') && !libre.trim())} onClick={valider}>Déposer</button></div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Amendements du point en cours : votés AVANT le texte ; adopté, le texte de la délibération est modifié (avec suivi). */
+function Amendements({ s, c, editable, can, root, act, onEtat }: { s: any; c: any; editable: boolean; can: boolean; root: string; act: (fn: () => Promise<{ data: any }>, ok?: string) => Promise<void>; onEtat: (d: any) => void }) {
+  const [depot, setDepot] = useState(false); const [ouvert, setOuvert] = useState<number | null>(null);
+  const liste: any[] = (s.amendements || []).filter((a: any) => a.itemId === c.id);
+  const elus: any[] = s.groupes.flatMap((g: any) => g.elus);
+  if (c.kind !== 'deliberation' && !liste.length) return null;
+  const enCours = c.etat === 'en_cours';
+  const voterGroupe = (a: any, g: any, choix: Choix | null) => act(() => api.put(`${root}/amendements/${a.id}/votes`, { votes: g.elus.filter((e: any) => e.droit !== 'aucun').map((e: any) => ({ eluId: e.id, choix })) }));
+  return (
+    <div className="mt-3 rounded border border-line bg-white p-3" aria-label="Amendements du point">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[13px] font-semibold uppercase tracking-wider text-mute">Amendements{liste.length ? ` (${liste.length})` : ''}</h3>
+        {can && !c.clos && c.kind === 'deliberation' && <button className="btn-secondary !py-1" disabled={!editable} onClick={() => setDepot(true)}>Déposer un amendement</button>}
+      </div>
+      {!liste.length ? <p className="mt-1 text-[12px] text-mute">Aucun amendement sur ce point.</p> : (
+        <ul className="mt-2 space-y-2">
+          {liste.map((a) => {
+            const st = AM_STATUT[a.statut]; const ouvertA = ouvert === a.id; const live = a.decompteLive;
+            return (
+              <li key={a.id} className="rounded border border-line bg-soft p-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <b>Amendement n° {a.numero}</b><span className="text-[12px] text-mute">{a.auteur} · {CIBLE[a.cible]}</span>
+                  <Badge tone={st.tone}>{st.label}</Badge>
+                  {a.resultat && <span className="text-[12px]">{RESULTAT[a.resultat]?.label}{a.decompte ? ` — ${a.decompte.pour} pour, ${a.decompte.contre} contre, ${a.decompte.abstention} abst.` : ''}</span>}
+                  {can && a.textePropose !== undefined && <button className="ml-auto text-[12px] text-action" onClick={() => setOuvert(ouvertA ? null : a.id)}>{ouvertA ? 'Masquer le texte' : 'Voir le texte proposé'}</button>}
+                </div>
+                {a.motif && <p className="mt-1 text-[12px] text-mute">Motif : {a.motif}</p>}
+                {ouvertA && <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[12px]">{a.textePropose}</pre>}
+                {can && a.statut === 'depose' && (
+                  <div className="mt-2">
+                    {enCours ? (
+                      <>
+                        <div className="grid gap-1.5 md:grid-cols-2">
+                          {s.groupes.map((g: any) => {
+                            const eligibles = g.elus.filter((e: any) => e.droit !== 'aucun'); const pour = eligibles.filter((e: any) => a.votes?.[e.id] === 'pour').length;
+                            return (
+                              <div key={g.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-line bg-white px-2 py-1">
+                                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.couleur || '#94A3B8' }} />
+                                <span className="min-w-0 flex-1 truncate text-[12px] font-semibold">{g.nom} <span className="font-normal text-mute">({eligibles.length}{pour ? ` · ${pour} pour` : ''})</span></span>
+                                <Seg size="sm" value={null} disabled={!editable || !eligibles.length} options={VOTE} onChange={(v) => voterGroupe(a, g, v)} />
+                              </div>);
+                          })}
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {live && <span className="text-[12px]">Pour <b>{live.pour}</b> · Contre <b>{live.contre}</b> · Abst. <b>{live.abstention}</b> · NPPV <b>{live.nppv}</b>{live.manquants?.length ? <span className="text-warn"> · {live.manquants.length} vote(s) à saisir</span> : null}</span>}
+                          <button className="btn-primary ml-auto !py-1" disabled={!editable} onClick={() => act(() => api.post(`${root}/amendements/${a.id}/cloture`, { issue: 'vote' }), `Amendement n° ${a.numero} : vote clôturé`)}>Clôturer le vote</button>
+                          <button className="btn-secondary !py-1" disabled={!editable} onClick={() => act(() => api.post(`${root}/amendements/${a.id}/cloture`, { issue: 'retire' }), `Amendement n° ${a.numero} retiré`)}>Retirer</button>
+                        </div>
+                      </>
+                    ) : <p className="text-[12px] text-mute">Ouvrez le point pour voter cet amendement.</p>}
+                  </div>)}
+              </li>);
+          })}
+        </ul>)}
+      {liste.some((a) => a.statut === 'depose') && <p className="mt-2 text-[12px] text-warn">Le vote du texte reste bloqué tant qu’un amendement est à voter ou à retirer.</p>}
+      {depot && <DepotAmendement root={root} point={c} groupes={s.groupes} elus={elus} onClose={() => setDepot(false)} onDone={onEtat} />}
     </div>
   );
 }
