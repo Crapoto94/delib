@@ -131,6 +131,20 @@ function createDirectoryService({ db, adapter, config, log }) {
     async searchAgents(q) { const list = await adapter.searchAgents(q); return Promise.all(list.map(async (a) => ({ ...a, poste: await posteAffiche(a) }))); },
     posteAffiche,
 
+    /** Agents de l'annuaire RH dont le nom complet est `nom` (« MERIEM KHAROUM ») : l'annuaire cherche un terme à la fois, on croise donc les termes. */
+    async searchByName(nom) {
+      const wanted = String(nom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().split(/\s+/).filter(Boolean).sort().join(' ');
+      const tokens = [...new Set(String(nom || '').split(/\s+/).filter((t) => t.length >= 3))].sort((a, b) => b.length - a.length);
+      const seen = new Map();
+      for (const t of tokens.slice(0, 3)) {
+        const hits = await adapter.searchAgents(t);
+        for (const h of hits) if (h.email && !seen.has(h.email.toLowerCase())) seen.set(h.email.toLowerCase(), h);
+        const exact = [...seen.values()].filter((h) => String(h.displayName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().split(/\s+/).filter(Boolean).sort().join(' ') === wanted);
+        if (exact.length) return exact;
+      }
+      return [];
+    },
+
     /** Poste de responsable vacant dans l'organigramme RH : { direction, service } (faux si l'organigramme est indisponible). */
     async vacance(directionCode, serviceCode) {
       const node = (await chart()).find((d) => d.code === directionCode);
@@ -152,11 +166,25 @@ function createDirectoryService({ db, adapter, config, log }) {
         if (r.nom && r.prenom) out[r.username] = full(r.prenom, r.nom);
         else if (r.display_name && r.display_name.toLowerCase() !== r.username) out[r.username] = r.display_name;
       }
-      for (const u of list.filter((x) => !out[x]).slice(0, 8)) {
-        if (nameCache.has(u) && Date.now() - nameCache.get(u).at < 600000) { if (nameCache.get(u).name) out[u] = nameCache.get(u).name; continue; }
+      // agents jamais connectés à l'application : l'annuaire RH, en cherchant sur des fragments de l'identifiant (« hbourdelet » -> « bourdelet »)
+      const inconnus = list.filter((x) => !out[x]).slice(0, 60);
+      const trouve = async (u) => {
+        const c = nameCache.get(u);
+        if (c && Date.now() - c.at < 600000) return c.name;
         let name = null;
-        try { const hit = (await adapter.searchAgents(u)).find((h) => (h.email || '').split('@')[0].toLowerCase() === u); if (hit?.displayName) name = capName(hit.displayName.split(' ')[0]) + ' ' + hit.displayName.split(' ').slice(1).join(' ').toUpperCase(); } catch { /* annuaire indisponible */ }
-        nameCache.set(u, { name, at: Date.now() }); if (name) out[u] = name.trim();
+        for (const q of [u.slice(2), u.slice(1), u]) {
+          if (q.length < 3) continue;
+          try {
+            const hit = (await adapter.searchAgents(q)).find((h) => (h.email || '').split('@')[0].toLowerCase() === u);
+            if (hit?.displayName) { const [prenom, ...reste] = hit.displayName.trim().split(/\s+/); name = full(prenom, reste.join(' ') || prenom); break; }
+          } catch { break; /* annuaire indisponible */ }
+        }
+        nameCache.set(u, { name, at: Date.now() });
+        return name;
+      };
+      for (let i = 0; i < inconnus.length; i += 8) {
+        const lot = inconnus.slice(i, i + 8);
+        (await Promise.all(lot.map(trouve))).forEach((n, k) => { if (n) out[lot[k]] = n; });
       }
       return out;
     },

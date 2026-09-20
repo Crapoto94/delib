@@ -21,10 +21,17 @@ const IGNOREE: Record<string, string> = {
 function Frise({ circuit }: { circuit: any }) {
   if (!circuit?.path?.length) return null;
   let n = 0;
+  // Le rédacteur détient lui-même les étapes qui suivent (il est directeur, chef de service…) : elles ne sont pas affichées une à une, elles
+  // fusionnent avec la rédaction en UNE carte « Rédacteur / Directeur » (les étapes contournées pour cette raison sont absorbées).
+  const path: any[] = circuit.path.map((p: any) => ({ ...p, ignoree: p.state === 'skipped' || p.skipped }));
+  const absorbee = (p: any) => p.ignoree && (p.reason === 'auto_validation' || p.reason === 'desactive');
+  let fin = 1; while (fin < path.length && absorbee(path[fin])) fin++;
+  const groupe = path.slice(0, fin); const roles = groupe.slice(1).filter((p) => p.reason === 'auto_validation' && p.via !== 'directeur').map((p) => p.label);
+  const items = roles.length ? [{ ...path[0], label: ['Rédacteur', ...roles].join(' / '), fusion: true }, ...path.slice(fin)] : path;
   return (
     <ol className="flex gap-2 overflow-x-auto pb-2" aria-label="Circuit d'approbation">
-      {circuit.path.filter((p: any) => !(p.state === 'skipped' && (p.reason === 'desactive' || !p.reason))).map((p: any) => {
-        const skipped = p.state === 'skipped';
+      {items.filter((p: any) => !(p.ignoree && (p.reason === 'desactive' || !p.reason))).map((p: any) => {
+        const skipped = p.ignoree && !p.fusion;
         if (skipped) {
           return (
             <li key={p.key} className="min-w-[150px] flex-1 rounded-lg border border-dashed border-warn/40 bg-warn-bg/50 p-3 text-warn" title={IGNOREE[p.reason] ?? 'Étape ignorée'}>

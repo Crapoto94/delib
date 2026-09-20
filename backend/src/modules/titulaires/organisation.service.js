@@ -8,7 +8,6 @@ const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
 
 const norm = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
-const key = (x) => norm(x).split(' ').filter(Boolean).sort().join(' '); // « NOM PRÉNOM » = « PRÉNOM NOM »
 
 function createOrganisation({ db, titulaires, dir }) {
   /** Directions qui relèvent de l'organisme : celles qui lui sont rattachées, ou — pour la collectivité par défaut — celles qui ne le sont à aucune autre. */
@@ -35,7 +34,9 @@ function createOrganisation({ db, titulaires, dir }) {
         const statut = r.direct === 'dgs' ? 'direct_dgs' : r.vacant ? 'vacant' : r.holders.length ? (r.via === 'directeur' ? 'implicite' : 'personne') : 'non_renseigne';
         return { fonction, statut, holders: r.holders, via: r.via, poste: r.poste, titulaires: fonction === 'dga' ? [] : rows(fonction, scope.directionCode, scope.serviceCode), rh };
       };
-      const rhOf = (n) => (n ? { responsable: n.responsable || null, poste: n.poste || null, vacant: !!n.vacant } : null);
+      // « MERIEM KHAROUM » -> « Meriem KHAROUM » (l'annuaire RH écrit « PRÉNOM NOM » en capitales)
+      const nomComplet = (x) => { const [p1, ...r] = String(x || '').trim().split(/\s+/); return r.length ? `${p1.toLowerCase().replace(/(^|-)(\p{L})/gu, (m, a1, b1) => a1 + b1.toUpperCase())} ${r.join(' ').toUpperCase()}` : (x || null); };
+      const rhOf = (n) => (n ? { responsable: n.responsable ? nomComplet(n.responsable) : null, poste: n.poste || null, vacant: !!n.vacant } : null);
       const directions = chart.map((d) => {
         const rt = data.rts.get(d.code);
         const poste = rt?.dga_poste_id ? postes.find((p) => p.id === rt.dga_poste_id) : null;
@@ -67,8 +68,7 @@ function createOrganisation({ db, titulaires, dir }) {
       const node = fonction === 'directeur' ? d : (d?.services || []).find((x) => x.code === serviceCode);
       if (!node) throw E.notFound('Direction ou service introuvable dans l\'organigramme RH');
       if (node.vacant || !node.responsable) throw E.conflict('Ce poste est vacant dans l\'organigramme RH : il n\'y a personne à désigner');
-      const wanted = key(node.responsable);
-      const hits = (await dir.searchAgents(node.responsable)).filter((a) => key(a.displayName) === wanted && (a.email || '').includes('@'));
+      const hits = (await dir.searchByName(node.responsable)).filter((a) => (a.email || '').includes('@'));
       const logins = [...new Set(hits.map((a) => a.email.split('@')[0].toLowerCase()))];
       if (logins.length !== 1) throw E.conflict(logins.length ? `Plusieurs agents portent le nom « ${node.responsable} » : désignez le bon à la main` : `Le responsable « ${node.responsable} » n'a pas été retrouvé dans l'annuaire : désignez-le à la main`);
       return titulaires.add(ctx, org, { fonction, username: logins[0], directionCode, serviceCode: fonction === 'chef_service' ? serviceCode : undefined });
