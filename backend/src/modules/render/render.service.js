@@ -158,10 +158,10 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
      * Aperçu d'un acte : exposé, une délibération, ou dossier complet (exposé + délibérations + annexes, avec sommaire).
      * mode : 'propre' | 'suivi' ; brouillon : utilise mon brouillon non enregistré (PRE-02).
      */
-    async renderActe(ctx, organismeId, acteId, { cible = 'expose', deliberationId, mode = 'propre', brouillon = false }) {
+    async renderActe(ctx, organismeId, acteId, { cible = 'expose', deliberationId, mode = 'propre', brouillon = false, watermark: wmOverride }) {
       const acte = await actes.load(ctx, organismeId, acteId);
       const { pick, delibs } = await svc.textsFor(ctx, acte, cible, deliberationId);
-      const watermark = FINAL.includes(acte.statut) ? '' : undefined;
+      const watermark = wmOverride !== undefined ? wmOverride : (FINAL.includes(acte.statut) ? '' : undefined);
 
       const runs = async (row) => {
         if (!row) return [{ text: '', type: 'text' }];
@@ -198,20 +198,30 @@ function createRender({ db, audit, storage, refs, actes, textes, config }) {
       if (cible === 'dossier') {
         const parts = [{ titre: 'Exposé des motifs', pdf: await exposePdf() }];
         for (const d of delibs) parts.push({ titre: `Délibération : ${d.titre}`, pdf: await delibPdf(d) });
-        const annexes = await db.all('SELECT a.titre, a.ordre, f.storage_key, f.pages FROM annexes a JOIN files f ON f.id = a.file_id WHERE a.acte_id = $1 ORDER BY a.ordre, a.id', [acte.id]);
-        for (const [i, a] of annexes.entries()) {
-          try { parts.push({ titre: `Annexe ${i + 1} : ${a.titre}`, pdf: { buffer: await storage.get(a.storage_key), pageCount: a.pages } }); }
-          catch (e) {
-            // fichier introuvable : le dossier reste imprimable, l'annexe est remplacée par une page d'avertissement
-            const doc = await PDFDocument.create(); const pg = doc.addPage([T.A4.w, T.A4.h]);
-            pg.drawText(`Annexe ${i + 1} : ${String(a.titre).replace(/[^ -~00A0-00FF]/g, '?')}`, { x: 56, y: 760, size: 14 });
-            pg.drawText('Fichier indisponible sur le serveur : redeposez cette annexe.', { x: 56, y: 730, size: 11 });
-            parts.push({ titre: `Annexe ${i + 1} : ${a.titre} (indisponible)`, pdf: { buffer: Buffer.from(await doc.save()), pageCount: 1 } });
-          }
-        }
+        parts.push(...(await svc.annexParts(acte)));
         return svc.assemble({ organismeId: acte.organisme_id, titre: `Dossier n° ${acte.numero_suivi} — ${acte.titre}`, parts, vars: await svc.varsFor(acte, null), watermark });
       }
       throw E.badRequest('cible inconnue');
+    },
+
+
+    /**
+     * Annexes d'un acte sous forme de pièces PDF (dossier complet, cahier de séance). Une annexe dont le fichier est introuvable
+     * est remplacée par une page d'avertissement : le document reste imprimable. `onlyCommunicable` : profils « élus » et « public ».
+     */
+    async annexParts(acte, { onlyCommunicable = false } = {}) {
+      const rows = await db.all(`SELECT a.titre, a.ordre, f.storage_key, f.pages FROM annexes a JOIN files f ON f.id = a.file_id WHERE a.acte_id = $1 ${onlyCommunicable ? 'AND a.communicable' : ''} ORDER BY a.ordre, a.id`, [acte.id]);
+      const parts = [];
+      for (const [i, a] of rows.entries()) {
+        try { parts.push({ titre: `Annexe ${i + 1} : ${a.titre}`, pdf: { buffer: await storage.get(a.storage_key), pageCount: a.pages } }); }
+        catch (e) {
+          const doc = await PDFDocument.create(); const pg = doc.addPage([T.A4.w, T.A4.h]);
+          pg.drawText(`Annexe ${i + 1} : ${String(a.titre).replace(/[^ -~\u00A0-\u00FF]/g, '?')}`, { x: 56, y: 760, size: 14 });
+          pg.drawText('Fichier indisponible sur le serveur : redeposez cette annexe.', { x: 56, y: 730, size: 11 });
+          parts.push({ titre: `Annexe ${i + 1} : ${a.titre} (indisponible)`, pdf: { buffer: Buffer.from(await doc.save()), pageCount: 1 }, manquante: true });
+        }
+      }
+      return parts;
     },
 
     /** Sommaire paginé + fusion des pièces (pdf-lib), utilisé par le dossier complet et repris par le cahier de séance. */

@@ -16,9 +16,12 @@ module.exports = ({ makeRouter, dir, onboarding }) => {
   }, async (req, res) => {
     const c = req.ctx; const real = req.realCtx || req.ctx;
     const def = c.organismes.find((o) => o.isDefault) || c.organismes[0] || null;
+    const agent = dir.toAgent(c.agent);
+    // intitulé de poste officiel (organigramme RH) pour un responsable de direction ou de service
+    if (agent) agent.poste = await dir.posteAffiche({ displayName: agent.displayName, nom: agent.nom, prenom: agent.prenom, direction: agent.direction?.label, service: agent.service, poste: agent.poste });
     res.json({
       username: c.username, displayName: c.displayName, email: c.email, kind: c.kind, isPlatformAdmin: c.isPlatformAdmin,
-      agent: dir.toAgent(c.agent) || null,
+      agent: agent || null,
       organismes: c.organismes.map((o) => ({ id: o.id, code: o.code, nom: o.nom, type: o.type, isDefault: o.isDefault, roles: o.roles, via: o.via, vocabulaire: o.vocabulaire, hasLogo: !!o.hasLogo, logoVersion: o.logoVersion ?? null })),
       defaultOrganismeId: def?.id ?? null,
       onboarding: { toShow: await onboarding.toShow(c.username) },

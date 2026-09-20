@@ -1,6 +1,6 @@
 # MANIFEST — IvryDélib : gestion des délibérations
 
-> **Statut : v1.5 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.6 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -744,7 +744,7 @@ Le tuto montre un **calendrier de toutes les instances** (type *Conseil municipa
 - **ODJ-12** — **Unicité** du numéro par instance et par année, garantie en base ; un numéro n'est jamais réattribué.
 - **ODJ-13** — Le même composant sert à l'**ordre du jour des séances de commission** (CMN-03).
 
-### 16.3 Cahier de séance (D11)
+### 16.3 Cahier de séance (D11, D60)
 
 - **CAH-01** — Le **cahier de séance** est **un seul PDF, prêt à imprimer et à relier**, qui compile tout le dossier d'une séance dans l'ordre de l'ordre du jour. Structure :
   1. **page de garde** (instance, séance, date, lieu) au gabarit de mise en page ;
@@ -763,6 +763,8 @@ Le tuto montre un **calendrier de toutes les instances** (type *Conseil municipa
 - **CAH-09** — **Poids** : option d'**optimisation** des annexes scannées lourdes (recompression, réduction de résolution), plafond de taille, alerte au-delà de N Mo.
 - **CAH-10** — **Filigrane** « PROJET » tant que l'ordre du jour n'est pas arrêté ; aucun sur le cahier définitif (paramétrable).
 - **CAH-11** — **Accès** : SCC, DGS et rôles autorisés ; version numérique à signets pour les élus **après publication** ; téléchargements **tracés**.
+**Réalisé (D60)** : CAH-01 (garde, sommaire paginé, intercalaires, exposé une fois par dossier, délibérations, annexes, points libres et chapitres), CAH-03 (recto-verso), CAH-04 (profils, annexes communicables), CAH-05 (contrôles avec bloquer / avertir / exclure), CAH-06 (génération asynchrone avec avancement — sans mail de fin ni reprise), CAH-08 (versions, marquage imprimé, changements depuis la version imprimée), CAH-10 (filigrane), CAH-11 (accès restreint, téléchargements tracés). **À faire** : CAH-02 (signets, numéro de point en pied), tomes, CAH-07 (cache), CAH-09 (optimisation des annexes).
+
 - **CAH-12** — *Phase ultérieure* : erratum / pages de remplacement pour les points modifiés après diffusion.
 
 ---
@@ -1541,6 +1543,8 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D57** | **Ordre du jour et circuit non terminé** : un dossier qui vise une séance peut être **inscrit à l'ordre du jour avant la fin de son circuit** (brouillon, en validation, à corriger). Sa ligne est colorée selon son **état de validation** (vert = prêt, bleu = en validation avec l'étape et les valideurs, ambre = à corriger, gris = en rédaction) ; son statut ne change pas tant que le circuit n'est pas terminé, puis il devient « inscrit à l'ODJ » automatiquement. L'**arrêt** de l'ordre du jour reste bloqué (sauf forçage) tant qu'un dossier n'est pas prêt. | 16 |
 | **D58** | **Visionneuse PDF unique** : tout PDF de l'application (aperçu d'un texte, aperçu du dossier, annexes, étalonnage de gabarit) s'affiche dans la **visionneuse intégrée** — la même que celle d'AppDSI : modale avec zoom (± et « ajuster à la largeur »), lecteur natif du navigateur sur poste, rendu pdf.js sur mobile et Safari, bouton « ouvrir dans un onglet » — et **jamais dans un onglet vierge**. | 12, 16, 25 |
 | **D59** | **Éditeur** : l'**en-tête de l'application** (logo, navigation, recherche, pastille IA, profil) **reste visible** pendant la rédaction ; le **panneau « Assistant »** (IA-60) est réalisé avec ses quatre outils — *Vérifier l'orthographe*, *Améliorer le style*, *Contrôler les visas et considérants*, *Contrôle complet du dossier* — sous forme de cartes catégorisées [Accepter] [Ignorer] [Pourquoi ?], « Tout accepter » limité à l'orthographe (IA-13), acceptation = modification suivie attribuée à l'utilisateur (IA-62). | 9, 21 |
+| **D60** | **Cahier de séance réalisé (première version)** : depuis l'écran de l'ordre du jour, le SCC, la DGS ou un administrateur génère, **en arrière plan**, un PDF unique — page de garde, sommaire paginé, puis pour chaque point intercalaire, exposé (une fois par dossier), délibération(s) et annexes — en **versions numérotées**, avec **contrôles préalables** (bloquer, avertir ou exclure les dossiers en anomalie), **recto-verso** en option, **profils** (secrétariat, présidence, élus, public — ces deux derniers ne joignent que les annexes communicables), **filigrane « PROJET »** tant que l'ordre du jour n'est pas arrêté, **téléchargements tracés** et marquage « imprimé » avec liste des points ajoutés, retirés ou modifiés depuis. Restent à faire : tomes, cache des blocs, optimisation des annexes, mail de fin, pages de notes, signets. | 16 |
+| **D61** | **Intitulé de poste d'un agent** : pour le **responsable d'une direction ou d'un service**, l'application affiche l'**intitulé officiel de l'organigramme RH** (« Directeur des systèmes d'information »), et non la fonction « métier » de la fiche RH (« Directeur et expertise informatique ») ; c'est le cas partout où le poste apparaît (profil, sélecteur d'agent « @ », liste des utilisateurs, fiche). Le masculin ou le féminin des intitulés épicènes (« Directeur·trice ») est choisi **d'après la fiche RH**, jamais d'après le prénom ; à défaut la forme épicène est conservée. Les autres agents gardent leur fonction RH. | 5, 12 |
 
 ---
 
@@ -1561,6 +1565,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.6** | 2026-09-20 | décisions **D60 et D61** : cahier de séance (première version : génération asynchrone, versions, contrôles, profils, recto-verso, filigrane, traçabilité) et intitulé de poste d'après l'organigramme RH pour les responsables |
 | **1.5** | 2026-09-20 | décisions **D56 à D59** : responsable intermédiaire facultatif et désactivé par défaut, dossiers inscrits à l'ordre du jour avant la fin du circuit (fond coloré selon l'état de validation), visionneuse PDF unique (celle d'AppDSI), en-tête conservé dans l'éditeur, panneau Assistant IA réalisé (orthographe, style, visas, contrôle complet) ; corrections : espaces des titres en gras et ligatures « fi » dans les PDF, logo dans l'en-tête et intitulé de poste d'après l'organigramme RH |
 | **1.4** | 2026-09-19 | décisions **D50 à D55** : identité et logo de l'organisme (aussi logo de l'application et des PDF), réunions de commission avec projets présentés et Teams, IA en arrière plan avec file d'attente paramétrable, séances passées et dossiers visant une séance, `docker compose` complet ; **copie de délibération assistée par IA**, éditeur en modale et polices Interstate réalisés |
 | **1.3** | 2026-09-19 | décisions **D47 à D49** : « Afficher en tant que » (administrateur, SCC), autocomplétion des agents partout (`@nom`), tableau de bord avec l'équipe (N-x) et les actes validés en cours de circuit ; **ODJ et numérotation**, utilisateurs et rôles, gabarits PDF (police Interstate, choix du gabarit) réalisés |

@@ -153,7 +153,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late }) {
   }
 
   const svc = {
-    VARS, DEFAULT_PATTERN, formatNumero, checkPattern,
+    VARS, DEFAULT_PATTERN, formatNumero, checkPattern, canEditOdj: canEdit,
 
     async get(ctx, organismeId, seanceId) {
       const s = await seanceOf(db, organismeId, seanceId);

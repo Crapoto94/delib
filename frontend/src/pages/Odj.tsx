@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Download, GripVertical, Lock, Plus, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Download, GripVertical, Lock, Plus, Trash2, Undo2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { TeamsForm, TeamsLink } from '../Reunions';
+import CahierModal from '../Cahier';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
 
 /** Ordre du jour d'une séance : classement par glisser-déposer (ou clavier), numérotation, affectation, arrêt (section 16.2). */
@@ -32,7 +33,7 @@ export default function Odj() {
   const [pattern, setPattern] = useState<{ value: string; exemples: string[] } | null>(null);
   const lockTimer = useRef<any>(null);
   const meta = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}`))).data, [o, id]);
-  const [teamsOpen, setTeamsOpen] = useState(false);
+  const [teamsOpen, setTeamsOpen] = useState(false); const [cahierOpen, setCahierOpen] = useState(false);
   const d = odj.data;
   useEffect(() => { if (d) setOrder(d.items); }, [d]);
   useEffect(() => () => clearInterval(lockTimer.current), []);
@@ -87,6 +88,7 @@ export default function Odj() {
         sub={<span>{meta.data?.teams && <span className="mr-2"><TeamsLink teams={meta.data.teams} /></span>}Format de numérotation : <code>{d.pattern}</code> · <Badge tone={arrete ? 'ok' : 'warn'}>{arrete ? `arrêté le ${dt(d.arreteAt, { dateStyle: 'short' })}` : 'en préparation — numéros provisoires'}</Badge>{d.lock && <span className="ml-2 inline-flex items-center gap-1 text-warn"><Lock className="h-3.5 w-3.5" /> en cours de modification par {d.lock.username}</span>}</span>}
         actions={<>
           {canEdit && meta.data && meta.data.statut !== 'annulee' && <button className="btn-secondary" onClick={() => setTeamsOpen(true)}>Teams…</button>}
+          {canEdit && meta.data?.kind !== 'commission' && <button className="btn-secondary" onClick={() => setCahierOpen(true)}><BookOpen className="h-4 w-4" /> Cahier de séance</button>}
           <button className="btn-secondary" onClick={exportCsv}><Download className="h-4 w-4" /> Tableau de suivi (CSV)</button>
           {canEdit && !arrete && <button className="btn-secondary" onClick={() => previewPattern(d.pattern)}>Numérotation…</button>}
           {canEdit && !arrete && <button className="btn-primary" onClick={() => doArret(false)} disabled={busy}>Arrêter l'ordre du jour</button>}
@@ -182,6 +184,7 @@ export default function Odj() {
       {arret && <Modal title="Anomalies avant l'arrêt" onClose={() => setArret(null)} wide><div className="space-y-3">
         <p>L'ordre du jour comporte des anomalies :</p><ul className="list-disc pl-5 text-warn">{(Array.isArray(arret) ? arret : []).map((p: any, i: number) => <li key={i}>{p.message}</li>)}</ul>
         <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setArret(null)}>Corriger</button><button className="btn-ko" onClick={() => doArret(true)}>Arrêter malgré tout</button></div></div></Modal>}
+      {cahierOpen && <CahierModal seanceId={Number(id)} onClose={() => setCahierOpen(false)} />}
       {teamsOpen && meta.data && <TeamsForm seance={meta.data} onClose={() => setTeamsOpen(false)} onDone={() => { toast('Visioconférence enregistrée'); meta.reload(); }} />}
       {node}
     </div>

@@ -23,6 +23,7 @@ function createUsers({ db, audit, dir, organismes, access, log }) {
       if (avecRole) { p.push(org); where.push(`EXISTS (SELECT 1 FROM user_org_roles r WHERE r.username = agent_ref.username AND (r.organisme_id = $${p.length} OR r.organisme_id IS NULL))`); }
       p.push(limit, offset);
       const local = (await db.all(`SELECT * FROM agent_ref WHERE ${where.join(' AND ')} ORDER BY display_name NULLS LAST, username LIMIT $${p.length - 1} OFFSET $${p.length}`, p)).map(toA);
+      for (const a of local) a.poste = await dir.posteAffiche({ displayName: a.displayName, direction: a.direction?.label, service: a.service?.label, poste: a.poste });
       const seen = new Set(local.map((a) => a.username));
       let remote = [];
       try {

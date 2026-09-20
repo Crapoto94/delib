@@ -31,7 +31,7 @@ module.exports = ({ makeRouter, dir }) => {
   }, async (req, res) => {
     const a = await dir.getAgent(req.valid.params.username);
     if (!a) throw E.notFound('Agent inconnu (jamais connecté à IvryDélib)');
-    res.json(a);
+    res.json({ ...a, poste: await dir.posteAffiche({ displayName: a.displayName, nom: a.nom, prenom: a.prenom, direction: a.direction?.label, service: a.service, poste: a.poste }) });
   });
 
   return [r];

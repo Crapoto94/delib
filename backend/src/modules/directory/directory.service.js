@@ -43,26 +43,53 @@ function createDirectoryService({ db, adapter, config, log }) {
     } catch { return null; }
   }
 
+  // ---- intitulé de poste d'après l'organigramme ---------------------------------------------------------------------------
+  // La fiche RH d'un agent porte un poste « métier » (« Directeur et expertise informatique ») ; l'organigramme porte l'intitulé
+  // OFFICIEL du responsable d'une direction ou d'un service (« Directeur·trice des systèmes d'information »). Pour un responsable,
+  // c'est l'intitulé de l'organigramme qui est affiché partout.
+  let chartCache = { at: 0, list: null };
+  async function chart() {
+    if (chartCache.list && Date.now() - chartCache.at < config.directoryCacheMs) return chartCache.list;
+    try { const list = await adapter.getOrganisationChart(); chartCache = { at: Date.now(), list }; return list; } catch (e) {
+      if (chartCache.list) return chartCache.list;
+      throw e;
+    }
+  }
+  // accents perdus dans l'organigramme (libellés en capitales sans accent)
+  const ACCENTS = { systemes: 'systèmes', developpement: 'développement', generaux: 'généraux', general: 'général', evenementiel: 'événementiel', securite: 'sécurité', prevention: 'prévention', reglementation: 'réglementation', etat: 'état', mediatheque: 'médiathèque', ecologie: 'écologie', elections: 'élections', etudes: 'études', sante: 'santé', education: 'éducation', cooperation: 'coopération', democratie: 'démocratie', numerique: 'numérique', economique: 'économique', equipements: 'équipements', batiments: 'bâtiments', proprete: 'propreté', regie: 'régie' };
+  const sentence = (t) => {
+    const low = String(t).toLowerCase().replace(/\s+/g, ' ').trim().replace(/[\p{L}]+/gu, (w) => ACCENTS[w] || w);
+    return low.charAt(0).toUpperCase() + low.slice(1);
+  };
+  /** « DIRECTEUR·TRICE » : masculin ou féminin selon la fiche RH de la personne (jamais d'après son prénom) ; sinon forme épicène. */
+  function genderPoste(orgPoste, fichePoste) {
+    return String(orgPoste).replace(/([\p{L}]+)·([\p{L}]+)/gu, (m, base, suf) => {
+      const masc = base; const fem = /teur$/i.test(base) && /^trice$/i.test(suf) ? base.slice(0, -4) + suf : base + suf;
+      const fiche = ` ${normLabel(fichePoste)} `;
+      if (fiche.includes(` ${normLabel(masc)} `)) return masc;
+      if (fiche.includes(` ${normLabel(fem)} `)) return fem;
+      return m;
+    });
+  }
   /**
-   * Intitulé de poste à afficher : si l'agent est le RESPONSABLE de sa direction ou de son service dans l'organigramme RH,
-   * on prend l'intitulé du poste d'organigramme (« Directeur des systèmes d'information »), plus parlant que la
-   * fonction de la fiche RH (« Directeur et expertise informatique »).
+   * Poste à afficher pour une personne : `who` = { displayName, nom?, prenom?, direction (libellé), service (libellé), poste }.
+   * Renvoie `who.poste` inchangé si la personne n'est pas le responsable de sa direction / de son service.
    */
-  async function posteOrganigramme(card, dir, svc) {
-    if (!card || !dir?.code) return null;
+  async function posteAffiche(who) {
+    if (!who || !who.direction) return who?.poste ?? null;
     try {
-      const chart = await adapter.getOrganisationChart();
-      const node = chart.find((d) => d.code === dir.code);
-      if (!node) return null;
-      const me = [normLabel(`${card.prenom} ${card.nom}`), normLabel(`${card.nom} ${card.prenom}`)];
-      const sn = svc?.code ? (node.services || []).find((x) => x.code === svc.code) : null;
+      const nodes = await chart();
+      const node = nodes.find((d) => normLabel(d.label) === normLabel(who.direction));
+      if (!node) return who.poste ?? null;
+      const key = (x) => normLabel(x).split(' ').filter(Boolean).sort().join(' '); // « nom prénom » = « prénom nom »
+      const names = new Set([who.displayName, `${who.prenom || ''} ${who.nom || ''}`].filter((x) => x && x.trim()).map(key));
+      const sn = who.service && normLabel(who.service) !== normLabel(node.label) ? (node.services || []).find((x) => normLabel(x.label) === normLabel(who.service)) : null;
       for (const n of [sn, node]) {
-        if (n?.poste && n.responsable && me.includes(normLabel(n.responsable))) return sentence(n.poste);
+        if (n?.poste && n.responsable && names.has(key(n.responsable))) return sentence(genderPoste(n.poste, who.poste));
       }
     } catch { /* organigramme indisponible : on garde la fonction de la fiche RH */ }
-    return null;
+    return who.poste ?? null;
   }
-  const sentence = (t) => { const s = String(t).toLowerCase().replace(/\s+/g, ' ').trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
 
   async function upsertAgent(a) {
     await db.run(
@@ -100,7 +127,8 @@ function createDirectoryService({ db, adapter, config, log }) {
   return {
     directions,
     organisationChart: () => adapter.getOrganisationChart(),
-    searchAgents: (q) => adapter.searchAgents(q),
+    async searchAgents(q) { const list = await adapter.searchAgents(q); return Promise.all(list.map(async (a) => ({ ...a, poste: await posteAffiche(a) }))); },
+    posteAffiche,
 
     /**
      * Autocomplétion d'un agent (« @nom ») : identifiant de connexion, nom, direction. Les agents déjà connectés d'abord, puis
@@ -121,7 +149,9 @@ function createDirectoryService({ db, adapter, config, log }) {
         remote = (await adapter.searchAgents(text)).map((a) => ({ a, login: ((a.email || '').split('@')[0] || '').toLowerCase() })).filter(({ login }) => login && !seen.has(login))
           .map(({ a, login }) => ({ username: login, displayName: a.displayName, email: a.email, direction: a.direction, service: a.service, poste: a.poste, knownLocally: false }));
       } catch (e) { log.warn({ err: e.message }, 'autocomplétion : annuaire RH indisponible, résultats locaux seulement'); }
-      return [...local, ...remote].slice(0, limit);
+      const all = [...local, ...remote].slice(0, limit);
+      for (const a of all) a.poste = await posteAffiche(a);
+      return all;
     },
     toAgent,
 
@@ -154,7 +184,7 @@ function createDirectoryService({ db, adapter, config, log }) {
       return upsertAgent({
         username: adUser.username, displayName, email,
         nom: card?.nom ?? adUser.surname, prenom: card?.prenom ?? adUser.givenName, matricule: card?.matricule,
-        directionCode: dir?.code, directionLabel: dir?.label || card?.direction, serviceLabel: svcHit?.label || card?.service, serviceCode: svcHit?.code, poste: (await posteOrganigramme(card, dir, svcHit)) || card?.fonction,
+        directionCode: dir?.code, directionLabel: dir?.label || card?.direction, serviceLabel: svcHit?.label || card?.service, serviceCode: svcHit?.code, poste: card?.fonction, // fonction de la fiche RH telle quelle ; l'intitulé d'organigramme est calculé à l'affichage (posteAffiche)
         actif: card ? card.present : true, loginAt: new Date(),
       });
     },
