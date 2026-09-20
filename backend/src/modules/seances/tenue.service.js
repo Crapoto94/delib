@@ -133,6 +133,34 @@ function createTenue({ db, audit, acl, access, seances, odj }) {
       return out;
     },
 
+    /**
+     * Vue PUBLIQUE minimale pour l'espace élus (ELU-40, ELU-41) : point en cours et avancement, jamais de notes ni de décompte de saisie.
+     * Attente longue comme `attendre`. `resultats` : afficher « adoptée / rejetée » une fois le vote clos (paramètre de l'organisme).
+     */
+    async directPublic(organismeId, seanceId, since, waitMs, { resultats = true } = {}) {
+      const org = requireOrg(organismeId);
+      const vue = async () => {
+        const t = await db.get('SELECT version, statut, point_courant_id FROM seance_tenue WHERE seance_id = $1', [seanceId]);
+        if (!t) return { version: 0, statut: 'non_ouverte', courantId: null, points: [] };
+        const pts = await db.all('SELECT item_id, etat, resultat FROM seance_points WHERE seance_id = $1', [seanceId]);
+        return {
+          version: t.version, statut: t.statut, courantId: t.point_courant_id,
+          points: pts.map((p) => ({ id: p.item_id, etat: p.etat === 'en_cours' ? 'en_cours' : ['traite', 'sans_vote', 'retire', 'ajourne'].includes(p.etat) ? 'clos' : 'a_venir', issue: p.etat === 'traite' ? (resultats ? (String(p.resultat).startsWith('adopte') ? 'adopte' : 'rejete') : 'traite') : (['retire', 'ajourne', 'sans_vote'].includes(p.etat) ? p.etat : null) })),
+        };
+      };
+      await seances.get(org, seanceId);
+      const cur = await vue();
+      if (cur.version > since || waitMs <= 0) return cur.version > since ? cur : { unchanged: true, version: cur.version };
+      await new Promise((resolve) => {
+        const done = () => { clearTimeout(timer); const w = waiters.get(seanceId); if (w) { w.delete(done); if (!w.size) waiters.delete(seanceId); } resolve(); };
+        const timer = setTimeout(done, Math.min(waitMs, 30000));
+        if (!waiters.has(seanceId)) waiters.set(seanceId, new Set());
+        waiters.get(seanceId).add(done);
+      });
+      const apres = await vue();
+      return apres.version > since ? apres : { unchanged: true, version: apres.version };
+    },
+
     /** Attente longue : renvoie l'état dès que la version dépasse `since`, sinon `{ unchanged: true }` après `waitMs`. */
     async attendre(ctx, organismeId, seanceId, since, waitMs = 25000) {
       const org = requireOrg(organismeId);

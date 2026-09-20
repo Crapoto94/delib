@@ -39,6 +39,8 @@ const MODULES = [
   require('../modules/seances/tenue.routes'),
   require('../modules/seances/pv.routes'),
   require('../modules/teletransmission/tlt.routes'),
+  require('../modules/espace-elus/elus.routes'),
+  require('../modules/espace-elus/comptes.routes'),
   require('../modules/titulaires/organisation.routes'),
   require('../modules/convocations/convocations.routes'),
   require('../modules/users/users.routes'),
@@ -72,6 +74,7 @@ function createApp(c) {
   app.use(express.json({ limit: '1mb' }));
 
   const mw = createAuthMiddleware({ config, sessions: c.sessions, access: c.access, organismes: c.organismes });
+  mw.authenticateElu = c.eluAuth.authenticate;
   const registry = [];
   const makeRouter = createRouterFactory(mw, registry);
   const limiter = config.env === 'test' ? (req, res, next) => next()

@@ -9,6 +9,7 @@
  * spec = {
  *   summary, tags, description?,
  *   auth?: false,                 // true par défaut
+ *   elu?: true,                   // jeton d'ÉLU (espace élus) au lieu du jeton d'agent
  *   org?: true,                   // exige un organisme (paramètre :orgId ou en-tête X-Organisme-Id) auquel l'utilisateur a accès
  *   roles?: ['org_admin', ...],   // rôles admis dans cet organisme (l'administrateur de plateforme passe toujours)
  *   platform?: true,              // administrateur de plateforme uniquement
@@ -30,7 +31,8 @@ function createRouterFactory(mw, registry) {
       api[method] = (path, spec, ...handlers) => {
         const stack = [];
         if (spec.limiter) stack.push(spec.limiter);
-        if (spec.auth !== false) stack.push(mw.authenticate);
+        if (spec.elu) stack.push(mw.authenticateElu); // espace élus : jeton d'élu, jamais un jeton d'agent
+        else if (spec.auth !== false) stack.push(mw.authenticate);
         if (spec.org) stack.push(mw.orgContext);
         if (spec.platform) stack.push(mw.requirePlatformAdmin);
         if (spec.roles) stack.push(mw.requireRoles(spec.roles));

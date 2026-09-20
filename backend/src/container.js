@@ -36,6 +36,8 @@ const { createCahier } = require('./modules/seances/cahier.service');
 const { createKpis } = require('./modules/seances/kpis.service');
 const { createTenue } = require('./modules/seances/tenue.service');
 const { createPv } = require('./modules/seances/pv.service');
+const { createEluAuth } = require('./modules/espace-elus/elu-auth.service');
+const { createEspaceElus } = require('./modules/espace-elus/espace.service');
 const { createTeletransmission } = require('./modules/teletransmission/tlt.service');
 const { createS2lowSimulateur } = require('./adapters/s2low-simulateur');
 const { createOrganisation } = require('./modules/titulaires/organisation.service');
@@ -100,9 +102,11 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
+  const eluAuth = createEluAuth({ db, config, mail, settings, audit, log });
+  const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log });
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };
