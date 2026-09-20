@@ -49,6 +49,8 @@ module.exports = ({ makeRouter, recherche, alertes }) => {
   r.put('/enregistrees/:id/alerte', { summary: 'Active ou coupe l\'alerte d\'une recherche enregistrée (« me prévenir quand un nouvel acte correspond »)', tags: T, org: true, params: PS, body: z.object({ actif: z.boolean() }),
     description: 'À l\'activation, les résultats du moment sont mémorisés : seuls les nouveaux actes déclenchent une notification. La vérification (au plus horaire) se fait avec vos droits.' },
   async (req, res) => res.json(await alertes.basculer(req.ctx, req.org.id, req.valid.params.id, req.valid.body.actif)));
+  r.put('/enregistrees/:id/alerte-mail', { summary: 'Alerte de recherche aussi par e-mail (facultatif ; l\'alerte doit être active)', tags: T, org: true, params: PS, body: z.object({ actif: z.boolean() }) },
+    async (req, res) => res.json(await alertes.basculerMail(req.ctx, req.org.id, req.valid.params.id, req.valid.body.actif)));
   r.get('/etat', { summary: 'État de l’index (actes indexés, en retard, annexes lues / sans texte), requêtes fréquentes et sans résultat (anonymisées)', tags: T, org: true, roles: ADMIN, params: P },
     async (req, res) => res.json(await recherche.etat(req.ctx, req.org.id)));
   r.post('/reindexation', { summary: 'Lance la ré-indexation complète en arrière-plan (les annexes déjà lues ne sont pas relues)', tags: T, org: true, roles: ADMIN, params: P, responses: { 202: 'Démarrée' } },

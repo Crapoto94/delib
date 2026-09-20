@@ -11,9 +11,15 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.36.1';
+export const VERSION = '0.37.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.37.0', type: 'minor', titre: 'Alertes de recherche par e-mail',
+    items: [
+      "Alertes de recherche par e-mail (facultatif) : l'enveloppe à côté de la cloche d'une recherche enregistrée envoie aussi le message par mail.",
+    ],
+  },
   {
     version: '0.36.1', type: 'patch', titre: 'Visite guidée et aide mises à jour',
     items: [

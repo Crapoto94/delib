@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.37 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.38 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -751,6 +751,7 @@ Le tuto montre un **calendrier de toutes les instances** (type *Conseil municipa
 - **SEA-13** — **Workflow de la séance (D105)** : comme un acte a son circuit, une séance a son **parcours** affiché en **frise en haut de la page** (même composant que la frise du circuit d'un dossier) : **① Rédaction** (les dossiers s'écrivent et se valident, la séance est planifiée) → **② Préparation** (ordre du jour en préparation, arrêté, cahier construit) → **③ Convocation** (convocation envoyée, projets mis à disposition) → **④ Séance** (suivi de séance ouvert, votes) → **⑤ Après la séance** (procès-verbal, extraits du registre, transmission au contrôle de légalité) → **⑥ Clôture** (séance close, tout archivé). Chaque étape porte son **état** (à venir, en cours, terminée), sa **date** et, quand elle est bloquée, la **raison** (« 3 dossiers pas encore validés », « ordre du jour non arrêté », « 2 transmissions sans AR »). L'étape se **déduit des faits** (dossiers, ordre du jour, convocation, tenue, transmissions, GED) : personne ne « coche » l'avancement à la main. Un clic sur une étape ouvre l'écran concerné.
 - **SEA-14** — **Président de séance par défaut (D106)** : au **conseil**, le président de séance est **le maire** dès l'ouverture du suivi de séance (l'élu dont la fonction est « Maire » ; un « adjoint au Maire » ne l'est pas). Le secrétariat peut le remplacer ; son choix n'est jamais écrasé. Rien n'est désigné d'office pour une commission ni quand aucun élu n'est maire.
 - **TLT-37** — **Date d'affichage (D106)** : après l'AR, le SCC saisit la **date d'affichage (publication)** de chaque délibération transmise (fenêtre « AR (XML) » du suivi) ; elle renseigne « PUBLIÉ PAR VOIE D'AFFICHAGE LE » de l'extrait du registre et met à jour son dépôt en GED. À défaut, la date de l'AR est reprise. Elle ne peut pas précéder la réception en préfecture.
+- **REC-32** — **Alerte de recherche par e-mail (D107)** : sur une recherche dont l'alerte est active, l'enveloppe « Recevoir aussi par e-mail » envoie le **même message** à l'adresse de la personne (en plus de la notification dans l'outil), avec le lien vers la recherche. **Facultatif, désactivé par défaut** ; couper l'alerte coupe aussi le mail ; le mode recette redirige le message comme les autres mails.
 
 ### 16.2 Ordre du jour, classement et numérotation (D10)
 
@@ -1774,6 +1775,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D104** | **AR de la préfecture** : tampon (encadré AR sur chaque page, mentions de transmission renseignées), **ARActe XML** conservé, consultable et déposé en GED, **extrait du registre** conforme au modèle de la Ville (garde, présence, délibération) | TLT-34, 35, 36 |
 | **D105** | **Workflow de la séance** (Rédaction → Préparation → Convocation → Séance → Après la séance → Clôture) en frise ; **deux dispositifs distincts** : bibliothèque des actes de la collectivité (consulter) et trajet de mes actes (mon rôle, circuit, amendements) | SEA-13, REC-30, REC-31 |
 | **D106** | **Listes déroulantes filtrables partout** ; **président de séance = le maire par défaut** au conseil ; **date d'affichage** saisie après l'AR | UI-06, SEA-14, TLT-37 |
+| **D107** | **Alerte de recherche par e-mail** (facultative), en plus de la notification dans l'outil | REC-32 |
 | **D97** | **API externe et clés d'accès** : lecture seule, clés hachées à affichage unique, portées distinguant actes exécutoires / adoptés / en cours, IP autorisées, limite de débit, synchronisation incrémentale *(EXT-01 à EXT-06)* | 24 bis |
 | **D96** | **Sauvegarde vers un dossier réseau** : export logique cohérent en NDJSON, fichiers incrémentaux, destination UNC avec identifiants chiffrés, planification nocturne, rétention, journal, restauration outillée *(SAV-01 à SAV-07)* | 29.1 |
 | **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |
@@ -1806,6 +1808,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.38** | 2026-09-20 | **D107** : alerte de recherche par e-mail (REC-32) ; visite guidée v2 |
 | **1.37** | 2026-09-20 | **D106** : listes déroulantes filtrables (UI-06), président de séance = maire (SEA-14), date d'affichage (TLT-37) |
 | **1.36** | 2026-09-20 | **D104** : tampon et AR XML, extrait du registre conforme (TLT-34 à 36) ; **D105** : workflow de la séance (SEA-13), bibliothèque des actes et trajet de mes actes (REC-30, 31) |
 | **1.35** | 2026-09-20 | **D103** : contrôle de légalité — envoi en masse, modification du texte par le SCC, workflow d'envoi paramétrable (TLT-31 à 33) |

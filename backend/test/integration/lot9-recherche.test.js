@@ -343,3 +343,34 @@ describe('alertes de recherche (REC-29)', () => {
     expect(await env.c.alertes.verifier(ville.id, { forcer: true })).toBe(0);
   });
 });
+
+describe('alerte de recherche aussi par e-mail (REC-29, D107)', () => {
+  it('facultative : il faut une alerte active ; le mail part en plus de la notification, jamais sans le choix de la personne', async () => {
+    const type = (await as(admin).get(`${base()}/referentiels/type_acte`)).body.items.find((x) => x.code === 'deliberation');
+    const id = (await as(t.dupont).post(R('/enregistrees'), { nom: 'Veille jardins partagés', requete: { q: 'jardins' } })).body.id;
+    const mailOn = (actif) => as(t.dupont).put(R(`/enregistrees/${id}/alerte-mail`), { actif });
+    expect((await mailOn(true)).status).toBe(400);                                        // pas d'alerte active
+    expect((await as(t.moreau).put(R(`/enregistrees/${id}/alerte-mail`), { actif: true })).status).toBe(404); // pas la sienne
+    await as(t.dupont).put(R(`/enregistrees/${id}/alerte`), { actif: true });
+    expect((await as(t.dupont).get(R('/alertes'))).body.items.find((x) => x.id === id)).toMatchObject({ alerte: true, alerteMail: false });
+
+    // sans le choix « e-mail » : notification seulement
+    let a = (await as(t.dupont).post(`${base()}/actes`, { typeId: type.id, titre: 'Création de jardins partagés' })).body;
+    await env.c.recherche.traiterActe(a.id);
+    const avant = mails(/Veille jardins partagés/).length;
+    expect(await env.c.alertes.verifier(ville.id, { forcer: true })).toBe(1);
+    expect(mails(/Veille jardins partagés/).length).toBe(avant);
+
+    // avec le choix : le mail part aussi
+    expect((await mailOn(true)).body.alerteMail).toBe(true);
+    a = (await as(t.dupont).post(`${base()}/actes`, { typeId: type.id, titre: 'Extension des jardins partagés' })).body;
+    await env.c.recherche.traiterActe(a.id);
+    expect(await env.c.alertes.verifier(ville.id, { forcer: true })).toBe(1);
+    const m = mails(/Veille jardins partagés/);
+    expect(m.length).toBe(avant + 1); expect(m[m.length - 1].html).toMatch(/Extension des jardins partagés/);
+
+    // couper l'alerte coupe aussi le mail
+    await as(t.dupont).put(R(`/enregistrees/${id}/alerte`), { actif: false });
+    expect((await as(t.dupont).get(R('/alertes'))).body.items.find((x) => x.id === id)).toMatchObject({ alerte: false, alerteMail: false });
+  });
+});

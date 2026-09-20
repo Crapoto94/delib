@@ -19,7 +19,7 @@ function criteres(requete) {
   return f;
 }
 
-function createAlertes({ db, access, recherche, log }) {
+function createAlertes({ db, access, recherche, log, notifications, config }) {
   const ids = async (ctx, org, requete) => {
     const f = criteres(requete);
     if (!Object.keys(f).length) return { ids: [], items: [], total: 0 };
@@ -32,16 +32,27 @@ function createAlertes({ db, access, recherche, log }) {
 
     /** État des alertes de l'utilisateur : par recherche enregistrée. */
     async etat(ctx, organismeId) {
-      const rows = await db.all('SELECT id, alerte, derniere_verif FROM search_saved WHERE organisme_id = $1 AND username = $2', [requireOrg(organismeId), ctx.username]);
-      return { items: rows.map((r) => ({ id: r.id, alerte: r.alerte, derniereVerif: r.derniere_verif })) };
+      const rows = await db.all('SELECT id, alerte, alerte_mail, derniere_verif FROM search_saved WHERE organisme_id = $1 AND username = $2', [requireOrg(organismeId), ctx.username]);
+      return { items: rows.map((r) => ({ id: r.id, alerte: r.alerte, alerteMail: r.alerte_mail, derniereVerif: r.derniere_verif })) };
     },
 
     /** Active ou coupe l'alerte : à l'activation, les résultats du moment sont mémorisés (aucun déluge de notifications). */
+    /** « Me prévenir aussi par e-mail » (facultatif) : ne concerne qu'une recherche dont l'alerte est active. */
+    async basculerMail(ctx, organismeId, id, actif) {
+      const org = requireOrg(organismeId);
+      const s = await db.get('SELECT alerte FROM search_saved WHERE id = $1 AND organisme_id = $2 AND username = $3', [id, org, ctx.username]);
+      if (!s) throw E.notFound('Recherche introuvable');
+      if (actif && !s.alerte) throw E.badRequest('Activez d\'abord l\'alerte de cette recherche');
+      if (actif && !ctx.email) throw E.badRequest('Aucune adresse e-mail n\'est connue pour votre compte');
+      await db.run('UPDATE search_saved SET alerte_mail = $2 WHERE id = $1', [id, !!actif]);
+      return { id, alerteMail: !!actif };
+    },
+
     async basculer(ctx, organismeId, id, actif) {
       const org = requireOrg(organismeId);
       const s = await db.get('SELECT * FROM search_saved WHERE id = $1 AND organisme_id = $2 AND username = $3', [id, org, ctx.username]);
       if (!s) throw E.notFound('Recherche introuvable');
-      if (!actif) { await db.run("UPDATE search_saved SET alerte = false, vus = '[]'::jsonb WHERE id = $1", [id]); return { id, alerte: false }; }
+      if (!actif) { await db.run("UPDATE search_saved SET alerte = false, alerte_mail = false, vus = '[]'::jsonb WHERE id = $1", [id]); return { id, alerte: false }; }
       if (!Object.keys(criteres(s.requete)).length) throw E.badRequest('Cette recherche n\'a aucun critère : une alerte n\'aurait pas de sens');
       const r = await ids(ctx, org, s.requete);
       await db.run('UPDATE search_saved SET alerte = true, vus = $2::jsonb, derniere_verif = now() WHERE id = $1', [id, JSON.stringify(r.ids)]);
@@ -67,6 +78,10 @@ function createAlertes({ db, access, recherche, log }) {
             await db.run('INSERT INTO notifications (organisme_id, username, family, rule_code, acte_id, title, body, link) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
               [org, s.username, 'recherche', 'recherche.alerte', nouveaux.length === 1 ? nouveaux[0].acteId : null, titre, `${liste}${nouveaux.length > 3 ? '…' : ''}`, `/recherche?${new URLSearchParams(Object.entries(criteres(s.requete)).map(([k, v]) => [k, String(v)])).toString()}`]);
             envoyees++;
+            if (s.alerte_mail && ctx.email && notifications) { // même message par e-mail, à l'adresse de la personne (le mode recette redirige, comme pour les autres mails)
+              const lien = `${config?.publicBaseUrl ?? ''}/recherche?${new URLSearchParams(Object.entries(criteres(s.requete)).map(([k, v]) => [k, String(v)])).toString()}`;
+              await notifications.sendMail(org, ctx.email, titre, `${liste}${nouveaux.length > 3 ? '…' : ''}\n${lien}`).catch((e) => log?.warn?.({ err: e.message, recherche: s.id }, "alerte de recherche : e-mail non envoyé"));
+            }
           }
           const tous = [...new Set([...(s.vus || []), ...r.ids])].slice(-MAX_VUS);
           await db.run('UPDATE search_saved SET vus = $2::jsonb, derniere_verif = now() WHERE id = $1', [s.id, JSON.stringify(tous)]);

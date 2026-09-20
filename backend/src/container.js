@@ -150,7 +150,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const configuration = createConfiguration({ db, audit, settings, circuits, champs });
   const rgpd = createRgpd({ db, audit, config, settings });
   const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
-  const alertes = createAlertes({ db, access, recherche, log });
+  const alertes = createAlertes({ db, access, recherche, log, notifications, config });
   const apiKeys = createApiKeys({ db, audit, log });
   const externe = createExterne({ db, render, storage });
   const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
