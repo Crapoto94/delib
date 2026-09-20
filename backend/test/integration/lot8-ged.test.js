@@ -251,7 +251,8 @@ describe('synchronisation avec la GED (GED-08)', () => {
 
   it('état comparé, synchronisation locale → GED idempotente, vérification GED → local et redépôt des manquants', async () => {
     expect((await as(admin).put(G('/config'), { mode: 'simulation', actif: true, autoArchivage: false, racine: '', url: '', utilisateur: '' })).status).toBe(200);
-    await sleep(1000); // laisse finir l'archivage automatique déclenché par la clôture des tests précédents
+    // laisse finir l'archivage automatique déclenché par la clôture (en arrière-plan, plus ou moins long selon la charge) : le nombre de dépôts doit être stable
+    for (let stable = 0, dernier = -1, i = 0; stable < 6 && i < 200; i++) { const n = (await env.db.get('SELECT count(*)::int AS n FROM ged_documents')).n; stable = n === dernier ? stable + 1 : 0; dernier = n; await sleep(250); }
     await env.db.run('DELETE FROM ged_documents WHERE seance_id = $1', [seance.id]);
     const avant = await ligne();
     expect(avant.documents).toBeGreaterThan(0); expect(avant).toMatchObject({ aArchiver: avant.documents, synchronises: 0 });

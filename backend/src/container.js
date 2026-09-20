@@ -42,6 +42,7 @@ const { createPv } = require('./modules/seances/pv.service');
 const { createGed } = require('./modules/ged/ged.service');
 const { createChamps } = require('./modules/parametrage/champs.service');
 const { createConfiguration } = require('./modules/parametrage/configuration.service');
+const { createSauvegarde } = require('./modules/sauvegarde/sauvegarde.service');
 const { createSms } = require('./adapters/sms');
 const { createRecherche } = require('./modules/recherche/recherche.service');
 const { createAnnotations } = require('./modules/espace-elus/annotations.service');
@@ -58,7 +59,7 @@ const { createAi } = require('./modules/ai/ai.service');
 const { createPrompts } = require('./modules/ai/prompts');
 const { createAiQueue } = require('./modules/ai/queue');
 
-function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, guard }) {
+function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard }) {
   assertAuthPort(ad);
   assertMailPort(mail);
   assertAiPort(aiAdapter);
@@ -129,11 +130,14 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const entrainement = createEntrainement({ db, actes, textes, audit });
   const configuration = createConfiguration({ db, audit, settings, circuits, champs });
   const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
+  const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
+  // sauvegarde nocturne (SAV-04) : plateforme entière, donc une seule fois par tick — portée par l'organisme par défaut
+  scheduler.register('sauvegarde', async (orgId) => ((await db.get('SELECT is_default FROM organismes WHERE id = $1', [orgId]))?.is_default ? sauvegarde.siDue() : 0));
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, entrainement, amendements, sms, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, entrainement, amendements, sms, sauvegarde, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

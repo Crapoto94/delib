@@ -45,6 +45,7 @@ const MODULES = [
   require('../modules/ged/ged.routes'),
   require('../modules/recherche/recherche.routes'),
   require('../modules/parametrage/parametrage.routes'),
+  require('../modules/sauvegarde/sauvegarde.routes'),
   require('../modules/titulaires/organisation.routes'),
   require('../modules/convocations/convocations.routes'),
   require('../modules/users/users.routes'),

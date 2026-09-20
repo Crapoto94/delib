@@ -221,9 +221,15 @@ Les valeurs sensibles ne figurent pas ici ; elles sont dans le fichier d'environ
 
 ## 7. Sauvegarde et restauration
 
-Sauvegarder ensemble, à fréquence régulière : la base de données (export du schéma applicatif), le dossier de stockage des fichiers, et la configuration (fichier d'environnement et polices).
+La sauvegarde est intégrée à l'application (menu Paramétrages, onglet « Sauvegarde », réservé à l'administrateur de la plateforme) : chaque nuit à l'heure choisie, la base est exportée de façon cohérente puis copiée avec les fichiers du stockage local vers un dossier réseau. Aucun outil externe n'est nécessaire sur le serveur.
 
-La restauration consiste à recréer le schéma, restaurer l'export, remettre le dossier de stockage en place, puis redémarrer. La configuration applicative (référentiels, circuits, champs) peut aussi être exportée en JSON depuis l'administration (onglet Export / import) ; ce fichier ne contient ni mot de passe ni donnée personnelle.
+- **Destination** : chemin réseau Windows (UNC) avec identifiant et mot de passe saisis dans l'application (mot de passe chiffré, jamais sur une ligne de commande), lecteur monté ou dossier local. Un bouton teste l'accès.
+- **Contenu** : une table par fichier compressé, un schéma, un manifeste avec les empreintes ; les fichiers locaux sont copiés de façon incrémentale. Les fichiers stockés dans la GED sont sauvegardés par la GED.
+- **Rétention** : les sauvegardes plus anciennes que la durée choisie sont supprimées uniquement après une nouvelle sauvegarde réussie.
+- **Suivi** : chaque sauvegarde est journalisée (durée, volume, statut, erreur) ; un échec est consigné dans le journal d'audit.
+- **Restauration** : script « restaurer-sauvegarde » qui recrée le schéma, recharge les données et contrôle les nombres de lignes ; à essayer d'abord dans un schéma vide de test. Après restauration : pointer le schéma, recopier les fichiers, redémarrer, ré-indexer la recherche.
+
+Conserver en plus la configuration (fichier d'environnement et polices). Vérifier régulièrement la sauvegarde par un test de restauration.
 
 ## 8. Supervision et alertes
 
@@ -272,7 +278,7 @@ Consigner chaque incident : date, symptôme, action, résultat.
 
 - **Après une mise à jour** : conteneurs stables, santé correcte, connexion de test, PDF de contrôle, envoi de mail de test, connexions externes testées.
 - **Avant une séance** : convocation envoyée, ordre du jour arrêté, documents disponibles pour les élus, cahier généré.
-- **Avant une intervention lourde** : sauvegarde base, stockage et configuration ; fenêtre de maintenance annoncée.`;
+- **Avant une intervention lourde** : lancer « Sauvegarder maintenant », vérifier son succès dans le journal, sauvegarder la configuration ; fenêtre de maintenance annoncée.`;
 }
 
 const BUILDERS = { dat, dex };

@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.28 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.29 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1566,6 +1566,16 @@ Le **backend est développé en premier** ; le **frontend démarre quand les maq
 - **SEC-09** — **Étanchéité multi-organismes** : filtrage `organisme_id` par une couche d'accès unique, tests automatisés d'isolation, *Row-Level Security* en défense supplémentaire (MOR-02).
 - **SEC-10** — **DMZ** : liste blanche, limites de débit et de taille, CSP stricte, anti-aspiration, journal complet, test d'intrusion avant production (ELU-50 à 52).
 - **SEC-11** — **Annotations privées** : contenu illisible pour les agents et administrateurs applicatifs, chiffrement au repos, purge après mandat (ELU-33, ELU-35).
+
+### 29.1 Sauvegarde vers un dossier réseau (D96)
+
+- **SAV-01** — **Sauvegarde logique de la base** sans outil externe (aucun `pg_dump` requis sur le serveur) : toutes les tables du schéma applicatif, lues dans **un instantané cohérent** (transaction en lecture seule, isolation « repeatable read »), écrites en **NDJSON compressé** (une ligne = une ligne de table, types PostgreSQL conservés), avec le **schéma** (tables, colonnes, types) et un **manifeste** (version de l'application, migrations, nombre de lignes, empreinte SHA-256 de chaque fichier).
+- **SAV-02** — **Fichiers** : le volume local des annexes et pièces est copié de façon **incrémentale** (les fichiers sont immuables : seuls les nouveaux sont copiés) ; les fichiers stockés dans Alfresco (GED-09) ne sont pas recopiés — c'est la GED qui les sauvegarde. Option désactivable.
+- **SAV-03** — **Destination** : dossier réseau Windows (chemin UNC, ex. `\SRVIVRY2\shares3\DSI`) avec **identifiant et mot de passe saisis dans les Paramétrages** (mot de passe **chiffré au repos, jamais renvoyé, jamais sur une ligne de commande** : transmis au processus de copie par variable d'environnement) ; un chemin local ou un lecteur réseau déjà monté est accepté sans identifiant. **Bouton de test** (connexion, écriture, effacement).
+- **SAV-04** — **Planification** : chaque nuit à l'heure choisie (défaut 02:00, une seule fois par jour, jamais deux sauvegardes simultanées) via le planificateur, et **« Sauvegarder maintenant »**. **Rétention** paramétrable (défaut 30 jours) : les sauvegardes plus anciennes sont supprimées **seulement après une nouvelle sauvegarde réussie**.
+- **SAV-05** — **Journal** : chaque sauvegarde (début, fin, durée, déclencheur, taille, lignes, fichiers, statut, erreur) est consignée ; l'échec d'une sauvegarde **alerte l'administrateur de la plateforme** (notification et journal d'audit).
+- **SAV-06** — **Restauration** documentée et outillée : script `restaurer-sauvegarde` (recrée le schéma par les migrations, recharge les données dans l'ordre, réaligne les compteurs) avec **contrôle des nombres de lignes** contre le manifeste ; à faire d'abord sur une base vide de test. Le contenu de la sauvegarde étant sensible (données personnelles, secrets chiffrés), la destination doit être réservée à la DSI.
+- **SAV-07** — **Droits** : réglage, lancement et journal réservés à l'**administrateur de la plateforme** (la base est commune à tous les organismes).
 - **SEC-12** — **Secrets S²LOW, APM et IA** : uniquement dans le backend LAN, coffre ou `.env` non versionné, rotation, alerte avant expiration du certificat, journaux sans secret (TLT-12).
 - **SEC-13** — **IA** : appels limités à l'IA interne, entrées délimitées contre l'injection de prompt, sorties validées par schéma, journal d'usage, aucune décision automatisée (IA-01 à IA-08).
 - **SEC-14** — **Preuves** : preuves d'envoi des convocations, journal de consultation, empreintes des paquets télétransmis et des cahiers, journal d'audit immuable.
@@ -1716,6 +1726,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D85** | **Espace élus** : API et front distincts (PDF finalisés seulement, ni notes ni saisie), authentification par invitation + mot de passe + code par mail, mise à disposition à l'envoi de la convocation, filigrane nominatif, **téléchargement en arrière-plan** (web et APK) pour un passage instantané d'un point à l'autre, lectures hors ligne synchronisées, notes personnelles partageables, suivi en direct. *(réalisé ; annotations sur PDF et service natif d'arrière-plan de l'APK : à venir)* | 18 |
 | **D90** | **Annotations sur les PDF de l'espace élus** : surlignage, note, dessin, signet ; privées par défaut, chiffrées au repos, partage figé par groupe ou par élus nommés, réponses, ré-ancrage par citation, export annoté *(ELU-71 à ELU-76)* | 18.4 |
 | **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
+| **D96** | **Sauvegarde vers un dossier réseau** : export logique cohérent en NDJSON, fichiers incrémentaux, destination UNC avec identifiants chiffrés, planification nocturne, rétention, journal, restauration outillée *(SAV-01 à SAV-07)* | 29.1 |
 | **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |
 | **D94** | **Gestion des élus et mot de passe oublié par SMS** : création / édition / suppression prudente, désactivation persistante après synchronisation, code SMS à 6 chiffres (5 min) → session de 12 h, journal des oublis, passerelle SMS *(ELU-80 à ELU-85)* | 18.4 ter |
 | **D93** | **Synchronisation avec la GED** : état comparé, local → GED en un clic, vérification GED → local, archivage du cahier dès sa fin *(GED-08)* | 19.5 bis |
@@ -1746,6 +1757,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.29** | 2026-09-20 | **D96** : sauvegarde vers dossier réseau (SAV-01 à SAV-07) |
 | **1.28** | 2026-09-20 | **D95** : stockage des fichiers dans Alfresco (GED-09, GED-10) |
 | **1.27** | 2026-09-20 | **D94** : gestion des élus, désactivation persistante, mot de passe oublié par SMS (ELU-80 à ELU-85) |
 | **1.26** | 2026-09-20 | **D93** : synchronisation GED (GED-08) |
