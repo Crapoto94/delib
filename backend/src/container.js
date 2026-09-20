@@ -37,6 +37,8 @@ const { createKpis } = require('./modules/seances/kpis.service');
 const { createTenue } = require('./modules/seances/tenue.service');
 const { createPv } = require('./modules/seances/pv.service');
 const { createGed } = require('./modules/ged/ged.service');
+const { createChamps } = require('./modules/parametrage/champs.service');
+const { createConfiguration } = require('./modules/parametrage/configuration.service');
 const { createRecherche } = require('./modules/recherche/recherche.service');
 const { createAnnotations } = require('./modules/espace-elus/annotations.service');
 const { createGedSimulateur } = require('./adapters/ged-simulateur');
@@ -71,6 +73,8 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const late = {}; // services liés après coup pour éviter les dépendances circulaires (textes suivis, circuit…)
   const elus = createElus({ db, audit, directoryAdapter, log });
   late.elus = elus;
+  const champs = createChamps({ db, audit, access });
+  late.champs = champs;
   const refs = createReferentiels({ db, audit });
   const titulaires = createTitulaires({ db, audit, access });
   titulaires.setRhVacancy((d, sv) => dir.vacance(d, sv));
@@ -113,11 +117,12 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const eluAuth = createEluAuth({ db, config, mail, settings, audit, log });
   const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log });
   const annotations = createAnnotations({ db, audit, config, espace, settings });
+  const configuration = createConfiguration({ db, audit, settings, circuits, champs });
   const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

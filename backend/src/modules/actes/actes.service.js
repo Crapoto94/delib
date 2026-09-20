@@ -74,6 +74,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const rubriqueId = b.rubriqueId ? (await refs.require('rubrique', b.rubriqueId, org)).id : null;
 
       await svc.checkRefs(org, b);
+      if (b.custom && late.champs) b.custom = await late.champs.valider(ctx, { organisme_id: org, type_id: type.id, statut: 'brouillon', redacteur: ctx.username, co_redacteurs: [] }, b.custom, {});
       const acte = await db.tx(async (q) => {
         const numero = await nextCounter(q, org, 'acte');
         const a = await q.get(
@@ -99,7 +100,8 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const a = await svc.load(ctx, organismeId, id);
       const [delibs, editable] = await Promise.all([svc.deliberations(a.id), acl.canEdit(ctx, a)]);
       const comp = await svc.completeness(a);
-      return { ...toActe(a), deliberations: delibs, droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp, odj: late.odj ? await late.odj.positionsOf(a.id) : [] };
+      const champs = late.champs ? await late.champs.pourActe(ctx, a) : [];
+      return { ...toActe(a), champs, deliberations: delibs, droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp, odj: late.odj ? await late.odj.positionsOf(a.id) : [] };
     },
 
     async list(ctx, organismeId, f = {}) {
@@ -147,7 +149,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       if (patch.dateLimite !== undefined) add('date_limite', patch.dateLimite);
       if (patch.confidentialite !== undefined) add('confidentialite', patch.confidentialite);
       if (patch.commentaireInitial !== undefined) add('commentaire_initial', patch.commentaireInitial);
-      if (patch.custom !== undefined) add('custom', JSON.stringify(patch.custom), '::jsonb');
+      if (patch.custom !== undefined) add('custom', JSON.stringify(late.champs ? await late.champs.valider(ctx, before, patch.custom, before.custom) : patch.custom), '::jsonb');
       if (patch.coRedacteurs !== undefined) {
         if (before.redacteur !== ctx.username && !acl.isAdmin(ctx, org)) throw E.forbidden('Seul le rédacteur désigne ses co-rédacteurs');
         add('co_redacteurs', JSON.stringify([...new Set(patch.coRedacteurs.map((u) => u.toLowerCase()))].filter((u) => u !== before.redacteur)), '::jsonb');
@@ -235,6 +237,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const n = (await db.get('SELECT count(*)::int AS n FROM deliberations WHERE acte_id = $1', [a.id])).n;
       need(n >= Math.max(1, type?.meta?.minDeliberations ?? 1), 'deliberation', 'Au moins une délibération');
       if (late.texts) for (const m of await late.texts.missingTexts(a, type?.meta)) missing.push(m);
+      if (late.champs) for (const m of await late.champs.manquants(a)) missing.push(m);
       return { complete: missing.length === 0, missing };
     },
   };

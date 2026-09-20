@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.23 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.24 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1425,6 +1425,13 @@ Règle : **rien de propre à un organisme dans le code**. Une installation hébe
 - **PAR-02** — **Jeux de données de démarrage** (seed) : circuit Ivry, matières, commissions, types d'actes ; un jeu « neutre » pour une autre commune.
 - **PAR-03** — Aucune valeur métier en dur : les constantes (codes rôles, statuts) sont des énumérations internes, les libellés viennent de la configuration.
 
+### 25.1 Réalisation du lot 5 : champs personnalisés et configuration transférable (D91)
+
+- **PAR-10** — **Champs personnalisés** définis par l'administrateur d'un organisme (éventuellement pour un seul **type d'acte**) : code, libellé, aide, **type** (texte, nombre, date, liste de valeurs, oui/non, élu, agent), **obligatoire** (bloque l'envoi au circuit et figure dans la complétude), **condition d'affichage** (« visible si le champ X vaut Y »), **droits de saisie par rôle** (administrateur, SCC, rédacteur…) et **par étape du circuit** (vide = tout éditeur de l'acte), ordre, activation. Les valeurs sont **validées côté serveur** (type, liste, existence de l'élu) ; modifier un champ sans en avoir le droit est refusé (403) ; les valeurs des champs masqués par leur condition ne comptent pas comme manquantes. La fiche du dossier les affiche et les édite ; l'administration les définit (onglet « Champs »).
+- **PAR-11** — **Export / import de la configuration** d'un organisme en JSON (`vibedelib.configuration/1`) : **paramètres** de l'organisme, vocabulaire et couleurs, **référentiels propres et surcharges**, **champs personnalisés**, **circuits** (dernière version), **instances**. **Jamais** de secret (mots de passe chiffrés, clés), de personne (titulaires, élus, comptes) ni d'acte. L'import se fait en **deux temps** : **aperçu** (ce qui serait créé, modifié, ignoré, avec avertissements) puis **application** ; il est **idempotent** (rejouable), **ne supprime jamais** rien, n'écrase jamais un circuit existant (les circuits importés arrivent en **brouillon** à publier après vérification) et est **audité**.
+- **PAR-12** — **Modèle « commune neutre »** (PAR-02) : fichier de configuration importable (types de séance, vocabulaire générique, champs et circuit court à 3 étapes) pour mettre en service **un autre organisme** (CCAS, autre commune) : créer la collectivité, importer le modèle, saisir à la main les membres (élus ou **non élus**), publier le circuit.
+
+
 ---
 
 ## 26. Modèle de données cible (schéma `ivrydelib`)
@@ -1696,6 +1703,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D85** | **Espace élus** : API et front distincts (PDF finalisés seulement, ni notes ni saisie), authentification par invitation + mot de passe + code par mail, mise à disposition à l'envoi de la convocation, filigrane nominatif, **téléchargement en arrière-plan** (web et APK) pour un passage instantané d'un point à l'autre, lectures hors ligne synchronisées, notes personnelles partageables, suivi en direct. *(réalisé ; annotations sur PDF et service natif d'arrière-plan de l'APK : à venir)* | 18 |
 | **D90** | **Annotations sur les PDF de l'espace élus** : surlignage, note, dessin, signet ; privées par défaut, chiffrées au repos, partage figé par groupe ou par élus nommés, réponses, ré-ancrage par citation, export annoté *(ELU-71 à ELU-76)* | 18.4 |
 | **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
+| **D91** | **Lot 5** : champs personnalisés (types, obligatoire, condition, droits par rôle et par étape) et export / import JSON de la configuration en deux temps, idempotent, sans secret ni personne ; modèle « commune neutre » *(PAR-10 à PAR-12)* | 25.1 |
 | **D88** | **Choix du tiers de télétransmission** : catalogue de fournisseurs (S²LOW par défaut, FAST-Actes prévu), paramétrage et test de connexion dans un onglet dédié ; le mode réel reste fermé jusqu'au certificat *(TLT-30)* | 19.5 |
 | **D87** | **Recherche plein texte** sur PostgreSQL (`fr_unaccent`, pondération A–D, GIN, trigrammes) : index par acte tenu à jour par évènements, texte des annexes PDF extrait et mis en cache, filtrage par droits dans la requête, facettes, extraits, actes similaires, recherches enregistrées, ré-indexation en administration ; espace élus limité aux délibérations adoptées. *(REC-20 à REC-27)* | 20.1 |
 | **D86** | **Archivage en GED Alfresco** : port et adaptateurs (Alfresco, simulateur), paramétrage en administration avec **bouton de test**, **plan de classement** créé selon les bonnes pratiques, archivage versionné de tous les documents de la séance (manuel ou automatique à la clôture). *(réalisé ; test contre un vrai Alfresco à faire à l'obtention du compte technique)* | 19.5 bis |
@@ -1721,6 +1729,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.24** | 2026-09-20 | **D91** : lot 5 (PAR-10 à PAR-12) |
 | **1.23** | 2026-09-20 | **D90** : annotations sur PDF (ELU-71 à ELU-76) |
 | **1.22** | 2026-09-20 | **D89** : visite guidée (UX-27) ; interfaces de la recherche (REC-28) |
 | **1.21** | 2026-09-20 | **D88** : choix du TDT (TLT-30) |

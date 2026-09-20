@@ -64,6 +64,19 @@ function Frise({ circuit }: { circuit: any }) {
   );
 }
 
+/** Un champ personnalisé (PAR-10) : le contrôle dépend du type ; la valeur vide est renvoyée au serveur, qui la retire. */
+function ChampInput({ c, v, onChange, disabled, elus }: { c: any; v: any; onChange: (x: any) => void; disabled: boolean; elus: any[] }) {
+  const val = v ?? '';
+  switch (c.kind) {
+    case 'nombre': return <input className="input" type="number" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} />;
+    case 'date': return <input className="input" type="date" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value)} />;
+    case 'booleen': return <div className="flex items-center gap-4 py-2">{[[true, 'Oui'], [false, 'Non']].map(([b, l]) => <label key={String(b)} className="flex items-center gap-1"><input type="radio" disabled={disabled} checked={v === b} onChange={() => onChange(b)} /> {l}</label>)}</div>;
+    case 'liste': return <select className="input" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value)}><option value="">— choisir —</option>{(c.options || []).map((o: any) => <option key={o.valeur} value={o.valeur}>{o.libelle}</option>)}</select>;
+    case 'elu': return <select className="input" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}><option value="">— choisir —</option>{elus.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}</option>)}</select>;
+    default: return <input className="input" disabled={disabled} value={val} onChange={(e) => onChange(e.target.value)} />;
+  }
+}
+
 /* --------------------------------------------------------------------------------------------------- fiche de l'acte */
 function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSaved: () => void }) {
   const { org } = useAuth(); const o = org!.id;
@@ -73,7 +86,9 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
   const elus = useLoad(async () => (await api.get(orgPath(o, '/elus'))).data.items as any[], [o]);
   const seances = useLoad(async () => (await api.get(orgPath(o, '/seances'), { params: { statut: 'planifiee' } })).data.items as any[], [o]);
   const [f, setF] = useState<any>({});
+  const [cv, setCv] = useState<Record<string, any>>({}); // valeurs des champs personnalisés
   const [err, setErr] = useState<string | null>(null); const [saving, setSaving] = useState(false);
+  useEffect(() => { setCv(Object.fromEntries((acte.champs || []).map((c: any) => [c.code, c.valeur]))); }, [acte.champs]);
   useEffect(() => { setF({ titre: acte.titre, matiereId: acte.matiereId ?? '', rubriqueId: acte.rubriqueId ?? '', natureId: acte.natureId ?? '', incidenceFinanciere: acte.incidenceFinanciere, montant: acte.montant ?? '', rapporteurId: acte.rapporteurId ?? '', seanceViseeId: acte.seanceViseeId ?? '', urgence: acte.urgence }); }, [acte]);
   const leaves = useMemo(() => { const parents = new Set((matieres.data ?? []).map((m) => m.parentCode).filter(Boolean)); return (matieres.data ?? []).filter((m) => !parents.has(m.code)); }, [matieres.data]);
   const nv = (v: any) => (v === '' ? null : Number(v));
@@ -84,6 +99,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
       await api.put(orgPath(o, `/actes/${acte.id}`), {
         titre: f.titre, matiereId: nv(f.matiereId), rubriqueId: nv(f.rubriqueId), natureId: nv(f.natureId), incidenceFinanciere: f.incidenceFinanciere,
         montant: f.incidenceFinanciere && f.montant !== '' ? Number(f.montant) : null, rapporteurId: nv(f.rapporteurId), seanceViseeId: nv(f.seanceViseeId), urgence: !!f.urgence,
+        ...((acte.champs || []).length ? { custom: { ...(acte.custom || {}), ...Object.fromEntries((acte.champs || []).filter((c: any) => c.modifiable).map((c: any) => [c.code, cv[c.code] ?? ''])) } } : {}),
       });
       onSaved();
     } catch (x) { setErr(errMsg(x)); } finally { setSaving(false); }
@@ -117,6 +133,10 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
             {f.incidenceFinanciere && <label className="flex items-center gap-2 rounded bg-soft px-3 py-1">Montant <input type="number" min={0} className="w-28 bg-transparent font-semibold outline-none" disabled={dis} value={f.montant ?? ''} onChange={(e) => setF({ ...f, montant: e.target.value })} /> €</label>}
           </div>
         </div>
+        {(acte.champs || []).filter((c: any) => (!c.visibleSi || String(c.visibleSi?.egal ?? '') === '' || String(cv[c.visibleSi?.champ] ?? '') === String(c.visibleSi?.egal ?? ''))).map((c: any) => (
+          <Field key={c.code} label={`${c.libelle}${c.obligatoire ? ' *' : ''}`} hint={c.aide || (!c.modifiable ? 'Non modifiable à ce stade ou avec votre rôle.' : undefined)}>
+            <ChampInput c={c} v={cv[c.code]} onChange={(x) => setCv({ ...cv, [c.code]: x })} disabled={dis || !c.modifiable} elus={elus.data ?? []} />
+          </Field>))}
         <label className="flex items-center gap-2 md:col-span-2"><input type="checkbox" disabled={dis} checked={!!f.urgence} onChange={(e) => setF({ ...f, urgence: e.target.checked })} /> Dossier urgent</label>
       </div>
       {editable && <div className="mt-4 flex justify-end"><button className="btn-secondary" onClick={save} disabled={saving}>{saving && <Spinner />} Enregistrer la fiche</button></div>}
