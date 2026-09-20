@@ -1,0 +1,3 @@
+# Fins de ligne : les migrations SQL sont hachées (SHA-256) pour vérifier qu'elles n'ont pas changé
+# après application. Elles doivent donc être strictement identiques sur tous les postes (Windows comme Linux).
+*.sql text eol=lf

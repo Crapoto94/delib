@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bookmark, Download, Search, X } from 'lucide-react';
+import { Bell, BellOff, Bookmark, Download, Search, X } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -27,6 +27,8 @@ export default function Recherche() {
 
   const res = useLoad(async () => (q || actifs) ? (await api.get(orgPath(org!.id, '/recherche'), { params })).data : null, [org!.id, sp.toString()]);
   const saved = useLoad(async () => (await api.get(orgPath(org!.id, '/recherche/enregistrees'))).data.items as any[], [org!.id]);
+  const alertes = useLoad(async () => new Map<number, boolean>(((await api.get(orgPath(org!.id, '/recherche/alertes'))).data.items as any[]).map((a) => [a.id, a.alerte])), [org!.id]);
+  const basculerAlerte = async (r: any) => { const actif = !alertes.data?.get(r.id); try { await api.put(orgPath(org!.id, `/recherche/enregistrees/${r.id}/alerte`), { actif }); alertes.reload(); toast(actif ? `Alerte activée : vous serez prévenu(e) des nouveaux actes pour « ${r.nom} »` : 'Alerte coupée', 'ok'); } catch (e) { toast(errMsg(e), 'ko'); } };
   useEffect(() => setSaisie(q), [q]);
 
   const set = (patch: Record<string, string | null>) => {
@@ -96,6 +98,7 @@ export default function Recherche() {
             {!saved.data?.length ? <p className="text-[12px] text-mute">Aucune recherche enregistrée.</p> : (
               <ul className="space-y-0.5">{saved.data.map((r: any) => (
                 <li key={r.id} className="flex items-center gap-1"><button className="flex-1 truncate rounded px-2 py-1 text-left text-[13px] hover:bg-soft" onClick={() => ouvrir(r)}>{r.nom}</button>
+                  <button aria-label={alertes.data?.get(r.id) ? `Couper l’alerte « ${r.nom} »` : `Me prévenir des nouveaux actes « ${r.nom} »`} title={alertes.data?.get(r.id) ? 'Alerte active : cliquer pour couper' : 'Me prévenir quand un nouvel acte correspond'} aria-pressed={!!alertes.data?.get(r.id)} className={`rounded p-1 hover:bg-soft ${alertes.data?.get(r.id) ? 'text-primary' : 'text-mute'}`} onClick={() => basculerAlerte(r)}>{alertes.data?.get(r.id) ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}</button>
                   <button aria-label={`Supprimer « ${r.nom} »`} className="rounded p-1 text-mute hover:bg-soft" onClick={() => supprimer(r.id)}><X className="h-3 w-3" /></button></li>))}</ul>)}
           </div>
         </aside>

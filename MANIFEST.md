@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.30 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.31 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1113,6 +1113,7 @@ Affichage, mise en ligne sur le site de la commune, **recueil des actes administ
 - **REC-26** — **Recherches enregistrées** par utilisateur (nom, requête, critères). *Les alertes (REC-07) restent à faire.*
 - **REC-28** — **Interfaces** : page « Recherche » (barre globale + raccourci `/`, facettes cliquables avec compteurs, filtres actifs, tri, pagination, recherches enregistrées, export CSV), proposition d'**actes proches** à la création d'un dossier et sur sa fiche, onglet « Recherche » des Paramétrages (état, ré-indexation, synonymes, requêtes sans résultat), et loupe de l'**espace élus**. *Reste à faire : alertes (REC-07), export Excel / PDF, OCR, import AirsDelib (REC-10).*
 - **REC-27** — **Administration** : ré-indexation complète (par organisme), état de l'index (actes indexés, annexes lues, sans texte), journal anonymisé des requêtes (aucun nom, seulement la requête et le nombre de résultats).
+- **REC-29** — **Alertes de recherche (D98, REC-07)** : sur une recherche enregistrée, la cloche « **Me prévenir quand un nouvel acte correspond** ». À l'activation, les résultats du moment sont mémorisés (pas de déluge) ; ensuite une vérification **au plus horaire**, faite **avec les droits de la personne**, l'informe **dans l'application** (notification qui ouvre la recherche) dès que de nouveaux actes correspondent, en indiquant le nombre et les premiers titres. Un acte qui cesse puis recommence à correspondre n'est pas re-signalé. Désactivable à tout moment ; supprimée avec la recherche.
 
 ---
 
@@ -1739,6 +1740,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D85** | **Espace élus** : API et front distincts (PDF finalisés seulement, ni notes ni saisie), authentification par invitation + mot de passe + code par mail, mise à disposition à l'envoi de la convocation, filigrane nominatif, **téléchargement en arrière-plan** (web et APK) pour un passage instantané d'un point à l'autre, lectures hors ligne synchronisées, notes personnelles partageables, suivi en direct. *(réalisé ; annotations sur PDF et service natif d'arrière-plan de l'APK : à venir)* | 18 |
 | **D90** | **Annotations sur les PDF de l'espace élus** : surlignage, note, dessin, signet ; privées par défaut, chiffrées au repos, partage figé par groupe ou par élus nommés, réponses, ré-ancrage par citation, export annoté *(ELU-71 à ELU-76)* | 18.4 |
 | **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
+| **D98** | **Alertes de recherche** : cloche sur une recherche enregistrée, vérification horaire avec les droits de la personne, notification dans l'application *(REC-29)* | 20.1 |
 | **D97** | **API externe et clés d'accès** : lecture seule, clés hachées à affichage unique, portées distinguant actes exécutoires / adoptés / en cours, IP autorisées, limite de débit, synchronisation incrémentale *(EXT-01 à EXT-06)* | 24 bis |
 | **D96** | **Sauvegarde vers un dossier réseau** : export logique cohérent en NDJSON, fichiers incrémentaux, destination UNC avec identifiants chiffrés, planification nocturne, rétention, journal, restauration outillée *(SAV-01 à SAV-07)* | 29.1 |
 | **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |
@@ -1771,6 +1773,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.31** | 2026-09-20 | **D98** : alertes de recherche (REC-29) ; amendements dans l'espace élus (ELU-41) |
 | **1.30** | 2026-09-20 | **D97** : API externe et clés d'accès (EXT-01 à EXT-06) |
 | **1.29** | 2026-09-20 | **D96** : sauvegarde vers dossier réseau (SAV-01 à SAV-07) |
 | **1.28** | 2026-09-20 | **D95** : stockage des fichiers dans Alfresco (GED-09, GED-10) |

@@ -141,3 +141,21 @@ describe('vote des amendements avant le texte (VOT-06)', () => {
     expect((await as(t.martin).post(S('/tenue/points/999999/amendements'), { cible: 'dispositif', textePropose: 'x', auteurLibelle: 'Z' })).status).toBe(404);
   });
 });
+
+describe('amendements dans l’espace des élus (ELU-41)', () => {
+  it('le texte proposé est poussé aux élus dès son dépôt ; le sort n’est montré que si l’organisme affiche les résultats ; jamais de décompte', async () => {
+    const v = await env.c.tenue.directPublic(ville.id, seance.id, 0, 0, { resultats: true });
+    const du = v.amendements.filter((a) => a.itemId === items[acteIds[0]]);
+    expect(du.map((a) => [a.numero, a.statut])).toEqual([[1, 'adopte'], [2, 'rejete'], [3, 'retire']]);
+    expect(du[0]).toMatchObject({ auteur: 'Paul Durif', cible: 'dispositif' }); expect(du[0].texte).toMatch(/2 000/);
+    const masque = await env.c.tenue.directPublic(ville.id, seance.id, 0, 0, { resultats: false });
+    expect(masque.amendements.filter((a) => a.itemId === items[acteIds[0]]).map((a) => a.statut)).toEqual(['traite', 'traite', 'retire']);
+    expect(JSON.stringify(v.amendements)).not.toMatch(/pour|contre|votants|absents/);
+    // un nouvel amendement déposé sur l'autre point est visible « à voter » tout de suite
+    await as(t.martin).put(S('/tenue/courant'), { itemId: items[acteIds[1]] });
+    await deposer(items[acteIds[1]], { textePropose: 'Article 1 : autre texte proposé.' });
+    const apres = await env.c.tenue.directPublic(ville.id, seance.id, 0, 0, { resultats: false });
+    expect(apres.amendements.find((a) => a.itemId === items[acteIds[1]])).toMatchObject({ statut: 'a_voter', numero: 1 });
+    expect(apres.version).toBeGreaterThan(v.version);
+  });
+});

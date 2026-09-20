@@ -48,6 +48,7 @@ const { createApiKeys } = require('./modules/externe/apikeys.service');
 const { createExterne } = require('./modules/externe/externe.service');
 const { createSms } = require('./adapters/sms');
 const { createRecherche } = require('./modules/recherche/recherche.service');
+const { createAlertes } = require('./modules/recherche/alertes.service');
 const { createAnnotations } = require('./modules/espace-elus/annotations.service');
 const { createGedSimulateur } = require('./adapters/ged-simulateur');
 const { createAlfresco } = require('./adapters/alfresco');
@@ -134,6 +135,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const configuration = createConfiguration({ db, audit, settings, circuits, champs });
   const rgpd = createRgpd({ db, audit, config, settings });
   const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
+  const alertes = createAlertes({ db, access, recherche, log });
   const apiKeys = createApiKeys({ db, audit, log });
   const externe = createExterne({ db, render, storage });
   const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
@@ -141,9 +143,10 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
   // sauvegarde nocturne (SAV-04) : plateforme entière, donc une seule fois par tick — portée par l'organisme par défaut
   scheduler.register('sauvegarde', async (orgId) => ((await db.get('SELECT is_default FROM organismes WHERE id = $1', [orgId]))?.is_default ? sauvegarde.siDue() : 0));
+  scheduler.register('recherche-alertes', (orgId) => alertes.verifier(orgId)); // alertes de recherche (REC-29) : au plus une vérification par heure et par alerte
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

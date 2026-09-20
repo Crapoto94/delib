@@ -173,7 +173,7 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
   async function enRetard(org, limite = 200) {
     return db.all(
       `SELECT a.id FROM actes a LEFT JOIN search_index si ON si.acte_id = a.id
-       WHERE a.organisme_id = $1 AND NOT (a.custom ? 'entrainement') AND (si.acte_id IS NULL OR si.indexed_at < GREATEST(a.updated_at,
+       WHERE a.organisme_id = $1 AND a.archive_intermediaire_at IS NULL AND NOT (a.custom ? 'entrainement') AND (si.acte_id IS NULL OR si.indexed_at < GREATEST(a.updated_at,
          COALESCE((SELECT max(t.updated_at) FROM tracked_texts t WHERE t.acte_id = a.id), 'epoch'),
          COALESCE((SELECT max(x.updated_at) FROM annexes x WHERE x.acte_id = a.id), 'epoch'),
          COALESCE((SELECT max(d.updated_at) FROM deliberations d WHERE d.acte_id = a.id), 'epoch'),

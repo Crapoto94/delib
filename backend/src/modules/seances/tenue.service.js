@@ -166,8 +166,11 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
         const t = await db.get('SELECT version, statut, point_courant_id FROM seance_tenue WHERE seance_id = $1', [seanceId]);
         if (!t) return { version: 0, statut: 'non_ouverte', courantId: null, points: [] };
         const pts = await db.all('SELECT item_id, etat, resultat FROM seance_points WHERE seance_id = $1', [seanceId]);
+        // amendements (ELU-41) : le texte proposé est poussé aux élus dès son dépôt ; le sort n'est montré que si l'organisme affiche les résultats
+        const am = (await db.all('SELECT * FROM seance_amendements WHERE seance_id = $1 ORDER BY item_id, numero', [seanceId]))
+          .map((a) => ({ id: a.id, itemId: a.item_id, numero: a.numero, auteur: a.auteur_libelle, cible: a.cible, texte: a.texte_propose, motif: a.motif, statut: a.statut === 'depose' ? 'a_voter' : a.statut === 'retire' ? 'retire' : (resultats ? a.statut : 'traite') }));
         return {
-          version: t.version, statut: t.statut, courantId: t.point_courant_id,
+          version: t.version, statut: t.statut, courantId: t.point_courant_id, amendements: am,
           points: pts.map((p) => ({ id: p.item_id, etat: p.etat === 'en_cours' ? 'en_cours' : ['traite', 'sans_vote', 'retire', 'ajourne'].includes(p.etat) ? 'clos' : 'a_venir', issue: p.etat === 'traite' ? (resultats ? (String(p.resultat).startsWith('adopte') ? 'adopte' : 'rejete') : 'traite') : (['retire', 'ajourne', 'sans_vote'].includes(p.etat) ? p.etat : null) })),
         };
       };

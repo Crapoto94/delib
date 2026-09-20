@@ -151,7 +151,68 @@ Chaque acte, chaque étape du circuit et chaque action d'administration laisse u
 
 L'architecture accueille sans refonte la signature électronique (port dédié), la publication et le recueil des actes, de nouveaux organismes, d'autres tiers de télétransmission, d'autres fournisseurs de GED et d'autres modèles d'IA. Les circuits, référentiels, champs et gabarits sont des données : ils se paramètrent sans modification de code.
 
-## 15. Glossaire
+## 15. Mode opératoire pour un vibecodeur
+
+Cette application est **vibecodée** : elle est développée de façon itérative avec l'assistance d'une IA, par petits lots, à partir d'un manifeste qui fait foi. Un vibecodeur qui reprend le projet doit donc s'appuyer sur les documents et respecter les garde-fous ci-dessous.
+
+### 15.1 Avant de commencer
+
+- Lire le MANIFEST (la section concernée par la demande) et le présent DAT, ainsi que le DEX pour l'exploitation.
+- Identifier le module touché, les fichiers concernés, l'impact sur la base et sur les autres modules.
+- Ne jamais travailler directement sur la production : passer par le dépôt de code, une branche et un environnement de recette.
+
+### 15.2 Précautions
+
+- Ne jamais modifier une migration déjà appliquée : ajouter une nouvelle migration numérotée, dans l'ordre.
+- Garder des fins de ligne identiques sur tous les postes (voir .gitattributes) : les migrations sont hachées en SHA-256.
+- Aucun secret, aucune URL et aucun port en dur : tout passe par les variables d'environnement ou le paramétrage chiffré.
+- Toujours filtrer par organisme : l'isolation multi-organismes est une exigence de sécurité.
+- Ne pas réécrire le journal d'audit : il est immuable ; la pseudonymisation passe par la table de correspondance.
+- Sauvegarder (base, stockage, configuration) avant toute opération sensible.
+
+### 15.3 Parties sensibles et risques
+
+- **Migrations et base partagée** : une erreur de somme de contrôle ou un trou de numérotation bloque le démarrage.
+- **Circuit et résolution des valideurs** : une étape obligatoire sans titulaire bloque les actes.
+- **Rendu PDF et gabarits** : vérifier le rendu après toute modification de la composition.
+- **Espace élus (DMZ) et données personnelles** : accès par lien personnel, aucune donnée sensible exposée.
+- **Intégrations externes** (APM, Hub DSI, S2LOW, Alfresco) : tester la connexion après modification.
+
+### 15.4 Prompts de base proposés avant de travailler
+
+- « Lis le MANIFEST (section concernée) et le DAT avant toute proposition ; cite les exigences applicables. »
+- « Décris d'abord l'impact : fichiers touchés, migrations nécessaires, tests à lancer, risques. »
+- « Ne modifie aucune migration appliquée ; crée une nouvelle migration numérotée. »
+- « Vérifie l'isolation par organisme et l'absence de secret en dur. »
+- « Propose un plan, attends ma validation, puis code par petits incréments avec tests. »
+- « Après modification, lance le lint et les tests du backend, et le typecheck et le build du frontend. »
+
+### 15.5 Boucle de travail recommandée
+
+Lire la spécification, proposer un plan, le faire valider, coder par petits lots, lancer les vérifications, puis commiter avec un message clair. En cas de doute sur une exigence, se référer au MANIFEST plutôt qu'à l'usage observé.
+
+## 16. RGPD et protection des données
+
+L'application traite des données personnelles d'agents publics et d'élus, dans le cadre de la préparation et du suivi des actes de la collectivité.
+
+- **Finalités** : gestion des délibérations, des séances et des convocations, contrôle de légalité, archivage et preuve. Les traitements reposent sur l'exercice de missions d'intérêt public et sur des obligations légales.
+- **Données traitées** : identité professionnelle des agents (annuaire RH, direction, service), identité des élus, actions journalisées (qui, quoi, quand, adresse IP sous forme d'empreinte), documents et pièces jointes.
+- **Principes** : minimisation des données, durées de conservation maîtrisées, accès restreint par rôle et par organisme, traçabilité des accès et des actions.
+- **Mesures techniques** : cloisonnement par organisme, rôles et habilitations, journal d'audit immuable, secrets chiffrés au repos, aucune donnée sensible exposée au navigateur.
+
+### 16.1 Menu RGPD (administrateur)
+
+- **Archivage intermédiaire** : sort de l'usage courant les actes terminés et anciens (listes actives, recherche) sans les supprimer ; l'acte reste conservé pour la preuve, avec sa date et son motif. Un aperçu précède l'application.
+- **Pseudonymisation des actions et journaux** : remplace les identités et adresses IP anciennes par des pseudonymes stables ; le journal d'audit restant immuable, la correspondance est conservée à part pour une ré-identification par une personne habilitée.
+- **Durées de conservation** paramétrables (actes en années, journaux en mois) ; **journal des opérations RGPD** (qui, quand, seuil, résultat).
+
+### 16.2 Droits des personnes et conservation
+
+- Les personnes concernées disposent de droits d'information, d'accès, de rectification et, selon les cas, d'effacement ou de limitation ; les obligations d'archivage et de preuve peuvent justifier la conservation de certaines données.
+- Les demandes sont adressées au délégué à la protection des données (DPO) de la collectivité.
+- Les durées d'usage sont définies par la collectivité ; au-delà, les actes sont archivés de façon intermédiaire et les journaux sont pseudonymisés.
+
+## 17. Glossaire
 
 - **Acte / dossier** : ensemble fiche, exposé, délibérations, annexes et discussion.
 - **Circuit** : suite d'étapes de validation d'un acte.

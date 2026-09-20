@@ -8,6 +8,7 @@ import { OrgLogo, useFavicon } from './Brand';
 import { AiChip } from './AiStatus';
 import Visite from './Visite';
 import { AideMenu } from './aide/Aide';
+import { VERSION } from './nouveautes';
 import { PdfViewerHost } from './PdfViewer';
 import { useAuth } from './auth';
 import { api, org as orgPath } from './api';
@@ -21,7 +22,8 @@ function Bells({ orgId }: { orgId: number }) {
   useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, [orgId]);
   const go = async (n: any) => {
     await api.post(orgPath(orgId, `/notifications/${n.id}/lue`)).catch(() => {}); setOpen(false); load();
-    if (n.acteId) nav(`/dossiers/${n.acteId}`);
+    if (n.link && String(n.link).startsWith('/recherche')) nav(n.link); // alerte de recherche : ouvre la recherche
+    else if (n.acteId) nav(`/dossiers/${n.acteId}`);
   };
   return (
     <div className="relative">
@@ -105,6 +107,7 @@ export default function Layout() {
               {me.canImpersonate && !me.impersonation && <button role="menuitem" onClick={() => { setMenu(false); setAsOpen(true); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft"><Eye className="h-4 w-4" /> Afficher en tant que…</button>}
               <NavLink role="menuitem" to="/delegations" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Mes délégations</NavLink>
               <NavLink role="menuitem" to="/preferences" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Mes notifications</NavLink>
+              <NavLink role="menuitem" to="/nouveautes" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Nouveautés</NavLink>
               <button role="menuitem" onClick={() => { setMenu(false); setTour(true); }} className="block w-full rounded px-3 py-2 text-left hover:bg-soft">Revoir la visite</button>
               <button role="menuitem" onClick={async () => { await logout(); nav('/connexion'); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft"><LogOut className="h-4 w-4" /> Se déconnecter</button>
             </div>}
@@ -133,7 +136,7 @@ export default function Layout() {
         </Modal>)}
       {toastNode}
       <footer className="fixed bottom-0 left-0 right-0 border-t border-line bg-white px-6 py-2 text-[11px] text-mute">
-        Ville d'Ivry-sur-Seine · VibeDélib — version de test
+        Ville d'Ivry-sur-Seine · VibeDélib — version {VERSION}
       </footer>
     </div>
   );

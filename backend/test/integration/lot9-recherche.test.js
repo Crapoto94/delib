@@ -308,3 +308,38 @@ describe('espace des élus (REC-06)', () => {
     expect((await rech(t.dupont, 'ecole')).status).toBe(401);
   });
 });
+
+describe('alertes de recherche (REC-29)', () => {
+  const alerte = (id, actif) => as(t.dupont).put(R(`/enregistrees/${id}/alerte`), { actif });
+  let id;
+  it('l’activation mémorise l’existant ; seuls les nouveaux actes visibles par la personne déclenchent une notification', async () => {
+    id = (await as(t.dupont).post(R('/enregistrees'), { nom: 'Mes subventions', requete: { q: 'subvention' } })).body.id;
+    expect((await as(t.moreau).put(R(`/enregistrees/${id}/alerte`), { actif: true })).status).toBe(404);   // pas la sienne
+    const vide = (await as(t.dupont).post(R('/enregistrees'), { nom: 'Sans critère', requete: {} })).body.id;
+    expect((await alerte(vide, true)).status).toBe(400);
+    const r = await alerte(id, true);
+    expect(r.body).toMatchObject({ alerte: true, memorises: expect.any(Number) });
+    expect((await as(t.dupont).get(R('/alertes'))).body.items.find((x) => x.id === id)).toMatchObject({ alerte: true });
+    expect(await env.c.alertes.verifier(ville.id, { forcer: true })).toBe(0);            // rien de nouveau
+    // un nouvel acte correspondant, créé par dupont (visible pour lui), puis indexé
+    const type = (await as(admin).get(`${base()}/referentiels/type_acte`)).body.items.find((x) => x.code === 'deliberation');
+    const a = (await as(t.dupont).post(`${base()}/actes`, { typeId: type.id, titre: 'Nouvelle subvention aux clubs de quartier' })).body;
+    await env.c.recherche.traiterActe(a.id);
+    expect(await env.c.alertes.verifier(ville.id, { forcer: true })).toBe(1);
+    const n = (await as(t.dupont).get(`${base()}/notifications?limit=5`)).body.items.find((x) => x.title.includes('Mes subventions'));
+    expect(n).toBeTruthy(); expect(n.title).toMatch(/^1 nouvel acte correspond/); expect(n.body).toMatch(/clubs de quartier/);
+    expect(await env.c.alertes.verifier(ville.id, { forcer: true })).toBe(0);            // déjà signalé : pas de doublon
+    // droits : l'acte d'un autre agent, invisible pour la personne, ne déclenche rien
+    await as(t.moreau).post(`${base()}/actes`, { typeId: type.id, titre: 'Subvention confidentielle de moreau' }).then(async (x) => x.body.id && env.c.recherche.traiterActe(x.body.id));
+    expect(await env.c.alertes.verifier(ville.id, { forcer: true })).toBe(0);
+  });
+
+  it('au plus une vérification par heure ; l’alerte se coupe ; supprimée avec la recherche', async () => {
+    expect(await env.c.alertes.verifier(ville.id)).toBe(0);                               // vérifiée il y a moins d'une heure
+    expect((await alerte(id, false)).body.alerte).toBe(false);
+    expect(await env.db.get('SELECT vus FROM search_saved WHERE id = $1', [id])).toEqual({ vus: [] });
+    await alerte(id, true);
+    expect((await as(t.dupont).del(R(`/enregistrees/${id}`))).status).toBe(200);
+    expect(await env.c.alertes.verifier(ville.id, { forcer: true })).toBe(0);
+  });
+});

@@ -21,7 +21,7 @@ const QExport = z.object(Criteres);
 const Similaires = z.object({ acteId: Id.optional(), titre: z.string().trim().max(500).optional(), objet: z.string().trim().max(2000).optional() });
 const Enregistrer = z.object({ nom: z.string().trim().min(2).max(80), requete: z.record(z.string(), z.unknown()) });
 
-module.exports = ({ makeRouter, recherche }) => {
+module.exports = ({ makeRouter, recherche, alertes }) => {
   const r = makeRouter('/api/v1/organismes/:orgId/recherche');
 
   r.get('/', {
@@ -44,6 +44,11 @@ module.exports = ({ makeRouter, recherche }) => {
   r.delete('/enregistrees/:id', { summary: 'Supprime une de mes recherches enregistrées', tags: T, org: true, params: PS },
     async (req, res) => res.json(await recherche.supprimerEnregistree(req.ctx, req.org.id, req.valid.params.id)));
 
+  r.get('/alertes', { summary: 'Mes alertes de recherche : quelles recherches enregistrées m\'alertent, et depuis quand elles ont été vérifiées', tags: T, org: true, params: P },
+    async (req, res) => res.json(await alertes.etat(req.ctx, req.org.id)));
+  r.put('/enregistrees/:id/alerte', { summary: 'Active ou coupe l\'alerte d\'une recherche enregistrée (« me prévenir quand un nouvel acte correspond »)', tags: T, org: true, params: PS, body: z.object({ actif: z.boolean() }),
+    description: 'À l\'activation, les résultats du moment sont mémorisés : seuls les nouveaux actes déclenchent une notification. La vérification (au plus horaire) se fait avec vos droits.' },
+  async (req, res) => res.json(await alertes.basculer(req.ctx, req.org.id, req.valid.params.id, req.valid.body.actif)));
   r.get('/etat', { summary: 'État de l’index (actes indexés, en retard, annexes lues / sans texte), requêtes fréquentes et sans résultat (anonymisées)', tags: T, org: true, roles: ADMIN, params: P },
     async (req, res) => res.json(await recherche.etat(req.ctx, req.org.id)));
   r.post('/reindexation', { summary: 'Lance la ré-indexation complète en arrière-plan (les annexes déjà lues ne sont pas relues)', tags: T, org: true, roles: ADMIN, params: P, responses: { 202: 'Démarrée' } },

@@ -34,6 +34,29 @@ function Lecteur({ doc, seanceId }: { doc: Pick<Doc, 'key' | 'version' | 'url'> 
   );
 }
 
+const CIBLE_AM: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Visas et considérants', dispositif: 'Dispositif' };
+const STATUT_AM: Record<string, { label: string; classe: string }> = { a_voter: { label: 'À voter', classe: 'bg-action text-white' }, adopte: { label: 'Adopté', classe: 'bg-ok text-white' }, rejete: { label: 'Rejeté', classe: 'bg-ko text-white' }, retire: { label: 'Retiré', classe: 'bg-warn text-white' }, traite: { label: 'Voté', classe: 'bg-slate-500 text-white' } };
+
+/** Amendements du point : le texte proposé arrive en temps réel, avant le vote (ELU-41). */
+function AmendementsElus({ liste }: { liste: any[] }) {
+  return (
+    <section className="rounded-xl border border-line bg-white p-4" aria-label="Amendements du point">
+      <h2 className="mb-2 text-[15px]">Amendements ({liste.length})</h2>
+      <ul className="space-y-2">
+        {liste.map((a) => {
+          const st = STATUT_AM[a.statut] ?? STATUT_AM.a_voter;
+          return (
+            <li key={a.id} className="rounded-lg border border-line bg-soft p-3">
+              <div className="flex flex-wrap items-center gap-2"><b>Amendement n° {a.numero}</b><span className="text-[13px] text-mute">{a.auteur} · {CIBLE_AM[a.cible]}</span><span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${st.classe}`}>{st.label}</span></div>
+              {a.motif && <p className="mt-1 text-[13px] text-mute">Motif : {a.motif}</p>}
+              <details className="mt-1" open={a.statut === 'a_voter'}><summary className="cursor-pointer text-[13px] font-semibold text-action">Texte proposé</summary><pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[13px]">{a.texte}</pre></details>
+            </li>);
+        })}
+      </ul>
+    </section>
+  );
+}
+
 /** Notes personnelles du point : privées par défaut ; partage avec son groupe ou des élus nommés. */
 function Notes({ seanceId, itemId, moi }: { seanceId: number; itemId: number; moi: boolean }) {
   const [notes, setNotes] = useState<any[]>([]); const [texte, setTexte] = useState(''); const [partage, setPartage] = useState<'prive' | 'groupe' | 'elus'>('prive');
@@ -171,6 +194,7 @@ export default function Seance() {
                   <button key={d.key} role="tab" aria-selected={docCourant?.key === d.key} onClick={() => setDocKey(d.key)} className={`rounded-lg border px-4 py-2 text-[14px] font-semibold ${docCourant?.key === d.key ? 'border-primary bg-primary text-white' : 'border-line bg-white'}`}>
                     {d.type === 'annexe' || d.type === 'piece' ? d.titre : TYPE_LABEL[d.type] ?? d.titre}{d.modifie && <span className="ml-2 rounded bg-warn px-1.5 text-[10px] text-white">modifié</span>}</button>))}</div>}
               </div>
+              {suivre && (direct?.amendements ?? []).some((a: any) => a.itemId === courant.id) && <AmendementsElus liste={(direct.amendements as any[]).filter((a) => a.itemId === courant.id)} />}
               {notes && <div className="rounded-xl border border-line bg-white p-4"><Notes seanceId={sid} itemId={courant.id} moi /></div>}
             </>
           ) : sel?.kind === 'doc' && docCourant ? <h1 className="text-[20px]">{docCourant.titre}</h1> : null}
