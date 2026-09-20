@@ -1,3 +1,4 @@
+import { AgentNames } from '../AgentName';
 import { FormEvent, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
@@ -19,7 +20,7 @@ function Detail({ id, onClose }: { id: number; onClose: () => void }) {
           <div><h3 className="mb-1">Membres ({c.data.membres.length})</h3>
             {c.data.membres.length === 0 ? <p className="text-mute">Aucun membre.</p> : <ul className="grid gap-1 md:grid-cols-2">{c.data.membres.map((m: any) => <li key={m.eluId} className="rounded bg-soft px-3 py-2">{m.prenom} {m.nom} {m.fonction !== 'membre' && <Badge tone="blue">{m.fonction.replace('_', '-')}</Badge>} <span className="text-mute">{m.groupe}</span></li>)}</ul>}</div>
           <ReunionsSection commissionId={id} canEdit={isScc} />
-          <div><h3 className="mb-1">Secrétaires</h3>{c.data.secretaires.length ? c.data.secretaires.join(', ') : <span className="text-mute">Aucun</span>}</div>
+          <div><h3 className="mb-1">Secrétaires</h3>{c.data.secretaires.length ? <AgentNames list={c.data.secretaires} /> : <span className="text-mute">Aucun</span>}</div>
         </div>)}
     </Modal>
   );

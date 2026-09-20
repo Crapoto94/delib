@@ -14,6 +14,16 @@ import { AgentName, AgentNames } from '../AgentName';
 
 /** Ordre du jour d'une séance : classement par glisser-déposer (ou clavier), numérotation, affectation, arrêt (section 16.2). */
 /** Fond d'une ligne selon l'état de validation du dossier (D57). */
+/** Couleur d'une ligne de l'ordre du jour selon son avancement : d'abord la préparation (rédaction, circuit, prêt), puis la séance elle-même. */
+const SEANCE_LIGNE: Record<string, { bar: string; bg: string; label: string }> = {
+  en_cours: { bar: 'border-l-sky-600', bg: 'bg-sky-100', label: 'En cours de débat' },
+  adopte: { bar: 'border-l-emerald-600', bg: 'bg-emerald-100/70', label: 'Adoptée' },
+  rejete: { bar: 'border-l-rose-600', bg: 'bg-rose-100/70', label: 'Rejetée' },
+  sans_vote: { bar: 'border-l-slate-500', bg: 'bg-slate-100', label: 'Traité sans vote' },
+  retire: { bar: 'border-l-amber-500', bg: 'bg-amber-100/70', label: 'Retiré' },
+  ajourne: { bar: 'border-l-amber-500', bg: 'bg-amber-100/70', label: 'Ajourné' },
+};
+const BARRE: Record<string, string> = { pret: 'border-l-emerald-400', en_circuit: 'border-l-sky-400', a_corriger: 'border-l-amber-400', brouillon: 'border-l-slate-300', libre: 'border-l-indigo-400' };
 const ETAT: Record<string, { bg: string; label: string; tone?: 'ok' | 'warn' | 'blue' }> = {
   pret: { bg: 'bg-emerald-50', label: 'Prêt (circuit terminé)', tone: 'ok' },
   en_circuit: { bg: 'bg-sky-50', label: 'En cours de validation', tone: 'blue' },
@@ -38,6 +48,9 @@ export default function Odj() {
   const [pattern, setPattern] = useState<{ value: string; exemples: string[] } | null>(null);
   const lockTimer = useRef<any>(null);
   const meta = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}`))).data, [o, id]);
+  // avancement de la séance elle-même (point en cours, résultats des votes) : colore l'ordre du jour au fur et à mesure
+  const tenue = useLoad(async () => { try { return (await api.get(orgPath(o, `/seances/${id}/tenue`))).data; } catch { return null; } }, [o, id]);
+  const seanceEtat = new Map<number, string>((tenue.data?.points ?? []).map((p: any) => [p.id, p.etat === 'traite' ? (String(p.resultat).startsWith('adopte') ? 'adopte' : 'rejete') : p.etat]));
   const [editing, setEditing] = useState(false); const [deleting, setDeleting] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false); const [cahierOpen, setCahierOpen] = useState(false);
   const d = odj.data;
@@ -115,7 +128,7 @@ export default function Odj() {
               <button className="btn-secondary !py-1" onClick={() => setPoint({ kind: 'libre', titre: '', description: '', numerote: false, files: [] })}><Plus className="h-3.5 w-3.5" /> Dossier simple / point libre / chapitre</button>
             </div>}
           </div>
-          {order.some((i) => i.acte && i.acte.etat !== 'pret') && <div className="border-b border-line px-4 py-2"><Legende /></div>}
+          {(order.some((i) => i.acte && i.acte.etat !== 'pret') || seanceEtat.size > 0) && <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-line px-4 py-2"><Legende />{[...new Set([...seanceEtat.values()].filter((e) => SEANCE_LIGNE[e]))].map((e) => <span key={e} className="inline-flex items-center gap-1 text-[11px] text-mute"><span className={`inline-block h-3 w-3 rounded border-l-4 ${SEANCE_LIGNE[e].bar} ${SEANCE_LIGNE[e].bg}`} />{SEANCE_LIGNE[e].label}</span>)}<span className="inline-flex items-center gap-1 text-[11px] text-mute"><span className="inline-block h-3 w-3 rounded border-l-4 border-l-indigo-400 bg-indigo-50" />Point libre</span></div>}
           {!order.length ? <Empty>Aucun point. Affectez des dossiers depuis la colonne de droite.</Empty> : (
             <ol>{order.map((it) => {
               const idx = active.findIndex((x) => x.id === it.id);
@@ -130,7 +143,7 @@ export default function Odj() {
               return (
                 <li key={it.id} draggable={canEdit && !retire} onDragStart={() => setDragFrom(idx)} onDragEnd={() => { setDragFrom(null); setOver(null); }} onDragOver={(e) => { if (!retire) { e.preventDefault(); setOver(idx); } }}
                   onDrop={() => { if (dragFrom !== null && !retire) move(dragFrom, idx); setDragFrom(null); setOver(null); }}
-                  className={`flex items-center gap-3 border-b border-line px-3 py-3 ${retire ? 'bg-slate-50 opacity-60' : (it.acte ? ETAT[it.acte.etat]?.bg : null) ?? 'bg-white'} ${dragFrom === idx ? 'opacity-40' : ''} ${over === idx && dragFrom !== idx ? 'shadow-lift ring-2 ring-action' : ''}`}>
+                  className={`flex items-center gap-3 border-b border-l-4 border-line px-3 py-3 ${retire ? 'border-l-slate-300 bg-slate-50 opacity-60' : `${SEANCE_LIGNE[seanceEtat.get(it.id) ?? '']?.bar ?? (it.acte ? BARRE[it.acte.etat] : BARRE.libre)} ${SEANCE_LIGNE[seanceEtat.get(it.id) ?? '']?.bg ?? (it.acte ? ETAT[it.acte.etat]?.bg : 'bg-indigo-50/60') ?? 'bg-white'}`} ${dragFrom === idx ? 'opacity-40' : ''} ${over === idx && dragFrom !== idx ? 'shadow-lift ring-2 ring-action' : ''}`}>
                   {canEdit && !retire ? <GripVertical className="h-5 w-5 shrink-0 cursor-grab text-slate-400" aria-label="Poignée de déplacement" /> : <span className="w-5" />}
                   <div className="w-36 shrink-0"><div className={`font-mono text-[13px] font-bold ${it.provisoire ? 'italic text-mute' : 'text-primary'}`}>{it.numero ?? '—'}</div>{it.numero && it.provisoire && <div className="text-[10px] uppercase text-mute">provisoire</div>}{it.ajouteApresArret && <Badge tone="warn">ajouté</Badge>}</div>
                   <div className="min-w-0 flex-1">
@@ -139,6 +152,7 @@ export default function Odj() {
                     {it.kind === 'libre' && it.description && <p className="mt-1 whitespace-pre-wrap text-[12px] text-slate-700">{it.description}</p>}
                     {it.kind === 'libre' && !retire && (it.fichiers?.length > 0 || canEdit) && <div className="mt-1 flex flex-wrap items-center gap-1">{(it.fichiers ?? []).map((f: any) => <button key={f.id} className="inline-flex items-center gap-1 rounded-full bg-soft px-2 py-0.5 text-[11px] hover:bg-slate-200" title={f.nom} onClick={async () => { const r = await api.get(orgPath(o, `/seances/${id}/odj/points/${it.id}/fichiers/${f.id}`), { responseType: 'blob' }); if (f.mime === 'application/pdf') showPdf(r.data, f.titre); else { const a = document.createElement('a'); a.href = URL.createObjectURL(r.data); a.download = f.nom; a.click(); } }}><Paperclip className="h-3 w-3" />{f.titre}</button>)}{canEdit && <button className="rounded-full border border-dashed border-line px-2 py-0.5 text-[11px] text-action hover:bg-soft" onClick={() => setDossierOpen(it)}>{it.fichiers?.length ? 'Gérer' : '+ pièce jointe'}</button>}</div>}
                     {retire && <div className="text-[12px] text-ko">Retiré : {it.retireMotif}</div>}
+                    {!retire && SEANCE_LIGNE[seanceEtat.get(it.id) ?? ''] && <div className="mt-0.5"><span className={`inline-block rounded px-2 py-0.5 text-[11px] font-bold ${SEANCE_LIGNE[seanceEtat.get(it.id)!].bg} ${seanceEtat.get(it.id) === 'adopte' ? 'text-emerald-800' : seanceEtat.get(it.id) === 'rejete' ? 'text-rose-800' : 'text-slate-700'}`}>{SEANCE_LIGNE[seanceEtat.get(it.id)!].label}</span></div>}
                     {!retire && it.acte && it.acte.etat !== 'pret' && <div className="mt-0.5"><Badge tone={ETAT[it.acte.etat]?.tone}>{it.acte.etat === 'en_circuit' ? (it.acte.etape ?? 'En circuit') : ETAT[it.acte.etat]?.label}</Badge>{it.acte.holders?.length ? <span className="ml-2 text-[11px] text-mute">chez <AgentNames list={it.acte.holders} /></span> : null}</div>}
                   </div>
                   {canEdit && !retire && <div className="flex shrink-0 items-center">

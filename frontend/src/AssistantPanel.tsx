@@ -1,3 +1,4 @@
+import { useIa } from './useIa';
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, HelpCircle, Languages, ScrollText, Sparkles, Wand2, XCircle } from 'lucide-react';
 import { api, errMsg, org as orgPath } from './api';
@@ -24,7 +25,7 @@ const GRAVITE: Record<string, { label: string; tone: 'ko' | 'warn' | 'gray' }> =
 export default function AssistantPanel({ acte, t, canEdit, beforeApply, afterApply, toast }: {
   acte: any; t: { id: number; kind: string }; canEdit: boolean; beforeApply: () => Promise<void>; afterApply: () => Promise<void>; toast: Toast;
 }) {
-  const { org } = useAuth(); const o = org!.id;
+  const { org } = useAuth(); const o = org!.id; const ia = useIa();
   const [items, setItems] = useState<Suggestion[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null); const [why, setWhy] = useState<number | null>(null);
 
@@ -78,7 +79,7 @@ export default function AssistantPanel({ acte, t, canEdit, beforeApply, afterApp
       </div>
       {canEdit ? (
         <div className="grid grid-cols-2 gap-2 border-b border-line p-3">
-          {OUTILS.map((x) => (
+          {OUTILS.filter((x) => ia[x.type]).map((x) => (
             <button key={x.type} title={x.hint + (x.scope === 'texte' ? ' — sur ce texte' : '')} className="flex items-start gap-2 rounded border border-line bg-white p-2 text-left hover:border-action hover:bg-soft disabled:opacity-60" disabled={!!busy} onClick={() => run(x)}>
               <x.icon className="mt-0.5 h-4 w-4 shrink-0 text-action" />
               <span className="min-w-0"><span className="block text-[12px] font-semibold leading-4">{busy === x.type && <Spinner />} {x.label}</span><span className="block text-[10px] text-mute">{x.scope === 'texte' ? 'ce texte' : 'tout le dossier'}</span></span>

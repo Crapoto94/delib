@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AgentName } from './AgentName';
 import { CheckCircle2, Eye, Sparkles, X, XCircle } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from './api';
 import { useAuth } from './auth';
@@ -6,6 +7,7 @@ import { dt } from './format';
 import { Loading } from './ui';
 import RichEditor, { EditorMode } from './RichEditor';
 import AssistantPanel from './AssistantPanel';
+import { useIa } from './useIa';
 
 export const KIND_LABEL: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispositif: 'Délibéré' };
 const PLACEHOLDER: Record<string, string> = {
@@ -31,7 +33,9 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const [text, setText] = useState('');
   const [state, setState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
   const [conflict, setConflict] = useState(false);
-  const [side, setSide] = useState<'suivi' | 'assistant'>('assistant');
+  const [side0, setSide] = useState<'suivi' | 'assistant'>('assistant');
+  const ia = useIa(); const assistantOn = ia.any; // aucun usage de l'IA actif : ni bouton, ni onglet, ni panneau
+  const side = assistantOn ? side0 : 'suivi';
   const [drawer, setDrawer] = useState(false); // écran étroit : le panneau latéral s'ouvre en tiroir
   const timer = useRef<any>(null); const latest = useRef({ text: '', version: 1, dirty: false });
 
@@ -81,7 +85,7 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
             <button key={k} className={`rounded px-2 py-1 font-semibold ${mode === k ? 'bg-white shadow-card' : ''}`} onClick={async () => { await commit(); setMode(k); }}>{l}</button>)}</div>}
           {canEdit && <span className={state === 'error' ? 'font-semibold text-ko' : 'text-mute'}>{state === 'saving' ? 'Enregistrement…' : state === 'dirty' ? 'Modifications en attente…' : state === 'error' ? 'Non enregistré' : `✓ Enregistré · version ${view.version}`}</span>}
           {!canEdit && <span className="text-mute">Lecture seule à ce stade du circuit.</span>}
-          <span className="ml-auto flex gap-2"><button className="btn-secondary !py-1 lg:!hidden" onClick={() => setDrawer(!drawer)} aria-expanded={drawer}><Sparkles className="h-3.5 w-3.5" /> Assistant IA</button>
+          <span className="ml-auto flex gap-2">{assistantOn && <button className="btn-secondary !py-1 lg:!hidden" onClick={() => setDrawer(!drawer)} aria-expanded={drawer}><Sparkles className="h-3.5 w-3.5" /> Assistant IA</button>}
           <button className="btn-secondary !py-1" onClick={preview}><Eye className="h-3.5 w-3.5" /> Aperçu mis en page</button></span>
         </div>
         {conflict && <div role="alert" className="border-b border-warn/30 bg-warn-bg px-4 py-2 text-warn">Ce texte a été modifié par quelqu'un d'autre. <button className="font-semibold underline" onClick={async () => { latest.current.dirty = false; setConflict(false); await load(); }}>Recharger sa version</button> (vos dernières frappes seront perdues).</div>}
@@ -91,21 +95,21 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
               {view.markdown ? (mode === 'suivi' && view.tracking ? <SpanView spans={view.spans} /> : <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{mode === 'propre' ? view.markdown : view.markdown}</div>) : <span className="text-mute">Texte vide.</span>}</div></div>}
         </div>
       </div>
-      <aside className={`${drawer ? 'absolute inset-y-0 right-0 z-10 flex shadow-float' : 'hidden'} w-80 shrink-0 flex-col overflow-hidden border-l border-line bg-white lg:static lg:flex lg:shadow-none`} aria-label="Assistant et modifications suivies">
-        {view.tracking && <div className="flex shrink-0 border-b border-line" role="tablist">{([['assistant', 'Assistant IA'], ['suivi', `Modifications${tracking ? ` (${view.changes.length})` : ''}`]] as const).map(([k, l]) =>
+      <aside className={`${!assistantOn && !view.tracking ? '!hidden' : ''} ${drawer ? 'absolute inset-y-0 right-0 z-10 flex shadow-float' : 'hidden'} w-80 shrink-0 flex-col overflow-hidden border-l border-line bg-white lg:static lg:flex lg:shadow-none`} aria-label="Assistant et modifications suivies">
+        {view.tracking && assistantOn && <div className="flex shrink-0 border-b border-line" role="tablist">{([['assistant', 'Assistant IA'], ['suivi', `Modifications${tracking ? ` (${view.changes.length})` : ''}`]] as const).map(([k, l]) =>
           <button key={k} role="tab" aria-selected={side === k} onClick={() => setSide(k)} className={`flex-1 px-3 py-2 text-[12px] font-semibold ${side === k ? 'border-b-2 border-action text-action' : 'text-mute'}`}>{l}</button>)}</div>}
-        {(side === 'assistant' || !view.tracking) && (
+        {assistantOn && (side === 'assistant' || !view.tracking) && (
           <div className="min-h-0 flex-1"><AssistantPanel acte={acte} t={t} canEdit={canEdit} toast={toast} beforeApply={commit} afterApply={async () => { latest.current.dirty = false; await load(); onChanged(); }} /></div>)}
         {view.tracking && side === 'suivi' && (
         <div className="min-h-0 flex-1 overflow-auto" aria-label="Modifications suivies">
           <div className="border-b border-line px-4 py-3"><h3 className="text-[14px]">Modifications suivies</h3><p className="text-[12px] text-mute">Une couleur par auteur.</p></div>
-          {view.authors?.length > 0 && <ul className="flex flex-wrap gap-2 border-b border-line px-4 py-2">{view.authors.map((a: any) => <li key={a.username} className="flex items-center gap-1 text-[12px]"><span className="h-3 w-3 rounded-full" style={{ background: a.color }} />{a.name || a.username}</li>)}</ul>}
+          {view.authors?.length > 0 && <ul className="flex flex-wrap gap-2 border-b border-line px-4 py-2">{view.authors.map((a: any) => <li key={a.username} className="flex items-center gap-1 text-[12px]"><span className="h-3 w-3 rounded-full" style={{ background: a.color }} /><AgentName u={a.username} /></li>)}</ul>}
           {!tracking ? <p className="p-4 text-[12px] text-mute">Aucune modification en attente de décision.</p> : (
             <>
               {canEdit && <div className="border-b border-line px-4 py-2"><button className="btn-ok w-full" onClick={() => resolve('accept')}>Tout accepter ({view.changes.length})</button></div>}
               <ul>{view.changes.map((c: any) => (
                 <li key={c.cid} className="border-b border-line px-4 py-3">
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ background: c.color }} /><b className="text-[12px]">{c.name || c.author}</b><span className="ml-auto text-[11px] text-mute">{dt(c.at, { dateStyle: 'short', timeStyle: 'short' })}</span></div>
+                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ background: c.color }} /><b className="text-[12px]"><AgentName u={c.author} /></b><span className="ml-auto text-[11px] text-mute">{dt(c.at, { dateStyle: 'short', timeStyle: 'short' })}</span></div>
                   <div className="mt-1 text-[13px]">{c.deleted && <del className="mr-1 text-ko">{c.deleted}</del>}{c.inserted && <ins className="text-ok-text no-underline">{c.inserted}</ins>}</div>
                   {canEdit && <div className="mt-2 flex gap-2"><button className="flex items-center gap-1 text-[12px] font-semibold text-ok" onClick={() => resolve('accept', c.cid)}><CheckCircle2 className="h-4 w-4" /> Accepter</button>
                     <button className="flex items-center gap-1 text-[12px] font-semibold text-ko" onClick={() => resolve('reject', c.cid)}><XCircle className="h-4 w-4" /> Rejeter</button></div>}

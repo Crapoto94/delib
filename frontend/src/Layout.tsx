@@ -1,3 +1,4 @@
+import { AgentName } from './AgentName';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, Eye, LogOut, Search } from 'lucide-react';
@@ -62,8 +63,8 @@ export default function Layout() {
     <div className="min-h-screen pb-16">
       {me.impersonation && (
         <div role="status" className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-3 bg-warn px-4 py-2 text-[13px] font-semibold text-white">
-          <Eye className="h-4 w-4" /> Vous voyez VibeDélib en tant que {me.displayName} (@{me.username}) — vos actions sont faites avec ses droits et journalisées à votre nom.
-          <button className="rounded bg-white px-3 py-1 text-warn" onClick={stopActAs}>Revenir à mon compte ({me.impersonation.by})</button>
+          <Eye className="h-4 w-4" /> Vous voyez VibeDélib en tant que <AgentName u={me.username} /> — vos actions sont faites avec ses droits et journalisées à votre nom.
+          <button className="rounded bg-white px-3 py-1 text-warn" onClick={stopActAs}>Revenir à mon compte (<AgentName u={me.impersonation.by} />)</button>
         </div>)}
       <header className="sticky top-0 z-30 border-b border-line bg-white">
         <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2 md:px-8">
@@ -101,7 +102,8 @@ export default function Layout() {
             <NavLink to="/dossiers" className={tab}>Actes & Dossiers</NavLink>
             <NavLink to="/seances" className={tab}>Séances & Ordre du jour</NavLink>
             <NavLink to="/commissions" className={tab}>Commissions</NavLink>
-            {(isAdmin || isScc) && <NavLink to="/admin" className={tab}>Administration</NavLink>}
+            {(isAdmin || isScc || org?.roles?.includes('teletransmission')) && <NavLink to="/controle-legalite" className={tab}>Contrôle de légalité</NavLink>}
+            {(isAdmin || isScc) && <NavLink to="/admin" className={tab}>Paramétrages</NavLink>}
           </nav>
         </div></div>
       </header>

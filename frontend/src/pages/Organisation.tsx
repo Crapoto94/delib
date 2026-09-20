@@ -47,7 +47,7 @@ export default function Organisation() {
           <span className="flex shrink-0 items-center gap-1">
             {role.statut !== 'implicite' && <button className="btn-secondary !py-0.5 !text-[12px]" onClick={() => setDesigner({ fonction, directionCode, serviceCode, titre })}><UserCheck className="h-3.5 w-3.5" /> Désigner…</button>}
             {role.statut !== 'implicite' && fonction !== 'dgs' && !manuel.some((x) => x.vacant) && <button className="btn-secondary !py-0.5 !text-[12px]" onClick={() => act(() => api.post(orgPath(o, '/titulaires'), { fonction, vacant: true, directionCode, serviceCode }), 'Poste déclaré vacant')}><UserX className="h-3.5 w-3.5" /> Vacant</button>}
-            {manuel.map((x) => <button key={x.id} className="rounded p-1 text-ko hover:bg-ko-bg" title={x.vacant ? 'Retirer la déclaration de vacance' : `Retirer ${x.username}`} aria-label="Retirer" onClick={() => act(() => api.delete(orgPath(o, `/titulaires/${x.id}`)), 'Titulaire retiré')}><Trash2 className="h-3.5 w-3.5" /></button>)}
+            {manuel.map((x) => <button key={x.id} className="rounded p-1 text-ko hover:bg-ko-bg" title={x.vacant ? 'Retirer la déclaration de vacance' : 'Retirer ce titulaire'} aria-label="Retirer" onClick={() => act(() => api.delete(orgPath(o, `/titulaires/${x.id}`)), 'Titulaire retiré')}><Trash2 className="h-3.5 w-3.5" /></button>)}
           </span>)}
       </div>
     );

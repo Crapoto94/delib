@@ -17,6 +17,12 @@ const HOLD = ['holders', 'delegues'];
 
 const RULES = [
   // ---- événementielles -------------------------------------------------------------------------------------------
+  { code: 'tlt.document', nom: 'Document de la préfecture à traiter (demande de pièces, observations, déféré)', family: 'echeances', kind: 'event', mandatory: true,
+    trigger: { event: 'tlt.document' }, recipients: ['scc'],
+    subject: 'Préfecture : {motif}', body: "La préfecture a adressé un document au sujet de l'acte n° {numero} « {titre} » : {motif}.\nC'est une tâche prioritaire du SCC : consultez le document et répondez si nécessaire (Contrôle de légalité).\n{lien}" },
+  { code: 'tlt.ar', nom: 'Acte reçu en préfecture (accusé de réception)', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'tlt.ar' }, recipients: ['redacteur'],
+    subject: 'Reçu en préfecture : {titre}', body: "L'acte n° {numero} « {titre} » a été reçu en préfecture : l'accusé de réception est enregistré.\n{lien}" },
   { code: 'etape.arrivee', nom: 'Un acte arrive à mon étape', family: 'validation', kind: 'event', mandatory: true,
     trigger: { event: 'step.entered' }, recipients: HOLD,
     subject: 'À valider : {titre}', body: "L'acte n° {numero} « {titre} » est arrivé à l'étape « {etape} ».\nRédacteur : {redacteur}.\nÉchéance : {echeance}.\n{lien}" },

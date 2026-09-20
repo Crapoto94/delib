@@ -10,6 +10,7 @@ import { useAuth } from '../auth';
 import { d, dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
+import { useIa } from '../useIa';
 
 /* ------------------------------------------------------------------------------------------------ frise du circuit */
 const IGNOREE: Record<string, string> = {
@@ -205,7 +206,7 @@ function Discussion({ acte, toast }: { acte: any; toast: (m: string, k?: 'ok' | 
       <h3 id="disc" className="mb-3">Discussion <Badge tone="blue">{list.data?.length ?? 0}</Badge></h3>
       <ul className="mb-3 space-y-2">{(list.data ?? []).map((c) => (
         <li key={c.id} className={`rounded border p-3 ${c.kind === 'refus' ? 'border-warn/40 bg-warn-bg' : 'border-line bg-slate-50'}`}>
-          <div className="flex justify-between text-[11px] text-mute"><b className="text-slate-700">{c.author}{c.kind === 'refus' ? ' · modification demandée' : ''}</b><span>{dt(c.createdAt, { dateStyle: 'short', timeStyle: 'short' })}</span></div>
+          <div className="flex justify-between text-[11px] text-mute"><b className="text-slate-700"><AgentName u={c.author} />{c.kind === 'refus' ? ' · modification demandée' : ''}</b><span>{dt(c.createdAt, { dateStyle: 'short', timeStyle: 'short' })}</span></div>
           <div className="mt-1 whitespace-pre-wrap">{c.body}</div></li>))}
       </ul>
       <MentionTextarea rows={2} placeholder="Écrire une consigne ou mentionner un collègue en tapant @nom…" value={body} onChange={setBody} />
@@ -316,7 +317,7 @@ function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolea
 /* ------------------------------------------------------------------------------- copie et assistant IA (D40) */
 function CopieModal({ acte, onClose, toast }: { acte: any; onClose: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth(); const o = org!.id; const nav = useNavigate();
-  const [adapter, setAdapter] = useState(true); const [contexte, setContexte] = useState(''); const [busy, setBusy] = useState(false);
+  const ia = useIa(); const [adapter0, setAdapter] = useState(true); const adapter = adapter0 && ia.copie; const [contexte, setContexte] = useState(''); const [busy, setBusy] = useState(false);
   const go = async () => {
     setBusy(true);
     try {
@@ -330,7 +331,7 @@ function CopieModal({ acte, onClose, toast }: { acte: any; onClose: () => void; 
       <div className="space-y-4">
         <p className="text-mute">Un nouveau <b>brouillon</b> est créé avec la fiche et les textes de « {acte.titre} ».</p>
         <label className="flex items-start gap-3 rounded border border-line p-3"><input type="radio" className="mt-1" checked={!adapter} onChange={() => setAdapter(false)} /><span><b>Copie simple</b><br /><span className="text-mute">Vous adaptez les textes à la main.</span></span></label>
-        <label className="flex items-start gap-3 rounded border border-action bg-soft p-3"><input type="radio" className="mt-1" checked={adapter} onChange={() => setAdapter(true)} /><span><Sparkles className="mr-1 inline h-4 w-4 text-action" /><b>Copie adaptée avec l'IA</b><br /><span className="text-mute">L'IA <b>propose</b> les modifications pour le nouveau contexte ; vous acceptez ou refusez chacune. Rien n'est appliqué sans vous.</span></span></label>
+        {ia.copie && <label className="flex items-start gap-3 rounded border border-action bg-soft p-3"><input type="radio" className="mt-1" checked={adapter} onChange={() => setAdapter(true)} /><span><Sparkles className="mr-1 inline h-4 w-4 text-action" /><b>Copie adaptée avec l'IA</b><br /><span className="text-mute">L'IA <b>propose</b> les modifications pour le nouveau contexte ; vous acceptez ou refusez chacune. Rien n'est appliqué sans vous.</span></span></label>}
         {adapter && <Field label="Décrivez le nouveau contexte" hint="Objet, bénéficiaire, montants, dates, ce qui change par rapport à ce dossier."><textarea className="input" rows={5} autoFocus value={contexte} onChange={(e) => setContexte(e.target.value)} placeholder="Ex. : subvention 2027 à l'association Ivry Théâtre, 8 000 €, versée en deux fois…" /></Field>}
         <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || (adapter && contexte.trim().length < 10)} onClick={go}>{busy && <Spinner />} Créer la copie</button></div>
       </div>

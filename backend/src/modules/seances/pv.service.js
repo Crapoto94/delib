@@ -86,7 +86,7 @@ function createPv({ db, audit, render, odj, tenue, actes }) {
         if (p.statut === 'retire') continue;
         body.push(`**${p.numero ? `Point n° ${p.numero}` : 'Point'}** — ${p.titre}`);
         if (p.acte) body.push(`Dossier n° ${p.acte.numeroSuivi}${p.acte.rapporteur ? ` — rapporteur : ${p.acte.rapporteur}` : ''}.`);
-        if (notes && p.notes?.trim()) body.push('', `*Observations* : ${p.notes.trim()}`);
+        if (notes && p.notes?.trim()) body.push('', '*Observations du secrétariat*', p.notes.trim()); // notes saisies dans l'éditeur (Markdown : gras, listes)
         body.push('');
         if (p.etat === 'traite') body.push(...voteLines(d, p, map), `**Résultat : ${RESULTAT[p.resultat] || ''}**`);
         else body.push(ETAT[p.etat] || '');

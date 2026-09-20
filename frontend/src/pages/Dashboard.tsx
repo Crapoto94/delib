@@ -48,7 +48,7 @@ export default function Dashboard() {
                 <td className="w-20 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
                 <td><Link className="font-semibold text-primary hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link></td>
                 <td><AgentName u={t.acte.redacteur} /></td>
-                <td>{t.phase === 'redaction' ? <Badge>En rédaction</Badge> : t.phase === 'correction' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{t.step?.label ?? 'En validation'}</Badge>}{t.step?.holders?.length ? <div className="text-[11px] text-mute">chez {t.step.holders.join(', ')}</div> : null}</td>
+                <td>{t.phase === 'redaction' ? <Badge>En rédaction</Badge> : t.phase === 'correction' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{t.step?.label ?? 'En validation'}</Badge>}{t.step?.holders?.length ? <div className="text-[11px] text-mute">chez <AgentNames list={t.step.holders} /></div> : null}</td>
                 <td>{t.step?.dueAt ? (t.step.late ? <Badge tone="ko">En retard · {dt(t.step.dueAt, { dateStyle: 'short' })}</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>
               </tr>))}
           </tbody></table>

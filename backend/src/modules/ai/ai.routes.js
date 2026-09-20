@@ -17,11 +17,12 @@ const JP = z.object({ orgId: Id, jid: Id });
 const OrgP = z.object({ orgId: Id });
 const JobsQ = z.object({ scope: z.enum(['mine', 'all']).default('mine'), acteId: Id.optional() });
 
-const PromptP = OrgP.extend({ code: z.enum(['orthographe', 'style', 'visas', 'copie']) });
+const PromptP = OrgP.extend({ code: z.enum(['orthographe', 'style', 'visas', 'complet', 'copie']) });
 const PromptB = z.object({
   texte: z.string().max(6000).nullable().optional().describe('Consigne (rôle et mission) ; null : revenir à la consigne par défaut'),
   modele: z.string().trim().max(120).nullable().optional().describe('Modèle de l\'IA pour cette fonction ; null : modèle par défaut'),
-}).refine((d) => d.texte !== undefined || d.modele !== undefined, { message: 'Rien à modifier' });
+  actif: z.boolean().optional().describe('Active ou désactive cet usage de l\'IA : désactivé, l\'IA n\'est jamais appelée et les boutons disparaissent'),
+}).refine((d) => d.texte !== undefined || d.modele !== undefined || d.actif !== undefined, { message: 'Rien à modifier' });
 
 module.exports = ({ makeRouter, ai, aiQueue, aiPrompts }) => {
   const r = makeRouter('/api/v1/organismes/:orgId/actes/:id');
@@ -63,6 +64,9 @@ module.exports = ({ makeRouter, ai, aiQueue, aiPrompts }) => {
     description: 'Paramètres (à régler dans les paramètres, par plateforme puis par organisme) : ai.max_concurrent, ai.max_par_utilisateur, ai.file_max, ai.file_max_par_utilisateur, ai.intervalle_ms, ai.timeout_s, ai.tentatives.' },
   async (req, res) => res.json(await aiQueue.overview(req.org.id)));
 
+  q.get('/statut', { summary: "Usages de l'IA activés (l'interface masque les boutons des usages désactivés)", tags: T, org: true, params: OrgP,
+    description: "`{ orthographe, style, visas, complet, copie }` : booléens. Un usage désactivé est refusé par le serveur (403) : l'IA n'est jamais appelée." },
+  async (req, res) => res.json(await aiPrompts.statuts(req.org.id)));
   q.get('/prompts', { summary: "Consignes envoyées à l'IA et modèle choisi pour chacune (administration)", tags: T, org: true, roles: ['org_admin'], params: OrgP,
     description: "Pour chaque fonction (orthographe, style, visas, copie assistée) : la consigne en vigueur et celle par défaut, le format de réponse imposé (non modifiable) et le modèle. `modeles` : liste fournie par l'IA interne (`null` si indisponible)." },
   async (req, res) => res.json(await aiPrompts.list(req.org.id)));

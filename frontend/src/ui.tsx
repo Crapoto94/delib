@@ -60,3 +60,13 @@ export function useToast() {
   const node = msg && <div role="status" className={`fixed bottom-20 right-6 z-50 rounded px-4 py-3 shadow-float ${msg.kind === 'ok' ? 'bg-ok text-white' : 'bg-ko text-white'}`}>{msg.text}</div>;
   return { toast: (text: string, kind: 'ok' | 'ko' = 'ok') => setMsg({ text, kind }), node };
 }
+
+/** Interrupteur : coché = la notification part aussi par e-mail ; décoché = elle reste dans l’outil (centre de notifications) seulement. */
+export function MailSwitch({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-action' : 'bg-slate-300'}`}>
+      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+    </button>
+  );
+}

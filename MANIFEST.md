@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.16 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.17 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -747,6 +747,7 @@ Le tuto montre un **calendrier de toutes les instances** (type *Conseil municipa
 - **SEA-09** — Instances, séances, numérotation et registres sont **propres à chaque organisme** (MOR-12, MOR-13).
 - **SEA-10** — **Modifier une séance** (D80) : date et heure, lieu, durée, type et dates clés (les rappels des dossiers sont recalculés) ; depuis la carte de la séance et depuis son ordre du jour ; réservé au SCC et aux administrateurs.
 - **SEA-11** — **Supprimer une séance** (D80) : l'écran annonce l'impact (dossiers qui visent la séance ou sont à son ordre du jour, séance suivante de l'instance, convocations déjà envoyées) et demande **ce que deviennent les dossiers** : **les reporter sur la prochaine séance** (ils la visent, le SCC les affectera) ou **les laisser sans affectation** (« en attente d'affectation ») ; un dossier n'est jamais perdu et l'historique du dossier garde la trace (report / retrait, motif). Refusé pour une séance **tenue** ou dont le **suivi est ouvert** ; des **convocations déjà envoyées** demandent une confirmation explicite (leur suivi est effacé). Audité.
+- **SEA-12** — **Couleurs de l'ordre du jour selon l'avancement** (D84) : chaque ligne porte une barre et un fond qui suivent la vie du point — **préparation** (rédaction, en circuit, à corriger, prêt ; point libre en bleu-violet), puis **séance** (en cours de débat en bleu, **adopté** en vert, **rejeté** en rouge, retiré / ajourné en orange, traité sans vote en gris) avec une pastille de résultat et une légende.
 
 ### 16.2 Ordre du jour, classement et numérotation (D10)
 
@@ -891,6 +892,7 @@ DMZ ─────────────────── firewall : un seul
   Partage **par annotation, par point ou pour tout le carnet de séance** ; **révocable** à tout moment ; le destinataire voit « partagé par X » et peut **répondre** (fil sur l'annotation).
 - **ELU-33** — **Confidentialité** : les annotations appartiennent à l'élu ; **ni les agents, ni le SCC, ni les administrateurs applicatifs ne peuvent les lire** ; l'administration ne voit que des **métadonnées de partage**. Chiffrement applicatif du contenu au repos (clé par instance) `[H]` Q43.
 - **ELU-34** — Entité **groupe politique** (nom, président, membres avec dates) ; un élu appartient à un seul groupe à la fois ; « non inscrits » géré.
+- **ELU-35** — **Groupes politiques repris du Hub** (D82) : le Hub DSI saisit le groupe d'un élu dans sa colonne « délégation » (`GET /api/ville/elus`) ; à chaque synchronisation, les élus du Hub **sans groupe local** sont rattachés au groupe de ce nom (créé au besoin, le plus nombreux prend l'ordre 1 : la majorité). Un groupe choisi localement n'est **jamais écrasé**. Aucune modification de l'API du Hub n'a été nécessaire.
 - **ELU-35** — **Export** : « mon dossier annoté » en PDF (annotations incorporées, **filigrane nominatif**), désactivable par paramètre ; **suppression** par l'élu ; **purge** à la fin du mandat après un délai paramétrable (RGPD).
 - **ELU-36** — Notifications de partage **non intrusives** (regroupées, jamais de contenu dans le mail).
 - **ELU-37** — *Phase ultérieure* : **mode hors-ligne** (PWA) avec synchronisation, pour les salles au réseau faible.
@@ -938,6 +940,8 @@ Une page de **suivi de séance** est **synchronisée en direct** : tous ceux qui
 - **LIVE-09** — **Quorum en direct** : nombre d'élus en salle (les pouvoirs ne comptent pas pour le quorum), seuil (majorité des membres en exercice `[H]`), alerte quand il n'est plus atteint.
 - **LIVE-10** — **Clôture d'un point** : *voté* (le résultat est calculé, VOT-03/VOT-04 : refus tant qu'un élu qui doit voter n'a pas de choix ; en cas de partage, la voix du président de séance est prépondérante et le président doit avoir voté), *sans vote* (communication), *retiré* ou *ajourné*. Le résultat met à jour le **statut de l'acte** (adopté, rejeté, retiré, ajourné) et est historisé. **Réouverture** d'un point avec motif obligatoire tant que la séance n'est pas close.
 - **LIVE-11** — **Président et secrétaire de séance** désignés parmi les élus.
+- **LIVE-12** — **Ergonomie de saisie** (D84) : le **point en cours reste collé en haut** de l'écran et porte, juste sous le décompte, les **votes de tout un groupe** (un rang par groupe : Pour / Contre / Abstention / NPPV / Effacer) — on vote sans défiler dans la liste des élus, qui reste modifiable élu par élu ensuite. Les **notes administratives** (séance et point) sont **visibles dès l'ouverture**, juste sous le point en cours.
+- **LIVE-13** — Les notes se saisissent dans un **éditeur WYSIWYG compact** (gras, italique, listes ; enregistrement automatique) ; elles sont conservées en Markdown, format que le **procès-verbal** met en page (observations du secrétariat).
 
 ### 19.2 Votes
 
@@ -1026,6 +1030,7 @@ Source : `SL-DOC-API.pdf` (*Documentation de l'API S²LOW, version 5.1 du 05/02/
 - **TLT-17** — L'API évolue (appels GET dépréciés) : tout est isolé dans l'adaptateur, testé contre l'instance de test à chaque montée de version de S²LOW.
 - **TLT-18** — La transmission conditionne, avec la publicité, le **caractère exécutoire** ; les délais applicables sont **paramétrables** et à faire valider par le service juridique.
 - **TLT-19** — **Accès à l'API indisponible pour l'instant** (D20) : l'adaptateur est développé **d'après la spécification v5.1** avec un **simulateur S²LOW** (serveur factice reproduisant les réponses `OK` / `KO`, les statuts 1 à 6 et 17, l'ARActe, les documents de la préfecture et les erreurs courantes), utilisé en développement, en tests et en intégration continue. Un **drapeau d'activation** par organisme garde l'outil en *simulation / export ZIP* tant que l'accès n'est pas obtenu ; à l'obtention du P12 et de l'instance de test, des **tests de contrat** rejoués contre S²LOW valident l'adaptateur **sans modifier le reste de l'application**.
+- **TLT-20** — **Réalisé en mode simulation (D82)** : la chaîne complète est jouable de bout en bout avec le **simulateur S²LOW** (adaptateur `s2low-simulateur.js`, état persistant dans les tables `s2low_sim_*`) : lot de la séance (adoptées transmissibles, rejetées / retirées / ajournées exclues avec leur raison), **numéro transmis** (motif paramétrable, validation en direct, unicité), **contrôles préalables** bloquants / avertissements, préparation (PDF de la délibération, classification à deux niveaux minimum, annexes typées), envoi **mode A** (direct) ou **mode B** (posté « en attente d'être postée » 17 puis **confirmation**), **double validation** optionnelle, suivi des statuts 17 → 1 → 2 → 3 → 4 (ARActe enregistré, date d'AR et état « reçu en préfecture » de l'acte renseignés d'office), **documents de la préfecture** (demande de pièces, lettre d'observations, déféré) avec **tâche prioritaire et notification du SCC**, **réponse** (envoi ou refus d'envoi de pièces), annulation, **bordereau d'acquittement** et **acte tamponné** avec la date de publication, journal par transaction, tableau de bord. Le **mode simulation** (défaut) offre six **scénarios** (nominal, observation, pièces complémentaires, déféré, refus, erreur) et un écran qui fait **avancer le serveur factice d'une étape à la fois** ; les modes « test » et « production » sont refusés avec un message clair tant que le certificat et l'instance de test ne sont pas obtenus. Menu **Contrôle de légalité** (administrateur, SCC, rôle « télétransmission »).
 
 ### 19.6 Publication (phase aval)
 
@@ -1135,6 +1140,7 @@ Classement : **P1** = fort gain, faible risque ; **P2** = gain net, effort moyen
 - **IA-70** — Dans *Administration / Assistant IA*, l'administrateur de l'organisme **modifie la consigne** (rôle, mission, règles de fond) envoyée à l'IA pour chaque fonction — orthographe, style, visas et considérants, copie assistée — et peut **rétablir la consigne d'origine** ; les modifications s'appliquent à la demande suivante et sont **auditées**.
 - **IA-71** — Le **format de réponse** attendu (objet JSON, règles de sécurité sur le texte fourni) est **imposé** : il est ajouté par le serveur à toute consigne, affiché en lecture seule, et ne peut pas être cassé par une consigne modifiée. Une consigne trop courte (< 30 caractères) ou trop longue (> 6 000) est refusée.
 - **IA-72** — Un **modèle** est choisi **pour chaque fonction** parmi ceux que l'IA interne propose (`GET /api/v1/ai/models`) ; sans choix, le modèle par défaut de l'IA est utilisé. Valeurs stockées comme paramètres de l'organisme (`ai.prompt.<fonction>`, `ai.model.<fonction>`).
+- **IA-73** — **Activation par usage** (D83) : chaque usage de l'IA — orthographe, style, visas et considérants, contrôle complet, copie assistée — a son **interrupteur** (Paramétrages / Assistant IA). **Désactivé, l'IA n'est jamais appelée** (le serveur refuse : 403, ou copie simple sans tâche IA) et **les boutons disparaissent** de l'interface (outils de l'assistant, onglet et bouton « Assistant IA », option « copie adaptée avec l'IA »). Le contrôle complet n'enchaîne que les passes actives ; sans aucune passe active, seuls les contrôles faits par le code tournent.
 
 ### 21.7 Modèle technique
 
@@ -1280,6 +1286,11 @@ Cible : un agent qui rédige 2 à 3 actes par an doit y arriver **sans formation
 - **UX-09** — Interface en français, **vocabulaire paramétrable par organisme** (MOR-09) (« Direction » ↔ « Pôle », « DGS » ↔ « DGA »…).
 - **UX-10** — Thème et logo de la collectivité en configuration.
 - **UX-11** — Messages d'erreur actionnables ; confirmation uniquement pour les actions irréversibles.
+
+### 23.0 Règles générales d'affichage (D84)
+
+- **UI-01** — Le menu de paramétrage s'appelle **« Paramétrages »** (et non « Administration »).
+- **UI-02** — **Partout** où un agent est affiché, c'est **« Prénom NOM »** (jamais l'identifiant de connexion) : listes, frise du circuit, tableaux de bord, commentaires, modifications suivies, secrétaires de commission, bandeau « Afficher en tant que ».
 
 ### 23.1 Conception graphique avec Stitch
 
@@ -1633,6 +1644,9 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D78** | **Suivi de séance en direct** : page synchronisée pour tous ceux qui l'affichent ; présences, sorties et retours des élus par groupe, pouvoirs, point en cours partagé, notes administratives, votes (Pour / Contre / Abstention / NPPV) par élu ou par groupe, les absents ne prenant pas part au vote ni pour eux ni pour leur mandant ; résultat qui met à jour le statut de l'acte. *(réalisé)* | 19.1 bis |
 | **D79** | **Canal des notifications et refus par l'utilisateur** (interrupteur mail / outil seulement par règle ; refus règle par règle des notifications facultatives) ; postes vacants annoncés au niveau de la direction ; l'AD retrouve l'identifiant d'un responsable absent de l'annuaire RH (fiche sans e-mail). *(réalisé)* | 22, 9.4 bis |
 | **D80** | **Modifier et supprimer une séance** (avec choix du devenir des dossiers : séance suivante ou sans affectation) ; **consignes et modèle de l'IA modifiables** par fonction dans Administration / Assistant IA. *(réalisé)* | 16.1, 21.6 ter |
+| **D82** | **S²LOW en mode simulation** : chaîne complète de télétransmission jouable avec un simulateur (envois, statuts, ARActe, retours de la préfecture, réponses), en attendant l'accès réel ; **groupes politiques repris du Hub** (colonne « délégation »). *(réalisé)* | 19.5, 15 |
+| **D83** | **Activation / désactivation de chaque usage de l'IA** : désactivé, aucun appel et boutons masqués. *(réalisé)* | 21 |
+| **D84** | **Ergonomie du suivi de séance** (votes de groupe et notes en haut, éditeur WYSIWYG), **couleurs de l'ordre du jour** selon l'avancement, menu **« Paramétrages »**, **« Prénom NOM » partout**. *(réalisé)* | 19.1 bis, 16, 23 |
 | **D81** | **Pièces produites après la séance** : procès-verbal, liste des délibérations et extrait du registre de chaque délibération, générés en PDF depuis le suivi de séance (présences, pouvoirs, votes, résultats). *(réalisé)* | 19.3 |
 | **D76** | **La DGS est le responsable de la Direction générale des services de l'organigramme RH** (et non un titulaire fictif de démonstration) : à défaut de titulaire désigné, le circuit s'adresse au directeur de la « DIRECTION GENERALE DES SERVICES » ; l'étape DGS n'est jamais contournée ; affichage « Directeur·trice » et « Prénom NOM » pour les noms composés. *(réalisé)* | 9.4 bis |
 
@@ -1655,6 +1669,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.17** | 2026-09-20 | **D82** S²LOW en simulation + groupes du Hub (TLT-20, ELU-35), **D83** activation par usage de l'IA (IA-73), **D84** ergonomie du suivi de séance, couleurs de l'ordre du jour, « Paramétrages », « Prénom NOM » partout (LIVE-12/13, SEA-12, UI-01/02) |
 | **1.16** | 2026-09-20 | **D81** : procès-verbal, liste des délibérations et extraits du registre en PDF (PST-06) |
 | **1.15** | 2026-09-20 | **D80** : modification et suppression d'une séance (SEA-10, SEA-11) ; consignes et modèle de l'IA par fonction (IA-70 à IA-72) |
 | **1.14** | 2026-09-20 | **D79** : canal mail / outil seulement par règle (NOT-26), refus règle par règle par l'utilisateur (NOT-27), vacants visibles au niveau de la direction (ORG-14), AD en repli pour les identifiants |

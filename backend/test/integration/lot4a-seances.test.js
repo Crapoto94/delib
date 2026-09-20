@@ -61,10 +61,18 @@ describe('élus et groupes politiques', () => {
   it('synchronise le Hub sans écraser la surcouche locale, désactive les absents', async () => {
     const r = await as(admin).post(`${base()}/elus/synchronisation`);
     expect(r.body).toMatchObject({ created: 2, updated: 0, deactivated: 0 });
+    // le Hub saisit le groupe politique dans la colonne « délégation » : l'élu est rattaché au groupe de ce nom (créé au besoin) ; sans délégation, aucun groupe
+    expect(r.body).toMatchObject({ groupesCrees: 1, elusRattaches: 1 });
+    const lem = (await as(admin).get(`${base()}/elus`)).body.items.find((e) => e.nom === 'Lemaire');
+    expect(lem.groupe).toBe('Finances');
+    expect((await as(admin).get(`${base()}/elus`)).body.items.find((e) => e.nom === 'Durif').groupe).toBeUndefined();
     const g = (await as(admin).post(`${base()}/groupes-politiques`, { nom: 'Majorité' })).body;
     const paul = (await as(admin).get(`${base()}/elus`)).body.items.find((e) => e.nom === 'Durif');
     expect((await as(admin).put(`${base()}/elus/${paul.id}`, { groupeId: g.id, mandatDebut: '2020-07-04' })).body.groupe).toBe('Majorité');
     expect((await as(admin).put(`${base()}/elus/${paul.id}`, { nom: 'Autre' })).status).toBe(409); // identité issue du Hub
+    await as(admin).put(`${base()}/elus/${lem.id}`, { groupeId: g.id }); // choix local : la resynchronisation ne l'écrase jamais
+    expect((await as(admin).post(`${base()}/elus/synchronisation`)).body).toMatchObject({ elusRattaches: 0, groupesCrees: 0 });
+    expect((await as(admin).get(`${base()}/elus/${lem.id}`)).body.groupe).toBe('Majorité');
     HUB_ELUS.pop();
     const r2 = await as(admin).post(`${base()}/elus/synchronisation`);
     expect(r2.body).toMatchObject({ created: 0, deactivated: 1 });

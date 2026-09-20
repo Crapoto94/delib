@@ -89,9 +89,38 @@ function createElus({ db, audit, directoryAdapter, log }) {
       }
       const gone = (await db.all("SELECT id, external_id FROM elus WHERE organisme_id = $1 AND source = 'hub' AND actif", [org])).filter((r) => !seen.has(r.external_id));
       for (const g of gone) await db.run('UPDATE elus SET actif = false WHERE id = $1', [g.id]);
-      await audit.log(ctx, { organismeId: org, action: 'elu.sync', entity: 'elus', after: { created, updated, deactivated: gone.length } });
-      log.info({ organisme: org, created, updated, deactivated: gone.length }, 'élus synchronisés depuis le Hub');
-      return { created, updated, deactivated: gone.length, total: list.length };
+      const groupes = await svc.rattacherGroupes(ctx, org);
+      await audit.log(ctx, { organismeId: org, action: 'elu.sync', entity: 'elus', after: { created, updated, deactivated: gone.length, ...groupes } });
+      log.info({ organisme: org, created, updated, deactivated: gone.length, ...groupes }, 'élus synchronisés depuis le Hub');
+      return { created, updated, deactivated: gone.length, total: list.length, ...groupes };
+    },
+
+    /**
+     * Le Hub DSI saisit le groupe politique d'un élu dans sa colonne « délégation » (« IVRY AVANT TOUT », « Front Populaire… »).
+     * Les élus du Hub qui n'ont pas encore de groupe local sont rattachés au groupe de ce nom (créé au besoin : le plus nombreux
+     * prend l'ordre 1, c'est la majorité). Un groupe déjà choisi localement n'est JAMAIS écrasé (surcouche locale, CMN-02).
+     */
+    async rattacherGroupes(ctx, organismeId) {
+      const org = requireOrg(organismeId);
+      const key = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const elus = await db.all("SELECT id, delegation, groupe_id FROM elus WHERE organisme_id = $1 AND source = 'hub' AND actif AND est_elu AND btrim(COALESCE(delegation, '')) <> ''", [org]);
+      const groupes = new Map((await db.all('SELECT id, nom FROM groupes_politiques WHERE organisme_id = $1', [org])).map((g) => [key(g.nom), g.id]));
+      const PALETTE = ['#2563EB', '#D97706', '#7C3AED', '#059669', '#DC2626', '#0891B2'];
+      const taille = new Map(); for (const e of elus) taille.set(key(e.delegation), (taille.get(key(e.delegation)) || 0) + 1);
+      let crees = 0; let rattaches = 0;
+      const noms = new Map(); for (const e of elus) if (!noms.has(key(e.delegation))) noms.set(key(e.delegation), e.delegation.trim());
+      const ordre = [...noms.keys()].sort((a, b) => taille.get(b) - taille.get(a));
+      const next = (await db.get('SELECT COALESCE(max(ordre), 0)::int AS n FROM groupes_politiques WHERE organisme_id = $1', [org])).n;
+      for (const k of ordre) {
+        if (groupes.has(k)) continue;
+        const g = await svc.createGroupe(ctx, org, { nom: noms.get(k), couleur: PALETTE[(next + crees) % PALETTE.length], ordre: next + crees + 1 });
+        groupes.set(k, g.id); crees++;
+      }
+      for (const e of elus) {
+        if (e.groupe_id) continue;
+        await db.run('UPDATE elus SET groupe_id = $2 WHERE id = $1', [e.id, groupes.get(key(e.delegation))]); rattaches++;
+      }
+      return { groupesCrees: crees, elusRattaches: rattaches };
     },
 
     // ---- groupes politiques

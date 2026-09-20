@@ -9,6 +9,7 @@ import Dossier from './pages/Dossier';
 import Admin from './pages/Admin';
 import Seances from './pages/Seances';
 import Commissions from './pages/Commissions';
+import Teletransmission from './pages/Teletransmission';
 import Delegations from './pages/Delegations';
 import Preferences from './pages/Preferences';
 import DevEditor from './pages/DevEditor';
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="dossiers/:id" element={<Dossier />} />
         <Route path="seances/*" element={<Seances />} />
         <Route path="commissions" element={<Commissions />} />
+        <Route path="controle-legalite" element={<Teletransmission />} />
         <Route path="delegations" element={<Delegations />} />
         <Route path="preferences" element={<Preferences />} />
         <Route path="admin/*" element={<Admin />} />

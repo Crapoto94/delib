@@ -5,6 +5,7 @@ import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { AgentName } from '../AgentName';
 import { dt } from '../format';
+import NotesEditor from '../NotesEditor';
 import { Badge, ErrorBox, Field, Loading, Modal, useToast } from '../ui';
 
 type Presence = 'en_salle' | 'sorti' | 'absent' | 'excuse';
@@ -54,7 +55,7 @@ function Notes({ resetKey, initial, onSave, placeholder }: { resetKey: string | 
   }, [txt]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div>
-      <textarea className="input min-h-[110px] resize-y" value={txt} onChange={(e) => setTxt(e.target.value)} placeholder={placeholder} />
+      <NotesEditor label={placeholder} value={txt} onChange={setTxt} placeholder={placeholder} />
       <div className="mt-1 text-right text-[11px] text-mute">{state === 'saving' ? 'Enregistrement…' : state === 'dirty' ? 'Modifications non enregistrées' : 'Enregistré'}</div>
     </div>
   );
@@ -151,9 +152,9 @@ export default function SuiviSeance() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
           {/* ------------------------------------------------------------------ ordre du jour */}
-          <aside className="card self-start overflow-hidden">
+          <aside className="card order-2 self-start overflow-hidden lg:order-1">
             <h3 className="border-b border-line px-4 py-3">Ordre du jour</h3>
-            <ol className="max-h-[70vh] overflow-y-auto">
+            <ol className="max-h-[40vh] overflow-y-auto lg:max-h-[70vh]">
               {s.points.map((p: any) => p.kind === 'chapitre' ? (
                 <li key={p.id} className="bg-soft px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-mute">{p.titre}</li>
               ) : (
@@ -168,9 +169,9 @@ export default function SuiviSeance() {
             </ol>
           </aside>
 
-          <div className="min-w-0 space-y-4">
+          <div className="order-1 min-w-0 space-y-4 lg:order-2">
             {/* ------------------------------------------------------------------ point en cours : affiché pour tous en même temps */}
-            <section className="card p-4">
+            <section className="card p-4 shadow-lift lg:sticky lg:top-2 lg:z-20">
               {!c ? <p className="text-mute">{can && ouverte ? 'Aucun point en cours : choisissez un point dans l’ordre du jour, ou passez au suivant.' : 'Aucun point en cours pour le moment.'}</p> : (
                 <>
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -190,6 +191,22 @@ export default function SuiviSeance() {
                     {([['Pour', 'pour', 'text-ok'], ['Contre', 'contre', 'text-ko'], ['Abstention', 'abstention', 'text-warn'], ['NPPV', 'nppv', 'text-slate-600'], ['Absents', 'absents', 'text-mute']] as const).map(([l, k, cl]) => (
                       <div key={k} className="rounded border border-line p-2 text-center"><div className={`text-[26px] font-bold leading-none ${cl}`}>{total(k)}</div><div className="mt-1 text-[11px] uppercase tracking-wider text-mute">{l}</div></div>))}
                   </div>
+                  {can && enCours && (
+                    <div className="mt-3 rounded-lg border border-line bg-soft p-2" aria-label="Votes par groupe">
+                      <div className="mb-1 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-mute"><span>Vote de tout un groupe d’un coup</span><span className="font-normal normal-case">chaque élu reste modifiable ensuite</span></div>
+                      <div className="grid gap-1.5 md:grid-cols-2">
+                        {s.groupes.map((g: any) => {
+                          const eligibles = g.elus.filter((e: any) => e.droit !== 'aucun').length; const pour = g.elus.filter((e: any) => e.vote === 'pour').length;
+                          return (
+                            <div key={g.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-line bg-white px-2 py-1">
+                              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.couleur || '#94A3B8' }} />
+                              <span className="min-w-0 flex-1 truncate text-[12px] font-semibold" title={g.nom}>{g.nom} <span className="font-normal text-mute">({eligibles} votant{eligibles > 1 ? 's' : ''}{pour ? ` · ${pour} pour` : ''})</span></span>
+                              <Seg size="sm" value={null} disabled={!editable || !eligibles} options={VOTE} onChange={(v) => bulkVote(g, v)} />
+                              <button className="text-[11px] text-mute hover:text-ko disabled:opacity-40" disabled={!editable || !eligibles} onClick={() => bulkVote(g, null)}>Effacer</button>
+                            </div>);
+                        })}
+                      </div>
+                    </div>)}
                   {enCours && c.decompteLive?.manquants > 0 && <p className="mt-2 text-[12px] text-warn">{c.decompteLive.manquants} élu(s) en salle n’ont pas encore de vote saisi ({voter - c.decompteLive.manquants}/{voter}).</p>}
 
                   {can && (
@@ -211,6 +228,14 @@ export default function SuiviSeance() {
                 </>)}
             </section>
 
+            {/* ------------------------------------------------------------------ notes administratives (secrétariat seulement) : visibles dès l’ouverture, sans défiler */}
+            {can && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <section className="card p-4"><h3 className="mb-2">Notes administratives de la séance</h3>
+                  <Notes resetKey={sid} initial={s.notes ?? ''} placeholder="Heure d’ouverture, incidents, remarques du secrétariat…" onSave={(x) => api.put(`${root}/notes`, { notes: x })} /></section>
+                <section className="card p-4"><h3 className="mb-2">Notes du point en cours</h3>
+                  {c ? <Notes resetKey={c.id} initial={c.notes ?? ''} placeholder="Intervenants, résumé du débat…" onSave={(x) => api.put(`${root}/points/${c.id}/notes`, { notes: x })} /> : <p className="text-mute">Choisissez un point pour y saisir des notes.</p>}</section>
+              </div>)}
             {/* ------------------------------------------------------------------ élus par groupe : présence, pouvoir, vote */}
             <section className="card overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
@@ -233,9 +258,6 @@ export default function SuiviSeance() {
                           <span className="flex items-center gap-1 text-[11px] text-mute">Présence du groupe
                             <button className="btn-secondary !px-2 !py-0.5 !text-[11px]" disabled={!editable} onClick={() => bulkPresence(g, 'en_salle')}>Tous en salle</button>
                             <button className="btn-secondary !px-2 !py-0.5 !text-[11px]" disabled={!editable} onClick={() => bulkPresence(g, 'absent')}>Tous absents</button></span>
-                          {enCours && <span className="flex items-center gap-1 text-[11px] text-mute">Vote du groupe ({eligibles})
-                            <Seg size="sm" value={null} disabled={!editable || !eligibles} options={VOTE} onChange={(v) => bulkVote(g, v)} />
-                            <button className="btn-secondary !px-2 !py-0.5 !text-[11px]" disabled={!editable || !eligibles} onClick={() => bulkVote(g, null)}>Effacer</button></span>}
                         </span>)}
                     </div>
                     <ul>
@@ -276,14 +298,7 @@ export default function SuiviSeance() {
               {!s.groupes.length && <p className="p-4 text-mute">Aucun élu n’est enregistré pour cette instance.</p>}
             </section>
 
-            {/* ------------------------------------------------------------------ notes administratives et journal (secrétariat seulement) */}
-            {can && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <section className="card p-4"><h3 className="mb-2">Notes administratives de la séance</h3>
-                  <Notes resetKey={sid} initial={s.notes ?? ''} placeholder="Heure d’ouverture, incidents, remarques du secrétariat…" onSave={(x) => api.put(`${root}/notes`, { notes: x })} /></section>
-                <section className="card p-4"><h3 className="mb-2">Notes du point en cours</h3>
-                  {c ? <Notes resetKey={c.id} initial={c.notes ?? ''} placeholder="Intervenants, résumé du débat…" onSave={(x) => api.put(`${root}/points/${c.id}/notes`, { notes: x })} /> : <p className="text-mute">Choisissez un point pour y saisir des notes.</p>}</section>
-              </div>)}
+            {/* ------------------------------------------------------------------ journal (secrétariat seulement) */}
             {can && s.journal?.length > 0 && (
               <details className="card p-4">
                 <summary className="cursor-pointer text-[14px] font-semibold">Journal de la séance ({s.journal.length} derniers évènements)</summary>

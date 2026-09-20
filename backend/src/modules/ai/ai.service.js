@@ -34,7 +34,8 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts }) {
       if (adapter && (!contexte || contexte.trim().length < 10)) throw E.badRequest('Décrivez le nouveau contexte (objet, bénéficiaire, montant, dates…) — au moins une phrase');
       const copy = await actes.duplicate(ctx, organismeId, sourceId);
       let job = null; let iaError = null;
-      if (adapter) {
+      if (adapter && !(await prompts.actif(copy.organismeId, 'copie'))) iaError = 'La copie assistée par l’IA est désactivée par l’administration : copie simple';
+      else if (adapter) {
         try { job = await queue.enqueue(ctx, { organismeId: copy.organismeId, acteId: copy.id, kind: 'adaptation', payload: { contexte, sourceId } }); }
         catch (e) { iaError = e.message; log.warn({ err: e.message }, "copie assistée : tâche IA refusée, copie simple conservée"); }
       }
@@ -45,6 +46,7 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts }) {
     /** Redemande les propositions pour un brouillon : tâche en arrière plan. */
     async requestAdaptation(ctx, organismeId, acteId, { contexte }) {
       const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      await prompts.assertActif(a.organisme_id, 'copie');
       if (!contexte || contexte.trim().length < 10) throw E.badRequest('Décrivez le nouveau contexte (objet, bénéficiaire, montant, dates…) — au moins une phrase');
       if (contexte.length > MAX_CONTEXT) throw E.badRequest(`Contexte trop long (maximum ${MAX_CONTEXT} caractères)`);
       return queue.enqueue(ctx, { organismeId: a.organisme_id, acteId: a.id, kind: 'adaptation', payload: { contexte } });
@@ -53,6 +55,7 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts }) {
     /** Demande à l'IA des propositions pour chaque texte non vide du dossier ; remplace les propositions en attente. */
     async suggest(ctx, organismeId, acteId, { contexte, sourceId } = {}, helpers = null) {
       const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      await prompts.assertActif(a.organisme_id, 'copie');
       if (!contexte || contexte.trim().length < 10) throw E.badRequest('Décrivez le nouveau contexte (objet, bénéficiaire, montant, dates…) — au moins une phrase');
       if (contexte.length > MAX_CONTEXT) throw E.badRequest(`Contexte trop long (maximum ${MAX_CONTEXT} caractères)`);
       const list = await textes.list(ctx, a.organisme_id, a.id);
@@ -99,6 +102,7 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts }) {
     async requestAnalyse(ctx, organismeId, acteId, { type, textId }) {
       const a = await actes.load(ctx, organismeId, acteId, { edit: true });
       if (!A.TYPES.includes(type)) throw E.badRequest(`Analyse inconnue : ${type}`);
+      await prompts.assertActif(a.organisme_id, type);
       if (textId) { const t = await db.get('SELECT 1 AS x FROM tracked_texts WHERE id = $1 AND acte_id = $2', [textId, a.id]); if (!t) throw E.notFound('Texte introuvable'); }
       return queue.enqueue(ctx, { organismeId: a.organisme_id, acteId: a.id, kind: 'analyse', payload: { type, textId: textId ?? null } });
     },
@@ -111,7 +115,8 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts }) {
       const a = await actes.load(ctx, organismeId, acteId, { edit: true });
       const all = await textes.list(ctx, a.organisme_id, a.id);
       const list = textId ? all.filter((t) => t.id === textId) : all;
-      const passes = type === 'complet' ? ['orthographe', 'style', 'visas'] : [type];
+      await prompts.assertActif(a.organisme_id, type);
+      const passes = type === 'complet' ? (await Promise.all(['orthographe', 'style', 'visas'].map(async (x) => ((await prompts.actif(a.organisme_id, x)) ? x : null)))).filter(Boolean) : [type];
       const run = await db.get('INSERT INTO ai_runs (organisme_id, acte_id, kind, requested_by, context) VALUES ($1,$2,$3,$4,$5) RETURNING id', [a.organisme_id, a.id, `analyse:${type}`, ctx.username, A.LABEL[type]]);
       const views = [];
       for (const t of list) { const v = await textes.view(ctx, a.organisme_id, a.id, t.id, { mode: 'propre' }); views.push({ t, md: v.markdown || '' }); }

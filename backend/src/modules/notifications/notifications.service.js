@@ -145,7 +145,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
   }
 
   // ------------------------------------------------------------------------------------------- événements
-  const EVENT_MAP = ['step.entered', 'acte.refused', 'circuit.completed', 'circuit.recalculated', 'comment.added', 'delegation.created', 'redaction.granted', 'circuit.blocked', 'circuit.published', 'circuit.missing_holders',
+  const EVENT_MAP = ['tlt.document', 'tlt.ar', 'step.entered', 'acte.refused', 'circuit.completed', 'circuit.recalculated', 'comment.added', 'delegation.created', 'redaction.granted', 'circuit.blocked', 'circuit.published', 'circuit.missing_holders',
   'derogation.requested', 'derogation.decided', 'commission.mise_a_disposition', 'commission.suspendue', 'commission.retiree', 'commission.avis', 'acte.seance_changed', 'odj.arrete', 'odj.modifie', 'ai.done', 'ai.failed', 'commission.reunion'];
 
   async function onEvent(type, p0) {

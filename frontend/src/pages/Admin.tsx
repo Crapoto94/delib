@@ -4,7 +4,7 @@ import { RefreshCw, Trash2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
-import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
+import { Badge, MailSwitch, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad, useToast } from '../ui';
 import { Gabarits, Identite, Utilisateurs } from './AdminExtra';
 import AdminIa from './AdminIa';
 import AgentPicker, { AgentList } from '../AgentPicker';
@@ -88,15 +88,6 @@ function GroupeCard({ g, o, reload, toast }: { g: any; o: number; reload: () => 
 
 /* -------------------------------------------------------------------------------------------------------- circuits */
 /* --------------------------------------------------------------------------------------------- règles de notification */
-/** Interrupteur : coché = la notification part aussi par e-mail ; décoché = elle reste dans l’outil (centre de notifications) seulement. */
-function MailSwitch({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-action' : 'bg-slate-300'}`}>
-      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
-    </button>
-  );
-}
 const withMail = (channels: string[], mail: boolean): string[] => (mail ? [...new Set([...channels, 'inapp', 'mail'])] : (channels.filter((c) => c !== 'mail').length ? channels.filter((c) => c !== 'mail') : ['inapp']));
 
 function Regles() {
@@ -168,8 +159,8 @@ export default function Admin() {
   const tabs = [['identite', 'Identité & logo'], ['utilisateurs', 'Utilisateurs & rôles'], ['titulaires', 'Titulaires & droits'], ['circuits', 'Circuits'], ['gabarits', 'Gabarits PDF'], ['notifications', 'Notifications & relances'], ['ia', 'Assistant IA'], ['elus', 'Élus'], ['calendrier', 'Jours fériés'], ...(me?.isPlatformAdmin ? [['collectivites', 'Collectivités']] : [])];
   return (
     <div>
-      <PageTitle title="Administration" sub={isAdmin ? "Paramétrage de l'organisme." : "Paramétrage accessible au SCC."} />
-      <nav className="mb-6 flex flex-wrap gap-1 border-b border-line" aria-label="Administration">{tabs.map(([k, l]) => (
+      <PageTitle title="Paramétrages" sub={isAdmin ? "Paramétrage de l'organisme." : "Paramétrage accessible au SCC."} />
+      <nav className="mb-6 flex flex-wrap gap-1 border-b border-line" aria-label="Paramétrages">{tabs.map(([k, l]) => (
         <NavLink key={k} to={`/admin/${k}`} className={({ isActive }) => `-mb-px border-b-2 px-4 py-2 text-[13px] font-semibold ${isActive ? 'border-primary text-primary' : 'border-transparent text-mute hover:text-ink'}`}>{l}</NavLink>))}</nav>
       <Routes>
         <Route index element={<Navigate to="utilisateurs" replace />} />

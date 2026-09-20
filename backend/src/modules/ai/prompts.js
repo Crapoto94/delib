@@ -4,6 +4,8 @@
  *  - le FORMAT de réponse (objet JSON attendu, règles de sécurité sur le texte fourni) est imposé et ajouté par le code : une consigne
  *    modifiée ne peut donc pas casser la lecture des propositions ;
  *  - le MODÈLE est propre à chaque fonction (liste fournie par l'API interne) ; vide : modèle par défaut de l'IA.
+ * Chaque USAGE (les quatre ci-dessus + le contrôle complet) s'active ou se désactive : désactivé, l'IA n'est JAMAIS appelée pour cet usage
+ * (le serveur refuse) et les boutons correspondants disparaissent de l'interface (D83).
  * Stockage : paramètres de l'organisme `ai.prompt.<code>` et `ai.model.<code>` ; la valeur par défaut est celle du code.
  */
 const { E } = require('../../shared/errors');
@@ -28,14 +30,33 @@ const DEFS = {
   copie: { label: 'Copie assistée d’une délibération', aide: 'Adaptation d’un dossier copié à un nouveau contexte (proposée à la copie d’un dossier).', mission: COPIE_MISSION, format: COPIE_FORMAT },
 };
 const CODES = Object.keys(DEFS);
+/** Usages de l'IA qu'on peut activer / désactiver (le contrôle complet enchaîne les passes actives et les contrôles automatiques). */
+const USAGES = { orthographe: DEFS.orthographe.label, style: DEFS.style.label, visas: DEFS.visas.label, complet: 'Contrôle complet du dossier', copie: DEFS.copie.label };
+const USAGE_CODES = Object.keys(USAGES);
 const MIN = 30; const MAX = 6000;
 
 function createPrompts({ settings, ai, log }) {
-  const keyP = (c) => `ai.prompt.${c}`; const keyM = (c) => `ai.model.${c}`;
+  const keyP = (c) => `ai.prompt.${c}`; const keyM = (c) => `ai.model.${c}`; const keyA = (c) => `ai.actif.${c}`;
   const check = (code) => { if (!DEFS[code]) throw E.notFound('Consigne inconnue'); return DEFS[code]; };
 
   const svc = {
-    CODES, DEFS,
+    CODES, DEFS, USAGES,
+
+    /** Cet usage de l'IA est-il activé pour l'organisme ? (activé par défaut) */
+    async actif(organismeId, code) {
+      if (!USAGES[code]) throw E.notFound('Usage de l’IA inconnu');
+      const cfg = await settings.resolve(requireOrg(organismeId));
+      return cfg[keyA(code)]?.value !== false;
+    },
+    /** État de tous les usages : l'interface masque les boutons des usages désactivés. */
+    async statuts(organismeId) {
+      const cfg = await settings.resolve(requireOrg(organismeId));
+      return Object.fromEntries(USAGE_CODES.map((c) => [c, cfg[keyA(c)]?.value !== false]));
+    },
+    /** Refuse l'appel : jamais d'interrogation de l'IA pour un usage désactivé. */
+    async assertActif(organismeId, code) {
+      if (!(await svc.actif(organismeId, code))) throw E.forbidden(`L’usage « ${USAGES[code]} » de l’IA est désactivé par l’administration`);
+    },
 
     /** Consigne complète (texte modifiable + format imposé) et modèle à utiliser pour cette fonction dans cet organisme. */
     async resolve(organismeId, code) {
@@ -58,14 +79,20 @@ function createPrompts({ settings, ai, log }) {
       const items = [];
       for (const code of CODES) {
         const d = DEFS[code]; const r = await svc.resolve(org, code);
-        items.push({ code, label: d.label, aide: d.aide, defaut: d.mission, texte: r.mission, personnalise: r.personnalise, format: d.format, modele: r.modele, origine: cfg[keyP(code)]?.origin ?? null });
+        items.push({ code, label: d.label, aide: d.aide, defaut: d.mission, texte: r.mission, personnalise: r.personnalise, format: d.format, modele: r.modele, origine: cfg[keyP(code)]?.origin ?? null, actif: cfg[keyA(code)]?.value !== false });
       }
+      // le contrôle complet n'a pas de consigne propre : il enchaîne les passes actives et des contrôles faits par le code
+      items.splice(3, 0, { code: 'complet', label: USAGES.complet, aide: 'Enchaîne les passes d’orthographe, de style et de visas qui sont actives, puis les contrôles de complétude et de cohérence faits par le code (sans IA).', defaut: null, texte: null, personnalise: false, format: null, modele: null, origine: null, actif: cfg[keyA('complet')]?.value !== false, sansConsigne: true });
       return { items, modeles: await svc.models() };
     },
 
     /** `texte` et `modele` : chaîne pour définir, `null` pour revenir à la valeur par défaut, absent pour ne pas y toucher. */
-    async set(ctx, organismeId, code, { texte, modele }) {
-      const org = requireOrg(organismeId); const d = check(code);
+    async set(ctx, organismeId, code, { texte, modele, actif }) {
+      const org = requireOrg(organismeId);
+      if (!USAGES[code]) throw E.notFound('Consigne inconnue');
+      if (actif !== undefined) await settings.put(ctx, { scope: 'organisme', organismeId: org, key: keyA(code), val: !!actif });
+      if (code === 'complet') { if (texte !== undefined || modele !== undefined) throw E.badRequest('Le contrôle complet n’a ni consigne ni modèle propres : ceux des passes s’appliquent'); return svc.list(org); }
+      const d = check(code);
       const put = (key, val) => settings.put(ctx, { scope: 'organisme', organismeId: org, key, val });
       const drop = async (key) => { try { await settings.remove(ctx, { scope: 'organisme', organismeId: org, key }); } catch (e) { if (e.status !== 404) throw e; } };
       if (texte !== undefined) {
