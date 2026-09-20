@@ -41,6 +41,7 @@ const MODULES = [
   require('../modules/teletransmission/tlt.routes'),
   require('../modules/espace-elus/elus.routes'),
   require('../modules/espace-elus/comptes.routes'),
+  require('../modules/ged/ged.routes'),
   require('../modules/titulaires/organisation.routes'),
   require('../modules/convocations/convocations.routes'),
   require('../modules/users/users.routes'),

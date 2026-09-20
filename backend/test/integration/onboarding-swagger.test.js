@@ -89,7 +89,10 @@ describe('documentation Swagger (critère d\'acceptation n°7)', () => {
   it("les routes publiques sont explicitement déclarées sans sécurité, toutes les autres exigent le jeton", async () => {
     const spec = (await env.http().get('/swagger.json')).body;
     const open = Object.entries(spec.paths).flatMap(([p, ops]) => Object.entries(ops).filter(([, o]) => o.security.length === 0).map(([m]) => `${m.toUpperCase()} ${p}`)).sort();
-    expect(open).toEqual(['GET /api/status', 'GET /api/v1/public/branding', 'GET /api/v1/public/organismes/{orgId}/logo', 'GET /api/v1/public/convocations/{token}', 'GET /api/v1/public/convocations/{token}/convocation.pdf', 'GET /api/v1/public/convocations/{token}/ordre-du-jour.pdf', 'GET /api/v1/public/convocations/{token}/pieces/{fichierId}', 'POST /api/v1/auth/login', 'POST /api/v1/auth/login-local', 'POST /api/v1/public/convocations/{token}/accuse', 'POST /api/v1/public/convocations/{token}/reponse'].sort());
+    // l'authentification de l'espace élus est publique par nature (mot de passe, code, invitation) ; le reste de l'espace exige un jeton d'élu
+    const publiques = ['POST /api/v1/elus-auth/code', 'POST /api/v1/elus-auth/connexion', 'POST /api/v1/elus-auth/invitation/{token}', 'POST /api/v1/elus-auth/oubli'];
+    expect(open.filter((x) => !publiques.includes(x))).toEqual(['GET /api/status', 'GET /api/v1/public/branding', 'GET /api/v1/public/organismes/{orgId}/logo', 'GET /api/v1/public/convocations/{token}', 'GET /api/v1/public/convocations/{token}/convocation.pdf', 'GET /api/v1/public/convocations/{token}/ordre-du-jour.pdf', 'GET /api/v1/public/convocations/{token}/pieces/{fichierId}', 'POST /api/v1/auth/login', 'POST /api/v1/auth/login-local', 'POST /api/v1/public/convocations/{token}/accuse', 'POST /api/v1/public/convocations/{token}/reponse'].sort());
+    expect(open.filter((x) => publiques.includes(x)).sort()).toEqual(publiques);
   });
 
   it("chaque route protégée refuse l'accès sans jeton (401)", async () => {

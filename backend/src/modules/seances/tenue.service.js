@@ -13,7 +13,7 @@ const rules = require('./tenue.rules');
 const CLOS = ['traite', 'sans_vote', 'retire', 'ajourne'];
 const ACTE_FINAUX = ['adopte', 'rejete', 'transmis', 'ar_recu', 'publie', 'executoire', 'archive', 'abandonne'];
 
-function createTenue({ db, audit, acl, access, seances, odj }) {
+function createTenue({ db, audit, acl, access, seances, odj, bus }) {
   const waiters = new Map(); // seanceId -> Set<() => void>
   const wake = (id) => { const w = waiters.get(id); if (w) { waiters.delete(id); w.forEach((f) => f()); } };
   const canWrite = (ctx, org) => acl.isAdmin(ctx, org);
@@ -211,6 +211,7 @@ function createTenue({ db, audit, acl, access, seances, odj }) {
     },
 
     async cloturer(ctx, organismeId, seanceId) {
+      const emettre = () => bus?.emit?.('tenue.close', { organismeId: requireOrg(organismeId), seanceId }); // archivage automatique en GED (facultatif)
       const out = await svc.mutate(ctx, organismeId, seanceId, async (q, t) => {
         const enCours = await q.get("SELECT it.numero, it.titre FROM seance_points p JOIN seance_items it ON it.id = p.item_id WHERE p.seance_id = $1 AND p.etat = 'en_cours' ORDER BY it.position LIMIT 1", [seanceId]);
         if (enCours) throw E.conflict(`Le point ${enCours.numero ? `n° ${enCours.numero} ` : ''}« ${enCours.titre || ''} » est encore en cours : clôturez-le (résultat, retrait ou ajournement) avant de clore la séance`);
@@ -220,6 +221,7 @@ function createTenue({ db, audit, acl, access, seances, odj }) {
         void t;
       });
       await audit.log(ctx, { organismeId: requireOrg(organismeId), action: 'seance.tenue.cloture', entity: 'seances', entityId: seanceId });
+      Promise.resolve(emettre()).catch(() => undefined);
       return out;
     },
 
