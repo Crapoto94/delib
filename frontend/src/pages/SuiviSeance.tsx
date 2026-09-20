@@ -15,9 +15,9 @@ const PRESENCE: { v: Presence; label: string; on: string }[] = [
   { v: 'en_salle', label: 'En salle', on: 'bg-ok-solid text-white border-ok' }, { v: 'sorti', label: 'Sorti', on: 'bg-warn-solid text-white border-warn' },
   { v: 'absent', label: 'Absent', on: 'bg-slate-500 text-white border-slate-500' }, { v: 'excuse', label: 'Excusé', on: 'bg-slate-400 text-white border-slate-400' },
 ];
-const VOTE: { v: Choix; label: string; on: string; row: string }[] = [
-  { v: 'pour', label: 'Pour', on: 'bg-ok-solid text-white border-ok', row: 'bg-ok-bg' }, { v: 'contre', label: 'Contre', on: 'bg-ko-solid text-white border-ko', row: 'bg-ko-bg' },
-  { v: 'abstention', label: 'Abst.', on: 'bg-warn-solid text-white border-warn', row: 'bg-warn-bg' }, { v: 'nppv', label: 'NPPV', on: 'bg-slate-600 text-white border-slate-600', row: 'bg-slate-100' },
+const VOTE: { v: Choix; label: string; on: string; row: string; tint: string }[] = [
+  { v: 'pour', label: 'Pour', on: 'bg-ok-solid text-white border-ok', row: 'bg-ok-bg', tint: 'ok-solid' }, { v: 'contre', label: 'Contre', on: 'bg-ko-solid text-white border-ko', row: 'bg-ko-bg', tint: 'ko-solid' },
+  { v: 'abstention', label: 'Abst.', on: 'bg-warn-solid text-white border-warn', row: 'bg-warn-bg', tint: 'warn-solid' }, { v: 'nppv', label: 'NPPV', on: 'bg-slate-600 text-white border-slate-600', row: 'bg-slate-100', tint: 's600' },
 ];
 const RESULTAT: Record<string, { label: string; tone: 'ok' | 'ko' }> = {
   adopte_unanimite: { label: 'Adoptée à l’unanimité', tone: 'ok' }, adopte_majorite: { label: 'Adoptée à la majorité', tone: 'ok' }, adopte_preponderante: { label: 'Adoptée (voix prépondérante du président)', tone: 'ok' },
@@ -33,12 +33,20 @@ const JOURNAL: Record<string, string> = {
 const nom = (e: { prenom?: string; nom: string }) => `${e.prenom ? `${e.prenom} ` : ''}${e.nom.toUpperCase()}`.trim();
 const hour = (d: string) => dt(d, { timeStyle: 'medium' });
 
-function Seg<T extends string>({ value, options, onChange, disabled, size = 'md' }: { value: T | null; options: { v: T; label: string; on: string }[]; onChange: (v: T) => void; disabled?: boolean; size?: 'sm' | 'md' }) {
+/**
+ * Boutons segmentés. `fill` (part de 0 à 1 par option) sert au vote d'un groupe : unanimité → la case du choix est pleine (`value`) ;
+ * majorité partagée → chaque case se remplit proportionnellement à la part du groupe qui a voté ainsi.
+ */
+function Seg<T extends string>({ value, options, onChange, disabled, size = 'md', fill }: { value: T | null; options: { v: T; label: string; on: string; tint?: string }[]; onChange: (v: T) => void; disabled?: boolean; size?: 'sm' | 'md'; fill?: Partial<Record<string, { part: number; n: number }>> }) {
   return (
     <span className="inline-flex overflow-hidden rounded border border-slate-300" role="group">
-      {options.map((o) => (
-        <button key={o.v} type="button" disabled={disabled} aria-pressed={value === o.v} onClick={() => onChange(o.v)}
-          className={`border-r border-slate-300 last:border-r-0 ${size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-[12px]'} font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${value === o.v ? o.on : 'bg-surface text-slate-700 hover:bg-slate-50'}`}>{o.label}</button>))}
+      {options.map((o) => {
+        const f = value === null ? fill?.[o.v] : undefined; const pct = f ? Math.round(f.part * 100) : 0;
+        return (
+          <button key={o.v} type="button" disabled={disabled} aria-pressed={value === o.v} onClick={() => onChange(o.v)} title={f ? `${f.n} élu(s) · ${pct} %` : undefined}
+            style={pct > 0 && o.tint ? { backgroundImage: `linear-gradient(to top, rgb(var(--c-${o.tint}) / 0.6) ${pct}%, transparent ${pct}%)` } : undefined}
+            className={`border-r border-slate-300 last:border-r-0 ${size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-[12px]'} font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${value === o.v ? o.on : 'bg-surface text-slate-700 hover:bg-slate-50'}`}>{o.label}</button>);
+      })}
     </span>
   );
 }
@@ -196,12 +204,16 @@ export default function SuiviSeance() {
                       <div className="mb-1 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-mute"><span>Vote de tout un groupe d’un coup</span><span className="font-normal normal-case">chaque élu reste modifiable ensuite</span></div>
                       <div className="grid gap-1.5 md:grid-cols-2">
                         {s.groupes.map((g: any) => {
-                          const eligibles = g.elus.filter((e: any) => e.droit !== 'aucun').length; const pour = g.elus.filter((e: any) => e.vote === 'pour').length;
+                          const votants = g.elus.filter((e: any) => e.droit !== 'aucun'); const eligibles = votants.length; const pour = g.elus.filter((e: any) => e.vote === 'pour').length;
+                          // unanimité du groupe : la case du choix est pleine ; sinon, chaque case se remplit selon la part du groupe qui a voté ainsi
+                          const parts: Record<string, { part: number; n: number }> = {};
+                          for (const x of VOTE) { const n = votants.filter((e: any) => e.vote === x.v).length; if (n) parts[x.v] = { part: n / eligibles, n }; }
+                          const unanime = eligibles > 0 ? (VOTE.find((x) => parts[x.v]?.n === eligibles)?.v ?? null) : null;
                           return (
                             <div key={g.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-line bg-surface px-2 py-1">
                               <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.couleur || '#94A3B8' }} />
                               <span className="min-w-0 flex-1 truncate text-[12px] font-semibold" title={g.nom}>{g.nom} <span className="font-normal text-mute">({eligibles} votant{eligibles > 1 ? 's' : ''}{pour ? ` · ${pour} pour` : ''})</span></span>
-                              <Seg size="sm" value={null} disabled={!editable || !eligibles} options={VOTE} onChange={(v) => bulkVote(g, v)} />
+                              <Seg size="sm" value={unanime} fill={parts} disabled={!editable || !eligibles} options={VOTE} onChange={(v) => bulkVote(g, v)} />
                               <button className="text-[11px] text-mute hover:text-ko disabled:opacity-40" disabled={!editable || !eligibles} onClick={() => bulkVote(g, null)}>Effacer</button>
                             </div>);
                         })}

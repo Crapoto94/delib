@@ -48,7 +48,8 @@ function SmsPasserelle({ o }: { o: number }) {
   const sim = f.mode !== 'http';
   return (
     <section className="card space-y-3 p-5"><h3>Passerelle SMS (mot de passe oublié)</h3>
-      <p className="max-w-3xl text-mute">Quand un élu clique sur « Mot de passe oublié », un <b>code à 6 chiffres</b> part par SMS sur son mobile (valable 5 minutes ; connexion de 12 h). Renseignez le mobile de chaque élu dans <b>Élus</b>.</p>
+      <p className="max-w-3xl text-mute">Quand un élu clique sur « Mot de passe oublié », un <b>code à 6 chiffres</b> part par SMS sur son mobile (valable 5 minutes ; connexion de 12 h). Les mobiles viennent du <b>Hub DSI</b> (champ téléphone, resynchronisé avec la liste des élus) ; un mobile saisi dans <b>Élus</b> a priorité.</p>
+      {d.data.couverture && <p className={`rounded border px-3 py-2 text-[13px] ${d.data.couverture.sansMobile.length ? 'border-warn/30 bg-warn-bg text-warn' : 'border-ok/30 bg-ok-bg text-ok-text'}`}><b>{d.data.couverture.avecMobile} élu(s) sur {d.data.couverture.total}</b> ont un mobile utilisable.{d.data.couverture.sansMobile.length > 0 && <> Sans mobile (ou numéro non mobile) : {d.data.couverture.sansMobile.join(', ')} — à renseigner dans <b>Élus</b> ou dans le Hub DSI.</>}</p>}
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Mode"><select className="input" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="simulation">Simulation (aucun SMS n’est envoyé)</option><option value="http">Passerelle HTTP</option></select></Field>
         {!sim && <Field label="Adresse de la passerelle" hint="Passerelle SMS de la Ville : http(s)://…/api/v1/messages"><input className="input" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://…" /></Field>}

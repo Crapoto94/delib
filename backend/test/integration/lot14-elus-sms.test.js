@@ -181,6 +181,9 @@ describe('passerelle SMS', () => {
     expect(appels[0].opts.headers.Authorization).toBe('Bearer jeton-secret-tres-long');
     const j = (await as(admin).get(E('/sms'))).body;
     expect(j.journal[0]).toMatchObject({ mode: 'http', statut: 'envoye', message: '(masqué)', mobile: '+33 •• •• •• 78' });
+    // couverture des mobiles (Hub : champ téléphone ; la saisie locale a priorité ; un fixe ne compte pas)
+    expect(j.couverture.total).toBeGreaterThan(0);
+    expect(j.couverture.avecMobile + j.couverture.sansMobile.length).toBe(j.couverture.total);
     // échec de la passerelle : erreur claire, journal « echec »
     const ko = createSms({ db: env.db, config: env.config, settings: env.c.settings, http: { post: async () => ({ status: 503 }) } });
     await expect(ko.envoyer({ organismeId: ville.id, mobile: '06 12 34 56 78', message: 'x' })).rejects.toMatchObject({ status: 502 });

@@ -80,6 +80,13 @@ function createSms({ db, config, settings, log, tls, http: injected }) {
       return svc.config(organismeId);
     },
 
+    /** Couverture des mobiles : les numéros viennent du Hub DSI (champ téléphone) ; un mobile saisi dans Élus a priorité. Un fixe ou un numéro invalide ne compte pas. */
+    async couverture(organismeId) {
+      const rows = await db.all("SELECT nom, prenom, COALESCE(NULLIF(mobile_local, ''), telephone) AS mobile, mobile_local <> '' AS local FROM elus WHERE organisme_id = $1 AND actif AND est_elu ORDER BY nom, prenom", [organismeId]);
+      const sans = rows.filter((r) => !normaliserMobile(r.mobile));
+      return { total: rows.length, avecMobile: rows.length - sans.length, sansMobile: sans.map((r) => `${r.prenom} ${r.nom}`.trim()) };
+    },
+
     /** Derniers messages du journal (le texte n'est lisible qu'en simulation). */
     async journal(organismeId, limit = 30) {
       return (await db.all('SELECT id, mobile_masque, message, mode, statut, erreur, created_at FROM sms_journal WHERE organisme_id = $1 ORDER BY id DESC LIMIT $2', [organismeId, limit]))

@@ -15,7 +15,7 @@ const PRule = P.extend({ code: z.string().regex(/^[a-z0-9_.-]{2,60}$/) });
 const Mute = z.object({ days: z.number().min(0.1).max(180), scope: z.enum(['me', 'all']).default('me'), reason: z.string().max(300).optional() });
 const Remind = z.object({ message: z.string().trim().max(1000).optional(), to: z.enum(['holders', 'redacteur']).default('holders') });
 const Rule = z.object({
-  nom: z.string().trim().min(2).max(200), enabled: z.boolean(), condition: z.record(z.string(), z.any()).nullable(),
+  nom: z.string().trim().min(2).max(200), enabled: z.boolean(), mandatory: z.boolean().describe('Obligatoire : toujours active, les utilisateurs ne peuvent pas la refuser'), condition: z.record(z.string(), z.any()).nullable(),
   recipients: z.array(z.string().max(80)).max(20), channels: z.array(z.enum(['inapp', 'mail', 'sms'])).min(1),
   palliers: z.array(z.record(z.string(), z.any())).max(20), subject: z.string().trim().min(2).max(300), body: z.string().trim().min(2).max(5000),
 }).partial();

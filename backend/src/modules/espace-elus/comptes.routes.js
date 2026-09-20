@@ -32,6 +32,6 @@ module.exports = ({ makeRouter, eluAuth, espace, annotations, sms }) => {
       modele: z.string().max(1000).optional().describe('Corps JSON avec {to}, {message}, {expediteur}'), jeton: z.string().max(500).optional().describe('Vide : conservé') }) },
   async (req, res) => res.json({ config: await sms.enregistrer(req.ctx, req.org.id, req.valid.body) }));
   r.get('/sms', { summary: 'Passerelle SMS : configuration (sans le jeton) et derniers messages (le texte n’est lisible qu’en simulation)', tags: T, org: true, roles: ['org_admin'], params: P },
-    async (req, res) => res.json({ config: await sms.config(req.org.id), journal: await sms.journal(req.org.id) }));
+    async (req, res) => res.json({ config: await sms.config(req.org.id), journal: await sms.journal(req.org.id), couverture: await sms.couverture(req.org.id) }));
   return [r];
 };

@@ -442,3 +442,30 @@ describe('mail ou dans l’outil seulement (administration et choix de chacun)',
     expect((await as(t.leroy).get(`${base()}/notifications/preferences`)).body.regles.find((r) => r.code === 'commentaire.mention').mode).toBe('immediate');
   });
 });
+
+describe('règle active / obligatoire réglables (administration)', () => {
+  const R = (code) => `${base()}/notifications/regles/${code}`;
+  const regle = async (code) => (await as(admin).get(`${base()}/notifications/regles`)).body.items.find((x) => x.code === code);
+  it('rend une règle facultative obligatoire (toujours active, non refusable), et inversement', async () => {
+    expect((await regle('circuit.termine')).mandatory).toBe(false);
+    await as(admin).put(R('circuit.termine'), { enabled: false });
+    expect((await regle('circuit.termine')).enabled).toBe(false);
+    // obligatoire : réactive d'office et ne peut plus être désactivée
+    const r = await as(admin).put(R('circuit.termine'), { mandatory: true });
+    expect(r.status).toBe(200); expect(r.body).toMatchObject({ mandatory: true, enabled: true });
+    expect((await as(admin).put(R('circuit.termine'), { enabled: false })).status).toBe(400);
+    expect((await as(t.dupont).put(`${base()}/notifications/preferences/regles/circuit.termine`, { mode: 'off' })).status).toBe(400);
+    // facultative à nouveau : chacun peut la refuser
+    expect((await as(admin).put(R('circuit.termine'), { mandatory: false })).body.mandatory).toBe(false);
+    expect((await as(t.dupont).put(`${base()}/notifications/preferences/regles/circuit.termine`, { mode: 'off' })).status).toBe(200);
+    await as(t.dupont).put(`${base()}/notifications/preferences/regles/circuit.termine`, { mode: 'immediate' });
+    await as(admin).del(R('circuit.termine'));
+  });
+  it('et une règle obligatoire fournie peut être rendue facultative', async () => {
+    const r = await as(admin).put(R('etape.arrivee'), { mandatory: false });
+    expect(r.body.mandatory).toBe(false);
+    expect((await as(admin).put(R('etape.arrivee'), { enabled: false })).body.enabled).toBe(false);
+    await as(admin).del(R('etape.arrivee'));
+    expect((await regle('etape.arrivee')).mandatory).toBe(true);
+  });
+});

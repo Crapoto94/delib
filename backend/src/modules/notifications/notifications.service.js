@@ -443,15 +443,17 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
       const cur = (await effectiveRules(orgId)).find((r) => r.code === code);
       if (!cur) throw E.notFound('Règle inconnue');
       const merged = { ...cur, ...body };
-      if (cur.mandatory && body.enabled === false) throw E.badRequest('Cette règle est obligatoire : elle ne peut pas être désactivée');
+      // « obligatoire » se règle ici aussi : une règle obligatoire est toujours active et échappe aux préférences des utilisateurs
+      if (merged.mandatory && body.enabled === false) throw E.badRequest('Cette règle est obligatoire : elle ne peut pas être désactivée');
+      if (merged.mandatory) merged.enabled = true;
       const before = cur;
       await db.run(
         `INSERT INTO notification_rules (organisme_id, code, nom, family, kind, trigger, condition, recipients, channels, palliers, subject, body, mandatory, enabled, updated_by)
          VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15)
          ON CONFLICT (COALESCE(organisme_id, 0), code) DO UPDATE SET nom = EXCLUDED.nom, condition = EXCLUDED.condition, recipients = EXCLUDED.recipients, channels = EXCLUDED.channels,
-           palliers = EXCLUDED.palliers, subject = EXCLUDED.subject, body = EXCLUDED.body, enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+           palliers = EXCLUDED.palliers, subject = EXCLUDED.subject, body = EXCLUDED.body, mandatory = EXCLUDED.mandatory, enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = now()`,
         [orgId, code, merged.nom, cur.family, cur.kind, JSON.stringify(cur.trigger), merged.condition ? JSON.stringify(merged.condition) : null, JSON.stringify(merged.recipients), JSON.stringify(merged.channels),
-          JSON.stringify(merged.palliers), merged.subject, merged.body, cur.mandatory, merged.enabled, ctx.username]);
+          JSON.stringify(merged.palliers), merged.subject, merged.body, !!merged.mandatory, merged.enabled, ctx.username]);
       await audit.log(ctx, { organismeId: orgId, action: 'notification.rule.update', entity: 'notification_rules', entityId: code, before, after: merged });
       return (await effectiveRules(orgId)).find((r) => r.code === code);
     },

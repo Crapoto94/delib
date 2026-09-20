@@ -108,23 +108,29 @@ function Regles() {
   const setMail = async (x: any, mail: boolean) => {
     try { await api.put(orgPath(o, `/notifications/regles/${x.code}`), { channels: withMail(x.channels ?? ['inapp', 'mail'], mail) }); toast(mail ? 'Notification par e-mail et dans l’outil' : 'Notification dans l’outil seulement (pas de mail)'); r.reload(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
-  const save = async () => { try { await api.put(orgPath(o, `/notifications/regles/${edit.code}`), { subject: edit.subject, body: edit.body, enabled: edit.enabled, channels: edit.channels }); toast('Règle enregistrée'); setEdit(null); r.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const setEtat = async (x: any, champ: 'enabled' | 'mandatory', v: boolean) => {
+    try { await api.put(orgPath(o, `/notifications/regles/${x.code}`), { [champ]: v }); toast(champ === 'enabled' ? (v ? 'Règle activée' : 'Règle désactivée') : (v ? 'Règle obligatoire : toujours active, non refusable par les utilisateurs' : 'Règle facultative : chacun peut la refuser')); r.reload(); } catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  const save = async () => { try { await api.put(orgPath(o, `/notifications/regles/${edit.code}`), { subject: edit.subject, body: edit.body, enabled: edit.enabled, mandatory: edit.mandatory, channels: edit.channels }); toast('Règle enregistrée'); setEdit(null); r.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
   return (
     <div className="space-y-6">
       {dash.data && <div className="grid gap-4 md:grid-cols-4">
         {[['Envoyés (7 j)', dash.data.last7Days.sent ?? 0], ['En échec', dash.data.last7Days.failed ?? 0], ['Actes sans titulaire', dash.data.blocked.length], ['Bloqués > 10 j', dash.data.stuckMoreThan10Days.length]].map(([l, v]) => (
           <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-head">{v}</div></div>))}</div>}
       <div className="card">{r.loading ? <Loading /> : (
-        <table className="w-full"><thead><tr><th>Règle</th><th>Type</th><th>Famille</th><th>État</th><th title="Décoché : la notification reste dans l’outil, aucun mail n’est envoyé">Par e-mail</th><th /></tr></thead><tbody>{r.data.items.map((x: any) => (
+        <table className="w-full"><thead><tr><th>Règle</th><th>Type</th><th>Famille</th><th title="Active : la règle s’applique. Obligatoire : toujours active, les utilisateurs ne peuvent pas la refuser">Active / Obligatoire</th><th title="Décoché : la notification reste dans l’outil, aucun mail n’est envoyé">Par e-mail</th><th /></tr></thead><tbody>{r.data.items.map((x: any) => (
           <tr key={x.code}><td><b>{x.nom}</b><div className="text-[11px] text-mute">{x.code}{x.origin === 'organisme' && ' · personnalisée'}</div></td><td>{x.kind === 'event' ? 'Événement' : 'Relance'}</td><td>{r.data.families[x.family]?.label}</td>
-            <td>{x.enabled ? <Badge tone="ok">active</Badge> : <Badge>désactivée</Badge>}{x.mandatory && <Badge tone="warn"> obligatoire</Badge>}</td>
+            <td><div className="space-y-1">
+              <span className="flex items-center gap-2"><MailSwitch on={!!x.enabled} disabled={!!x.mandatory} onChange={(v) => setEtat(x, 'enabled', v)} label={`Règle active : ${x.nom}`} /><span className="text-[12px]">{x.enabled ? 'Active' : 'Désactivée'}</span></span>
+              <span className="flex items-center gap-2"><MailSwitch on={!!x.mandatory} onChange={(v) => setEtat(x, 'mandatory', v)} label={`Règle obligatoire : ${x.nom}`} /><span className="text-[12px]">{x.mandatory ? 'Obligatoire' : 'Facultative'}</span></span></div></td>
             <td><span className="flex items-center gap-2"><MailSwitch on={(x.channels ?? []).includes('mail')} onChange={(v) => setMail(x, v)} label={`Envoyer aussi par e-mail : ${x.nom}`} /><span className="text-[11px] text-mute">{(x.channels ?? []).includes('mail') ? 'mail + outil' : 'outil seulement'}</span></span></td><td className="text-right"><button className="btn-secondary" onClick={() => setEdit({ ...x })}>Modifier</button></td></tr>))}</tbody></table>)}</div>
       {edit && <Modal title={edit.nom} onClose={() => setEdit(null)} wide><div className="space-y-4">
         {edit.palliers?.length > 0 && <p className="rounded bg-soft p-2 text-[12px]">Paliers : {edit.palliers.map((p: any) => p.id).join(' → ')} (jours ouvrés, 8 h – 18 h). Destinataires : {edit.recipients.join(', ')}</p>}
         <Field label="Objet"><input className="input" value={edit.subject} onChange={(e) => setEdit({ ...edit, subject: e.target.value })} /></Field>
         <Field label="Corps" hint="Variables : {titre} {numero} {etape} {lien} {redacteur} {acteur} {motif} {echeance} {retard}"><textarea className="input" rows={7} value={edit.body} onChange={(e) => setEdit({ ...edit, body: e.target.value })} /></Field>
         <label className="flex items-center gap-3"><MailSwitch on={(edit.channels ?? []).includes('mail')} onChange={(v) => setEdit({ ...edit, channels: withMail(edit.channels ?? ['inapp', 'mail'], v) })} label="Envoyer aussi par e-mail" /><span>Envoyer aussi par <b>e-mail</b> <span className="text-[12px] text-mute">— désactivé : la notification n’apparaît que dans l’outil (cloche)</span></span></label>
-        {!edit.mandatory && <label className="flex items-center gap-2"><input type="checkbox" checked={edit.enabled} onChange={(e) => setEdit({ ...edit, enabled: e.target.checked })} /> Règle active</label>}
+        <label className="flex items-center gap-3"><MailSwitch on={!!edit.enabled || !!edit.mandatory} disabled={!!edit.mandatory} onChange={(v) => setEdit({ ...edit, enabled: v })} label="Règle active" /><span>Règle <b>active</b></span></label>
+        <label className="flex items-center gap-3"><MailSwitch on={!!edit.mandatory} onChange={(v) => setEdit({ ...edit, mandatory: v, enabled: v ? true : edit.enabled })} label="Règle obligatoire" /><span>Règle <b>obligatoire</b> <span className="text-[12px] text-mute">— toujours active ; les utilisateurs ne peuvent pas la refuser</span></span></label>
         <div className="flex justify-between"><button className="btn-secondary" onClick={async () => { try { await api.post(orgPath(o, `/notifications/regles/${edit.code}/test`), {}); toast('Mail de test envoyé'); } catch (e) { toast(errMsg(e), 'ko'); } }}>M'envoyer un test</button><button className="btn-primary" onClick={save}>Enregistrer</button></div></div></Modal>}{node}
     </div>
   );
