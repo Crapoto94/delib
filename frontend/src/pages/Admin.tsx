@@ -88,25 +88,41 @@ function GroupeCard({ g, o, reload, toast }: { g: any; o: number; reload: () => 
 
 /* -------------------------------------------------------------------------------------------------------- circuits */
 /* --------------------------------------------------------------------------------------------- règles de notification */
+/** Interrupteur : coché = la notification part aussi par e-mail ; décoché = elle reste dans l’outil (centre de notifications) seulement. */
+function MailSwitch({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-action' : 'bg-slate-300'}`}>
+      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+    </button>
+  );
+}
+const withMail = (channels: string[], mail: boolean): string[] => (mail ? [...new Set([...channels, 'inapp', 'mail'])] : (channels.filter((c) => c !== 'mail').length ? channels.filter((c) => c !== 'mail') : ['inapp']));
+
 function Regles() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const r = useLoad(async () => (await api.get(orgPath(o, '/notifications/regles'))).data, [o]);
   const dash = useLoad(async () => (await api.get(orgPath(o, '/notifications/tableau'))).data, [o]);
   const [edit, setEdit] = useState<any>(null);
-  const save = async () => { try { await api.put(orgPath(o, `/notifications/regles/${edit.code}`), { subject: edit.subject, body: edit.body, enabled: edit.enabled }); toast('Règle enregistrée'); setEdit(null); r.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const setMail = async (x: any, mail: boolean) => {
+    try { await api.put(orgPath(o, `/notifications/regles/${x.code}`), { channels: withMail(x.channels ?? ['inapp', 'mail'], mail) }); toast(mail ? 'Notification par e-mail et dans l’outil' : 'Notification dans l’outil seulement (pas de mail)'); r.reload(); } catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  const save = async () => { try { await api.put(orgPath(o, `/notifications/regles/${edit.code}`), { subject: edit.subject, body: edit.body, enabled: edit.enabled, channels: edit.channels }); toast('Règle enregistrée'); setEdit(null); r.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
   return (
     <div className="space-y-6">
       {dash.data && <div className="grid gap-4 md:grid-cols-4">
         {[['Envoyés (7 j)', dash.data.last7Days.sent ?? 0], ['En échec', dash.data.last7Days.failed ?? 0], ['Actes sans titulaire', dash.data.blocked.length], ['Bloqués > 10 j', dash.data.stuckMoreThan10Days.length]].map(([l, v]) => (
           <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-primary">{v}</div></div>))}</div>}
       <div className="card">{r.loading ? <Loading /> : (
-        <table className="w-full"><thead><tr><th>Règle</th><th>Type</th><th>Famille</th><th>État</th><th /></tr></thead><tbody>{r.data.items.map((x: any) => (
+        <table className="w-full"><thead><tr><th>Règle</th><th>Type</th><th>Famille</th><th>État</th><th title="Décoché : la notification reste dans l’outil, aucun mail n’est envoyé">Par e-mail</th><th /></tr></thead><tbody>{r.data.items.map((x: any) => (
           <tr key={x.code}><td><b>{x.nom}</b><div className="text-[11px] text-mute">{x.code}{x.origin === 'organisme' && ' · personnalisée'}</div></td><td>{x.kind === 'event' ? 'Événement' : 'Relance'}</td><td>{r.data.families[x.family]?.label}</td>
-            <td>{x.enabled ? <Badge tone="ok">active</Badge> : <Badge>désactivée</Badge>}{x.mandatory && <Badge tone="warn"> obligatoire</Badge>}</td><td className="text-right"><button className="btn-secondary" onClick={() => setEdit({ ...x })}>Modifier</button></td></tr>))}</tbody></table>)}</div>
+            <td>{x.enabled ? <Badge tone="ok">active</Badge> : <Badge>désactivée</Badge>}{x.mandatory && <Badge tone="warn"> obligatoire</Badge>}</td>
+            <td><span className="flex items-center gap-2"><MailSwitch on={(x.channels ?? []).includes('mail')} onChange={(v) => setMail(x, v)} label={`Envoyer aussi par e-mail : ${x.nom}`} /><span className="text-[11px] text-mute">{(x.channels ?? []).includes('mail') ? 'mail + outil' : 'outil seulement'}</span></span></td><td className="text-right"><button className="btn-secondary" onClick={() => setEdit({ ...x })}>Modifier</button></td></tr>))}</tbody></table>)}</div>
       {edit && <Modal title={edit.nom} onClose={() => setEdit(null)} wide><div className="space-y-4">
         {edit.palliers?.length > 0 && <p className="rounded bg-soft p-2 text-[12px]">Paliers : {edit.palliers.map((p: any) => p.id).join(' → ')} (jours ouvrés, 8 h – 18 h). Destinataires : {edit.recipients.join(', ')}</p>}
         <Field label="Objet"><input className="input" value={edit.subject} onChange={(e) => setEdit({ ...edit, subject: e.target.value })} /></Field>
         <Field label="Corps" hint="Variables : {titre} {numero} {etape} {lien} {redacteur} {acteur} {motif} {echeance} {retard}"><textarea className="input" rows={7} value={edit.body} onChange={(e) => setEdit({ ...edit, body: e.target.value })} /></Field>
+        <label className="flex items-center gap-3"><MailSwitch on={(edit.channels ?? []).includes('mail')} onChange={(v) => setEdit({ ...edit, channels: withMail(edit.channels ?? ['inapp', 'mail'], v) })} label="Envoyer aussi par e-mail" /><span>Envoyer aussi par <b>e-mail</b> <span className="text-[12px] text-mute">— désactivé : la notification n’apparaît que dans l’outil (cloche)</span></span></label>
         {!edit.mandatory && <label className="flex items-center gap-2"><input type="checkbox" checked={edit.enabled} onChange={(e) => setEdit({ ...edit, enabled: e.target.checked })} /> Règle active</label>}
         <div className="flex justify-between"><button className="btn-secondary" onClick={async () => { try { await api.post(orgPath(o, `/notifications/regles/${edit.code}/test`), {}); toast('Mail de test envoyé'); } catch (e) { toast(errMsg(e), 'ko'); } }}>M'envoyer un test</button><button className="btn-primary" onClick={save}>Enregistrer</button></div></div></Modal>}{node}
     </div>

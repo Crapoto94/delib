@@ -2,8 +2,10 @@ import { FormEvent, useState } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
 import Odj from './Odj';
 import Convocation from './Convocation';
+import SuiviSeance from './SuiviSeance';
+import { DeleteSeanceModal, EditSeanceModal } from './SeanceActions';
 import { TeamsLink } from '../Reunions';
-import { CalendarDays, Plus } from 'lucide-react';
+import { CalendarDays, Plus, Pencil, Trash2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { d, daysUntil, dt } from '../format';
@@ -63,6 +65,7 @@ function HorsDelai() {
 
 function SeancesList() {
   const { org, isScc } = useAuth(); const o = org!.id;
+  const [editing, setEditing] = useState<any>(null); const [deleting, setDeleting] = useState<any>(null);
   const [tab, setTab] = useState<'avenir' | 'passees' | 'hors'>('avenir'); const [creating, setCreating] = useState(false); const [kind, setKind] = useState<'' | 'conseil' | 'commission'>('');
   const list = useLoad(async () => {
     const now = new Date().toISOString();
@@ -80,7 +83,10 @@ function SeancesList() {
           const j = daysUntil(s.dateSeance); const lim = daysUntil(s.dateLimiteRedaction);
           return (
             <Link key={s.id} to={`/seances/${s.id}`} className="card block p-5 hover:shadow-lift" aria-label={`Ordre du jour du ${d(s.dateSeance)}`}>
-              <div className="flex items-start justify-between"><div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-action" /><h3>{s.instance}</h3></div><Badge tone={s.statut === 'planifiee' ? 'blue' : 'gray'}>{s.statut}</Badge></div>
+              <div className="flex items-start justify-between"><div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-action" /><h3>{s.instance}</h3></div>
+                <div className="flex items-center gap-1"><Badge tone={s.statut === 'planifiee' ? 'blue' : 'gray'}>{s.statut}</Badge>
+                  {isScc && <><button type="button" className="rounded p-1 text-mute hover:bg-soft hover:text-action" title="Modifier la séance" aria-label="Modifier la séance" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditing(s); }}><Pencil className="h-4 w-4" /></button>
+                    <button type="button" className="rounded p-1 text-mute hover:bg-ko-bg hover:text-ko" title="Supprimer la séance" aria-label="Supprimer la séance" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleting(s); }}><Trash2 className="h-4 w-4" /></button></>}</div></div>
               <div className="mt-2 text-[18px] font-bold">{dt(s.dateSeance, { dateStyle: 'full', timeStyle: 'short' })}</div>
               <div className="text-mute">{s.lieu || 'Lieu à définir'}{j !== null && j >= 0 ? ` · dans ${j} jour(s)` : ''}</div>
               {s.teams && <div className="mt-2" onClick={(e) => e.stopPropagation()}><TeamsLink teams={s.teams} /></div>}
@@ -93,10 +99,12 @@ function SeancesList() {
             </Link>);
         })}</div>)}
       {creating && <NewSeance onClose={() => setCreating(false)} onDone={list.reload} />}
+      {editing && <EditSeanceModal seance={editing} onClose={() => setEditing(null)} onDone={list.reload} />}
+      {deleting && <DeleteSeanceModal seance={deleting} onClose={() => setDeleting(null)} onDone={list.reload} />}
     </div>
   );
 }
 
 export default function Seances() {
-  return <Routes><Route index element={<SeancesList />} /><Route path=":id" element={<Odj />} /><Route path=":id/convocation" element={<Convocation />} /></Routes>;
+  return <Routes><Route index element={<SeancesList />} /><Route path=":id" element={<Odj />} /><Route path=":id/convocation" element={<Convocation />} /><Route path=":id/suivi" element={<SuiviSeance />} /></Routes>;
 }

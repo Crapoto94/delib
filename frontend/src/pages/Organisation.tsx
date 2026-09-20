@@ -6,7 +6,7 @@ import AgentPicker from '../AgentPicker';
 import { AgentName, AgentNames } from '../AgentName';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
 
-type Role = { fonction: string; statut: 'personne' | 'vacant' | 'implicite' | 'direct_dgs' | 'non_defini' | 'non_renseigne'; holders: string[]; via: string | null; poste: string | null; titulaires: { id: number; username: string | null; suppleant: string | null; vacant: boolean }[]; rh: { responsable: string | null; poste: string | null; vacant: boolean } | null };
+type Role = { fonction: string; statut: 'personne' | 'vacant' | 'implicite' | 'direct_dgs' | 'non_defini' | 'non_renseigne'; holders: string[]; via: string | null; poste: string | null; titulaires: { id: number; username: string | null; suppleant: string | null; vacant: boolean }[]; rh: { responsable: string | null; poste: string | null; vacant: boolean; estLeDirecteur?: boolean } | null };
 const LABEL: Record<string, string> = { directeur: 'Directeur', chef_service: 'Chef de service', dga: 'DGA', dgs: 'DGS' };
 
 /**
@@ -38,7 +38,8 @@ export default function Organisation() {
           {role.statut === 'direct_dgs' && <Badge tone="blue">Directement rattachée à la DGS — pas de DGA</Badge>}
           {role.statut === 'non_defini' && <Badge tone="ko">Rattachement à définir</Badge>}
           {role.statut === 'non_renseigne' && <span><Badge tone="ko">À renseigner</Badge> <span className="text-[12px] text-ko">le circuit serait bloqué</span></span>}
-          {role.rh?.responsable && (role.statut !== 'personne' || role.via === 'direction_generale') && role.statut !== 'implicite' && !role.rh.vacant && (
+          {role.rh?.estLeDirecteur && role.statut !== 'personne' && role.statut !== 'implicite' && <span className="rounded bg-soft px-2 py-0.5 text-[12px] text-mute">Les RH indiquent le directeur, <b>{role.rh.responsable}</b>, comme responsable de ce service : pas de chef de service propre.</span>}
+          {role.rh?.responsable && !role.rh.estLeDirecteur && (role.statut !== 'personne' || role.via === 'direction_generale') && role.statut !== 'implicite' && !role.rh.vacant && (
             <span className="rounded bg-soft px-2 py-0.5 text-[12px]">RH : <b>{role.rh.responsable}</b>{role.rh.poste ? ` — ${role.rh.poste.toLowerCase()}` : ''}
               {fonction !== 'dga' && <button className="ml-2 font-semibold text-action" onClick={() => act(() => api.post(orgPath(o, '/organisation/adopter'), { fonction, directionCode: directionCode || undefined, serviceCode }), 'Responsable désigné')}>Désigner</button>}</span>)}
         </span>
@@ -91,7 +92,7 @@ export default function Organisation() {
             <button className="flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left" onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(dir.code)) n.delete(dir.code); else n.add(dir.code); return n; })} aria-expanded={isOpen}>
               {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}<b className="text-[14px]">{dir.label}</b>
               {dir.rattachement?.type === 'dga' && <Badge tone="blue">{dir.rattachement.poste}</Badge>}{dir.rattachement?.type === 'dgs' && <Badge tone="blue">DGS</Badge>}{!dir.rattachement && <Badge tone="ko">sans rattachement</Badge>}
-              {dir.manques > 0 && <Badge tone="ko">{dir.manques} à renseigner</Badge>}<span className="ml-auto text-[12px] text-mute">{dir.services.length} service(s)</span>
+              {dir.manques > 0 && <Badge tone="ko">{dir.manques} à renseigner</Badge>}{dir.vacants > 0 && <Badge tone="warn">{dir.vacants} poste{dir.vacants > 1 ? 's' : ''} vacant{dir.vacants > 1 ? 's' : ''}</Badge>}<span className="ml-auto text-[12px] text-mute">{dir.services.length} service(s)</span>
             </button>
             {isOpen && (
               <div>

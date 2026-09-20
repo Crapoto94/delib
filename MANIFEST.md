@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.13 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.15 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -482,6 +482,7 @@ Le circuit est une **donnée**, pas du code : `circuit_definitions → circuit_s
 - **ORG-11** — **Noms des personnes** (D73) : l'annuaire RH ne cherche qu'**un terme à la fois** ; pour désigner le responsable indiqué par les RH ou pour afficher le nom d'un agent **jamais connecté** à l'outil, on **croise les termes** (nom complet) ou on cherche sur des **fragments de l'identifiant** ; le nom RH est affiché « Prénom NOM » (« Meriem KHAROUM »).
 - **ORG-12** — **DGS et Direction générale** (D76) : la **DGS** (fonction) n'est pas la personne du jeu de démonstration (`demo.dgs`) mais le **responsable de la « DIRECTION GENERALE DES SERVICES »** de l'organigramme RH. Sans titulaire « DGS » désigné dans l'outil, le DGS est ce directeur (`via = direction_generale`) ; un titulaire désigné à la main reste prioritaire ; « Désigner » retrouve le responsable RH. La validation DGS n'est **jamais contournée** (ni vacance présumée). La direction est repérée par son libellé, ou par le réglage `organisation.direction_generale` (code de direction).
 - **ORG-13** — **Affichage** : le service qui porte le nom de sa direction est marqué « **Directeur·trice** » (forme épicène de l'organigramme) ; le nom du responsable est toujours « Prénom NOM », y compris pour les noms composés à trait d'union (« Maryline MARTIAL-LUIT » retrouvé depuis « mmartialluit »).
+- **ORG-14** — **Postes vacants visibles sans dérouler** (D79) : la ligne de chaque direction annonce le nombre de postes **vacants** (« 1 poste vacant ») et de rôles **à renseigner**, sans qu'il faille l'ouvrir. Quand l'organigramme RH nomme le **directeur** comme responsable d'un service qui ne porte pas le nom de la direction, l'outil l'indique (« les RH indiquent le directeur… : pas de chef de service propre ») et **ne le propose pas** comme chef de service à désigner.
 
 ### 9.5 Délégations et absences
 
@@ -744,6 +745,8 @@ Le tuto montre un **calendrier de toutes les instances** (type *Conseil municipa
 - **SEA-07** — Phases ultérieures : présents/absents/procurations, votes, PV, extrait du registre (voir section 28).
 - **SEA-08** — Un acte **dont la séance visée a une date limite de rédaction dépassée** est signalé dans la liste du SCC (« hors délai ») ; la **dérogation** ou le **report** se traitent selon NOT-04 à NOT-08.
 - **SEA-09** — Instances, séances, numérotation et registres sont **propres à chaque organisme** (MOR-12, MOR-13).
+- **SEA-10** — **Modifier une séance** (D80) : date et heure, lieu, durée, type et dates clés (les rappels des dossiers sont recalculés) ; depuis la carte de la séance et depuis son ordre du jour ; réservé au SCC et aux administrateurs.
+- **SEA-11** — **Supprimer une séance** (D80) : l'écran annonce l'impact (dossiers qui visent la séance ou sont à son ordre du jour, séance suivante de l'instance, convocations déjà envoyées) et demande **ce que deviennent les dossiers** : **les reporter sur la prochaine séance** (ils la visent, le SCC les affectera) ou **les laisser sans affectation** (« en attente d'affectation ») ; un dossier n'est jamais perdu et l'historique du dossier garde la trace (report / retrait, motif). Refusé pour une séance **tenue** ou dont le **suivi est ouvert** ; des **convocations déjà envoyées** demandent une confirmation explicite (leur suivi est effacé). Audité.
 
 ### 16.2 Ordre du jour, classement et numérotation (D10)
 
@@ -1126,6 +1129,12 @@ Classement : **P1** = fort gain, faible risque ; **P2** = gain net, effort moyen
 - **IAQ-04** — **Équité** : les utilisateurs sont servis « à tour de rôle » (celui qui a déjà une tâche en cours, ou qui a été servi le plus récemment, passe après les autres).
 - **IAQ-05** — **Robustesse** : file en base (survit à un redémarrage), nouvelle tentative avec temporisation croissante, reprise d'une tâche dont l'exécutant a disparu (5 minutes sans signe de vie), écran d'**administration** (état de la file, limites, tâches récentes, annulation).
 
+### 21.6 ter Consignes et modèle de chaque fonction (D80)
+
+- **IA-70** — Dans *Administration / Assistant IA*, l'administrateur de l'organisme **modifie la consigne** (rôle, mission, règles de fond) envoyée à l'IA pour chaque fonction — orthographe, style, visas et considérants, copie assistée — et peut **rétablir la consigne d'origine** ; les modifications s'appliquent à la demande suivante et sont **auditées**.
+- **IA-71** — Le **format de réponse** attendu (objet JSON, règles de sécurité sur le texte fourni) est **imposé** : il est ajouté par le serveur à toute consigne, affiché en lecture seule, et ne peut pas être cassé par une consigne modifiée. Une consigne trop courte (< 30 caractères) ou trop longue (> 6 000) est refusée.
+- **IA-72** — Un **modèle** est choisi **pour chaque fonction** parmi ceux que l'IA interne propose (`GET /api/v1/ai/models`) ; sans choix, le modèle par défaut de l'IA est utilisé. Valeurs stockées comme paramètres de l'organisme (`ai.prompt.<fonction>`, `ai.model.<fonction>`).
+
 ### 21.7 Modèle technique
 
 - **IA-70** — Port `AiPort` (adaptateur **APM IA** ; adaptateur local possible), tâches **asynchrones** (`query-async`/`progress` relayées par la file de tâches), tables `ai_features`, `ai_runs`, `ai_suggestions`, `ai_check_rules`, `visa_library`, `ai_eval_cases`.
@@ -1245,6 +1254,8 @@ Jours = **jours ouvrés**. Envois entre 8 h et 18 h. Une relance s'arrête dès 
 - **NOT-23** — **Tableau de bord d'admin** : relances émises, actes bloqués depuis > N jours, valideurs les plus en retard.
 - **NOT-24** — Tout paramétrage de règle est **audité** (avant/après).
 - **NOT-25** — Règles, gabarits, calendriers et jours fériés sont **propres à chaque organisme**, avec héritage de la plateforme (MOR-11).
+- **NOT-26** — **Canal de chaque notification** (D79) : pour chaque règle, l'administration choisit par un **interrupteur** si la notification part **aussi par e-mail** ou **seulement dans l'outil** (cloche) ; ce choix est audité (NOT-24) et se règle depuis la liste des règles ou la fenêtre de modification.
+- **NOT-27** — **Refus par l'utilisateur** (D79) : pour toute notification **non obligatoire**, chacun peut, dans « Mes notifications », choisir règle par règle **de ne pas la recevoir** ou de ne la recevoir **que dans l'outil** (sans e-mail), en plus du choix par famille (NOT-11). Un choix est personnel ; les notifications **obligatoires** ne figurent pas dans la liste et l'API refuse (400) de les désactiver.
 
 ### 22.6 Calendrier
 
@@ -1619,6 +1630,8 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D75** | **Convocation pour chaque commission, avec dossiers simples** : le module de convocation (D65) fonctionne pour **chaque commission** ; l'ordre du jour d'une réunion peut comporter, en plus des délibérations, des **dossiers simples** (**nom, description, pièces jointes**), consultables par les convoqués depuis leur lien personnel. *(réalisé)* | 15, 17 |
 | **D77** | **Données de démonstration retirées** : les agents fictifs `demo.*`, les élus « @demo.ivry » et tout ce qui s'y rattache (dossiers, séances de démo, titulaires, groupes) sont supprimés dès que les vrais services sont renseignés ; le script `scripts/purge-demo.js` (essai à blanc puis `--apply`) le fait sans toucher aux vrais agents ni aux vrais élus. *(réalisé)* | 30 |
 | **D78** | **Suivi de séance en direct** : page synchronisée pour tous ceux qui l'affichent ; présences, sorties et retours des élus par groupe, pouvoirs, point en cours partagé, notes administratives, votes (Pour / Contre / Abstention / NPPV) par élu ou par groupe, les absents ne prenant pas part au vote ni pour eux ni pour leur mandant ; résultat qui met à jour le statut de l'acte. *(réalisé)* | 19.1 bis |
+| **D79** | **Canal des notifications et refus par l'utilisateur** (interrupteur mail / outil seulement par règle ; refus règle par règle des notifications facultatives) ; postes vacants annoncés au niveau de la direction ; l'AD retrouve l'identifiant d'un responsable absent de l'annuaire RH (fiche sans e-mail). *(réalisé)* | 22, 9.4 bis |
+| **D80** | **Modifier et supprimer une séance** (avec choix du devenir des dossiers : séance suivante ou sans affectation) ; **consignes et modèle de l'IA modifiables** par fonction dans Administration / Assistant IA. *(réalisé)* | 16.1, 21.6 ter |
 | **D76** | **La DGS est le responsable de la Direction générale des services de l'organigramme RH** (et non un titulaire fictif de démonstration) : à défaut de titulaire désigné, le circuit s'adresse au directeur de la « DIRECTION GENERALE DES SERVICES » ; l'étape DGS n'est jamais contournée ; affichage « Directeur·trice » et « Prénom NOM » pour les noms composés. *(réalisé)* | 9.4 bis |
 
 ---
@@ -1640,6 +1653,8 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.15** | 2026-09-20 | **D80** : modification et suppression d'une séance (SEA-10, SEA-11) ; consignes et modèle de l'IA par fonction (IA-70 à IA-72) |
+| **1.14** | 2026-09-20 | **D79** : canal mail / outil seulement par règle (NOT-26), refus règle par règle par l'utilisateur (NOT-27), vacants visibles au niveau de la direction (ORG-14), AD en repli pour les identifiants |
 | **1.13** | 2026-09-20 | **D77** (purge des données de démonstration) et **D78** (suivi de séance en direct, LIVE-01 à LIVE-11) |
 | **1.12** | 2026-09-20 | **D76** : la DGS dérive de la Direction générale des services de l'organigramme RH (ORG-12), affichage « Directeur·trice » et noms composés (ORG-13) |
 | **1.11** | 2026-09-20 | les décisions **D66 à D75** sont **réalisées** : écran « Organisation », frise du circuit (étapes contournées, validations implicites), éditeur de circuits avec étape de refus, visibilité des actes (général et par utilisateur), type de commission, dossiers simples (description et pièces jointes) et convocation de chaque commission |

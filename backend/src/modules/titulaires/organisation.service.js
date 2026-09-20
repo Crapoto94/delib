@@ -44,10 +44,13 @@ function createOrganisation({ db, titulaires, dir }) {
         const directeur = role('directeur', { directionCode: d.code }, rhOf(d));
         const services = (d.services || []).map((sv) => {
           const memeNom = norm(sv.label) === norm(d.label);
-          return { code: sv.code, label: sv.label, memeNom, chef: role('chef_service', { directionCode: d.code, serviceCode: sv.code, serviceSameAsDirection: memeNom }, rhOf(sv)) };
+          // l'organigramme RH nomme parfois le DIRECTEUR comme responsable d'un service qui n'a pas de chef propre : ce n'est pas un chef à désigner
+          const rh = rhOf(sv); if (rh && !memeNom && d.responsable && sv.responsable && norm(sv.responsable) === norm(d.responsable)) rh.estLeDirecteur = true;
+          return { code: sv.code, label: sv.label, memeNom, chef: role('chef_service', { directionCode: d.code, serviceCode: sv.code, serviceSameAsDirection: memeNom }, rh) };
         });
         const manques = [dga, directeur, ...services.map((x) => x.chef)].filter((x) => x.statut === 'non_renseigne' || x.statut === 'non_defini').length;
-        return { code: d.code, label: d.label, rattachement: rt ? { type: rt.rattachement, posteId: rt.dga_poste_id, poste: poste?.libelle ?? null } : null, dga, directeur, services, manques };
+        const vacants = [dga, directeur, ...services.map((x) => x.chef)].filter((x) => x.statut === 'vacant').length;
+        return { code: d.code, label: d.label, rattachement: rt ? { type: rt.rattachement, posteId: rt.dga_poste_id, poste: poste?.libelle ?? null } : null, dga, directeur, services, manques, vacants };
       });
       const dgNode = await dir.directionGenerale(null).catch(() => null);
       const dgs = { ...role('dgs', {}, rhOf(dgNode)), directionGenerale: dgNode ? { code: dgNode.code, label: dgNode.label } : null };

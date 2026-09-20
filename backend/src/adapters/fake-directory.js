@@ -72,13 +72,14 @@ module.exports.createFakeMail = createFakeMail;
 
 /** AiPort de remplacement : `handler({ system, prompt })` renvoie le texte de la réponse (tests, développement sans IA). */
 function createFakeAi(handler = () => '{"propositions":[],"alertes":[]}') {
-  const state = { calls: [], failing: false, handler };
+  const state = { calls: [], failing: false, handler, models: ['fake-ia', 'fake-ia-rapide'] };
   return {
     state,
+    async models() { return [...state.models]; },
     async query(req) {
       state.calls.push(req);
       if (state.failing) { const { E } = require('../shared/errors'); throw E.upstream('IA indisponible (simulée)'); }
-      return { text: await state.handler(req), model: 'fake-ia' };
+      return { text: await state.handler(req), model: req.model || 'fake-ia' };
     },
     async ping() { return 1; },
   };

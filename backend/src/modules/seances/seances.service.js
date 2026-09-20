@@ -174,6 +174,66 @@ function createSeances({ db, audit, actes, acl, settings, bus, late, meeting, lo
       return after;
     },
 
+    // ------------------------------------------------------------------------------ suppression
+    /** Actes que la suppression d'une séance touche : ceux qui la visent ou sont à son ordre du jour, et ne sont pas terminés. */
+    async _actesTouches(q, org, id) {
+      return q.all(`SELECT id, numero_suivi, titre, statut, seance_id, seance_visee_id FROM actes
+                    WHERE organisme_id = $1 AND (seance_id = $2 OR seance_visee_id = $2)
+                      AND statut NOT IN ('adopte','rejete','abandonne','archive','executoire','publie','transmis','ar_recu') ORDER BY numero_suivi`, [org, id]);
+    },
+
+    /** Ce que produirait la suppression : actes concernés, séance suivante proposée pour les reporter, convocations envoyées. */
+    async suppressionImpact(organismeId, id) {
+      const org = requireOrg(organismeId);
+      const s = await svc.get(org, id);
+      const tenue = await db.get('SELECT statut FROM seance_tenue WHERE seance_id = $1', [id]);
+      const suivante = await svc.next(org, id);
+      const touches = await svc._actesTouches(db, org, id);
+      const conv = await db.get('SELECT count(*)::int AS n FROM convocations WHERE seance_id = $1', [id]);
+      const bloque = ['tenue', 'close'].includes(s.statut) || !!tenue ? "La séance a été tenue (ou son suivi ouvert) : elle ne peut pas être supprimée, elle reste au registre" : null;
+      return {
+        seance: { id: s.id, instance: s.instance, dateSeance: s.dateSeance, statut: s.statut }, supprimable: !bloque, raison: bloque,
+        actes: touches.map((a) => ({ id: a.id, numeroSuivi: a.numero_suivi, titre: a.titre, statut: a.statut, alOrdreDuJour: a.seance_id === id })),
+        suivante: suivante ? { id: suivante.id, dateSeance: suivante.date_seance, lieu: suivante.lieu } : null,
+        convocations: conv.n,
+      };
+    },
+
+    /**
+     * Supprime une séance. Les actes qui la visent ou sont à son ordre du jour ne sont jamais perdus : `destination` = « prochaine »
+     * (ils visent la séance suivante de l'instance, à affecter ensuite) ou « aucune » (ils reviennent « en attente d'affectation »).
+     * Une séance tenue ne se supprime pas ; des convocations déjà envoyées demandent `forcer` (leur suivi est effacé avec la séance).
+     */
+    async remove(ctx, organismeId, id, { destination, motif, forcer = false }) {
+      const org = requireOrg(organismeId);
+      const imp = await svc.suppressionImpact(org, id);
+      if (!imp.supprimable) throw E.conflict(imp.raison);
+      if (imp.convocations && !forcer) throw E.conflict(`Des convocations ont déjà été envoyées (${imp.convocations}) : leur suivi serait effacé. Confirmez la suppression pour continuer`);
+      let target = null;
+      if (imp.actes.length) {
+        if (!['prochaine', 'aucune'].includes(destination)) throw E.badRequest('Indiquez ce que deviennent les actes : « prochaine » (séance suivante) ou « aucune » (sans affectation)');
+        if (destination === 'prochaine') {
+          target = imp.suivante;
+          if (!target) throw E.conflict("Il n'y a pas de séance suivante planifiée pour l'instance : créez-la, ou choisissez « sans affectation »");
+        }
+      }
+      const before = await svc.get(org, id);
+      const row = await db.get('SELECT teams_event_id FROM seances WHERE id = $1', [id]);
+      if (row?.teams_event_id) { try { await meeting.cancel(row.teams_event_id); } catch (e) { log.warn({ err: e.message }, 'suppression de séance : la réunion Teams n\'a pas pu être annulée'); } }
+      await db.tx(async (q) => {
+        for (const a of await svc._actesTouches(q, org, id)) {
+          if (a.seance_id === id) await q.run("UPDATE actes SET statut = CASE WHEN statut = 'inscrit_odj' THEN 'en_attente_scc' ELSE statut END WHERE id = $1", [a.id]);
+          await q.run('UPDATE actes SET seance_id = NULL, seance_visee_id = $2 WHERE id = $1', [a.id, target?.id ?? null]);
+          await q.run("INSERT INTO acte_seance_history (acte_id, kind, from_seance, to_seance, motif, actor) VALUES ($1, $2, $6, $3, $4, $5)",
+            [a.id, target ? 'report' : 'retrait', target?.id ?? null, motif || `Séance du ${new Date(before.dateSeance).toISOString().slice(0, 10)} supprimée`, ctx.username, id]);
+        }
+        await q.run('DELETE FROM seances WHERE id = $1 AND organisme_id = $2', [id, org]);
+      });
+      await audit.log(ctx, { organismeId: org, action: 'seance.delete', entity: 'seances', entityId: id, before, after: { destination: target ? 'prochaine' : 'aucune', vers: target?.id ?? null, actes: imp.actes.length, motif: motif || null } });
+      await bus.emit('seance.deleted', { organismeId: org, seanceId: id, before, actes: imp.actes.map((a) => a.id), to: target?.id ?? null, ctx });
+      return { deleted: id, actes: imp.actes.length, destination: target ? 'prochaine' : 'aucune', vers: target?.id ?? null };
+    },
+
     // ------------------------------------------------------------------------------ réunions de commission
     /** Instance propre à une commission (créée à la demande) : ses réunions sont des séances, avec ordre du jour = projets présentés. */
     async ensureCommissionInstance(commissionId) {

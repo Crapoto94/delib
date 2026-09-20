@@ -189,6 +189,9 @@ describe('vue « organisation »', () => {
     expect(r.body.dgs).toMatchObject({ statut: 'personne', holders: ['boot'] });
     expect(r.body.postesDga.length).toBeGreaterThan(0);
     expect(r.body.resume).toMatchObject({ directions: expect.any(Number), manques: expect.any(Number), vacants: expect.any(Number) });
+    // chaque direction annonce ses postes vacants sans qu’il faille la dérouler
+    expect(r.body.directions.every((d) => Number.isInteger(d.vacants))).toBe(true);
+    expect(r.body.directions.reduce((n, d) => n + d.vacants, 0)).toBe(r.body.resume.vacants - (r.body.dgs.statut === 'vacant' ? 1 : 0));
     expect((await as(t.dupont).get(O())).status).toBe(403);
   });
 });

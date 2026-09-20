@@ -10,6 +10,8 @@ const ADMIN = ['org_admin', 'scc'];
 
 const CenterQ = z.object({ unread: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'), limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0) });
 const Pref = z.object({ family: z.enum(Object.keys(FAMILIES)), mode: z.enum(['immediate', 'digest', 'off']) });
+const RulePref = z.object({ mode: z.enum(['immediate', 'inapp', 'off']).describe('immediate : comportement normal ; inapp : dans l\'outil seulement, pas de mail ; off : ne pas la recevoir') });
+const PRule = P.extend({ code: z.string().regex(/^[a-z0-9_.-]{2,60}$/) });
 const Mute = z.object({ days: z.number().min(0.1).max(180), scope: z.enum(['me', 'all']).default('me'), reason: z.string().max(300).optional() });
 const Remind = z.object({ message: z.string().trim().max(1000).optional(), to: z.enum(['holders', 'redacteur']).default('holders') });
 const Rule = z.object({
@@ -40,6 +42,10 @@ module.exports = ({ makeRouter, notifications }) => {
   async (req, res) => res.json(await notifications.preferences(req.ctx, req.org.id)));
   r.put('/notifications/preferences', { summary: 'Modifie une préférence', tags: T, org: true, params: P, body: Pref },
     async (req, res) => res.json(await notifications.setPreference(req.ctx, req.org.id, req.valid.body.family, req.valid.body.mode)));
+
+  r.put('/notifications/preferences/regles/:code', { summary: 'Choix pour UNE notification facultative : la recevoir, dans l\'outil seulement, ou pas du tout', tags: T, org: true, params: PRule, body: RulePref,
+    description: 'Refusé (400) pour une notification obligatoire. Le choix n\'a d\'effet que pour son auteur.' },
+  async (req, res) => res.json(await notifications.setRulePreference(req.ctx, req.org.id, req.valid.params.code, req.valid.body.mode)));
 
   // --- par acte
   r.get('/actes/:id/notifications/sourdines', { summary: 'Sourdines et suspensions en cours sur un acte', tags: T, org: true, params: PA },

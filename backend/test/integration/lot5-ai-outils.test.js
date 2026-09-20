@@ -169,3 +169,49 @@ describe('contrôles déterministes', () => {
     expect(msgs).toMatch(/aucune incidence financière/); expect(msgs).toMatch(/2 annexe\(s\) jointe\(s\)/);
   });
 });
+
+describe('consignes et modèles de l’IA (administration)', () => {
+  const PR = () => `${base()}/ia/prompts`;
+  it('liste les consignes par défaut, le format imposé et les modèles proposés ; réservé à l’administrateur', async () => {
+    const r = await as(admin).get(PR());
+    expect(r.status).toBe(200);
+    expect(r.body.items.map((i) => i.code)).toEqual(['orthographe', 'style', 'visas', 'copie']);
+    expect(r.body.items[0]).toMatchObject({ personnalise: false, modele: null });
+    expect(r.body.items[0].texte).toBe(r.body.items[0].defaut);
+    expect(r.body.items[0].format).toContain('UNIQUEMENT par un objet JSON'); // imposé : non modifiable
+    expect(r.body.modeles).toEqual(['fake-ia', 'fake-ia-rapide']);
+    expect((await as(t.dupont).get(PR())).status).toBe(403);
+  });
+
+  it('une consigne modifiée et un modèle choisi sont utilisés pour cette fonction seulement, le format de réponse restant imposé', async () => {
+    useAnswer();
+    const texte = 'Tu es un correcteur très strict du français administratif. Corrige uniquement les fautes d’orthographe et de grammaire, rien d’autre.';
+    const r = await as(admin).put(`${PR()}/orthographe`, { texte, modele: 'fake-ia-rapide' });
+    expect(r.status).toBe(200);
+    expect(r.body.items[0]).toMatchObject({ personnalise: true, texte, modele: 'fake-ia-rapide' });
+    expect(r.body.items[1]).toMatchObject({ personnalise: false, modele: null }); // les autres fonctions ne bougent pas
+
+    env.ai.state.calls.length = 0;
+    await as(t.dupont).post(`${P(acte.id)}/ia/analyse`, { type: 'orthographe' });
+    await settle();
+    const call = env.ai.state.calls[0];
+    expect(call.system.startsWith('Tu es un correcteur très strict')).toBe(true);
+    expect(call.system).toContain('UNIQUEMENT par un objet JSON'); // le format est toujours ajouté
+    expect(call.model).toBe('fake-ia-rapide');
+
+    env.ai.state.calls.length = 0;
+    await as(t.dupont).post(`${P(acte.id)}/ia/analyse`, { type: 'style', textId: (await texts(acte.id)).find((x) => x.kind === 'expose').id });
+    await settle();
+    expect(env.ai.state.calls[0].model).toBeUndefined(); // style : modèle par défaut
+  });
+
+  it('refuse une consigne trop courte ; « null » rétablit la consigne et le modèle par défaut (audité)', async () => {
+    expect((await as(admin).put(`${PR()}/style`, { texte: 'Trop court' })).status).toBe(400);
+    expect((await as(admin).put(`${PR()}/inconnue`, { texte: 'x'.repeat(40) })).status).toBe(400);
+    expect((await as(admin).put(`${PR()}/style`, {})).status).toBe(400);
+    const r = await as(admin).put(`${PR()}/orthographe`, { texte: null, modele: null });
+    expect(r.body.items[0]).toMatchObject({ personnalise: false, modele: null });
+    const audit = await env.db.all("SELECT action FROM audit_log WHERE action IN ('setting.set','setting.unset') AND entity_id LIKE '%ai.prompt.orthographe%'");
+    expect(audit.map((a) => a.action)).toEqual(expect.arrayContaining(['setting.set', 'setting.unset']));
+  });
+});

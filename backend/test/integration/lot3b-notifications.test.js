@@ -399,3 +399,46 @@ describe('planificateur', () => {
     expect([x, y].some((z) => z.skipped)).toBe(true);
   });
 });
+
+describe('mail ou dans l’outil seulement (administration et choix de chacun)', () => {
+  const R = () => `${base()}/notifications/regles/commentaire.mention`;
+  const PREF = () => `${base()}/notifications/preferences/regles/commentaire.mention`;
+  const mention = async (titre) => { const a = await submit({ titre }); await as(t.dupont).post(`${A(a.id)}/commentaires`, { body: 'Avis @leroy ?' }); return a; };
+
+  it('l’administrateur décide, règle par règle, si la notification part aussi par mail : sinon elle reste dans l’outil', async () => {
+    expect((await as(admin).put(R(), { channels: ['inapp'] })).status).toBe(200);
+    const a = await mention('Canal outil seulement');
+    expect((await center(t.leroy)).items.some((i) => i.acteId === a.id && i.family === 'discussion')).toBe(true); // visible dans l’outil
+    const row = (await logOf(a.id, "AND recipient = 'leroy' AND rule_code = 'commentaire.mention'"))[0];
+    expect(row).toMatchObject({ channel: 'inapp', status: 'sent' }); // aucun mail en file
+    expect((await as(admin).put(R(), { channels: ['inapp', 'mail'] })).status).toBe(200);
+    const b = await mention('Canal mail et outil');
+    expect((await logOf(b.id, "AND recipient = 'leroy' AND rule_code = 'commentaire.mention'"))[0]).toMatchObject({ channel: 'mail', status: 'pending' });
+  });
+
+  it('chacun peut refuser une notification facultative, ou ne la recevoir que dans l’outil ; jamais une obligatoire', async () => {
+    const list = (await as(t.leroy).get(`${base()}/notifications/preferences`)).body.regles;
+    expect(list.find((r) => r.code === 'commentaire.mention')).toMatchObject({ mode: 'immediate', mail: true, family: 'discussion' });
+    expect(list.some((r) => r.code === 'etape.arrivee')).toBe(false); // obligatoire : pas proposée
+    expect((await as(t.leroy).put(`${base()}/notifications/preferences/regles/etape.arrivee`, { mode: 'off' })).status).toBe(400);
+    expect((await as(t.leroy).put(`${base()}/notifications/preferences/regles/inconnue.regle`, { mode: 'off' })).status).toBe(404);
+
+    expect((await as(t.leroy).put(PREF(), { mode: 'off' })).status).toBe(200);
+    const off = await mention('Refus de la notification');
+    expect((await center(t.leroy)).items.some((i) => i.acteId === off.id)).toBe(false);
+    expect((await logOf(off.id, "AND recipient = 'leroy' AND rule_code = 'commentaire.mention'"))[0]).toMatchObject({ status: 'skipped', skip_reason: 'pref_off' });
+
+    expect((await as(t.leroy).put(PREF(), { mode: 'inapp' })).status).toBe(200);
+    const inapp = await mention('Dans l’outil seulement');
+    expect((await center(t.leroy)).items.some((i) => i.acteId === inapp.id)).toBe(true);
+    expect((await logOf(inapp.id, "AND recipient = 'leroy' AND rule_code = 'commentaire.mention'"))[0]).toMatchObject({ channel: 'inapp', status: 'sent' });
+
+    // le choix est personnel : un autre utilisateur continue de recevoir le mail
+    const other = await submit({ titre: 'Choix personnel' });
+    await as(t.dupont).post(`${A(other.id)}/commentaires`, { body: 'Avis @moreau ?' });
+    expect((await logOf(other.id, "AND recipient = 'moreau' AND rule_code = 'commentaire.mention'"))[0]).toMatchObject({ channel: 'mail', status: 'pending' });
+
+    expect((await as(t.leroy).put(PREF(), { mode: 'immediate' })).status).toBe(200);
+    expect((await as(t.leroy).get(`${base()}/notifications/preferences`)).body.regles.find((r) => r.code === 'commentaire.mention').mode).toBe('immediate');
+  });
+});

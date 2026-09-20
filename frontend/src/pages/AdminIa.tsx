@@ -15,6 +15,55 @@ const LIMITS: [string, string, string][] = [
   ['tentatives', 'Essais par demande', "Nombre d'essais (avec temporisation croissante) avant de déclarer l'échec."],
 ];
 
+type Prompt = { code: string; label: string; aide: string; defaut: string; texte: string; personnalise: boolean; format: string; modele: string | null };
+
+/** Une fonction de l'IA : sa consigne (modifiable), le format de réponse imposé (lecture seule) et son modèle. */
+function PromptCard({ p, modeles, onSaved }: { p: Prompt; modeles: string[] | null; onSaved: () => void }) {
+  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const [texte, setTexte] = useState(p.texte); const [modele, setModele] = useState(p.modele ?? ''); const [busy, setBusy] = useState(false);
+  const dirty = texte.trim() !== p.texte.trim() || (modele || '') !== (p.modele ?? '');
+  const call = async (body: Record<string, unknown>, ok: string) => {
+    setBusy(true);
+    try { await api.put(orgPath(o, `/ia/prompts/${p.code}`), body); toast(ok); onSaved(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
+  // le modèle actuellement configuré reste sélectionnable même s'il ne figure plus dans la liste de l'IA
+  const choix = [...new Set([...(modeles ?? []), ...(p.modele ? [p.modele] : [])])];
+  return (
+    <div className="rounded-lg border border-line p-4">
+      <div className="mb-1 flex flex-wrap items-center gap-2"><h4 className="!text-[15px]">{p.label}</h4>{p.personnalise && <Badge tone="blue">consigne personnalisée</Badge>}{p.modele && <Badge tone="ok">modèle : {p.modele}</Badge>}</div>
+      <p className="mb-3 text-[12px] text-mute">{p.aide}</p>
+      <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
+        <Field label="Consigne envoyée à l’IA" hint="Rôle et mission : ce que l’IA doit faire, et ne pas faire. Le format de réponse ci-dessous est ajouté automatiquement.">
+          <textarea className="input min-h-[150px] font-mono text-[12px] leading-relaxed" value={texte} onChange={(e) => setTexte(e.target.value)} spellCheck={false} />
+        </Field>
+        <Field label="Modèle" hint={modeles ? 'Liste fournie par l’IA interne.' : 'La liste des modèles n’est pas disponible : saisissez le nom du modèle.'}>
+          {modeles ? (
+            <select className="input" value={modele} onChange={(e) => setModele(e.target.value)}><option value="">Modèle par défaut de l’IA</option>{choix.map((m) => <option key={m} value={m}>{m}</option>)}</select>
+          ) : <input className="input" value={modele} onChange={(e) => setModele(e.target.value)} placeholder="Modèle par défaut de l’IA" />}
+        </Field>
+      </div>
+      <details className="mt-2 text-[12px]"><summary className="cursor-pointer font-semibold text-mute">Format de réponse imposé (non modifiable)</summary><pre className="mt-1 whitespace-pre-wrap rounded bg-soft p-2 text-[11px] leading-relaxed">{p.format}</pre></details>
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        {(p.personnalise || p.modele) && <button className="btn-secondary" disabled={busy} onClick={() => { setTexte(p.defaut); setModele(''); call({ texte: null, modele: null }, 'Valeurs par défaut rétablies'); }}>Rétablir les valeurs par défaut</button>}
+        <button className="btn-secondary" disabled={busy || texte === p.defaut} onClick={() => setTexte(p.defaut)}>Consigne d’origine</button>
+        <button className="btn-primary" disabled={busy || !dirty} onClick={() => call({ texte: texte.trim() === p.defaut.trim() ? null : texte, modele: modele || null }, 'Consigne et modèle enregistrés')}>{busy && <Spinner />} Enregistrer</button>
+      </div>{node}
+    </div>
+  );
+}
+
+function Prompts() {
+  const { org } = useAuth(); const o = org!.id;
+  const r = useLoad(async () => (await api.get(orgPath(o, '/ia/prompts'))).data as { items: Prompt[]; modeles: string[] | null }, [o]);
+  if (r.loading || !r.data) return <Loading />;
+  return (
+    <section className="card p-5"><h3 className="mb-1">Consignes et modèles</h3>
+      <p className="mb-4 text-[13px] text-mute">Pour chaque fonction de l’assistant, modifiez la consigne envoyée à l’IA et choisissez le modèle qui la traite. La consigne d’origine peut être rétablie à tout moment ; le format de réponse attendu reste imposé pour que les propositions restent lisibles. Les modifications s’appliquent à la prochaine demande.</p>
+      <div className="space-y-4">{r.data.items.map((p) => <PromptCard key={`${p.code}:${p.texte}:${p.modele}`} p={p} modeles={r.data!.modeles} onSaved={r.reload} />)}</div>
+    </section>
+  );
+}
+
 /** Paramétrage et supervision de la file d'attente de l'IA (D52). */
 export default function AdminIa() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
@@ -35,6 +84,7 @@ export default function AdminIa() {
   const LABEL: Record<string, string> = { queued: 'en attente', running: 'en cours', done: 'terminée', error: 'échec', cancelled: 'annulée' };
   return (
     <div className="space-y-6">
+      <Prompts />
       <p className="text-mute">Toute interrogation de l'IA se fait <b>en arrière plan</b>, dans une file d'attente : les agents continuent à travailler et voient un indicateur d'avancement. Ces limites évitent de surcharger l'IA.</p>
       <div className="grid gap-4 md:grid-cols-4">{[['En attente', ov.data.queued], ['En cours', ov.data.running], ['Terminées (24 h)', ov.data.done], ['En échec (24 h)', ov.data.errors]].map(([l, v]) => (
         <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-primary">{v}</div></div>))}</div>

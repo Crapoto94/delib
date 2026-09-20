@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, BookOpen, Download, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { DeleteSeanceModal, EditSeanceModal } from './SeanceActions';
+import { ArrowDown, ArrowUp, BookOpen, Download, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2, Radio, Pencil } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -25,7 +26,7 @@ const Legende = () => (
 
 export default function Odj() {
   const { id } = useParams();
-  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const { org, isScc } = useAuth(); const o = org!.id; const { toast, node } = useToast(); const navigate = useNavigate();
   const odj = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj`))).data, [o, id]);
   const visant = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj/visant`))).data.items as any[], [o, id]);
   const pendingLoad = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj/en-attente`))).data.items as any[], [o, id]);
@@ -37,6 +38,7 @@ export default function Odj() {
   const [pattern, setPattern] = useState<{ value: string; exemples: string[] } | null>(null);
   const lockTimer = useRef<any>(null);
   const meta = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}`))).data, [o, id]);
+  const [editing, setEditing] = useState(false); const [deleting, setDeleting] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false); const [cahierOpen, setCahierOpen] = useState(false);
   const d = odj.data;
   useEffect(() => { if (d) setOrder(d.items); }, [d]);
@@ -91,8 +93,11 @@ export default function Odj() {
       <PageTitle title={`${meta.data?.kind === 'commission' ? 'Projets présentés — ' : 'Ordre du jour — '}${dt(d.seance.dateSeance, { dateStyle: 'long' })}`}
         sub={<span>{meta.data?.teams && <span className="mr-2"><TeamsLink teams={meta.data.teams} /></span>}Format de numérotation : <code>{d.pattern}</code> · <Badge tone={arrete ? 'ok' : 'warn'}>{arrete ? `arrêté le ${dt(d.arreteAt, { dateStyle: 'short' })}` : 'en préparation — numéros provisoires'}</Badge>{d.lock && <span className="ml-2 inline-flex items-center gap-1 text-warn"><Lock className="h-3.5 w-3.5" /> en cours de modification par {d.lock.username}</span>}</span>}
         actions={<>
+          {isScc && meta.data && <button className="btn-secondary" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" /> Modifier la séance</button>}
+          {isScc && meta.data && <button className="btn-secondary text-ko" onClick={() => setDeleting(true)}><Trash2 className="h-4 w-4" /> Supprimer</button>}
           {canEdit && meta.data && meta.data.statut !== 'annulee' && <button className="btn-secondary" onClick={() => setTeamsOpen(true)}>Teams…</button>}
           {canEdit && meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/convocation`}><Mail className="h-4 w-4" /> Convocation</Link>}
+          {meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/suivi`}><Radio className="h-4 w-4" /> Suivi de séance</Link>}
           {canEdit && meta.data?.kind !== 'commission' && <button className="btn-secondary" onClick={() => setCahierOpen(true)}><BookOpen className="h-4 w-4" /> Cahier de séance</button>}
           <button className="btn-secondary" onClick={exportCsv}><Download className="h-4 w-4" /> Tableau de suivi (CSV)</button>
           {canEdit && !arrete && <button className="btn-secondary" onClick={() => previewPattern(d.pattern)}>Numérotation…</button>}
@@ -204,6 +209,8 @@ export default function Odj() {
         <p>L'ordre du jour comporte des anomalies :</p><ul className="list-disc pl-5 text-warn">{(Array.isArray(arret) ? arret : []).map((p: any, i: number) => <li key={i}>{p.message}</li>)}</ul>
         <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setArret(null)}>Corriger</button><button className="btn-ko" onClick={() => doArret(true)}>Arrêter malgré tout</button></div></div></Modal>}
       {cahierOpen && <CahierModal seanceId={Number(id)} onClose={() => setCahierOpen(false)} />}
+      {editing && meta.data && <EditSeanceModal seance={meta.data} onClose={() => setEditing(false)} onDone={() => { toast('Séance modifiée'); meta.reload(); odj.reload(); }} />}
+      {deleting && meta.data && <DeleteSeanceModal seance={meta.data} onClose={() => setDeleting(false)} onDone={() => navigate('/seances')} />}
       {teamsOpen && meta.data && <TeamsForm seance={meta.data} onClose={() => setTeamsOpen(false)} onDone={() => { toast('Visioconférence enregistrée'); meta.reload(); }} />}
       {node}
     </div>

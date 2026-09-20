@@ -20,6 +20,7 @@ const SeancePatch = SeanceIn.omit({ instanceId: true }).partial().extend({ statu
 const TeamsB = z.object({ mode: z.enum(['auto', 'lien', 'aucun']), joinUrl: z.string().url().optional(), inviter: z.boolean().default(false) })
   .refine((d) => d.mode !== 'lien' || !!d.joinUrl, { message: 'Le lien Teams est obligatoire', path: ['joinUrl'] });
 const ListQ = z.object({ kind: z.enum(['conseil', 'commission', 'autre']).optional(), commissionId: Id.optional(), instanceId: Id.optional(), statut: z.enum(STATUTS).optional(), from: z.iso.datetime().optional(), to: z.iso.datetime().optional(), limit: z.coerce.number().int().min(1).max(200).default(100), offset: z.coerce.number().int().min(0).default(0) });
+const DelQ = z.object({ destination: z.enum(['prochaine', 'aucune']).optional().describe('Que deviennent les actes : reportés sur la séance suivante, ou sans affectation'), motif: z.string().trim().max(500).optional(), forcer: z.enum(['true', 'false']).default('false').transform((v) => v === 'true') });
 const ProposeQ = z.object({ dateSeance: z.iso.datetime() });
 const Report = z.object({ motif: z.string().trim().min(3).max(500), toSeanceId: Id.optional() });
 const DerReq = z.object({ motif: z.string().trim().min(5).max(1000), nouvelleDateLimite: z.iso.datetime().optional() });
@@ -50,6 +51,11 @@ module.exports = ({ makeRouter, seances, deadlines }) => {
   r.put('/seances/:id', { summary: 'Modifie une séance, ses dates clés ou son statut', tags: T, org: true, roles: ADMIN, params: PI, body: SeancePatch,
     description: 'Un changement de date limite recalcule d\'office les rappels (ils sont calculés à chaque passage du planificateur).' },
   async (req, res) => res.json(await seances.update(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+  r.get('/seances/:id/suppression', { summary: 'Impact de la suppression : actes concernés, séance suivante proposée, convocations déjà envoyées', tags: T, org: true, roles: ADMIN, params: PI },
+    async (req, res) => res.json(await seances.suppressionImpact(req.org.id, req.valid.params.id)));
+  r.delete('/seances/:id', { summary: 'Supprime une séance (les actes sont reportés sur la suivante ou remis sans affectation)', tags: T, org: true, roles: ADMIN, params: PI, query: DelQ,
+    description: "Refusé (409) pour une séance tenue ou dont le suivi est ouvert. `destination` est obligatoire quand des actes visent la séance ou sont à son ordre du jour : `prochaine` (409 s'il n'y a pas de séance suivante) ou `aucune`. Des convocations déjà envoyées demandent `forcer=true`." },
+  async (req, res) => res.json(await seances.remove(req.ctx, req.org.id, req.valid.params.id, req.valid.query)));
   r.put('/seances/:id/teams', { summary: 'Associe (ou retire) une réunion Microsoft Teams à la séance', tags: T, org: true, roles: ADMIN, params: PI, body: TeamsB,
     description: "`auto` : crée la réunion Teams via Microsoft Graph (organisateur configuré côté serveur) ; `lien` : enregistre un lien de réunion Teams (https://teams.microsoft.com/…) ; `aucun` : retire le lien (et annule la réunion créée automatiquement). `inviter: true` envoie les invitations Teams aux membres." },
   async (req, res) => res.json(await seances.setTeams(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));

@@ -102,9 +102,11 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
     for (const u of list) {
       const key = keyBase ? `${keyBase}:${u}` : null;
       if (key && await db.get('SELECT 1 AS x FROM notification_log WHERE dedupe_key = $1', [key])) continue;
-      const pref = force || rule.mandatory ? 'immediate' : (await db.get('SELECT mode FROM notification_prefs WHERE organisme_id = $1 AND username = $2 AND family = $3', [orgId, u, rule.family]))?.mode || 'immediate';
+      const own0 = force || rule.mandatory ? null : (await db.get('SELECT mode FROM notification_rule_prefs WHERE organisme_id = $1 AND username = $2 AND rule_code = $3', [orgId, u, rule.code]))?.mode;
+      const pref = own0 === 'off' ? 'off' : force || rule.mandatory ? 'immediate' : (await db.get('SELECT mode FROM notification_prefs WHERE organisme_id = $1 AND username = $2 AND family = $3', [orgId, u, rule.family]))?.mode || 'immediate';
       const muted = !force && acte && await isMuted(acte.id, u);
-      const channels = rule.channels || ['inapp', 'mail'];
+      // choix de l'utilisateur pour CETTE notification (facultative) : « ne pas la recevoir » ou « dans l'outil seulement »
+      const channels = own0 === 'inapp' ? (rule.channels || ['inapp', 'mail']).filter((c) => c !== 'mail') : (rule.channels || ['inapp', 'mail']);
       let status = 'pending'; let skip = null; const email = emails.get(u) || null;
       if (muted) { status = 'skipped'; skip = 'muted'; }
       else if (pref === 'off') { status = 'skipped'; skip = 'pref_off'; }
@@ -371,7 +373,19 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
     async preferences(ctx, orgId) {
       const rows = await db.all('SELECT family, mode FROM notification_prefs WHERE organisme_id = $1 AND username = $2', [orgId, ctx.username]);
       const m = Object.fromEntries(rows.map((r) => [r.family, r.mode]));
-      return { items: Object.entries(FAMILIES).map(([family, f]) => ({ family, label: f.label, mandatory: f.mandatory, mode: f.mandatory ? 'immediate' : (m[family] || 'immediate') })) };
+      const own = new Map((await db.all('SELECT rule_code, mode FROM notification_rule_prefs WHERE organisme_id = $1 AND username = $2', [orgId, ctx.username])).map((r) => [r.rule_code, r.mode]));
+      // notifications facultatives : chacune peut être refusée (ou reçue dans l'outil seulement) ; les obligatoires ne figurent pas dans cette liste
+      const regles = (await effectiveRules(orgId)).filter((r) => !r.mandatory && r.enabled)
+        .map((r) => ({ code: r.code, nom: r.nom, family: r.family, familyLabel: FAMILIES[r.family]?.label ?? r.family, kind: r.kind, mail: (r.channels || []).includes('mail'), mode: own.get(r.code) || 'immediate' }));
+      return { items: Object.entries(FAMILIES).map(([family, f]) => ({ family, label: f.label, mandatory: f.mandatory, mode: f.mandatory ? 'immediate' : (m[family] || 'immediate') })), regles };
+    },
+    async setRulePreference(ctx, orgId, code, mode) {
+      const rule = (await effectiveRules(orgId)).find((r) => r.code === code);
+      if (!rule) throw E.notFound('Notification inconnue');
+      if (rule.mandatory) throw E.badRequest('Cette notification est obligatoire : elle ne peut pas être désactivée');
+      if (mode === 'immediate') await db.run('DELETE FROM notification_rule_prefs WHERE organisme_id = $1 AND username = $2 AND rule_code = $3', [orgId, ctx.username, code]);
+      else await db.run('INSERT INTO notification_rule_prefs (organisme_id, username, rule_code, mode) VALUES ($1,$2,$3,$4) ON CONFLICT (organisme_id, username, rule_code) DO UPDATE SET mode = EXCLUDED.mode', [orgId, ctx.username, code, mode]);
+      return svc.preferences(ctx, orgId);
     },
     async setPreference(ctx, orgId, family, mode) {
       if (!FAMILIES[family]) throw E.badRequest('Famille inconnue');
