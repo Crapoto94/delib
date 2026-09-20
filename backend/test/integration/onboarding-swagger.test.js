@@ -39,6 +39,21 @@ describe('tutoriel de première connexion (UX-20 à 26)', () => {
     expect(list[0]).toMatchObject({ id: 'first-login', status: 'new', toShow: true });
   });
 
+  it("mesure anonymisée : taux de complétion, étapes atteintes, étape d'abandon — réservée à l'administrateur de la plateforme", async () => {
+    const adm = await loginAs(env, 'boot', 'pw-boot'); const nv = await loginAs(env, 'nouveau', 'pw-nouveau'); const lr = await loginAs(env, 'leroy', 'pw-leroy');
+    const avant = (await api(adm).get('/api/v1/me/onboarding-stats')).body.tours[0];
+    await api(nv).put('/api/v1/me/onboarding/first-login', { version: 1, status: 'completed', stepsDone: ['bienvenue', 'dossiers', 'fin'] });
+    await api(lr).put('/api/v1/me/onboarding/first-login', { version: 1, status: 'skipped', stepsDone: ['bienvenue', 'dossiers'] });
+    expect((await api(nv).get('/api/v1/me/onboarding-stats')).status).toBe(403);
+    const st = (await api(adm).get('/api/v1/me/onboarding-stats')).body.tours[0];
+    expect(st).toMatchObject({ id: 'first-login', termines: avant.termines + 1, ignores: avant.ignores + 1 });
+    expect(st.etapesAtteintes.bienvenue - (avant.etapesAtteintes.bienvenue || 0)).toBe(2);
+    expect(st.etapesAtteintes.fin - (avant.etapesAtteintes.fin || 0)).toBe(1);
+    expect(st.abandons.dossiers - (avant.abandons.dossiers || 0)).toBe(1);
+    expect(st.tauxCompletion).toBeGreaterThan(0);
+    expect(JSON.stringify(st)).not.toMatch(/nouveau|leroy|boot/); // aucun identifiant
+  });
+
   it('une nouvelle version du tutoriel est reproposée à ceux qui l\'avaient terminé (Nouveautés)', async () => {
     const t = await loginAs(env, 'dupont', 'pw-dupont');
     expect((await api(t).get('/api/v1/me')).body.onboarding.toShow).toEqual([]);

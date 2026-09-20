@@ -43,5 +43,8 @@ module.exports = ({ makeRouter, dir, onboarding }) => {
     description: "Un tutoriel terminé ou ignoré à la version courante n'est plus proposé ; une version plus récente le repropose.",
   }, async (req, res) => res.json(await onboarding.update(req.ctx.username, req.valid.params.tourId, req.valid.body)));
 
+  r.get('/onboarding-stats', { summary: 'Mesure anonymisée des tutoriels : taux de complétion, étapes atteintes, étapes d’abandon', tags: ['me'], platform: true },
+    async (req, res) => res.json({ tours: await onboarding.stats() }));
+
   return [r];
 };

@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { HashRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { LogOut, Search } from 'lucide-react';
 import { PdfViewerHost } from '../PdfViewer';
 import { api, session } from './api';
 import { purger } from './docs';
 import Accueil from './pages/Accueil';
 import Seance from './pages/Seance';
 import { Connexion, Invitation } from './pages/Acces';
+import Recherche from './pages/Recherche';
 
 function Cadre() {
   const nav = useNavigate();
@@ -19,6 +20,7 @@ function Cadre() {
       <header className="flex h-14 items-center gap-3 border-b border-line bg-white px-4">
         <span className="font-bold text-primary">VibeDélib</span><span className="text-[13px] text-mute">Espace des élus</span>
         <span className="ml-auto hidden text-[13px] text-mute sm:inline">{elu?.nom}</span>
+        <button className="rounded p-2 text-mute hover:bg-slate-100" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
         <button className="rounded p-2 text-mute hover:bg-slate-100" onClick={sortir} aria-label="Me déconnecter" title="Me déconnecter"><LogOut className="h-5 w-5" /></button>
       </header>
       <Outlet />
@@ -37,6 +39,7 @@ export default function App() {
         <Route element={<Cadre />}>
           <Route index element={<Accueil />} />
           <Route path="seances/:id" element={<Seance />} />
+          <Route path="recherche" element={<Recherche />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

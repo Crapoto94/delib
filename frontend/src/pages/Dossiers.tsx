@@ -60,7 +60,7 @@ export default function Dossiers() {
 
   return (
     <div>
-      <PageTitle title="Actes & Dossiers" sub="Retrouvez, rédigez et suivez vos actes." actions={<button className="btn-primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nouveau dossier</button>} />
+      <PageTitle title="Actes & Dossiers" sub="Retrouvez, rédigez et suivez vos actes." actions={<button data-tour="nouveau-dossier" className="btn-primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nouveau dossier</button>} />
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div role="tablist" className="flex rounded bg-white p-1 shadow-card">
           {[['mine', 'Mes dossiers'], ['following', 'Ceux que je suis'], ['all', 'Tous ceux que je peux voir']].map(([k, l]) => (

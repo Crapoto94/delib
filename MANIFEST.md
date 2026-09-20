@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.21 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.22 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1092,6 +1092,7 @@ Affichage, mise en ligne sur le site de la commune, **recueil des actes administ
 - **REC-24** — **Facettes** avec compteurs (statut, type, nature, matière, rubrique, rapporteur, direction, séance, résultat du vote, année), **extraits surlignés** (échappés côté serveur), tri pertinence / date, pagination, **export CSV**.
 - **REC-25** — **Actes similaires** : sur la fiche d'un acte et à la création (« des délibérations proches existent »), par similarité de vocabulaire du titre et de l'objet, dans les limites des droits.
 - **REC-26** — **Recherches enregistrées** par utilisateur (nom, requête, critères). *Les alertes (REC-07) restent à faire.*
+- **REC-28** — **Interfaces** : page « Recherche » (barre globale + raccourci `/`, facettes cliquables avec compteurs, filtres actifs, tri, pagination, recherches enregistrées, export CSV), proposition d'**actes proches** à la création d'un dossier, onglet « Recherche » des Paramétrages (état, ré-indexation, synonymes, requêtes sans résultat), et loupe de l'**espace élus**. *Reste à faire : actes proches sur la fiche d'un dossier, alertes (REC-07), export Excel / PDF, OCR, import AirsDelib (REC-10).*
 - **REC-27** — **Administration** : ré-indexation complète (par organisme), état de l'index (actes indexés, annexes lues, sans texte), journal anonymisé des requêtes (aucun nom, seulement la requête et le nombre de résultats).
 
 ---
@@ -1349,6 +1350,7 @@ Cible : un agent qui rédige 2 à 3 actes par an doit y arriver **sans formation
 - **UX-24** — **Astuces contextuelles** à la première utilisation d'une fonction (annotation, glisser-déposer de l'ordre du jour, délégation…), désactivables.
 - **UX-25** — Textes et activation par rôle **administrables** ; visuels et scénario fournis par **Stitch** ; accessibles (clavier, lecteurs d'écran, animations réduites si demandé, jamais obligatoire).
 - **UX-26** — Mesure **anonymisée** : taux de complétion, étape où l'on abandonne, pour améliorer le tutoriel.
+- **UX-27** — **Réalisation (D89)** : visite guidée à projecteur (élément visé mis en valeur, navigation entre pages, clavier : ← → Échap), proposée à la première connexion et **reprise là où on s'était arrêté** ; étapes adaptées aux rôles (SCC : séances, commissions, contrôle de légalité ; administrateur : paramétrages) ; **badges** de fin ; « Revoir la visite » dans le menu ; avancement enregistré côté serveur ; nouvelle version = « Nouveautés » ; mesure anonymisée en lecture pour l'administrateur de la plateforme (`GET /api/v1/me/onboarding-stats`). *Reste à faire : dossier d'entraînement en bac à sable (UX-22), astuces contextuelles (UX-24), textes administrables et visuels Stitch (UX-25).*
 
 ---
 
@@ -1686,6 +1688,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D83** | **Activation / désactivation de chaque usage de l'IA** : désactivé, aucun appel et boutons masqués. *(réalisé)* | 21 |
 | **D84** | **Ergonomie du suivi de séance** (votes de groupe et notes en haut, éditeur WYSIWYG), **couleurs de l'ordre du jour** selon l'avancement, menu **« Paramétrages »**, **« Prénom NOM » partout**. *(réalisé)* | 19.1 bis, 16, 23 |
 | **D85** | **Espace élus** : API et front distincts (PDF finalisés seulement, ni notes ni saisie), authentification par invitation + mot de passe + code par mail, mise à disposition à l'envoi de la convocation, filigrane nominatif, **téléchargement en arrière-plan** (web et APK) pour un passage instantané d'un point à l'autre, lectures hors ligne synchronisées, notes personnelles partageables, suivi en direct. *(réalisé ; annotations sur PDF et service natif d'arrière-plan de l'APK : à venir)* | 18 |
+| **D89** | **Visite guidée de première connexion** : projecteur sur l'interface, étapes selon les rôles, reprise, badges, rejeu, mesure anonymisée *(UX-27)* | 23.2 |
 | **D88** | **Choix du tiers de télétransmission** : catalogue de fournisseurs (S²LOW par défaut, FAST-Actes prévu), paramétrage et test de connexion dans un onglet dédié ; le mode réel reste fermé jusqu'au certificat *(TLT-30)* | 19.5 |
 | **D87** | **Recherche plein texte** sur PostgreSQL (`fr_unaccent`, pondération A–D, GIN, trigrammes) : index par acte tenu à jour par évènements, texte des annexes PDF extrait et mis en cache, filtrage par droits dans la requête, facettes, extraits, actes similaires, recherches enregistrées, ré-indexation en administration ; espace élus limité aux délibérations adoptées. *(REC-20 à REC-27)* | 20.1 |
 | **D86** | **Archivage en GED Alfresco** : port et adaptateurs (Alfresco, simulateur), paramétrage en administration avec **bouton de test**, **plan de classement** créé selon les bonnes pratiques, archivage versionné de tous les documents de la séance (manuel ou automatique à la clôture). *(réalisé ; test contre un vrai Alfresco à faire à l'obtention du compte technique)* | 19.5 bis |
@@ -1711,6 +1714,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.22** | 2026-09-20 | **D89** : visite guidée (UX-27) ; interfaces de la recherche (REC-28) |
 | **1.21** | 2026-09-20 | **D88** : choix du TDT (TLT-30) |
 | **1.20** | 2026-09-20 | **D87** : recherche plein texte (REC-20 à REC-27) |
 | **1.19** | 2026-09-20 | **D86** : archivage en GED Alfresco (GED-01 à GED-07) |

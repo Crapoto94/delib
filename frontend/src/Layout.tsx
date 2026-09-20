@@ -6,6 +6,7 @@ import AgentPicker from './AgentPicker';
 import { Modal, useToast } from './ui';
 import { OrgLogo, useFavicon } from './Brand';
 import { AiChip } from './AiStatus';
+import Visite from './Visite';
 import { PdfViewerHost } from './PdfViewer';
 import { useAuth } from './auth';
 import { api, org as orgPath } from './api';
@@ -54,6 +55,7 @@ export default function Layout() {
   const [asOpen, setAsOpen] = useState(false); const [asUser, setAsUser] = useState(''); const { toast, node: toastNode } = useToast();
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
+  const [tour, setTour] = useState(false);
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
@@ -81,7 +83,7 @@ export default function Layout() {
             <OrgLogo orgId={org.id} nom={org.nom} hasLogo={!!org.hasLogo} version={org.logoVersion ?? null} className="h-10" />
             <span className="leading-tight"><span className="block text-[16px] font-bold text-primary">VibeDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
           </NavLink>
-          <form className="ml-auto flex min-w-0 max-w-sm flex-1 items-center rounded bg-soft px-3" onSubmit={(e) => { e.preventDefault(); nav(`/recherche?q=${encodeURIComponent(q)}`); }}>
+          <form data-tour="recherche" className="ml-auto flex min-w-0 max-w-sm flex-1 items-center rounded bg-soft px-3" onSubmit={(e) => { e.preventDefault(); nav(`/recherche?q=${encodeURIComponent(q)}`); }}>
             <Search className="h-4 w-4 text-mute" /><input id="recherche-globale" aria-label="Rechercher un acte" title="Raccourci : /" className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher (raccourci /)…" value={q} onChange={(e) => setQ(e.target.value)} />
           </form>
           {me.organismes.length > 1 && (
@@ -90,8 +92,8 @@ export default function Layout() {
             </select>
           )}
           <AiChip />
-          <Bells orgId={org.id} />
-          <div className="relative" ref={ref}>
+          <span data-tour="notifications"><Bells orgId={org.id} /></span>
+          <div className="relative" ref={ref} data-tour="menu-utilisateur">
             <button className="flex items-center gap-2 rounded p-1 hover:bg-slate-100" onClick={() => setMenu(!menu)} aria-haspopup="menu" aria-expanded={menu}>
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[12px] font-bold text-white">{me.displayName.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase()}</span>
               <span className="hidden text-left leading-tight md:block"><span className="block text-[12px] font-semibold">{me.displayName}</span><span className="block text-[11px] text-mute">{me.agent?.poste || me.agent?.direction?.label || (me.isPlatformAdmin ? 'Administrateur' : '')}</span></span>
@@ -101,23 +103,25 @@ export default function Layout() {
               {me.canImpersonate && !me.impersonation && <button role="menuitem" onClick={() => { setMenu(false); setAsOpen(true); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft"><Eye className="h-4 w-4" /> Afficher en tant que…</button>}
               <NavLink role="menuitem" to="/delegations" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Mes délégations</NavLink>
               <NavLink role="menuitem" to="/preferences" onClick={() => setMenu(false)} className="block rounded px-3 py-2 hover:bg-soft">Mes notifications</NavLink>
+              <button role="menuitem" onClick={() => { setMenu(false); setTour(true); }} className="block w-full rounded px-3 py-2 text-left hover:bg-soft">Revoir la visite</button>
               <button role="menuitem" onClick={async () => { await logout(); nav('/connexion'); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft"><LogOut className="h-4 w-4" /> Se déconnecter</button>
             </div>}
           </div>
         </div>
         <div className="border-t border-line"><div className="mx-auto max-w-[1400px] px-4 md:px-8">
         <nav className="flex gap-1 overflow-x-auto py-1" aria-label="Navigation principale">
-            <NavLink to="/" end className={tab}>Tableau de bord</NavLink>
-            <NavLink to="/dossiers" className={tab}>Actes & Dossiers</NavLink>
-            <NavLink to="/seances" className={tab}>Séances & Ordre du jour</NavLink>
-            <NavLink to="/commissions" className={tab}>Commissions</NavLink>
-            {(isAdmin || isScc || org?.roles?.includes('teletransmission')) && <NavLink to="/controle-legalite" className={tab}>Contrôle de légalité</NavLink>}
-            {(isAdmin || isScc) && <NavLink to="/admin" className={tab}>Paramétrages</NavLink>}
+            <NavLink to="/" end className={tab} data-tour="nav-dashboard">Tableau de bord</NavLink>
+            <NavLink to="/dossiers" className={tab} data-tour="nav-dossiers">Actes & Dossiers</NavLink>
+            <NavLink to="/seances" className={tab} data-tour="nav-seances">Séances & Ordre du jour</NavLink>
+            <NavLink to="/commissions" className={tab} data-tour="nav-commissions">Commissions</NavLink>
+            {(isAdmin || isScc || org?.roles?.includes('teletransmission')) && <NavLink to="/controle-legalite" className={tab} data-tour="nav-cdl">Contrôle de légalité</NavLink>}
+            {(isAdmin || isScc) && <NavLink to="/admin" className={tab} data-tour="nav-admin">Paramétrages</NavLink>}
           </nav>
         </div></div>
       </header>
       <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8"><Outlet /></main>
       <PdfViewerHost />
+      <Visite ouverte={tour} onFermer={() => setTour(false)} />
       {asOpen && (
         <Modal title="Afficher en tant que…" onClose={() => setAsOpen(false)}>
           <p className="mb-3 text-mute">Choisissez un utilisateur : vous aurez <b>exactement ses droits</b> (ce qu'il voit, ce qu'il peut faire). Chaque action est journalisée à votre nom.</p>

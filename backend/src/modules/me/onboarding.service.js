@@ -21,8 +21,22 @@ function createOnboarding(db) {
     return TOURS.map((t) => toState(t, rows.find((r) => r.tour_id === t.id)));
   }
 
+  /** UX-26 : mesure anonymisée (aucun identifiant) — taux de complétion et étape où l'on abandonne. */
+  async function stats() {
+    const out = [];
+    for (const t of TOURS) {
+      const rows = await db.all('SELECT status, steps_done FROM user_onboarding WHERE tour_id = $1 AND tour_version = $2', [t.id, t.version]);
+      const total = rows.length; const n = (st) => rows.filter((r) => r.status === st).length;
+      const atteintes = {}; for (const r of rows) for (const id of new Set(r.steps_done || [])) atteintes[id] = (atteintes[id] || 0) + 1;
+      // étape d'abandon : dernière étape faite par ceux qui ont ignoré ou n'ont pas terminé
+      const abandon = {}; for (const r of rows.filter((x) => x.status !== 'completed')) { const last = (r.steps_done || []).at(-1) || '(avant la première étape)'; abandon[last] = (abandon[last] || 0) + 1; }
+      out.push({ id: t.id, version: t.version, commences: total, termines: n('completed'), ignores: n('skipped'), enCours: n('started'), tauxCompletion: total ? Math.round((n('completed') / total) * 100) : null, etapesAtteintes: atteintes, abandons: abandon });
+    }
+    return out;
+  }
+
   return {
-    list,
+    list, stats,
     async toShow(username) { return (await list(username)).filter((t) => t.toShow).map((t) => ({ id: t.id, version: t.currentVersion, status: t.status })); },
 
     async update(username, tourId, { version, status, stepsDone }) {
