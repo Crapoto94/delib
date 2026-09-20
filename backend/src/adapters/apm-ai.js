@@ -6,6 +6,18 @@
 const { createHttpClient, call } = require('./http-client');
 const { E } = require('../shared/errors');
 
+/**
+ * Noms des modèles actifs. L'APM renvoie tous les modèles (actifs ou non) sous forme d'objets { id, name, model, is_active, … } ;
+ * `POST /ai/query` attend le NOM (« Interne Gemma RGPD++ »), comme le fait appdsi. Chaînes brutes et {models:[…]} / {data:[…]} acceptés.
+ */
+function normalizeModels(body) {
+  const d = body?.data ?? body;
+  const raw = Array.isArray(d) ? d : (Array.isArray(d?.models) ? d.models : (Array.isArray(d?.items) ? d.items : []));
+  // actifs, et capables de converser (l'APM liste aussi des modèles de transcription, inutilisables pour une consigne)
+  const actifs = raw.filter((m) => typeof m !== 'object' || m === null || ((m.active !== undefined ? m.active : m.is_active) !== false && (!Array.isArray(m.capabilities) || m.capabilities.includes('chat'))));
+  return [...new Set(actifs.map((m) => (typeof m === 'string' ? m : (m?.name || m?.label || m?.model || (m?.id !== undefined ? String(m.id) : null)))).filter(Boolean).map(String))];
+}
+
 function createApmAi(config) {
   const http = createHttpClient({ baseURL: config.apm.url, headers: { 'X-API-KEY': config.apm.key }, tls: config.tls, timeoutMs: 120000 });
   return {
@@ -22,11 +34,9 @@ function createApmAi(config) {
     async models() {
       const r = await call('APM ai/models', () => http.get('/api/v1/ai/models'));
       if (r.status !== 200) throw E.upstream(`APM ai/models : HTTP ${r.status}`);
-      const d = r.data?.data ?? r.data;
-      const list = Array.isArray(d) ? d : (d?.models ?? d?.items ?? []);
-      return [...new Set((Array.isArray(list) ? list : []).map((m) => (typeof m === 'string' ? m : (m?.id ?? m?.name ?? m?.model ?? null))).filter(Boolean).map(String))];
+      return normalizeModels(r.data);
     },
     async ping() { return 1; },
   };
 }
-module.exports = { createApmAi };
+module.exports = { createApmAi, normalizeModels };
