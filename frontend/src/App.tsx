@@ -22,6 +22,7 @@ import { lazy, Suspense } from 'react';
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./elus/dev/DevAnnot')) : null;
 const DevSeances = import.meta.env.DEV ? lazy(() => import('./dev/DevSeances')) : null;
 const DevDesign = import.meta.env.DEV ? lazy(() => import('./dev/DevDesign')) : null;
+const Manifest = lazy(() => import('./pages/Manifest'));
 import ConvocationPublique from './pages/ConvocationPublique';
 import Legal from './pages/Legal';
 
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="delegations" element={<Delegations />} />
         <Route path="preferences" element={<Preferences />} />
         <Route path="aide/*" element={<Aide />} />
+        <Route path="manifest" element={<Suspense fallback={<Loading />}><Manifest /></Suspense>} />
         <Route path="nouveautes" element={<Nouveautes />} />
         <Route path="admin/*" element={<Admin />} />
       </Route>

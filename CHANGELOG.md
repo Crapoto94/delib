@@ -9,6 +9,21 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.41.0 — Dossier assisté : un guide pas à pas à la rédaction
+
+- **Dossier assisté** : à la création d'un dossier (« Nouveau dossier » → case « Créer en dossier assisté ») ou depuis un brouillon existant (carte « Dossier assisté » dans la fiche), un avatar d'aide — **Del-IA** — accompagne le rédacteur : il dit **quoi faire**, donne des **conseils** et suit la **progression** (fiche, exposé des motifs, visas, dispositif, annexes, relecture, envoi).
+- L'**étape courante est déduite automatiquement** de l'état du dossier (complétude et statut) : le guide avance tout seul, sans case à cocher.
+- Le bouton **« Montrer »** amène directement au bon endroit : il **ouvre l'éditeur** sur le texte concerné ou **place le curseur** sur le champ à remplir, avec un repère visuel. Les **champs obligatoires non renseignés** de la fiche sont **surlignés**.
+- Le guide est **déplaçable** sur la fenêtre (glisser son en-tête ou l'avatar) ; sa position est mémorisée. Il rappelle que l'**état de complétude** est affiché dans l'encadré « État de complétude », à droite de la fiche.
+- **Domaine d'intervention (matière)** : la nomenclature de la préfecture se choisit dans une **arborescence** dépliable avec recherche — seules les matières précises (feuilles) sont sélectionnables.
+- **Éditeur** : un rappel indique que les modifications sont **enregistrées automatiquement** au fil de la frappe ; il suffit de cliquer sur **« Terminer »** quand le texte est vraiment fini.
+- **Bibliothèque de vus et considérants** : dans le texte « Vu et considérant », les formules les plus utilisées des délibérations **adoptées** sont proposées, les plus fréquentes d'abord, chacune avec une **pastille de vérification** (vérifié, à revoir, obsolète, à faire vérifier, sans référence) rapprochée de la bibliothèque de visas ; un clic **insère** la ligne.
+- **Étape « Relecture »** : un bouton **« Ouvrir le dossier complet »** affiche l'aperçu PDF du dossier entier ; le conseil rappelle qu'on peut ouvrir un **fil de discussion** sur le dossier (mentions **@**).
+- **Après l'envoi au circuit**, un écran de **félicitations** s'affiche avec un **mini feu d'artifice** : « Bravo, vous avez envoyé votre premier dossier, il est en relecture auprès de … et poursuivra son chemin ».
+- Le guide se **réduit**, se **coupe** (« Ne plus m'aider ») et se **réactive** à tout moment ; son état est mémorisé côté serveur sur le dossier.
+- À chaque **étape franchie**, Del-IA **félicite** le rédacteur et sa **zone passe au vert** (« c'est bon, on passe à l'étape suivante »), pour soutenir l'engagement.
+- Accès direct depuis le **tableau de bord** : bouton « Dossier assisté ».
+
 ## 0.40.0 — Mode simulation de séance, numéro d'origine, CGU et licence
 
 - **Mode simulation de séance** : ouvrir une séance un autre jour que sa date est autorisé, mais l'application passe en **mode simulation** — un **bandeau** le signale (comme « Afficher en tant que »), aucune valeur juridique n'est engagée, et une action **« Annuler la simulation »** efface tout ce qui a été saisi (présences, pouvoirs, votes, amendements, points) et remet la séance dans son état d'avant ouverture.

@@ -29,8 +29,8 @@ export default function Login() {
           <h2>VibeDélib</h2><p className="text-mute">{brand?.nom ?? ''} · gestion des délibérations</p>
         </div>
         <ErrorBox msg={err} />
-        <label className="block"><span className="label">{local ? 'Compte de secours' : 'Identifiant (compte Windows)'}</span>
-          <input className="input" autoFocus={!memo} autoComplete="username" value={u} onChange={(e) => setU(e.target.value)} required /></label>
+        <label className="block"><span className="label">{local ? 'Compte de secours' : 'Identifiant ou adresse e-mail'}</span>
+          <input className="input" autoFocus={!memo} autoComplete="username" placeholder={local ? '' : 'prenom.nom ou prenom.nom@ivry94.fr'} value={u} onChange={(e) => setU(e.target.value)} required /></label>
         <label className="block"><span className="label">Mot de passe</span>
           <input className="input" type="password" autoFocus={!!memo} autoComplete="current-password" value={p} onChange={(e) => setP(e.target.value)} required /></label>
         <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={souvenir} onChange={(e) => setSouvenir(e.target.checked)} /> Se souvenir de moi <span className="text-mute">(reste connecté jusqu’à 6 mois, ou jusqu’à la déconnexion ; jamais le mot de passe)</span></label>

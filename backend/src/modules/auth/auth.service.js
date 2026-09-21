@@ -15,6 +15,21 @@ const INVALID = 'Identifiant ou mot de passe incorrect';
 
 function createAuthService({ db, config, log, ad, dir, sessions, audit, guard }) {
   const normalize = (u) => String(u || '').trim().toLowerCase();
+  const localPart = (u) => normalize(u).split('@')[0];
+
+  /**
+   * Une adresse e-mail complète est acceptée à la connexion (ex. « machevalier@ivry94.fr » en plus de « machevalier »).
+   * On retrouve l'identifiant de connexion réel via l'AD ; à défaut (AD indisponible, adresse inconnue), on retombe
+   * sur la partie locale de l'adresse, qui est l'identifiant usuel.
+   */
+  async function resolveUsername(id) {
+    if (!id.includes('@')) return id;
+    try {
+      const u = await ad.getUser(id);
+      if (u?.username) return normalize(u.username);
+    } catch (e) { log.warn({ err: e.message }, 'résolution de l’adresse e-mail indisponible'); }
+    return localPart(id);
+  }
 
   /**
    * Émet un jeton et sa session. `souvenir` (« Se souvenir de moi ») : session persistante — le jeton vaut jusqu'à 6 mois (SESSION_SOUVENIR_DAYS) depuis la connexion
@@ -42,7 +57,7 @@ function createAuthService({ db, config, log, ad, dir, sessions, audit, guard })
 
   return {
     async loginAd({ username, password, ip, souvenir = false }) {
-      const name = normalize(username);
+      const name = await resolveUsername(normalize(username));
       guard.assertNotLocked(name);
       // Connexion de DÉVELOPPEMENT : un mot de passe commun (DEV_LOGIN_PASSWORD, jamais en production) valide n'importe quel
       // identifiant sans interroger l'AD. Chaque usage est journalisé et audité.
@@ -67,7 +82,7 @@ function createAuthService({ db, config, log, ad, dir, sessions, audit, guard })
     },
 
     async loginLocal({ username, password, ip, souvenir = false }) {
-      const name = normalize(username);
+      const name = localPart(username); // compte de secours : l'adresse e-mail complète est acceptée, ramenée à son identifiant
       guard.assertNotLocked('local:' + name);
       const acc = config.localAdmin.enabled ? await db.get('SELECT * FROM local_accounts WHERE username = $1 AND NOT disabled', [name]) : null;
       // comparaison faite même si le compte n'existe pas, pour ne pas révéler son existence par le temps de réponse

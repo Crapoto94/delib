@@ -66,7 +66,7 @@ const AGENTS = [
   { username: 'moreau', displayName: 'Moreau Luc', email: 'luc.moreau@ivry.test', service: 'COMPTABILITÉ', direction: 'DIRECTION DES FINANCES', poste: 'Agent comptable', matricule: '006' },
 ];
 
-async function createTestEnv({ users = USERS, agents = AGENTS, directions = DIRECTIONS, elus = [], env = {}, guard } = {}) {
+async function createTestEnv({ users = USERS, agents = AGENTS, directions = DIRECTIONS, elus = [], env = {}, guard, airsSource } = {}) {
   const schema = PREFIX + crypto.randomBytes(4).toString('hex');
   const config = testConfig(schema, env);
   const log = createLogger('silent');
@@ -77,7 +77,7 @@ async function createTestEnv({ users = USERS, agents = AGENTS, directions = DIRE
   const mail = createFakeMail();
   const ai = createFakeAi();
   const meeting = createFakeMeeting();
-  const c = buildContainer({ config, log, db, ad, directoryAdapter, mail, ai, meeting, guard });
+  const c = buildContainer({ config, log, db, ad, directoryAdapter, mail, ai, meeting, guard, airsSource });
   const boot = await bootstrap(c);
   // un élu (id 1) rapporteur par défaut des actes de test
   await db.query("INSERT INTO elus (organisme_id, source, nom, prenom, email, role) VALUES ($1, 'manual', 'Rapporteur', 'Martine', 'martine.rapporteur@ivry.test', 'Adjointe')", [boot.id]);

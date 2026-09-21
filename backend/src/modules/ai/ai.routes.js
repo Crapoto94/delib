@@ -11,13 +11,18 @@ const Analyse = z.object({ type: z.enum(['orthographe', 'style', 'visas', 'compl
 const AllSpelling = z.object({ textId: Id });
 const ListQ = z.object({ statut: z.enum(['pending', 'accepted', 'edited', 'rejected', 'obsolete']).optional(), textId: Id.optional() });
 const Decision = z.object({ decision: z.enum(['accept', 'reject']), replacement: z.string().max(5000).optional().describe('Remplacement édité par l\'agent (facultatif)') });
+const AideQ = z.object({
+  question: z.string().trim().min(3).max(1000),
+  extraits: z.array(z.object({ titre: z.string().max(300).optional(), texte: z.string().min(1).max(8000) })).min(1).max(8)
+    .describe("Extraits pertinents du manifeste, sélectionnés par l'interface ; l'IA ne répond qu'à partir d'eux"),
+});
 const T = ['assistant IA'];
 
 const JP = z.object({ orgId: Id, jid: Id });
 const OrgP = z.object({ orgId: Id });
 const JobsQ = z.object({ scope: z.enum(['mine', 'all']).default('mine'), acteId: Id.optional() });
 
-const PromptP = OrgP.extend({ code: z.enum(['orthographe', 'style', 'visas', 'complet', 'copie']) });
+const PromptP = OrgP.extend({ code: z.enum(['orthographe', 'style', 'visas', 'complet', 'copie', 'aide']) });
 const PromptB = z.object({
   texte: z.string().max(6000).nullable().optional().describe('Consigne (rôle et mission) ; null : revenir à la consigne par défaut'),
   modele: z.string().trim().max(120).nullable().optional().describe('Modèle de l\'IA pour cette fonction ; null : modèle par défaut'),
@@ -65,8 +70,11 @@ module.exports = ({ makeRouter, ai, aiQueue, aiPrompts }) => {
   async (req, res) => res.json(await aiQueue.overview(req.org.id)));
 
   q.get('/statut', { summary: "Usages de l'IA activés (l'interface masque les boutons des usages désactivés)", tags: T, org: true, params: OrgP,
-    description: "`{ orthographe, style, visas, complet, copie }` : booléens. Un usage désactivé est refusé par le serveur (403) : l'IA n'est jamais appelée." },
+    description: "`{ orthographe, style, visas, complet, copie, aide }` : booléens. Un usage désactivé est refusé par le serveur (403) : l'IA n'est jamais appelée." },
   async (req, res) => res.json(await aiPrompts.statuts(req.org.id)));
+  q.post('/manifeste', { summary: "Aide IA fondée sur le manifeste (réponse strictement limitée aux extraits fournis)", tags: T, org: true, params: OrgP, body: AideQ,
+    description: "L'interface sélectionne les extraits pertinents du manifeste (MANIFEST.md) et pose la question ; l'IA répond uniquement à partir de ces extraits, sans connaissance extérieure, et dit quand l'information n'y est pas. Usage `aide` activable/désactivable par l'administration. Appel synchrone." },
+  async (req, res) => res.json(await ai.aideManifeste(req.ctx, req.org.id, req.valid.body)));
   q.get('/prompts', { summary: "Consignes envoyées à l'IA et modèle choisi pour chacune (administration)", tags: T, org: true, roles: ['org_admin'], params: OrgP,
     description: "Pour chaque fonction (orthographe, style, visas, copie assistée) : la consigne en vigueur et celle par défaut, le format de réponse imposé (non modifiable) et le modèle. `modeles` : liste fournie par l'IA interne (`null` si indisponible)." },
   async (req, res) => res.json(await aiPrompts.list(req.org.id)));

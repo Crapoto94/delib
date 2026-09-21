@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, org as orgPath } from './api';
 import { useAuth } from './auth';
 
-export type IaUsages = { orthographe: boolean; style: boolean; visas: boolean; complet: boolean; copie: boolean };
-const TOUT_OFF: IaUsages = { orthographe: false, style: false, visas: false, complet: false, copie: false };
+export type IaUsages = { orthographe: boolean; style: boolean; visas: boolean; complet: boolean; copie: boolean; aide: boolean };
+const TOUT_OFF: IaUsages = { orthographe: false, style: false, visas: false, complet: false, copie: false, aide: false };
 const cache = new Map<number, IaUsages>();
 
 /**
@@ -20,7 +20,7 @@ export function useIa(): IaUsages & { loaded: boolean; any: boolean } {
     return () => { stop = true; };
   }, [o]);
   const u = v ?? TOUT_OFF;
-  return { ...u, loaded: v !== null, any: u.orthographe || u.style || u.visas || u.complet || u.copie };
+  return { ...u, loaded: v !== null, any: u.orthographe || u.style || u.visas || u.complet || u.copie || u.aide };
 }
 /** Après un changement dans les paramétrages : force la relecture au prochain affichage. */
 export const oublierIa = () => cache.clear();

@@ -124,6 +124,18 @@ describe('bibliothèque des actes de la collectivité (REC-30) : consulter sans 
     expect(f.documents.map((d) => d.cible)).toEqual(['expose', 'deliberation', 'extrait']);
   });
 
+  it('recherche avancée : rapporteur, direction, thématique et période', async () => {
+    const ids = async (q) => (await as(t.leroy).get(`${base()}/bibliotheque?${q}`)).body;
+    expect((await ids('rapporteurId=1')).items.map((i) => i.acteId)).toContain(A1);
+    expect((await ids('rapporteurId=999999')).total).toBe(0);
+    expect((await ids(`matiereId=${matiere.id}`)).items.map((i) => i.acteId)).toContain(A1);
+    const dir = (await env.db.get('SELECT direction_code FROM actes WHERE id = $1', [A1])).direction_code;
+    expect((await ids(`directionCode=${dir}`)).items.map((i) => i.acteId)).toContain(A1);
+    const jour = inDays(120).slice(0, 10);
+    expect((await ids(`du=${jour}&au=${jour}`)).items.map((i) => i.acteId)).toContain(A1);
+    expect((await ids(`du=${inDays(200).slice(0, 10)}`)).total).toBe(0);
+  });
+
   it('exposé des motifs, délibération et extrait du registre s’affichent en PDF', async () => {
     for (const cible of ['expose', 'deliberation', 'extrait']) {
       const r = await bin(t.leroy, `${base()}/bibliotheque/actes/${A1}/pdf?cible=${cible}`);

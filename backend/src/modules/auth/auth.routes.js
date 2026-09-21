@@ -1,7 +1,7 @@
 const { z } = require('zod');
 
 const Credentials = z.object({
-  username: z.string().trim().min(1).max(128).describe('Identifiant AD (insensible à la casse)'),
+  username: z.string().trim().min(1).max(128).describe('Identifiant AD ou adresse e-mail complète (insensible à la casse)'),
   password: z.string().min(1).max(256),
   souvenir: z.boolean().optional().describe("« Se souvenir de moi » : session persistante de 6 mois au plus, jusqu'à la déconnexion"),
 });
@@ -14,7 +14,7 @@ module.exports = ({ makeRouter, auth, limiter, access, audit }) => {
 
   r.post('/login', {
     summary: "Connexion d'un agent (AD via l'APM)", tags: ['auth'], auth: false, limiter, body: Credentials,
-    description: "Identifiant insensible à la casse. Renvoie un JWT (Bearer) et ouvre une session révocable. 401 sans détail sur la cause ; 429 après trop d'échecs ; 502 si l'AD est indisponible.",
+    description: "Identifiant AD ou adresse e-mail complète (ex. `machevalier@ivry94.fr`), insensible à la casse. Renvoie un JWT (Bearer) et ouvre une session révocable. 401 sans détail sur la cause ; 429 après trop d'échecs ; 502 si l'AD est indisponible.",
   }, async (req, res) => res.json(await auth.loginAd({ ...req.valid.body, ip: req.ip })));
 
   r.post('/login-local', {

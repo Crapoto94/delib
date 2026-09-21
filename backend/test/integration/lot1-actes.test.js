@@ -231,6 +231,24 @@ describe("fiche d'acte", () => {
   });
 });
 
+describe('mode « dossier assisté »', () => {
+  it('active le guide à la création, mémorise sa progression et se coupe sans perdre les autres usages de custom', async () => {
+    const a = (await newActe(t.dupont, { titre: 'Dossier assisté', custom: { assiste: { actif: true } } })).body;
+    expect(a.custom.assiste.actif).toBe(true);
+    const r = await as(t.dupont).put(`${base()}/actes/${a.id}/assiste`, { passees: ['annexes', 'relecture'], bienvenue: true });
+    expect(r.body.custom.assiste).toMatchObject({ actif: true, bienvenue: true, passees: ['annexes', 'relecture'] });
+    expect((await as(t.dupont).put(`${base()}/actes/${a.id}/assiste`, { actif: false })).body.custom.assiste.actif).toBe(false);
+    // une simple modification de la fiche ne perd pas l'état du guide
+    expect((await as(t.dupont).put(`${base()}/actes/${a.id}`, { titre: 'Titre modifié' })).body.custom.assiste).toMatchObject({ actif: false, bienvenue: true });
+  });
+
+  it("n'est modifiable que par qui peut modifier l'acte", async () => {
+    const a = (await newActe(t.dupont, { titre: 'Guide protégé' })).body;
+    expect((await as(t.petit).put(`${base()}/actes/${a.id}/assiste`, { actif: true })).status).toBe(404); // ne voit pas l'acte
+    expect((await as(t.durand).put(`${base()}/actes/${a.id}/assiste`, { actif: true })).status).toBe(403); // voit mais ne peut éditer
+  });
+});
+
 describe('visibilité (VIS-01, VIS-02, VIS-05)', () => {
   let a;
   beforeAll(async () => { a = (await newActe(t.dupont, { titre: 'Brouillon confidentiel du service budget' })).body; });

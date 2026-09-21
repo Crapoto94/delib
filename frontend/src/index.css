@@ -101,6 +101,14 @@ aside nav::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.
 /* Barre d'accent des cartes de synthèse et fil de couleur sous l'en-tête */
 .accent-bar { height: 3px; background: linear-gradient(90deg, rgb(var(--c-action)), rgb(var(--c-azur)) 55%, rgb(var(--c-ok))); }
 
+/* Mini feu d'artifice de l'écran de félicitations après l'envoi d'un dossier */
+@keyframes feu-artifice {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.4); opacity: 0; }
+}
+.feu { animation: feu-artifice 1000ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+@media (prefers-reduced-motion: reduce) { .feu { animation: none; opacity: 0.6; } }
+
 /* Éditeur de textes (TipTap) : rendu proche du document final */
 .prose-doc { outline: none; min-height: 60vh; font-size: 16px; line-height: 26px; }
 .prose-doc p { margin: 0 0 0.85em; }

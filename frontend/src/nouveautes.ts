@@ -11,9 +11,25 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.40.0';
+export const VERSION = '0.41.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.41.0', type: 'minor', titre: 'Dossier assisté : un guide pas à pas à la rédaction',
+    items: [
+      "Créer un dossier en mode assisté (case à la création, ou carte « Dossier assisté » sur un brouillon existant) : un avatar d'aide, Del-IA, accompagne la rédaction.",
+      "Del-IA dit quoi faire à chaque étape — fiche, exposé des motifs, visas, dispositif, annexes, relecture, envoi — donne des conseils, et suit la progression. L'étape courante est déduite automatiquement de l'état du dossier.",
+      "Le bouton « Montrer » ouvre l'éditeur sur le texte concerné ou place le curseur sur le champ à remplir, avec un repère visuel. Les champs obligatoires non renseignés de la fiche sont surlignés.",
+      "Le guide est déplaçable sur la fenêtre (glisser son en-tête ou l'avatar) ; sa position est mémorisée. Il rappelle que l'état de complétude est affiché dans l'encadré « État de complétude », à droite de la fiche.",
+      "Le guide se réduit, se coupe (« Ne plus m'aider ») et se réactive à tout moment ; son état est mémorisé sur le dossier. Aussi accessible depuis le tableau de bord.",
+      "À chaque étape franchie, Del-IA félicite le rédacteur et sa zone passe au vert — « c'est bon, on passe à l'étape suivante ».",
+      "Domaine d'intervention (matière) : la nomenclature de la préfecture se choisit désormais dans une arborescence dépliable, avec recherche ; seules les matières précises (feuilles) sont sélectionnables.",
+      "Éditeur : les modifications sont enregistrées automatiquement au fil de la frappe — il suffit de cliquer sur « Terminer » quand le texte est vraiment fini (un rappel s'affiche pendant l'édition).",
+      "Bibliothèque de vus et considérants : dans l'onglet « Vu et considérant », les formules les plus utilisées des délibérations adoptées sont proposées (les plus fréquentes d'abord), chacune avec une pastille de vérification (vérifié, à revoir, obsolète, à faire vérifier) ; un clic insère la ligne.",
+      "Étape « Relecture » : un bouton « Ouvrir le dossier complet » affiche l'aperçu PDF du dossier entier, et le conseil rappelle qu'on peut ouvrir un fil de discussion sur le dossier (mentions @).",
+      "Après l'envoi d'un dossier, un écran de félicitations s'affiche avec un mini feu d'artifice : « Bravo, vous avez envoyé votre premier dossier, il est en relecture auprès de … et poursuivra son chemin ».",
+    ],
+  },
   {
     version: '0.40.0', type: 'minor', titre: 'Mode simulation de séance, numéro d’origine à l’ordre du jour, CGU et licence',
     items: [

@@ -1,11 +1,60 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
 import { STATUTS } from './format';
 
 export const Spinner = () => <Loader2 className="h-4 w-4 animate-spin" aria-label="Chargement" />;
-export const Loading = () => <div className="flex items-center gap-2 p-6 text-mute"><Spinner /> Chargement…</div>;
+export const Loading = ({ progress }: { progress?: { fait?: number; total?: number; phase?: string } | null } = {}) => {
+  const total = Number(progress?.total ?? 0);
+  const pct = total > 0 ? Math.min(100, Math.round((Number(progress?.fait ?? 0) / total) * 100)) : null;
+  const fait = Number(progress?.fait ?? 0);
+  return (
+    <div className="flex flex-col items-center gap-2 p-6 text-mute">
+      <div className="flex items-center gap-2"><Spinner /> Chargement…</div>
+      {pct !== null && (
+        <div className="w-full max-w-md" role="status" aria-live="polite">
+          <div className="h-2 overflow-hidden rounded-full bg-line"><div className="h-full bg-action-solid transition-all" style={{ width: `${pct}%` }} /></div>
+          <div className="mt-1 text-center text-[12px] tabular-nums">{fait} / {total} · {pct} %</div>
+        </div>
+      )}
+    </div>
+  );
+};
 export const ErrorBox = ({ msg }: { msg: string | null }) => (msg ? <div role="alert" className="rounded border border-ko/30 bg-ko-bg px-3 py-2 text-ko">{msg}</div> : null);
 export const Empty = ({ children }: { children: ReactNode }) => <div className="p-8 text-center text-mute">{children}</div>;
+
+/**
+ * Pagination côté serveur (l'API renvoie déjà `total`, `limit`, `offset`) : affiche l'intervalle courant
+ * et la navigation entre les pages. `page` est numérotée à partir de 1.
+ */
+export function Pagination({ total, limit, page, onPage, itemLabel = 'élément', className }: {
+  total: number; limit: number; page: number; onPage: (page: number) => void; itemLabel?: string; className?: string;
+}) {
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const courant = Math.min(Math.max(1, page), pages);
+  const premier = total === 0 ? 0 : (courant - 1) * limit + 1;
+  const dernier = Math.min(courant * limit, total);
+  const numeros: (number | '…')[] = [];
+  for (let p = 1; p <= pages; p++) {
+    if (p === 1 || p === pages || Math.abs(p - courant) <= 1) { if (numeros[numeros.length - 1] !== p) numeros.push(p); }
+    else if (numeros[numeros.length - 1] !== '…') numeros.push('…');
+  }
+  const pluriel = total > 1 && !itemLabel.endsWith('s') ? 's' : '';
+  return (
+    <nav className={`flex flex-wrap items-center justify-between gap-3 ${className ?? ''}`} aria-label="Pagination">
+      <span className="text-[12px] text-mute">{total ? <>{premier}–{dernier} sur <b>{total}</b> {itemLabel}{pluriel}</> : <>Aucun {itemLabel}</>}</span>
+      {pages > 1 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <button type="button" className="btn-secondary !px-2 !py-1" disabled={courant <= 1} onClick={() => onPage(courant - 1)} aria-label="Page précédente"><ChevronLeft className="h-4 w-4" /></button>
+          {numeros.map((n, i) => n === '…' ? <span key={`v${i}`} className="px-1 text-mute" aria-hidden="true">…</span> : (
+            <button key={n} type="button" aria-current={n === courant ? 'page' : undefined} aria-label={`Page ${n}`} onClick={() => onPage(n)}
+              className={`min-w-[30px] rounded border px-2 py-1 text-[12px] font-semibold ${n === courant ? 'border-transparent bg-primary text-white' : 'border-slate-300 bg-surface text-slate-700 hover:bg-soft'}`}>{n}</button>
+          ))}
+          <button type="button" className="btn-secondary !px-2 !py-1" disabled={courant >= pages} onClick={() => onPage(courant + 1)} aria-label="Page suivante"><ChevronRight className="h-4 w-4" /></button>
+        </div>
+      )}
+    </nav>
+  );
+}
 
 const TONES: Record<string, string> = {
   gray: 'bg-slate-100 text-slate-700 border-slate-300/70', blue: 'bg-action/10 text-action border-action/30', ok: 'bg-ok-bg text-ok-text border-ok/30', warn: 'bg-warn-bg text-warn border-warn/30', ko: 'bg-ko-bg text-ko border-ko/30',
@@ -22,8 +71,13 @@ export function PageTitle({ title, sub, actions }: { title: string; sub?: ReactN
   );
 }
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
-  return <label className="block"><span className="label">{label}</span>{children}{hint && <span className="mt-1 block text-[12px] text-mute">{hint}</span>}</label>;
+export function Field({ label, children, hint, missing }: { label: string; children: ReactNode; hint?: string; missing?: boolean }) {
+  return (
+    <label className={`block ${missing ? 'rounded-md border-l-4 border-warn bg-warn-bg/50 px-3 py-2' : ''}`}>
+      <span className="label">{label}{missing && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-warn align-middle" title="À renseigner" aria-label="À renseigner" />}</span>
+      {children}{hint && <span className="mt-1 block text-[12px] text-mute">{hint}</span>}
+    </label>
+  );
 }
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {

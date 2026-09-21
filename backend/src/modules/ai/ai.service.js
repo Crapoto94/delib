@@ -54,6 +54,28 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts, visa
       return { acte: copy, job, iaError };
     },
 
+    /**
+     * Aide IA fondée sur le manifeste : l'interface fournit les extraits pertinents du manifeste et la question ;
+     * l'IA répond STRICTEMENT à partir de ces extraits (aucune connaissance extérieure). Appel synchrone (l'agent attend la réponse).
+     */
+    async aideManifeste(ctx, organismeId, { question, extraits }) {
+      await prompts.assertActif(organismeId, 'aide');
+      const { system, modele } = await prompts.resolve(organismeId, 'aide');
+      const morceaux = [];
+      let total = 0;
+      for (const [i, e] of extraits.slice(0, 8).entries()) {
+        const texte = String(e.texte || '').slice(0, 8000);
+        total += texte.length;
+        if (total > 24000) break;
+        morceaux.push(`### Extrait ${i + 1} — ${String(e.titre || 'Manifeste').slice(0, 300)}\n${texte}`);
+      }
+      if (!morceaux.length) throw E.badRequest('Aucun extrait du manifeste fourni');
+      const prompt = `Question de l'agent :\n${question.trim()}\n\nExtraits du manifeste de l'application (source unique autorisée) :\n<EXTRAITS>\n${morceaux.join('\n\n')}\n</EXTRAITS>`;
+      const r = await ai.query({ system, prompt, maxTokens: 1200, temperature: 0.1, model: modele || undefined });
+      await audit.log(ctx, { organismeId, action: 'ia.aide_manifeste', entity: 'ia', after: { question: question.slice(0, 200), extraits: morceaux.length, modele: r.model ?? modele ?? null } });
+      return { reponse: r.text, modele: r.model ?? null };
+    },
+
     /** Redemande les propositions pour un brouillon : tâche en arrière plan. */
     async requestAdaptation(ctx, organismeId, acteId, { contexte }) {
       const a = await actes.load(ctx, organismeId, acteId, { edit: true });

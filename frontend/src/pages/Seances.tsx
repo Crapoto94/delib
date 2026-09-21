@@ -18,16 +18,20 @@ function NewSeance({ onClose, onDone }: { onClose: () => void; onDone: () => voi
   const { org } = useAuth(); const o = org!.id;
   const inst = useLoad(async () => (await api.get(orgPath(o, '/instances'))).data.items as any[], [o]);
   const [instanceId, setI] = useState(''); const [date, setDate] = useState(''); const [lieu, setLieu] = useState('');
+  const [type, setType] = useState('ordinaire');
   const [err, setErr] = useState<string | null>(null);
   const prop = useLoad(async () => (date ? (await api.get(orgPath(o, '/seances/dates-proposees'), { params: { dateSeance: new Date(date).toISOString() } })).data : null), [date]);
+  const choisi = (inst.data ?? []).find((i) => String(i.id) === String(instanceId)) ?? inst.data?.[0];
+  const estConseil = choisi?.kind === 'conseil';
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    try { await api.post(orgPath(o, '/seances'), { instanceId: Number(instanceId || inst.data?.[0]?.id), dateSeance: new Date(date).toISOString(), lieu: lieu || undefined }); onDone(); onClose(); } catch (x) { setErr(errMsg(x)); }
+    try { await api.post(orgPath(o, '/seances'), { instanceId: Number(instanceId || inst.data?.[0]?.id), dateSeance: new Date(date).toISOString(), lieu: lieu || undefined, type: estConseil ? type : undefined }); onDone(); onClose(); } catch (x) { setErr(errMsg(x)); }
   };
   return (
     <Modal title="Nouvelle séance" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4"><ErrorBox msg={err} />
         <Field label="Instance"><Select className="input" value={instanceId} onChange={(e) => setI(e.target.value)}>{inst.data?.map((i) => <option key={i.id} value={i.id}>{i.nom}</option>)}</Select></Field>
+        {estConseil && <Field label="Type de conseil" hint="Par défaut : conseil ordinaire."><Select className="input" value={type} onChange={(e) => setType(e.target.value)}><option value="ordinaire">Conseil ordinaire</option><option value="extraordinaire">Conseil extraordinaire</option></Select></Field>}
         <Field label="Date et heure"><input className="input" type="datetime-local" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Lieu"><input className="input" value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Salle du conseil, Hôtel de ville" /></Field>
         {prop.data && <div className="rounded bg-soft p-3 text-[12px]"><b>Dates clés proposées</b><ul className="mt-1"><li>Date limite de rédaction : {d(prop.data.dateLimiteRedaction)}</li><li>Validation DGS : {d(prop.data.dateLimiteDgs)}</li><li>Mise à disposition des commissions : {d(prop.data.dateLimiteMadCommissions)}</li><li>Envoi de la convocation : {d(prop.data.dateEnvoiConvocation)}</li></ul></div>}

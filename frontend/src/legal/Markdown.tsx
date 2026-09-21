@@ -1,9 +1,10 @@
 import { Fragment } from 'react';
 
 /**
- * Rendu Markdown minimal, suffisant pour les documents juridiques (CGU et licence).
+ * Rendu Markdown minimal, suffisant pour les documents de référence (CGU, licence, manifeste).
  * Sous-ensemble pris en charge : titres `#` à `######`, paragraphes, listes `-` et `1.`,
- * citations `>`, filet `---`, et en ligne : `gras`, `*italique*`, `code`, `[lien](url)`.
+ * citations `>`, filet `---`, blocs de code ```, tableaux `| … |` (avec ligne de séparation),
+ * et en ligne : `gras`, `*italique*`, `code`, `[lien](url)`.
  * Le contenu est embarqué dans l'application (import `?raw`), donc de confiance.
  */
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -16,15 +17,21 @@ function inline(s: string): string {
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" class="text-action underline">$1</a>');
 }
 
+/** Cellules d'une ligne de tableau GitHub (`| a | b |` → `['a', 'b']`). */
+const cellules = (l: string) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+
 type Bloc =
   | { t: 'h'; niveau: number; texte: string }
   | { t: 'p'; texte: string }
   | { t: 'ul'; items: string[] }
   | { t: 'ol'; items: string[] }
   | { t: 'quote'; texte: string }
+  | { t: 'code'; lang: string; texte: string }
+  | { t: 'table'; entete: string[]; lignes: string[][] }
   | { t: 'hr' };
 
-const DEBUT_BLOC = /^(#{1,6}\s|[-*]\s|\d+[.)]\s|>\s?|-{3,}\s*$)/;
+const DEBUT_BLOC = /^(#{1,6}\s|[-*]\s|\d+[.)]\s|>\s?|-{3,}\s*$|`{3}|\|)/;
+const SEPARATEUR = /^\s*\|[\s:|-]+\|\s*$/;
 
 function parser(md: string): Bloc[] {
   const lignes = md.replace(/\r\n/g, '\n').split('\n');
@@ -33,6 +40,22 @@ function parser(md: string): Bloc[] {
   while (i < lignes.length) {
     const l = lignes[i];
     if (!l.trim()) { i++; continue; }
+    const cloture = /^```(.*)$/.exec(l.trim());
+    if (cloture) {
+      const lang = cloture[1].trim();
+      const code: string[] = [];
+      i++;
+      while (i < lignes.length && !/^```/.test(lignes[i].trim())) { code.push(lignes[i]); i++; }
+      i++; // ligne de clôture
+      blocs.push({ t: 'code', lang, texte: code.join('\n') }); continue;
+    }
+    if (/^\s*\|/.test(l) && i + 1 < lignes.length && /^\s*\|/.test(lignes[i + 1])) {
+      const entete = SEPARATEUR.test(lignes[i + 1]) && /-/.test(lignes[i + 1]) ? cellules(l) : [];
+      const corps: string[][] = [];
+      i += entete.length ? 2 : 0; // en-tête + ligne de séparation quand elle existe
+      while (i < lignes.length && /^\s*\|/.test(lignes[i])) { corps.push(cellules(lignes[i])); i++; }
+      blocs.push({ t: 'table', entete, lignes: corps }); continue;
+    }
     const titre = /^(#{1,6})\s+(.*)$/.exec(l);
     if (titre) { blocs.push({ t: 'h', niveau: titre[1].length, texte: titre[2].trim() }); i++; continue; }
     if (/^\s*-{3,}\s*$/.test(l)) { blocs.push({ t: 'hr' }); i++; continue; }
@@ -53,7 +76,7 @@ function parser(md: string): Bloc[] {
     }
     const para: string[] = [];
     while (i < lignes.length && lignes[i].trim() && !DEBUT_BLOC.test(lignes[i])) { para.push(lignes[i].trim()); i++; }
-    if (para.length === 0) { i++; continue; }
+    if (para.length === 0) { blocs.push({ t: 'p', texte: l.trim() }); i++; continue; }
     blocs.push({ t: 'p', texte: para.join(' ') });
   }
   return blocs;
@@ -93,6 +116,23 @@ export function Markdown({ source }: { source: string }) {
             );
           case 'quote':
             return <TEXTE key={i} className="mb-4 border-l-4 border-action/40 bg-action/5 px-4 py-3 text-[13px] leading-relaxed text-slate-700" html={inline(b.texte)} />;
+          case 'code':
+            return (
+              <pre key={i} className="mb-4 overflow-x-auto rounded border border-line bg-soft p-3 text-[12px] leading-5" data-lang={b.lang || undefined}>
+                <code className="font-mono">{b.texte}</code>
+              </pre>
+            );
+          case 'table':
+            return (
+              <div key={i} className="mb-4 overflow-x-auto rounded border border-line">
+                <table className="w-full border-collapse text-[13px]">
+                  {b.entete.length > 0 && <thead><tr>{b.entete.map((c, k) => <th key={k} dangerouslySetInnerHTML={{ __html: inline(c) }} />)}</tr></thead>}
+                  <tbody>
+                    {b.lignes.map((ligne, k) => <tr key={k}>{ligne.map((c, j) => <td key={j} dangerouslySetInnerHTML={{ __html: inline(c) }} />)}</tr>)}
+                  </tbody>
+                </table>
+              </div>
+            );
           case 'hr':
             return <Fragment key={i}><hr className="my-6 border-line" /></Fragment>;
           default:

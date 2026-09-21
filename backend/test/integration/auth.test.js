@@ -16,6 +16,15 @@ describe('connexion des agents (AD via APM)', () => {
     }
   });
 
+  it("accepte l'adresse e-mail complète en plus de l'identifiant", async () => {
+    for (const mail of ['alice.dupont@ivry.test', 'ALICE.DUPONT@IVRY.TEST', '  alice.dupont@ivry.test ']) {
+      const r = await login(mail, 'pw-dupont');
+      expect(r.status, mail).toBe(200);
+      expect(r.body.username).toBe('dupont');
+      expect(r.body.token).toBeTruthy();
+    }
+  });
+
   it("refuse un mauvais mot de passe sans dire si le compte existe", async () => {
     const a = await login('dupont', 'faux');
     const b = await login('inconnu', 'faux');
@@ -145,6 +154,12 @@ describe('administrateurs et compte de secours', () => {
       const me = await e2.http().get('/api/v1/me').set(bearer(r.body.token));
       expect(me.body).toMatchObject({ username: 'secours', kind: 'local', isPlatformAdmin: true });
     } finally { await e2.close(); }
+  });
+
+  it("le compte de secours accepte l'adresse e-mail complète", async () => {
+    const r = await env.http().post('/api/v1/auth/login-local').send({ username: 'secours@ivry94.fr', password: 'mot-de-passe-de-secours-123' });
+    expect(r.status).toBe(200);
+    expect(r.body.username).toBe('secours');
   });
 
   it("le mot de passe de secours est haché, jamais stocké en clair, et chaque usage est audité", async () => {

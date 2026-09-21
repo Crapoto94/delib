@@ -1,6 +1,6 @@
 {
   "name": "vibedelib-backend",
-  "version": "0.40.0",
+  "version": "0.41.0",
   "private": true,
   "license": "SEE LICENSE IN LICENCE.md",
   "description": "VibeDélib — gestion des délibérations (backend)",
@@ -31,6 +31,7 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
+    "oracledb": "^7.0.1",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.23.0",

@@ -10,6 +10,7 @@ const { createHubDirectory } = require('./src/adapters/hub-directory');
 const { createApmMail } = require('./src/adapters/apm-mail');
 const { createApmAi } = require('./src/adapters/apm-ai');
 const { createGraphTeams } = require('./src/adapters/graph-teams');
+const { createAirsOracle } = require('./src/adapters/airs-oracle');
 const { buildContainer } = require('./src/container');
 const { createApp } = require('./src/http/app');
 const { bootstrap } = require('./src/bootstrap');
@@ -20,7 +21,7 @@ async function main() {
   const db = createDb(config, log);
 
   if (config.autoMigrate) await migrate(db, log);
-  const c = buildContainer({ config, log, db, ad: createApmAd(config), directoryAdapter: createHubDirectory(config), mail: createApmMail(config), ai: createApmAi(config), meeting: createGraphTeams(config) });
+  const c = buildContainer({ config, log, db, ad: createApmAd(config), directoryAdapter: createHubDirectory(config), mail: createApmMail(config), ai: createApmAi(config), meeting: createGraphTeams(config), airsSource: createAirsOracle({ config, log }) });
   await bootstrap(c);
 
   const app = createApp(c);

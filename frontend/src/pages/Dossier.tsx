@@ -12,6 +12,9 @@ import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, us
 import { AgentName, AgentNames } from '../AgentName';
 import { useIa } from '../useIa';
 import { Select } from '../Select';
+import { MatiereTree } from '../MatiereTree';
+import DossierAssiste, { ActiverAssiste } from '../DossierAssiste';
+import EnvoiBravo from '../EnvoiBravo';
 
 /* ------------------------------------------------------------------------------------------------ frise du circuit */
 const IGNOREE: Record<string, string> = {
@@ -81,7 +84,6 @@ function ChampInput({ c, v, onChange, disabled, elus }: { c: any; v: any; onChan
 /* --------------------------------------------------------------------------------------------------- fiche de l'acte */
 function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSaved: () => void }) {
   const { org } = useAuth(); const o = org!.id;
-  const matieres = useLoad(async () => (await api.get(orgPath(o, '/referentiels/matiere'))).data.items as any[], [o]);
   const rubriques = useLoad(async () => (await api.get(orgPath(o, '/referentiels/rubrique'))).data.items as any[], [o]);
   const natures = useLoad(async () => (await api.get(orgPath(o, '/referentiels/nature'))).data.items as any[], [o]);
   const elus = useLoad(async () => (await api.get(orgPath(o, '/elus'))).data.items as any[], [o]);
@@ -92,8 +94,17 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
   const [err, setErr] = useState<string | null>(null); const [saving, setSaving] = useState(false);
   useEffect(() => { setCv(Object.fromEntries((acte.champs || []).map((c: any) => [c.code, c.valeur]))); }, [acte.champs]);
   useEffect(() => { setF({ titre: acte.titre, matiereId: acte.matiereId ?? '', rubriqueId: acte.rubriqueId ?? '', natureId: acte.natureId ?? '', incidenceFinanciere: acte.incidenceFinanciere, montant: acte.montant ?? '', rapporteurId: acte.rapporteurId ?? '', seanceViseeId: acte.seanceViseeId ?? '', urgence: acte.urgence }); }, [acte]);
-  const leaves = useMemo(() => { const parents = new Set((matieres.data ?? []).map((m) => m.parentCode).filter(Boolean)); return (matieres.data ?? []).filter((m) => !parents.has(m.code)); }, [matieres.data]);
   const nv = (v: any) => (v === '' ? null : Number(v));
+  // Champs obligatoires non renseignés : surlignés pour guider la saisie tant que la fiche est modifiable (CRE-02).
+  const manque = {
+    titre: !String(f.titre ?? '').trim(),
+    matiere: f.matiereId === '' || f.matiereId == null,
+    rubrique: f.rubriqueId === '' || f.rubriqueId == null,
+    nature: f.natureId === '' || f.natureId == null,
+    rapporteur: f.rapporteurId === '' || f.rapporteurId == null,
+    incidence: f.incidenceFinanciere == null,
+  };
+  const mq = (k: keyof typeof manque) => editable && manque[k];
 
   const save = async () => {
     setSaving(true); setErr(null);
@@ -118,17 +129,17 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
             <option value="">— à définir —</option>{[...(seances.data ?? []), ...(acte.seanceVisee && !(seances.data ?? []).some((s) => s.id === acte.seanceVisee.id) ? [acte.seanceVisee] : [])].map((s) => <option key={s.id} value={s.id}>{s.instance} — {d(s.dateSeance)}</option>)}
           </Select>
         </Field>
-        <div className="md:col-span-2"><Field label="Titre explicite de l'acte *"><input className="input" disabled={dis} value={f.titre ?? ''} onChange={(e) => setF({ ...f, titre: e.target.value })} /></Field></div>
-        <Field label="Domaine d'intervention (matière) *"><Select className="input" disabled={dis} value={f.matiereId ?? ''} onChange={(e) => setF({ ...f, matiereId: e.target.value })}>
-          <option value="">— choisir —</option>{leaves.map((m) => <option key={m.id} value={m.id}>{m.code} — {m.libelle}</option>)}</Select></Field>
-        <Field label="Rubrique *"><Select className="input" disabled={dis} value={f.rubriqueId ?? ''} onChange={(e) => setF({ ...f, rubriqueId: e.target.value })}>
+        <div className="md:col-span-2"><Field label="Titre explicite de l'acte *" missing={mq('titre')}><input className="input" disabled={dis} value={f.titre ?? ''} onChange={(e) => setF({ ...f, titre: e.target.value })} /></Field></div>
+        <Field label="Domaine d'intervention (matière) *" missing={mq('matiere')} hint="Nomenclature de la préfecture : parcourez l'arborescence, seules les matières précises (feuilles) sont sélectionnables.">
+          <MatiereTree disabled={dis} value={f.matiereId} onChange={(id) => setF({ ...f, matiereId: id ?? '' })} /></Field>
+        <Field label="Rubrique *" missing={mq('rubrique')}><Select className="input" disabled={dis} value={f.rubriqueId ?? ''} onChange={(e) => setF({ ...f, rubriqueId: e.target.value })}>
           <option value="">— choisir —</option>{rubriques.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
-        <Field label="Nature *"><Select className="input" disabled={dis} value={f.natureId ?? ''} onChange={(e) => setF({ ...f, natureId: e.target.value })}>
+        <Field label="Nature *" missing={mq('nature')}><Select className="input" disabled={dis} value={f.natureId ?? ''} onChange={(e) => setF({ ...f, natureId: e.target.value })}>
           <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
-        <Field label="Élu rapporteur *"><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => setF({ ...f, rapporteurId: e.target.value })}>
+        <Field label="Élu rapporteur *" missing={mq('rapporteur')}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => setF({ ...f, rapporteurId: e.target.value })}>
           <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${m.role})` : ''}</option>)}</Select></Field>
-        <div>
-          <span className="label">Impact budgétaire (dépense ou recette) ? *</span>
+        <div className={mq('incidence') ? 'rounded-md border-l-4 border-warn bg-warn-bg/50 px-3 py-2' : ''}>
+          <span className="label">Impact budgétaire (dépense ou recette) ? *{mq('incidence') && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-warn align-middle" title="À renseigner" aria-label="À renseigner" />}</span>
           <div className="flex items-center gap-4 py-2">
             {[[true, 'Oui'], [false, 'Non']].map(([v, l]) => (
               <label key={String(v)} className="flex items-center gap-1"><input type="radio" name="inc" disabled={dis} checked={f.incidenceFinanciere === v} onChange={() => setF({ ...f, incidenceFinanciere: v })} /> {l as string}</label>))}
@@ -136,7 +147,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
           </div>
         </div>
         {(acte.champs || []).filter((c: any) => (!c.visibleSi || String(c.visibleSi?.egal ?? '') === '' || String(cv[c.visibleSi?.champ] ?? '') === String(c.visibleSi?.egal ?? ''))).map((c: any) => (
-          <Field key={c.code} label={`${c.libelle}${c.obligatoire ? ' *' : ''}`} hint={c.aide || (!c.modifiable ? 'Non modifiable à ce stade ou avec votre rôle.' : undefined)}>
+          <Field key={c.code} label={`${c.libelle}${c.obligatoire ? ' *' : ''}`} hint={c.aide || (!c.modifiable ? 'Non modifiable à ce stade ou avec votre rôle.' : undefined)} missing={editable && c.obligatoire && (cv[c.code] === undefined || cv[c.code] === null || cv[c.code] === '')}>
             <ChampInput c={c} v={cv[c.code]} onChange={(x) => setCv({ ...cv, [c.code]: x })} disabled={dis || !c.modifiable} elus={elus.data ?? []} />
           </Field>))}
         <label className="flex items-center gap-2 md:col-span-2"><input type="checkbox" disabled={dis} checked={!!f.urgence} onChange={(e) => setF({ ...f, urgence: e.target.checked })} /> Dossier urgent</label>
@@ -158,6 +169,18 @@ function Textes({ acte, editable, onChanged, toast }: { acte: any; editable: boo
     return out;
   }, [acte.id, acte.statut, acte.updatedAt]);
   const [open, setOpen] = useState<number | null>(null);
+  // Le guide « dossier assisté » peut demander l'ouverture directe de l'éditeur (bouton « Montrer »).
+  useEffect(() => {
+    const h = (e: Event) => {
+      const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
+      const items = (texts.data ?? []) as any[];
+      if (!items.length) return;
+      const cible = (kind ? items.find((x) => x.kind === kind) : null) ?? items.find((x) => x.empty) ?? items[0];
+      if (cible) setOpen(cible.id);
+    };
+    window.addEventListener('vibedelib:ouvrir-texte', h);
+    return () => window.removeEventListener('vibedelib:ouvrir-texte', h);
+  }, [texts.data]);
   if (texts.loading && !texts.data) return <Loading />;
   const dels = acte.deliberations || [];
   const list = texts.data ?? [];
@@ -238,22 +261,22 @@ function Discussion({ acte, toast }: { acte: any; toast: (m: string, k?: 'ok' | 
 }
 
 /* ------------------------------------------------------------------------------------- panneau latéral : actions */
-function Actions({ acte, circuit, reload, toast }: { acte: any; circuit: any; reload: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
+function Actions({ acte, circuit, reload, toast, onEnvoye }: { acte: any; circuit: any; reload: () => void; toast: (m: string, k?: 'ok' | 'ko') => void; onEnvoye?: (data: any) => void }) {
   const { org } = useAuth(); const o = org!.id;
   const [busy, setBusy] = useState(false); const [refus, setRefus] = useState(false); const [motif, setMotif] = useState('');
   const [target, setTarget] = useState('previous'); const [resume, setResume] = useState('direct'); const [derog, setDerog] = useState<any>(null);
   const act = async (fn: () => Promise<any>, ok: string) => {
     setBusy(true);
-    try { await fn(); toast(ok); reload(); }
+    try { const r = await fn(); toast(ok); reload(); return r; }
     catch (e: any) { if (e.response?.status === 423) setDerog(e.response.data); else toast(errMsg(e), 'ko'); }
     finally { setBusy(false); }
   };
   const a = circuit?.actions ?? {};
   return (
     <>
-      <div className="card p-5">
+      <div className="card p-5" id="actions">
         <h3 className="mb-2">Actions</h3>
-        {a.submit && <button className="btn-primary w-full" disabled={busy} onClick={() => act(() => api.post(orgPath(o, `/actes/${acte.id}/envoi`)), 'Dossier envoyé au circuit')}><Send className="h-4 w-4" /> {acte.statut === 'modification_demandee' ? 'Renvoyer au circuit' : 'Envoyer pour validation'}</button>}
+        {a.submit && <button className="btn-primary w-full" disabled={busy} onClick={async () => { const r = await act(() => api.post(orgPath(o, `/actes/${acte.id}/envoi`)), 'Dossier envoyé au circuit'); if (r?.data) onEnvoye?.(r.data); }}><Send className="h-4 w-4" /> {acte.statut === 'modification_demandee' ? 'Renvoyer au circuit' : 'Envoyer pour validation'}</button>}
         {a.validate && <button className="btn-ok mt-2 w-full" disabled={busy} onClick={() => act(() => api.post(orgPath(o, `/actes/${acte.id}/validation`), {}), 'Étape validée')}><Check className="h-4 w-4" /> Valider{a.onBehalfOf ? ` (pour ${a.onBehalfOf})` : ''}</button>}
         {a.refuse && <button className="btn-ko mt-2 w-full" disabled={busy} onClick={() => setRefus(true)}><RotateCcw className="h-4 w-4" /> Demander une modification…</button>}
         {!a.submit && !a.validate && !a.refuse && <p className="text-mute">{circuit?.submitted ? 'Vous n\'avez rien à faire sur ce dossier pour le moment.' : 'Vous ne pouvez pas envoyer ce dossier.'}</p>}
@@ -427,23 +450,30 @@ function ActesProches({ acte }: { acte: any }) {
 
 export default function Dossier() {
   const { id } = useParams();
-  const { org } = useAuth(); const o = org!.id;
+  const { org, me } = useAuth(); const o = org!.id;
   const { toast, node } = useToast();
   const acte = useLoad(async () => (await api.get(orgPath(o, `/actes/${id}`))).data, [o, id]);
   const circuit = useLoad(async () => (await api.get(orgPath(o, `/actes/${id}/circuit`))).data, [o, id]);
   const reloadAll = useCallback(() => { acte.reload(); circuit.reload(); }, [acte, circuit]);
   const [copying, setCopying] = useState(false);
+  const [envoi, setEnvoi] = useState<{ data: any; premier: boolean } | null>(null);
   if (acte.loading && !acte.data) return <Loading />;
   if (acte.error || !acte.data) return <div><ErrorBox msg={acte.error || 'Dossier introuvable'} /><Link className="mt-4 inline-block text-action" to="/dossiers">← Retour aux dossiers</Link></div>;
   const a = acte.data; const c = circuit.data;
   const editable = !!a.droits?.modifier;
+  const apercuDossier = async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }), `Dossier #${a.numeroSuivi} — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };
+  const onEnvoye = (data: any) => {
+    let premier = true;
+    try { const k = `vibedelib.premier-envoi.${me?.username ?? 'x'}`; premier = !localStorage.getItem(k); localStorage.setItem(k, '1'); } catch { /* stockage indisponible : message générique */ }
+    setEnvoi({ data, premier });
+  };
   return (
     <div className="space-y-6">
       <div>
         <div className="mb-1 text-[12px] text-mute"><Link to="/dossiers" className="hover:underline">Actes & Dossiers</Link> › Dossier #{a.numeroSuivi}</div>
         <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><StatutBadge statut={a.statut} />
           <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
-          <button className="btn-secondary" onClick={async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }), `Dossier #${a.numeroSuivi} — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); }}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button></div>
+          <button className="btn-secondary" onClick={apercuDossier}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button></div>
       </div>
       {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -455,7 +485,8 @@ export default function Dossier() {
         </div>
         <aside className="space-y-4">
           {a.custom?.entrainement && <div role="note" className="rounded border border-primary/30 bg-primary/5 p-3 text-[13px]"><b>Dossier d’entraînement</b> : essayez tout librement. Il ne partira jamais dans un vrai circuit et se supprime tout seul au bout de 14 jours.</div>}
-          <Actions acte={a} circuit={c} reload={reloadAll} toast={toast} />
+          <ActiverAssiste acte={a} editable={editable} onReload={reloadAll} toast={toast} />
+          <Actions acte={a} circuit={c} reload={reloadAll} toast={toast} onEnvoye={onEnvoye} />
           <IaPanel acte={a} editable={editable} onApplied={acte.reload} toast={toast} />
           {a.statut === 'brouillon' || a.statut === 'modification_demandee' ? <Completude c={a.completude} /> : null}
           <CommissionsBox acte={a} editable={editable} toast={toast} />
@@ -466,6 +497,8 @@ export default function Dossier() {
         </aside>
       </div>
       {copying && <CopieModal acte={a} onClose={() => setCopying(false)} toast={toast} />}
+      {a.custom?.assiste?.actif && <DossierAssiste acte={a} editable={editable} onReload={reloadAll} onApercu={apercuDossier} toast={toast} />}
+      {envoi && <EnvoiBravo data={envoi.data} premier={envoi.premier} onClose={() => setEnvoi(null)} />}
       {node}
     </div>
   );

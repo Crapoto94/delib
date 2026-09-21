@@ -32,7 +32,7 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
     RESULTATS,
 
     // ---------------------------------------------------------------------------------------------------------- 1. bibliothèque
-    async chercher(ctx, organismeId, { q = '', annee, matiereId, limit = 20, offset = 0 } = {}) {
+    async chercher(ctx, organismeId, { q = '', annee, matiereId, natureId, rubriqueId, instanceId, rapporteurId, directionCode, du, au, limit = 20, offset = 0 } = {}) {
       const org = requireOrg(organismeId); const p = [org]; const add = (v) => { p.push(v); return `$${p.length}`; };
       const w = ['a.organisme_id = $1', "a.confidentialite = 'normale'", "a.statut NOT IN ('abandonne', 'retire')", "sp.resultat LIKE 'adopte%'"];
       let rang = '0::float4';
@@ -41,17 +41,24 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
       else if (an.tsq) { const t = add(an.tsq); w.push(`si.tsv @@ to_tsquery('fr_unaccent', ${t})`); rang = `ts_rank(si.tsv, to_tsquery('fr_unaccent', ${t}))`; }
       if (annee) w.push(`EXTRACT(year FROM s.date_seance AT TIME ZONE 'Europe/Paris') = ${add(Number(annee))}`);
       if (matiereId) w.push(`a.matiere_id = ${add(Number(matiereId))}`);
+      if (natureId) w.push(`a.nature_id = ${add(Number(natureId))}`);
+      if (rubriqueId) w.push(`a.rubrique_id = ${add(Number(rubriqueId))}`);
+      if (rapporteurId) w.push(`a.rapporteur_id = ${add(Number(rapporteurId))}`);
+      if (directionCode) w.push(`a.direction_code = ${add(directionCode)}`);
+      if (instanceId) w.push(`s.instance_id = ${add(Number(instanceId))}`);
+      if (du) w.push(`s.date_seance >= ${add(du)}`);
+      if (au) w.push(`s.date_seance < (${add(au)}::date + interval '1 day')`);
       const from = `FROM actes a JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
         JOIN seances s ON s.id = it.seance_id AND ${CLOSES} JOIN instances i ON i.id = s.instance_id
         JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite' LEFT JOIN search_index si ON si.acte_id = a.id
-        LEFT JOIN ref_items m ON m.id = a.matiere_id WHERE ${w.join(' AND ')}`;
+        LEFT JOIN ref_items m ON m.id = a.matiere_id LEFT JOIN elus ra ON ra.id = a.rapporteur_id WHERE ${w.join(' AND ')}`;
       const total = (await db.get(`SELECT count(DISTINCT a.id)::int AS n ${from}`, p)).n;
-      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.direction_label, m.libelle AS matiere, it.numero, s.date_seance, i.nom AS instance, sp.resultat, ${rang} AS rang ${from}
+      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.direction_label, a.direction_code, m.libelle AS matiere, it.numero, s.date_seance, i.nom AS instance, sp.resultat, NULLIF(trim(ra.prenom || ' ' || ra.nom), '') AS rapporteur, ${rang} AS rang ${from}
         ORDER BY a.id, s.date_seance DESC`, p);
       rows.sort((x, y) => (Number(y.rang) - Number(x.rang)) || (new Date(y.date_seance) - new Date(x.date_seance)));
       return {
         total, items: rows.slice(Number(offset), Number(offset) + Number(limit)).map((r) => ({
-          acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, numero: r.numero, direction: r.direction_label, matiere: r.matiere, dateSeance: r.date_seance, instance: r.instance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null,
+          acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, numero: r.numero, direction: r.direction_label, directionCode: r.direction_code, matiere: r.matiere, rapporteur: r.rapporteur, dateSeance: r.date_seance, instance: r.instance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null,
         })),
       };
     },

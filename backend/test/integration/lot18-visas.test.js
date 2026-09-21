@@ -288,6 +288,33 @@ describe('visas habituels des délibérations similaires (IA-32)', () => {
   });
 });
 
+describe('bibliothèque des vus et considérants les plus utilisés (suggestion de rédaction)', () => {
+  it('classe par fréquence les lignes « Vu… »/« Considérant… » des actes adoptés, avec pastille de vérification', async () => {
+    await as(admin).post(V(), { cle: 'loi:2099-1', intitule: 'Loi n° 2099-1 (essai)', verifieLe: jour(0) });
+    await as(admin).post(V(), { cle: 'decret:2099-2', intitule: 'Décret n° 2099-2 (essai)', statut: 'abroge' });
+    const loi = "Vu la loi n° 2099-1 du 1er janvier 2099 ;";
+    const decret = "Vu le décret n° 2099-2 du 2 février 2099 ;";
+    const considere = 'Considérant que le projet présente un intérêt général ;';
+    for (let i = 1; i <= 3; i++) { const p = await nouvelActe(`Usuels passage ${i}`, { visas: [loi, considere, ...(i === 1 ? [decret] : [])].join('\n') }); await env.db.run("UPDATE actes SET statut = 'adopte' WHERE id = $1", [p.id]); }
+    await nouvelActe('Non adopté', { visas: 'Vu un texte isolé jamais adopté ;' });
+    const courant = await nouvelActe('Dossier courant', { visas: 'Vu le budget primitif ;' });
+
+    const r = await as(dupont).get(A(courant.id, '/visas/usuels'));
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const trouve = (re) => r.body.items.find((x) => re.test(x.texte));
+    expect(trouve(/2099-1/)).toMatchObject({ occurrences: 3, cle: 'loi:2099-1', etat: 'a_jour' });
+    expect(trouve(/2099-2/)).toMatchObject({ occurrences: 1, cle: 'decret:2099-2', etat: 'obsolete' });
+    expect(trouve(/intérêt général/)).toMatchObject({ occurrences: 3, etat: 'sans_reference' });
+    const occ = r.body.items.map((x) => x.occurrences);
+    expect([...occ].sort((a, b) => b - a)).toEqual(occ); // le plus fréquent d'abord
+    expect(r.body.items.some((x) => /jamais adopté/.test(x.texte))).toBe(false); // un brouillon ne compte pas
+    expect(r.body.bibliotheque.entrees).toBeGreaterThanOrEqual(2);
+    // qui ne voit pas le dossier ne peut pas lire la bibliothèque
+    const petit = await loginAs(env, 'petit', 'pw-petit');
+    expect((await as(petit).get(A(courant.id, '/visas/usuels'))).status).toBe(404);
+  });
+});
+
 describe('pré-contrôle à l\'entrée dans l\'étape juridique (IA-37)', () => {
   const propositions = async (id) => (await as(dupont).get(A(id, '/ia/propositions'))).body.items.filter((i) => i.analyse === 'references');
   it('dépose les constats quand le circuit entre dans l\'étape « Service juridique » — sans IA, sans bloquer', async () => {

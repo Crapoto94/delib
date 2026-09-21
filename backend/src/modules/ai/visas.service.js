@@ -322,6 +322,48 @@ function createVisas({ db, audit, actes, settings, log }) {
       };
     },
 
+    /**
+     * « Bibliothèque » des vus et considérants les plus utilisés (pratique de l'organisme) : les lignes « Vu… » et
+     * « Considérant que… » des délibérations adoptées, classées par fréquence. Chaque ligne est rapprochée de la
+     * bibliothèque de visas (statut, validité, dernière vérification) pour afficher une pastille de vérification.
+     */
+    async usuels(ctx, organismeId, acteId, { limit = 15 } = {}) {
+      const org = requireOrg(organismeId);
+      const acte = await actes.load(ctx, organismeId, acteId); // contrôle des droits de lecture du dossier
+      const lignes = await db.all(`SELECT t.markdown, a.id AS acte_id FROM tracked_texts t JOIN actes a ON a.id = t.acte_id
+        WHERE a.organisme_id = $1 AND a.id <> $2 AND t.kind = 'visas' AND a.statut IN ('adopte', 'executoire', 'publie', 'ar_recu', 'transmis', 'archive')`,
+      [org, acte.id]);
+      const compte = new Map(); const actesVus = new Set();
+      for (const l of lignes) {
+        actesVus.add(l.acte_id); const vues = new Set();
+        for (const brut of String(l.markdown || '').split(/\r?\n/)) {
+          const texte = brut.replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim();
+          const n = R.norm(texte);
+          if (!/^(vu\b|considerant\b)/.test(n) || vues.has(n)) continue;
+          vues.add(n);
+          const e = compte.get(n) || { texte, occurrences: 0 }; e.occurrences++; compte.set(n, e);
+        }
+      }
+      const mois = await validite(org); const ajd = new Date().toISOString().slice(0, 10);
+      const seance = await db.get("SELECT (date_seance AT TIME ZONE 'Europe/Paris')::date AS d FROM seances WHERE id = COALESCE($1::int, $2::int)", [acte.seance_id ?? null, acte.seance_visee_id ?? null]);
+      const ref = iso(seance?.d) || ajd;
+      const lib = new Map((await db.all('SELECT * FROM visa_library WHERE organisme_id = $1', [org])).map((e) => [e.cle, e]));
+      const RANG_ETAT = { obsolete: 0, a_revoir: 1, a_verifier: 2, a_jour: 3 };
+      const items = [...compte.values()].sort((a, b) => b.occurrences - a.occurrences || a.texte.length - b.texte.length).slice(0, Math.max(1, Math.min(50, limit))).map((l) => {
+        const refs = R.extraire({ id: null, kind: 'visas', markdown: l.texte });
+        let pire = null;
+        for (const r of refs) {
+          const e = lib.get(r.cle);
+          const etat = e ? jauger(e, ref, mois, ajd).etat : 'a_verifier';
+          if (!pire || RANG_ETAT[etat] < RANG_ETAT[pire.etat]) pire = { etat, cle: r.cle, libelle: r.libelle, intitule: e?.intitule ?? r.libelle, verifieLe: e ? iso(e.verifie_le) : null };
+        }
+        return pire
+          ? { texte: l.texte, occurrences: l.occurrences, ...pire }
+          : { texte: l.texte, occurrences: l.occurrences, etat: 'sans_reference', cle: null, libelle: null, intitule: null, verifieLe: null };
+      });
+      return { items, dateReference: ref, actesAnalyses: actesVus.size, bibliotheque: { entrees: lib.size, verifMois: mois } };
+    },
+
     /** L'identifiant d'une matière et de tous ses ancêtres (une règle posée sur « Finances » vaut pour ses sous-matières). */
     async chaineMatiere(organismeId, matiereId) {
       if (!matiereId) return [];

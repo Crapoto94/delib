@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, HelpCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, GraduationCap, HelpCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '../auth';
 import { PageTitle } from '../ui';
 import { ACCES_LABEL, ARTICLES, peutVoir } from './articles';
 import { Article } from './ui';
 import Documents from './Documents';
+import AideIa from './AideIa';
 
 export function useAideDisponible() {
   const { isAdmin, isScc } = useAuth();
@@ -16,6 +17,8 @@ export function AideMenu() {
   const { isAdmin, isScc } = useAuth();
   const dispo = ARTICLES.filter((a) => peutVoir(a, isScc, isAdmin));
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  const surDossier = /^\/dossiers\/[^/]+/.test(pathname);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
   return (
@@ -28,6 +31,10 @@ export function AideMenu() {
       {open && (
         <div role="menu" className="card absolute right-0 z-40 mt-2 w-80 p-1 shadow-float">
           <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-mute">Aides disponibles pour votre profil</div>
+          <NavLink role="menuitem" to="/aide/ia" onClick={() => setOpen(false)} className="flex items-start gap-3 rounded px-3 py-2 hover:bg-soft">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-head" />
+            <span><span className="block text-[13px] font-semibold text-ink">Aide IA (manifeste)</span><span className="block text-[12px] text-mute">Posez une question : réponse fondée sur le manifeste.</span></span>
+          </NavLink>
           {dispo.map((a) => (
             <NavLink key={a.code} role="menuitem" to={`/aide/${a.code}`} onClick={() => setOpen(false)} className="flex items-start gap-3 rounded px-3 py-2 hover:bg-soft">
               <a.Icone className="mt-0.5 h-4 w-4 shrink-0 text-head" />
@@ -35,6 +42,11 @@ export function AideMenu() {
             </NavLink>
           ))}
           <div className="mt-1 border-t border-line pt-1">
+            {surDossier && (
+              <button role="menuitem" onClick={() => { setOpen(false); window.dispatchEvent(new Event('vibedelib:guide-dossier')); }} className="flex w-full items-start gap-3 rounded px-3 py-2 text-left hover:bg-soft">
+                <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-head" />
+                <span><span className="block text-[13px] font-semibold text-ink">Réafficher le guide du dossier</span><span className="block text-[12px] text-mute">Del-IA, l'assistant pas à pas de ce dossier.</span></span>
+              </button>)}
             <Link role="menuitem" to="/aide" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-[13px] font-semibold text-action hover:bg-soft">Ouvrir le centre d'aide</Link>
           </div>
         </div>
@@ -60,6 +72,11 @@ function Hub() {
   return (
     <div>
       <PageTitle title="Centre d'aide" sub="Comment utiliser VibeDélib, expliqué simplement. Les aides affichées dépendent de votre profil." />
+      <Link to="/aide/ia" className="card group mb-4 flex items-start gap-4 p-5 transition-shadow hover:shadow-lift">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-action/10 text-action"><Sparkles className="h-5 w-5" /></span>
+        <span className="flex-1"><span className="block font-semibold text-ink">Aide IA — interroger le manifeste</span><span className="mt-1 block text-[13px] leading-relaxed text-mute">Posez une question en langage courant : la réponse s'appuie uniquement sur le manifeste de l'application.</span></span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-action" />
+      </Link>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {dispo.map((a) => <CarteArticle key={a.code} a={a} />)}
       </div>
@@ -151,6 +168,7 @@ export default function Aide() {
   return (
     <Routes>
       <Route index element={<Hub />} />
+      <Route path="ia" element={<AideIa />} />
       {dispo.map((a) => <Route key={a.code} path={a.code} element={<ArticlePage article={a} dispo={dispo} />} />)}
       <Route path="*" element={<Navigate to="/aide" replace />} />
     </Routes>

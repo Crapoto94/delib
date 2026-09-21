@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentName } from './AgentName';
-import { CheckCircle2, Eye, Sparkles, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Eye, Info, Sparkles, X, XCircle } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { dt } from './format';
 import { Loading } from './ui';
 import RichEditor, { EditorMode } from './RichEditor';
 import AssistantPanel from './AssistantPanel';
+import BibliothequeVisas from './BibliothequeVisas';
 import { useIa } from './useIa';
 
 export const KIND_LABEL: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispositif: 'Délibéré' };
@@ -64,6 +65,8 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const change = (md: string) => { setText(md); latest.current.text = md; latest.current.dirty = true; setState('dirty'); clearTimeout(timer.current); timer.current = setTimeout(commit, 1200); };
+  /** Insère un visa depuis la bibliothèque, à la fin du texte (une ligne par visa). */
+  const inserer = (visa: string) => { const base = text.replace(/\s+$/, ''); change(`${base ? `${base}\n` : ''}${visa}\n`); };
   const resolve = async (decision: 'accept' | 'reject', cid?: string) => {
     try { await commit(); await api.post(`${base}/modifications`, cid ? { decision, cids: [cid] } : { decision, all: true }); latest.current.dirty = false; await load(); onChanged(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
@@ -76,6 +79,8 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const canEdit = editable && view.canEdit;
   const tracking = view.tracking && view.changes?.length > 0;
   const editing = canEdit && mode === 'edition';
+  const visas = t.kind === 'visas';
+  const asideVisible = assistantOn || view.tracking || visas;
 
   return (
     <div className="relative flex h-full min-h-0">
@@ -85,17 +90,22 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
             <button key={k} className={`rounded px-2 py-1 font-semibold ${mode === k ? 'bg-surface shadow-card' : ''}`} onClick={async () => { await commit(); setMode(k); }}>{l}</button>)}</div>}
           {canEdit && <span className={state === 'error' ? 'font-semibold text-ko' : 'text-mute'}>{state === 'saving' ? 'Enregistrement…' : state === 'dirty' ? 'Modifications en attente…' : state === 'error' ? 'Non enregistré' : `✓ Enregistré · version ${view.version}`}</span>}
           {!canEdit && <span className="text-mute">Lecture seule à ce stade du circuit.</span>}
-          <span className="ml-auto flex gap-2">{assistantOn && <button className="btn-secondary !py-1 lg:!hidden" onClick={() => setDrawer(!drawer)} aria-expanded={drawer}><Sparkles className="h-3.5 w-3.5" /> Assistant IA</button>}
+          <span className="ml-auto flex gap-2">{asideVisible && <button className="btn-secondary !py-1 lg:!hidden" onClick={() => setDrawer(!drawer)} aria-expanded={drawer}><Sparkles className="h-3.5 w-3.5" /> {assistantOn ? 'Assistant IA' : 'Bibliothèque de visas'}</button>}
           <button className="btn-secondary !py-1" onClick={preview}><Eye className="h-3.5 w-3.5" /> Aperçu mis en page</button></span>
         </div>
         {conflict && <div role="alert" className="border-b border-warn/30 bg-warn-bg px-4 py-2 text-warn">Ce texte a été modifié par quelqu'un d'autre. <button className="font-semibold underline" onClick={async () => { latest.current.dirty = false; setConflict(false); await load(); }}>Recharger sa version</button> (vos dernières frappes seront perdues).</div>}
+        {editing && <div className="flex items-center gap-2 border-b border-line bg-action/5 px-4 py-1.5 text-[12px] leading-snug text-slate-700">
+          <Info className="h-3.5 w-3.5 shrink-0 text-action" aria-hidden="true" />
+          <span>Vos modifications sont <b>enregistrées automatiquement</b> au fil de la frappe — rien à valider. Cliquez sur <b>« Terminer »</b> (en haut à droite) quand le texte est vraiment fini.</span>
+        </div>}
         <div className="min-h-0 flex-1">
           {editing ? <RichEditor value={text} onChange={change} mode={t.kind as EditorMode} placeholder={PLACEHOLDER[t.kind]} />
             : <div className="h-full overflow-auto bg-soft p-4 md:p-8"><div className="mx-auto min-h-[60vh] max-w-[820px] rounded-lg border border-line bg-surface px-6 py-8 md:px-14">
               {view.markdown ? (mode === 'suivi' && view.tracking ? <SpanView spans={view.spans} /> : <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{mode === 'propre' ? view.markdown : view.markdown}</div>) : <span className="text-mute">Texte vide.</span>}</div></div>}
         </div>
       </div>
-      <aside className={`${!assistantOn && !view.tracking ? '!hidden' : ''} ${drawer ? 'absolute inset-y-0 right-0 z-10 flex shadow-float' : 'hidden'} w-80 shrink-0 flex-col overflow-hidden border-l border-line bg-surface lg:static lg:flex lg:shadow-none`} aria-label="Assistant et modifications suivies">
+      <aside className={`${!asideVisible ? '!hidden' : ''} ${drawer ? 'absolute inset-y-0 right-0 z-10 flex shadow-float' : 'hidden'} w-80 shrink-0 flex-col overflow-hidden border-l border-line bg-surface lg:static lg:flex lg:shadow-none`} aria-label="Assistant et modifications suivies">
+        {visas && <BibliothequeVisas acteId={acte.id} peutInserer={canEdit && mode === 'edition'} onInserer={inserer} toast={toast} />}
         {view.tracking && assistantOn && <div className="flex shrink-0 border-b border-line" role="tablist">{([['assistant', 'Assistant IA'], ['suivi', `Modifications${tracking ? ` (${view.changes.length})` : ''}`]] as const).map(([k, l]) =>
           <button key={k} role="tab" aria-selected={side === k} onClick={() => setSide(k)} className={`flex-1 px-3 py-2 text-[12px] font-semibold ${side === k ? 'border-b-2 border-action text-action' : 'text-mute'}`}>{l}</button>)}</div>}
         {assistantOn && (side === 'assistant' || !view.tracking) && (

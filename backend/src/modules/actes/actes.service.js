@@ -192,6 +192,25 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       return toActe(after);
     },
 
+    /**
+     * Mode « dossier assisté » : un guide pas à pas accompagne la rédaction. L'état vit dans `custom.assiste`
+     * (comme le marqueur `custom.entrainement`) : `actif`, étapes conseillées passées (`passees`), accueil vu.
+     * Seuls `assiste` et les autres clés existantes sont touchées : les champs personnalisés ne sont jamais écrasés.
+     */
+    async setAssiste(ctx, organismeId, id, { actif, passees, bienvenue } = {}) {
+      const a = await svc.load(ctx, organismeId, id, { edit: true });
+      const custom = { ...(a.custom || {}) };
+      const cur = custom.assiste && typeof custom.assiste === 'object' && !Array.isArray(custom.assiste) ? custom.assiste : {};
+      const next = { ...cur };
+      if (actif !== undefined) next.actif = !!actif;
+      if (passees !== undefined) next.passees = [...new Set(passees)];
+      if (bienvenue !== undefined) next.bienvenue = !!bienvenue;
+      custom.assiste = next;
+      const after = await db.get('UPDATE actes SET custom = $2::jsonb WHERE id = $1 RETURNING *', [id, JSON.stringify(custom)]);
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.assiste', entity: 'actes', entityId: id, after: { actif: next.actif, passees: next.passees } });
+      return toActe(after);
+    },
+
     // ---- délibérations d'un dossier (D5) ------------------------------------------------------------------------------
     async addDeliberation(ctx, organismeId, acteId, { titre }) {
       const a = await svc.load(ctx, organismeId, acteId, { edit: true });

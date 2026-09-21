@@ -5,7 +5,7 @@ import { api, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { AgentName } from '../AgentName';
 import { dt } from '../format';
-import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutBadge, useLoad } from '../ui';
+import { Badge, Empty, ErrorBox, Loading, Pagination, PageTitle, StatutBadge, useLoad } from '../ui';
 import { Select } from '../Select';
 
 const ROLES: [string, string][] = [['', 'Tous mes rôles'], ['redacteur', 'Rédacteur'], ['co_redacteur', 'Co-rédacteur'], ['valideur', 'Valideur'], ['remplacant', 'Remplaçant'], ['commentateur', 'Commentaire'], ['participant', 'Dans le circuit']];
@@ -19,24 +19,28 @@ export default function MesActes() {
 
 function Liste() {
   const { org } = useAuth(); const o = org!.id;
-  const [q, setQ] = useState(''); const [role, setRole] = useState(''); const [annee, setAnnee] = useState('');
-  const d = useLoad(async () => (await api.get(orgPath(o, '/mes-actes'), { params: { q: q || undefined, role: role || undefined, annee: annee || undefined, limit: 100 } })).data, [o, q, role, annee]);
+  const [q, setQ] = useState(''); const [role, setRole] = useState(''); const [annee, setAnnee] = useState(''); const [page, setPage] = useState(1);
+  const LIMIT = 50;
+  const d = useLoad(async () => (await api.get(orgPath(o, '/mes-actes'), { params: { q: q || undefined, role: role || undefined, annee: annee || undefined, limit: LIMIT, offset: (page - 1) * LIMIT } })).data, [o, q, role, annee, page]);
   const ans = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
   return (
     <div>
       <PageTitle title="Mes actes" sub="Les dossiers pour lesquels j’ai eu un rôle à un moment (rédaction, validation, remplacement, commentaire), avec leur trajet complet — circuit, modifications, amendements. Pour les délibérations de la collectivité, voir la Bibliothèque." />
       <div className="card mb-4 flex flex-wrap items-center gap-2 p-3">
-        <input className="input max-w-xs" placeholder="Titre ou n° de suivi…" aria-label="Rechercher dans mes actes" value={q} onChange={(e) => setQ(e.target.value)} />
-        <Select className="input w-auto" aria-label="Mon rôle" value={role} onChange={(e) => setRole(e.target.value)}>{ROLES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
-        <Select className="input w-auto" aria-label="Année de création" value={annee} onChange={(e) => setAnnee(e.target.value)}><option value="">Toutes les années</option>{ans.map((a) => <option key={a} value={a}>{a}</option>)}</Select>
+        <input className="input max-w-xs" placeholder="Titre ou n° de suivi…" aria-label="Rechercher dans mes actes" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+        <Select className="input w-auto" aria-label="Mon rôle" value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }}>{ROLES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
+        <Select className="input w-auto" aria-label="Année de création" value={annee} onChange={(e) => { setAnnee(e.target.value); setPage(1); }}><option value="">Toutes les années</option>{ans.map((a) => <option key={a} value={a}>{a}</option>)}</Select>
       </div>
       {d.loading && !d.data ? <Loading /> : !d.data ? <ErrorBox msg={d.error} /> : !d.data.items.length ? <div className="card"><Empty>Aucun acte ne correspond.</Empty></div> : (
-        <div className="card overflow-x-auto"><table className="w-full"><thead><tr><th>Dossier</th><th>Mes rôles</th><th>Statut</th><th>Séance</th><th /></tr></thead><tbody>{d.data.items.map((a: any) => (
-          <tr key={a.acteId}><td><b>{a.titre}</b><div className="text-[12px] text-mute">n° {a.numeroSuivi} · créé le {dt(a.creeLe, { dateStyle: 'short' })}</div></td>
-            <td className="space-x-1">{a.roles.map((r: any) => <Badge key={r.code} tone="blue">{r.label}</Badge>)}</td>
-            <td><StatutBadge statut={a.statut} />{a.resultatLabel && <div className="mt-1 text-[11px] text-mute">{a.resultatLabel}</div>}</td>
-            <td className="text-[12px]">{a.dateSeance ? dt(a.dateSeance, { dateStyle: 'medium' }) : '—'}</td>
-            <td className="text-right"><Link className="btn-secondary !py-1" to={`/mes-actes/${a.acteId}`}>Voir le trajet</Link></td></tr>))}</tbody></table></div>)}
+        <>
+          <div className="card overflow-x-auto"><table className="w-full"><thead><tr><th>Dossier</th><th>Mes rôles</th><th>Statut</th><th>Séance</th><th /></tr></thead><tbody>{d.data.items.map((a: any) => (
+            <tr key={a.acteId}><td><b>{a.titre}</b><div className="text-[12px] text-mute">n° {a.numeroSuivi} · créé le {dt(a.creeLe, { dateStyle: 'short' })}</div></td>
+              <td className="space-x-1">{a.roles.map((r: any) => <Badge key={r.code} tone="blue">{r.label}</Badge>)}</td>
+              <td><StatutBadge statut={a.statut} />{a.resultatLabel && <div className="mt-1 text-[11px] text-mute">{a.resultatLabel}</div>}</td>
+              <td className="text-[12px]">{a.dateSeance ? dt(a.dateSeance, { dateStyle: 'medium' }) : '—'}</td>
+              <td className="text-right"><Link className="btn-secondary !py-1" to={`/mes-actes/${a.acteId}`}>Voir le trajet</Link></td></tr>))}</tbody></table></div>
+          <Pagination className="mt-3" total={d.data.total} limit={LIMIT} page={page} onPage={setPage} itemLabel="acte" />
+        </>)}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Loading, PageTitle, useLoad } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
 import { SeanceVisee } from '../SeanceVisee';
+import { Mascotte } from '../DossierAssiste';
 
 export default function Dashboard() {
   const { me, org } = useAuth();
@@ -20,7 +21,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <PageTitle title={`Bonjour ${first ?? ''}`} sub={`Voici ce qui vous attend à ${org!.nom}.`} actions={<Link to="/dossiers?nouveau=1" className="btn-primary"><PenLine className="h-4 w-4" /> Nouveau dossier</Link>} />
+      <PageTitle title={`Bonjour ${first ?? ''}`} sub={`Voici ce qui vous attend à ${org!.nom}.`} actions={
+        <>
+          <Link to="/dossiers?nouveau=1&assiste=1" className="btn-secondary"><Mascotte className="h-4 w-4" humeur="content" /> Dossier assisté</Link>
+          <Link to="/dossiers?nouveau=1" className="btn-primary"><PenLine className="h-4 w-4" /> Nouveau dossier</Link>
+        </>
+      } />
 
       <section aria-labelledby="atraiter" className="card">
         <div className="flex items-center gap-2 border-b border-line px-5 py-3"><ClipboardCheck className="h-5 w-5 text-action" /><h3 id="atraiter">À traiter</h3>{todo.data && <Badge tone="blue">{todo.data.length}</Badge>}</div>

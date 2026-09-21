@@ -1,7 +1,7 @@
-// Synchronise les documents juridiques de référence (CGU.md et LICENCE.md à la
-// racine du dépôt) vers frontend/src/legal, d'où l'application les importe pour
-// les afficher (routes /cgu et /licence). La racine reste la source unique :
-// on modifie CGU.md ou LICENCE.md à la racine, jamais la copie.
+// Synchronise les documents de référence à la racine du dépôt (CGU.md,
+// LICENCE.md, MANIFEST.md) vers frontend/src/legal, d'où l'application les
+// importe pour les afficher (routes /cgu, /licence et /manifest). La racine
+// reste la source unique : on modifie ces documents à la racine, jamais la copie.
 //
 // Hors contexte Docker (où seuls les fichiers de frontend/ sont copiés), les
 // sources de la racine sont absentes : le script le signale et laisse en place
@@ -16,7 +16,7 @@ const frontend = resolve(here, '..');
 const racine = resolve(frontend, '..');
 const dest = resolve(frontend, 'src', 'legal');
 
-const FICHIERS = ['CGU.md', 'LICENCE.md'];
+const FICHIERS = ['CGU.md', 'LICENCE.md', 'MANIFEST.md'];
 await mkdir(dest, { recursive: true });
 
 let copies = 0;

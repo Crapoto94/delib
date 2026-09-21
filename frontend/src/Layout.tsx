@@ -148,6 +148,8 @@ export default function Layout() {
         <Link to="/cgu" className="underline hover:text-ink">Conditions d'utilisation</Link>
         <span aria-hidden>·</span>
         <Link to="/licence" className="underline hover:text-ink">Licence (PolyForm Noncommercial 1.0.0)</Link>
+        <span aria-hidden>·</span>
+        <Link to="/manifest" className="underline hover:text-ink">Manifeste de l'application</Link>
       </footer>
     </div>
   );

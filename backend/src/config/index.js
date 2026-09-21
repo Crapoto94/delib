@@ -61,11 +61,20 @@ const EnvSchema = z.object({
   SCHEDULER_ENABLED: flag('false'),
   PUBLIC_BASE_URL: z.string().default('http://localhost:5160'),
   ANNOTATIONS_KEY: z.string().optional(),
+  // Reprise d'historique AIRS DELIB : connexion directe (lecture seule) à la base Oracle d'origine.
+  AIRS_ORACLE_HOST: z.string().optional(),
+  AIRS_ORACLE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  AIRS_ORACLE_SERVICE: z.string().optional(),
+  AIRS_ORACLE_USER: z.string().optional(),
+  AIRS_ORACLE_PASSWORD: z.string().optional(),
 });
 
 function loadEnvFile() {
   const file = process.env.ENV_FILE || path.resolve(__dirname, '../../../.env');
   require('dotenv').config({ path: file, quiet: true }); // n'écrase jamais une variable déjà définie
+  // Connexion Oracle AIRS DELIB : fichier séparé (secrets de la base d'origine), ignoré par git.
+  const airsFile = process.env.AIRS_ENV_FILE || path.resolve(__dirname, '../../../.env.airs');
+  require('dotenv').config({ path: airsFile, quiet: true });
 }
 
 function buildConfig(env = process.env) {
@@ -116,6 +125,15 @@ function buildConfig(env = process.env) {
     schedulerEnabled: e.SCHEDULER_ENABLED,
     publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/+$/, ''),
     annotationsKey: e.ANNOTATIONS_KEY || null,
+    airs: Object.freeze({
+      enabled: !!(e.AIRS_ORACLE_HOST && e.AIRS_ORACLE_PORT && e.AIRS_ORACLE_SERVICE && e.AIRS_ORACLE_USER && e.AIRS_ORACLE_PASSWORD),
+      host: e.AIRS_ORACLE_HOST || null,
+      port: e.AIRS_ORACLE_PORT || null,
+      service: e.AIRS_ORACLE_SERVICE || null,
+      user: e.AIRS_ORACLE_USER || null,
+      password: e.AIRS_ORACLE_PASSWORD || null,
+      connectString: e.AIRS_ORACLE_HOST ? `${e.AIRS_ORACLE_HOST}:${e.AIRS_ORACLE_PORT}/${e.AIRS_ORACLE_SERVICE}` : null,
+    }),
   });
 }
 

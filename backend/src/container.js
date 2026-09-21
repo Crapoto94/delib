@@ -70,7 +70,7 @@ const { createAiQueue } = require('./modules/ai/queue');
 const { createVisas } = require('./modules/ai/visas.service');
 const { createAirs } = require('./modules/import-airs/airs.service');
 
-function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard }) {
+function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard, airsSource }) {
   assertAuthPort(ad);
   assertMailPort(mail);
   assertAiPort(aiAdapter);
@@ -161,7 +161,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const apiKeys = createApiKeys({ db, audit, log });
   const externe = createExterne({ db, render, storage });
   const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
-  const airs = createAirs({ db, audit, dir }); // import de l'historique AIRS DELIB (section 25 bis, D111)
+  const airs = createAirs({ db, audit, dir, source: airsSource }); // import de l'historique AIRS DELIB (section 25 bis, D111)
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
   // sauvegarde nocturne (SAV-04) : plateforme entière, donc une seule fois par tick — portée par l'organisme par défaut

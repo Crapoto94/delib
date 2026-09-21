@@ -67,6 +67,9 @@ module.exports = ({ makeRouter, visas, ai }) => {
 
   // sur un dossier
   const a = makeRouter('/api/v1/organismes/:orgId/actes/:id');
+  a.get('/visas/usuels', { summary: 'Bibliothèque des vus et considérants les plus utilisés, avec pastille de vérification', tags: T, org: true, params: IdP, query: z.object({ limit: z.coerce.number().int().min(1).max(50).default(15) }),
+    description: "Les lignes « Vu… » et « Considérant que… » les plus fréquentes des délibérations adoptées de l'organisme, rapprochées de la bibliothèque de visas : vérifié, à revoir, obsolète, à faire vérifier ou sans référence. Sert de bibliothèque de suggestion à la rédaction (sans IA, sans écriture)." },
+  async (req, res) => res.json(await visas.usuels(req.ctx, req.org.id, req.valid.params.id, req.valid.query)));
   a.get('/ia/references', { summary: 'Rapport de vérification des références juridiques du dossier (sans IA, sans écriture)', tags: T, org: true, params: IdP,
     description: "Références extraites par règles (codes et articles, lois, décrets, arrêtés, délibérations antérieures), rapprochées de la bibliothèque à la date de la séance visée : à jour, à revoir, obsolète, introuvable. Ajoute les constats des listes de contrôle et l'ordre conventionnel des visas." },
   async (req, res) => res.json(await visas.rapport(req.ctx, req.org.id, req.valid.params.id)));

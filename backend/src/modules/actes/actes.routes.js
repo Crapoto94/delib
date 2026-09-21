@@ -28,6 +28,10 @@ const ListQ = z.object({
 const Delib = z.object({ titre: z.string().trim().min(3).max(500) });
 const DelibUpd = z.object({ titre: z.string().trim().min(3).max(500).optional(), ordre: z.number().int().min(1).optional() });
 const Abandon = z.object({ motif: z.string().trim().min(3).max(1000) });
+const Assiste = z.object({
+  actif: z.boolean().optional(), bienvenue: z.boolean().optional(),
+  passees: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
+});
 
 module.exports = ({ makeRouter, actes }) => {
   const r = makeRouter('/api/v1/organismes/:orgId/actes');
@@ -49,6 +53,11 @@ module.exports = ({ makeRouter, actes }) => {
     summary: "Modifie la fiche d'un acte", tags: ['actes'], org: true, params: IdP, body: Update,
     description: "Le rédacteur tant que l'acte est brouillon ou à modifier ; en circuit, le détenteur d'une étape éditable. Tout valideur du circuit peut changer la séance visée (CRE-09). Un changement d'incidence financière ou de montant recalcule le circuit (CIR-14).",
   }, async (req, res) => res.json(await actes.update(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
+  r.put('/:id/assiste', {
+    summary: 'Active/désactive le mode « dossier assisté » et enregistre sa progression', tags: ['actes'], org: true, params: IdP, body: Assiste,
+    description: "Le guide pas à pas de rédaction : `actif` active ou coupe l'aide, `passees` mémorise les étapes conseillées passées, `bienvenue` l'accueil déjà vu. Réservé à qui peut modifier l'acte.",
+  }, async (req, res) => res.json(await actes.setAssiste(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
 
   r.post('/:id/abandon', { summary: 'Abandonne un acte (motif obligatoire, jamais de suppression)', tags: ['actes'], org: true, params: IdP, body: Abandon },
     async (req, res) => res.json(await actes.abandon(req.ctx, req.org.id, req.valid.params.id, req.valid.body.motif)));
