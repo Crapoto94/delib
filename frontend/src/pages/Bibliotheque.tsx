@@ -1,7 +1,7 @@
 import { FormEvent, Fragment, useState } from 'react';
 import { BookOpen, FileText, Paperclip, ScrollText, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
-import { api, blobErrMsg, errMsg, openPdf, org as orgPath } from '../api';
-import { showPdf } from '../PdfViewer';
+import { api, errMsg, openPdf, org as orgPath } from '../api';
+import { showDocs } from '../PdfViewer';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Pagination, PageTitle, useLoad, useToast } from '../ui';
@@ -12,15 +12,10 @@ function Fiche({ acteId, onClose, onDone }: { acteId: number; onClose: () => voi
   const { org, isScc } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const d = useLoad(async () => (await api.get(orgPath(o, `/bibliotheque/actes/${acteId}`))).data, [acteId]);
   const pdf = async (cible: string, titre: string) => { const m = await openPdf(() => api.get(orgPath(o, `/bibliotheque/actes/${acteId}/pdf`), { params: { cible }, responseType: 'blob' }), titre); if (m) toast(m, 'ko'); };
-  const ouvrirAnnexe = async (x: any, format?: 'pdf') => {
-    try {
-      const r = await api.get(orgPath(o, `/actes/${acteId}/annexes/${x.id}/file`), { params: format ? { format } : {}, responseType: 'blob' });
-      if (format === 'pdf' || (x.mime || '').includes('pdf')) { showPdf(r.data, x.titre || x.nom); return; }
-      const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = x.nom || x.titre || 'annexe'; a.click(); URL.revokeObjectURL(url);
-    } catch (e) { toast(await blobErrMsg(e), 'ko'); }
-  };
   const supprimer = async () => { if (!window.confirm('Retirer cette délibération de la bibliothèque ? L’acte est conservé, mais il n’y sera plus consultable.')) return; try { await api.delete(orgPath(o, `/bibliotheque/actes/${acteId}`)); toast('Délibération retirée de la bibliothèque'); onDone(); } catch (e) { toast(errMsg(e), 'ko'); } };
   const f = d.data;
+  const docsAnnexes = () => (f?.annexes ?? []).map((x: any) => ({ title: x.titre || x.nom || 'Annexe', fetch: async () => (await api.get(orgPath(o, `/actes/${acteId}/annexes/${x.id}/file`), { params: { format: 'pdf' }, responseType: 'blob' })).data }));
+  const ouvrirAnnexes = (i: number) => showDocs(docsAnnexes(), i);
   return (
     <Modal title={f ? <span className={f.airs ? 'text-purple-700' : undefined}>{`${f.numero ? `${f.numero} — ` : ''}${f.titre}`}</span> : 'Délibération'} onClose={onClose} wide>
       {d.loading ? <Loading /> : !f ? <ErrorBox msg={d.error} /> : (
@@ -42,9 +37,9 @@ function Fiche({ acteId, onClose, onDone }: { acteId: number; onClose: () => voi
             </section>)}
           {[['Exposé des motifs', f.expose], ['Visas et considérants', f.visas], ['Dispositif', f.dispositif]].map(([t, md]) => md ? (
             <section key={t}><h3 className="mb-1">{t}</h3><div className="whitespace-pre-wrap rounded border border-line bg-soft/40 p-3 text-[13px] leading-6">{md}</div></section>) : null)}
-          {f.annexes.length > 0 && <section><h3 className="mb-1">Annexes publiables</h3><ul className="space-y-1 text-[13px]">{f.annexes.map((x: any) => {
+          {f.annexes.length > 0 && <section><h3 className="mb-1">Annexes publiables <span className="text-[12px] font-normal text-mute">(cliquez pour ouvrir la visionneuse, naviguez de l’une à l’autre)</span></h3><ul className="space-y-1 text-[13px]">{f.annexes.map((x: any, i: number) => {
             const nom = x.nom || x.titre || ''; const ext = (nom.includes('.') ? nom.split('.').pop() : (x.mime || '').includes('pdf') ? 'pdf' : '') || '';
-            return <li key={x.id} className="flex flex-wrap items-center gap-2"><button className="font-semibold text-head hover:underline" onClick={() => ouvrirAnnexe(x)}><FileText className="mr-1 inline h-3.5 w-3.5" /> {x.titre}</button>{ext && <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-mute">{ext}</span>}{x.pdf && <button className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-action hover:underline" title="Voir le PDF" onClick={() => ouvrirAnnexe(x, 'pdf')}>pdf</button>}</li>;
+            return <li key={x.id} className="flex flex-wrap items-center gap-2"><button className="font-semibold text-head hover:underline" onClick={() => ouvrirAnnexes(i)}><FileText className="mr-1 inline h-3.5 w-3.5" /> {x.titre}</button>{ext && <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-mute">{ext}</span>}</li>;
           })}</ul></section>}
           <p className="text-[12px] text-mute">Consultation seule. Pour suivre le parcours d’un dossier auquel vous avez participé, ouvrez <b>Mes actes</b>.</p>
           {isScc && <div className="flex justify-end border-t border-line pt-3"><button className="btn-ko" onClick={supprimer}><Trash2 className="h-4 w-4" /> Supprimer de la bibliothèque</button></div>}
@@ -85,6 +80,14 @@ export default function Bibliotheque() {
   const appliquer = (k: keyof Filtres) => (e: any) => { const next = { ...f, [k]: e.target.value }; setF(next); setPage(1); setApplique(next); };
   /** Ouvre directement un PDF de la délibération (exposé des motifs = rapport, ou extrait du registre = délibération). */
   const pdfActe = async (acteId: number, cible: string, titre: string) => { const m = await openPdf(() => api.get(orgPath(o, `/bibliotheque/actes/${acteId}/pdf`), { params: { cible }, responseType: 'blob' }), titre); if (m) toast(m, 'ko'); };
+  /** Trombone : ouvre la visionneuse directement sur les pièces jointes de l'acte (navigation de l'une à l'autre). */
+  const ouvrirPj = async (acteId: number) => {
+    try {
+      const f = (await api.get(orgPath(o, `/bibliotheque/actes/${acteId}`))).data;
+      if (!f.annexes?.length) { setOuvert(acteId); return; }
+      showDocs(f.annexes.map((x: any) => ({ title: x.titre || x.nom || 'Annexe', fetch: async () => (await api.get(orgPath(o, `/actes/${acteId}/annexes/${x.id}/file`), { params: { format: 'pdf' }, responseType: 'blob' })).data })), 0);
+    } catch (e) { toast(errMsg(e), 'ko'); }
+  };
   return (
     <div>
       <PageTitle title="Bibliothèque des actes" sub="Les délibérations adoptées de la collectivité (séances closes) : texte, exposé des motifs, extrait du registre. Consultation ouverte à tous les agents." />
@@ -123,13 +126,10 @@ export default function Bibliotheque() {
             <td className="text-[12px]">{dt(r.dateSeance, { dateStyle: 'medium' })}<div className="text-mute">{r.instance}</div></td><td><Badge tone="ok">{r.resultatLabel}</Badge></td>
             <td className="whitespace-nowrap text-right">
               <button className="btn-secondary mr-1 !px-2 !py-1" title="Exposé des motifs" aria-label="Exposé des motifs" onClick={() => pdfActe(r.acteId, 'expose', `Exposé des motifs — ${r.titre}`)}><FileText className="h-3.5 w-3.5" /></button>
-              {r.courant ? (<>
-                <button className="btn-secondary mr-1 !px-2 !py-1" title="Visas et considérants" aria-label="Visas et considérants" onClick={() => pdfActe(r.acteId, 'visas', `Visas et considérants — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>
-                <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibéré" aria-label="Délibéré" onClick={() => pdfActe(r.acteId, 'dispositif', `Délibéré — ${r.titre}`)}><FileText className="h-3.5 w-3.5" /></button>
-              </>) : (
-                <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibération (extrait du registre)" aria-label="Extrait du registre" onClick={() => pdfActe(r.acteId, 'extrait', `Extrait du registre — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>
-              )}
-              {r.annexesCount > 0 && <button className="btn-secondary mr-1 !px-2 !py-1" title={`${r.annexesCount} annexe(s)${r.annexesNonPubliables ? ` dont ${r.annexesNonPubliables} non publiable(s)` : ''}`} onClick={() => setOuvert(r.acteId)}><Paperclip className="h-3.5 w-3.5" /> {r.annexesCount}{r.annexesNonPubliables > 0 && <span className="ml-1 font-semibold text-ko">({r.annexesNonPubliables})</span>}</button>}
+              {!r.archive
+                ? <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibération — visas et considérants, délibéré (au modèle)" aria-label="Délibération" onClick={() => pdfActe(r.acteId, 'deliberation', `Délibération — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>
+                : <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibération (extrait du registre)" aria-label="Extrait du registre" onClick={() => pdfActe(r.acteId, 'extrait', `Extrait du registre — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>}
+              {r.annexesCount > 0 && <button className="btn-secondary mr-1 !px-2 !py-1" title={`Voir les ${r.annexesCount} annexe(s)${r.annexesNonPubliables ? ` dont ${r.annexesNonPubliables} non publiable(s)` : ''}`} onClick={() => ouvrirPj(r.acteId)}><Paperclip className="h-3.5 w-3.5" /> {r.annexesCount}{r.annexesNonPubliables > 0 && <span className="ml-1 font-semibold text-ko">({r.annexesNonPubliables})</span>}</button>}
               <button className="btn-secondary !px-2 !py-1" title="Consulter la fiche" aria-label="Consulter" onClick={() => setOuvert(r.acteId)}><BookOpen className="h-3.5 w-3.5" /></button>
             </td></tr>))}</tbody></table>
           <div className="border-t border-line px-3 py-2"><Pagination total={d.data.total} limit={LIMIT} page={page} onPage={setPage} itemLabel="délibération" /></div></div>)}

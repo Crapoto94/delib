@@ -53,7 +53,8 @@ function inlineRuns(text) {
   }
   return out;
 }
-const para = (text) => { const r = inlineRuns(text); return `<w:p>${r}</w:p>`; };
+const JC = { center: 'center', right: 'right', justify: 'both' }; // justifié = « both » en OOXML
+const para = (text, align) => { const jc = JC[align]; const r = inlineRuns(text); return `<w:p>${jc ? `<w:pPr><w:jc w:val="${jc}"/></w:pPr>` : ''}${r}</w:p>`; };
 
 const BORDER = (c) => `<w:${c} w:val="single" w:sz="4" w:space="0" w:color="808080"/>`;
 const tableXml = (rows) => {
@@ -84,33 +85,41 @@ function imageSize(buf, mime) {
 
 const EMU = 9525; // 1 px (96 dpi) en EMU
 const MAX_W = 5_600_000; // ~15,5 cm
-function drawingXml(rid, size, id) {
+function drawingXml(rid, size, id, opts = {}) {
   const ratio = size.h / size.w || 0.66;
-  const cx = Math.min(MAX_W, Math.max(1, size.w) * EMU);
+  const wpx = opts.width && opts.width > 0 ? opts.width : size.w;
+  const cx = Math.min(MAX_W, Math.max(1, wpx) * EMU);
   const cy = Math.round(cx * ratio);
-  return `<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">`
+  const rot = opts.rotation ? Math.round(opts.rotation * 60000) : 0;
+  const jc = JC[opts.align];
+  const pPr = jc ? `<w:pPr><w:jc w:val="${jc}"/></w:pPr>` : '';
+  return `<w:p>${pPr}<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">`
     + `<wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Image ${id}"/>`
     + `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">`
     + `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="image${id}"/><pic:cNvPicPr/></pic:nvPicPr>`
     + `<pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
-    + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`
+    + `<pic:spPr><a:xfrm${rot ? ` rot="${rot}"` : ''}><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`
     + `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
 }
 
+const ALIGN_PREFIX = /^\s*\{(center|right|justify)\}\s*/;
 const IMG_LINE = /^\s*!\[([^\]]*)\]\((data:[^)]+)\)\s*$/;
 const isTableSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
 const splitRow = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
-const hasRich = (v) => String(v ?? '').split('\n').some((l) => IMG_LINE.test(l)) || /\n\s*\|.*\|\s*\n/.test(`\n${v}\n`);
+const hasRich = (v) => String(v ?? '').split('\n').some((l) => IMG_LINE.test(l)) || /(^|\n)\s*\{(center|right|justify)\}\s/i.test(String(v ?? '')) || /\n\s*\|.*\|\s*\n/.test(`\n${v}\n`);
 
 /** Contenu d'une zone → XML Word (paragraphes, tableaux, images). `img` collecte les images à joindre au .docx. */
 function blocksXml(value, img) {
   const blocks = String(value ?? '').split(/\n{2,}/);
   let out = '';
-  for (const block of blocks) {
+  for (const block0 of blocks) {
+    const am = ALIGN_PREFIX.exec(block0);
+    const align = am ? am[1] : null;
+    const block = am ? block0.slice(am[0].length) : block0;
     const lines = block.split('\n');
     if (lines.length >= 2 && lines[0].includes('|') && isTableSep(lines[1])) { out += tableXml(lines.slice(2).length ? [splitRow(lines[0]), ...lines.slice(2).map(splitRow)] : [splitRow(lines[0])]); continue; }
-    if (lines.every((l) => IMG_LINE.test(l))) { for (const l of lines) { const m = IMG_LINE.exec(l); out += img.add(m[2], m[1]); } continue; }
-    if (block.trim() || lines.length) out += para(block);
+    if (lines.every((l) => IMG_LINE.test(l))) { for (const l of lines) { const m = IMG_LINE.exec(l); out += img.add(m[2], m[1], align); } continue; }
+    if (block.trim() || lines.length) out += para(block, align);
   }
   return out;
 }
@@ -131,15 +140,26 @@ async function remplir(buffer, variables) {
   let relId = Math.max(0, ...[...rels.matchAll(/Id="rId(\d+)"/g)].map((m) => Number(m[1]))) + 1;
   let picId = 1; const images = [];
   const img = {
-    add(dataUrl, alt) {
-      const m = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl);
-      if (!m) return para(alt || '');
+    add(dataUrl, alt, blockAlign = null) {
+      // Réglages de l'éditeur : fragment `#vd:w=200,rot=90,align=center` ajouté à la source.
+      const opts = {};
+      const hi = dataUrl.indexOf('#vd:');
+      const clean = hi >= 0 ? dataUrl.slice(0, hi) : dataUrl;
+      if (hi >= 0) for (const part of dataUrl.slice(hi + 4).split(',')) {
+        const [k, v] = part.split('=');
+        if (k === 'w' && Number(v)) opts.width = Number(v);
+        else if (k === 'rot' && Number(v)) opts.rotation = Number(v);
+        else if (k === 'align') opts.align = v;
+      }
+      if (!opts.align) opts.align = blockAlign;
+      const m = /^data:([^;,]+);base64,(.*)$/s.exec(clean);
+      if (!m) return para(alt || '', blockAlign);
       const mime = m[1]; const bytes = Buffer.from(m[2], 'base64');
       const ext = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : 'jpeg';
       const name = `image${picId}.${ext}`; const rid = `rId${relId}`;
       images.push({ name, bytes, rid, mime, ext });
       relId++; const id = picId++;
-      return drawingXml(rid, imageSize(bytes, mime), id);
+      return drawingXml(rid, imageSize(bytes, mime), id, opts);
     },
   };
 

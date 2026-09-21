@@ -6,6 +6,7 @@ import { MentionTextarea } from '../AgentPicker';
 import { Progress, useAiJobs } from '../AiStatus';
 import { mdToHtml } from '../mdconv';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
+import { showDocs, type PdfDoc } from '../PdfViewer';
 import { useAuth } from '../auth';
 import { d, dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, useLoad, useToast } from '../ui';
@@ -521,7 +522,14 @@ export default function Dossier() {
     if (!confirm(`Supprimer définitivement le dossier #${a.numeroSuivi} « ${a.titre} » ?`)) return;
     try { await api.delete(orgPath(o, `/actes/${a.id}`)); toast('Dossier supprimé'); nav('/dossiers'); } catch (e) { toast(errMsg(e), 'ko'); }
   };
-  const apercuDossier = async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }), `Dossier #${a.numeroSuivi} — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };
+  const apercuDossier = async () => {
+    try {
+      const docs: PdfDoc[] = [{ title: `Dossier #${a.numeroSuivi} — ${a.titre}`, fetch: async () => (await api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre', avecAnnexes: false }, { responseType: 'blob' })).data }];
+      const annexes = (await api.get(orgPath(o, `/actes/${a.id}/annexes`))).data.items as any[];
+      for (const x of annexes) docs.push({ title: x.titre || x.nom || 'Annexe', fetch: async () => (await api.get(orgPath(o, `/actes/${a.id}/annexes/${x.id}/file`), { params: { format: 'pdf' }, responseType: 'blob' })).data });
+      showDocs(docs, 0);
+    } catch (e) { toast(errMsg(e), 'ko'); }
+  };
   const modeleDocx = !!gabarits.data?.find((t) => t.docType === 'deliberation')?.docx;
   const telechargerDocx = async () => { try { const r = await api.get(orgPath(o, `/actes/${a.id}/docx`), { params: { docType: 'deliberation' }, responseType: 'blob' }); const url = URL.createObjectURL(r.data); const el = document.createElement('a'); el.href = url; el.download = `deliberation-${a.numeroSuivi}.docx`; el.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
   const apercuModele = async () => { const m = await openPdf(() => api.get(orgPath(o, `/actes/${a.id}/docx-pdf`), { params: { docType: 'deliberation' }, responseType: 'blob' }), `Délibération (modèle Word) — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };

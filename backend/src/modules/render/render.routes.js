@@ -29,6 +29,7 @@ const Preview = z.object({
   deliberationId: Id.optional(),
   mode: z.enum(['propre', 'suivi']).default('propre'),
   brouillon: z.boolean().default(false),
+  avecAnnexes: z.boolean().default(true),
 });
 const DocxQ = z.object({ docType: Doc.default('deliberation'), deliberationId: Id.optional() });
 
@@ -36,7 +37,7 @@ const DocxQ = z.object({ docType: Doc.default('deliberation'), deliberationId: I
 const DOCX_VARS = [
   { nom: '{titre}', description: "Titre de l'acte (dossier)" },
   { nom: '{numero_suivi}', description: 'Numéro de suivi interne' },
-  { nom: '{numero}', description: 'Numéro de la délibération (figé à l’arrêt de l’ordre du jour)' },
+  { nom: '{numero}', description: "Numéro du dossier au conseil, dans l’ordre de passage (figé à l’arrêt de l’ordre du jour, provisoire avant) — alias {numero_point}" },
   { nom: '{deliberation}', description: 'Titre de la délibération' },
   { nom: '{date_seance}', description: 'Date de la séance (en majuscules)' },
   { nom: '{date_du_jour}', description: "Date du jour" },

@@ -11,6 +11,7 @@ const { resolveConfig, DEFAULTS } = require('./defaults');
 const { convertirEnPdf } = require('../../shared/convert');
 const D = require('./docx.service');
 const T = require('./typeset');
+const { numeroAffiche } = require('../seances/odj.service');
 
 const DOC_TYPES = Object.keys(DEFAULTS);
 const FINAL = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre', 'transmis', 'ar_recu', 'publie', 'executoire', 'archive'];
@@ -329,13 +330,15 @@ function createRender({ db, audit, storage, actes, config }) {
         acte.nature_id ? db.get('SELECT libelle FROM ref_items WHERE id = $1', [acte.nature_id]) : null,
       ]);
       const seance = acte.seance_id || acte.seance_visee_id ? await db.get('SELECT date_seance FROM seances WHERE id = $1', [acte.seance_id || acte.seance_visee_id]).catch(() => null) : null;
+      // Numéro du dossier au conseil, dans l'ordre de passage (numéro du point à l'ordre du jour) : figé après l'arrêt, provisoire avant.
+      const numeroPoint = await numeroAffiche(db, org, { acteId: acte.id, deliberationId: delib?.id }).catch(() => '');
       return {
         organisme: orgRow?.nom || '', adresse: orgRow?.adresse || '', ville: orgRow?.contact?.ville || '', code_postal: orgRow?.contact?.codePostal || '', telephone: orgRow?.contact?.telephone || '',
         email: orgRow?.contact?.email || '', site_web: orgRow?.contact?.siteWeb || '', signataire: orgRow?.contact?.signataire || '', numero_suivi: acte.numero_suivi, titre: delib?.titre || acte.titre, titre_dossier: acte.titre,
         rubrique: rub?.libelle || '', matiere: mat ? `${mat.code} ${mat.libelle}` : '', nature: nat?.libelle || '',
         direction: acte.direction_label || acte.direction_code, service: acte.service_label || '', redacteur: acte.redacteur, statut: acte.statut,
         date_seance: seance?.date_seance ? new Date(seance.date_seance).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() : '[date de séance à définir]',
-        date_du_jour: new Date().toLocaleDateString('fr-FR'), numero: delib?.numero || '',
+        date_du_jour: new Date().toLocaleDateString('fr-FR'), numero: numeroPoint, numero_point: numeroPoint,
       };
     },
 
@@ -379,7 +382,7 @@ function createRender({ db, audit, storage, actes, config }) {
      * Aperçu d'un acte : exposé, une délibération, ou dossier complet (exposé + délibérations + annexes, avec sommaire).
      * mode : 'propre' | 'suivi' ; brouillon : utilise mon brouillon non enregistré (PRE-02).
      */
-    async renderActe(ctx, organismeId, acteId, { cible = 'expose', deliberationId, mode = 'propre', brouillon = false, watermark: wmOverride }) {
+    async renderActe(ctx, organismeId, acteId, { cible = 'expose', deliberationId, mode = 'propre', brouillon = false, watermark: wmOverride, avecAnnexes = true }) {
       const acte = await actes.load(ctx, organismeId, acteId);
       const { pick, delibs } = await svc.textsFor(ctx, acte, cible, deliberationId);
       const watermark = wmOverride !== undefined ? wmOverride : (FINAL.includes(acte.statut) ? '' : undefined);
@@ -451,7 +454,8 @@ function createRender({ db, audit, storage, actes, config }) {
         const dxDossier = await docxPdf('dossier'); if (dxDossier) return dxDossier;
         const parts = [{ titre: 'Exposé des motifs', pdf: await exposePdf() }];
         for (const d of delibs) parts.push({ titre: `Délibération : ${d.titre}`, pdf: await delibPdf(d) });
-        parts.push(...(await svc.annexParts(acte)));
+        // `avecAnnexes=false` : la visionneuse affiche les annexes à part (documents navigables), pas fusionnées ici.
+        if (avecAnnexes !== false) parts.push(...(await svc.annexParts(acte)));
         return svc.assemble({ organismeId: acte.organisme_id, titre: `Dossier n° ${acte.numero_suivi} — ${acte.titre}`, parts, vars: await svc.varsFor(acte, null), watermark });
       }
       throw E.badRequest('cible inconnue');

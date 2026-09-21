@@ -39,6 +39,39 @@ function formatNumero(pattern, vars) {
   });
 }
 
+const estNumerote = (it) => it.kind === 'deliberation' || (it.kind === 'libre' && it.numerote);
+
+/**
+ * Numéro affiché d'un dossier à l'ordre du jour, pour un acte (et, si fourni, une délibération) : le numéro FIGÉ
+ * après l'arrêt de l'ordre du jour, sinon le numéro PROVISOIRE recalculé selon le motif de la séance.
+ * Renvoie '' si l'acte n'est pas inscrit à une séance. Sert notamment de variable de gabarit `{numero}`.
+ */
+async function numeroAffiche(q, organismeId, { acteId, deliberationId } = {}) {
+  const id = deliberationId ?? acteId;
+  if (!id) return '';
+  const col = deliberationId ? 'it.deliberation_id' : 'it.acte_id';
+  const it = await q.get(
+    `SELECT it.*, ru.code AS rub_code, ru.libelle AS rub_libelle
+     FROM seance_items it LEFT JOIN actes a ON a.id = it.acte_id LEFT JOIN ref_items ru ON ru.id = a.rubrique_id
+     WHERE it.organisme_id = $1 AND ${col} = $2 AND it.statut = 'a_traiter'
+     ORDER BY it.seance_id, it.position, it.id LIMIT 1`, [organismeId, id]);
+  if (!it) return '';
+  if (it.numero) return it.numero;
+  const s = await q.get('SELECT s.*, ins.numbering AS instance_numbering FROM seances s JOIN instances ins ON ins.id = s.instance_id WHERE s.id = $1', [it.seance_id]);
+  if (!s) return it.numero_seq != null ? String(it.numero_seq) : '';
+  const pattern = s.numbering?.pattern || s.instance_numbering?.pattern || DEFAULT_PATTERN;
+  const siblings = await q.all('SELECT id, kind, numerote, statut FROM seance_items WHERE seance_id = $1 ORDER BY position, id', [s.id]);
+  let n = 0; let ordre = null;
+  for (const x of siblings) { if (x.statut === 'retire' || !estNumerote(x)) continue; n++; if (Number(x.id) === Number(it.id)) { ordre = n; break; } }
+  if (ordre == null) return it.numero_seq != null ? String(it.numero_seq) : '';
+  const p = parisParts(new Date(s.date_seance));
+  const rank = (await q.get(
+    `SELECT count(*)::int + 1 AS n FROM seances WHERE instance_id = $1 AND statut <> 'annulee' AND date_seance < $2
+       AND EXTRACT(year FROM date_seance AT TIME ZONE 'Europe/Paris') = $3`, [s.instance_id, s.date_seance, p.y])).n;
+  const rubrique = it.rub_code || it.rub_libelle ? strip(it.rub_code || it.rub_libelle).slice(0, 4) : '';
+  return formatNumero(pattern, { ANNEE: p.y, N_SEANCE: rank, DATE: `${p.y}${String(p.m).padStart(2, '0')}${String(p.d).padStart(2, '0')}`, ORDRE: ordre, RUBRIQUE: rubrique });
+}
+
 /** Pièces jointes d'un dossier simple : type contrôlé par l'extension ET par la signature du fichier, 20 Mo au plus. */
 const PIECES = {
   pdf: { mime: 'application/pdf', magic: [0x25, 0x50, 0x44, 0x46] }, png: { mime: 'image/png', magic: [0x89, 0x50, 0x4e, 0x47] },
@@ -589,4 +622,4 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
   return svc;
 }
 
-module.exports = { createOdj, formatNumero, checkPattern, VARS };
+module.exports = { createOdj, formatNumero, checkPattern, VARS, numeroAffiche };
