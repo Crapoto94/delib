@@ -4,7 +4,7 @@ import { CheckCircle2, Eye, Info, Sparkles, X, XCircle } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { dt } from './format';
-import { Loading } from './ui';
+import { Loading, useLoad } from './ui';
 import RichEditor, { EditorMode } from './RichEditor';
 import AssistantPanel from './AssistantPanel';
 import BibliothequeVisas from './BibliothequeVisas';
@@ -36,6 +36,7 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const [conflict, setConflict] = useState(false);
   const [side0, setSide] = useState<'suivi' | 'assistant'>('assistant');
   const ia = useIa(); const assistantOn = ia.any; // aucun usage de l'IA actif : ni bouton, ni onglet, ni panneau
+  const gabarits = useLoad(async () => (await api.get(orgPath(o, '/gabarits'))).data.items as any[], [o]);
   const side = assistantOn ? side0 : 'suivi';
   const [drawer, setDrawer] = useState(false); // écran étroit : le panneau latéral s'ouvre en tiroir
   const timer = useRef<any>(null); const latest = useRef({ text: '', version: 1, dirty: false });
@@ -70,9 +71,16 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const resolve = async (decision: 'accept' | 'reject', cid?: string) => {
     try { await commit(); await api.post(`${base}/modifications`, cid ? { decision, cids: [cid] } : { decision, all: true }); latest.current.dirty = false; await load(); onChanged(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
+  // Aperçu au gabarit : si un modèle Word (.docx) est défini pour le gabarit correspondant, on le fusionne et le
+  // convertit en PDF. Exposé des motifs → gabarit « expose » ; visas/considérants et délibéré → gabarit « deliberation ».
+  const docType = t.kind === 'expose' ? 'expose' : 'deliberation';
+  const modeleWord = !!gabarits.data?.find((g) => g.docType === docType)?.docx;
   const preview = async () => {
     await commit();
-    const m = await openPdf(() => api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' }), `${KIND_LABEL[t.kind]} — dossier #${acte.numeroSuivi}`);
+    const titre = `${KIND_LABEL[t.kind]} — dossier #${acte.numeroSuivi}`;
+    const m = modeleWord
+      ? await openPdf(() => api.get(orgPath(o, `/actes/${acte.id}/docx-pdf`), { params: { docType, deliberationId: t.deliberationId ?? undefined }, responseType: 'blob' }), titre)
+      : await openPdf(() => api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' }), titre);
     if (m) toast(`Aperçu impossible : ${m}`, 'ko');
   };
   if (!view) return <Loading />;

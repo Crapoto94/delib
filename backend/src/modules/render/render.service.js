@@ -390,13 +390,22 @@ function createRender({ db, audit, storage, actes, config }) {
         return svc.runsOf({ ...row, markdown: row.markdown }, mode);
       };
 
+      // Si le gabarit correspondant a un modèle Word (.docx), c'est LUI le bon gabarit : on le fusionne puis on le
+      // convertit en PDF. Sinon, on retombe sur la mise en page PDF (PDF de fond + en-tête/pied paramétrés).
+      const docxPdf = async (docType, deliberationId) => {
+        const t = await svc.getTemplate(acte.organisme_id, docType);
+        return t.docxFileId ? svc.renderDocxPdf(ctx, acte.organisme_id, acteId, { docType, deliberationId }) : null;
+      };
+
       const exposePdf = async () => {
+        const dx = await docxPdf('expose'); if (dx) return dx;
         const tpl = await svc.getTemplate(acte.organisme_id, 'expose');
         const vars = await svc.varsFor(acte, null);
         const content = [...svc.headerItems(tpl.cfg), { type: 'runs', runs: await runs(pick('expose', null)) }];
         return svc.build({ organismeId: acte.organisme_id, docType: 'expose', content, vars, watermark, title: `Exposé des motifs — ${acte.titre}` });
       };
       const delibPdf = async (d) => {
+        const dx = await docxPdf('deliberation', d.id); if (dx) return dx;
         const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
         const vars = await svc.varsFor(acte, d);
         const dispLabel = tpl.cfg.sections?.dispositif ?? 'Après en avoir délibéré, le conseil DÉCIDE :';
@@ -410,12 +419,14 @@ function createRender({ db, audit, storage, actes, config }) {
         return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Délibération — ${d.titre}` });
       };
       const visasPdf = async (d) => {
+        const dx = await docxPdf('deliberation', d.id); if (dx) return dx;
         const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
         const vars = await svc.varsFor(acte, d);
         const content = [...svc.headerItems(tpl.cfg), { type: 'runs', runs: await runs(pick('visas', d.id)) }];
         return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Visas et considérants — ${d.titre}` });
       };
       const dispositifPdf = async (d) => {
+        const dx = await docxPdf('deliberation', d.id); if (dx) return dx;
         const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
         const vars = await svc.varsFor(acte, d);
         const dispLabel = tpl.cfg.sections?.dispositif ?? 'Après en avoir délibéré, le conseil DÉCIDE :';
@@ -436,6 +447,8 @@ function createRender({ db, audit, storage, actes, config }) {
         return delibPdf(d);
       }
       if (cible === 'dossier') {
+        // Un modèle Word « dossier complet » (s'il est défini) remplace l'assemblage par parties.
+        const dxDossier = await docxPdf('dossier'); if (dxDossier) return dxDossier;
         const parts = [{ titre: 'Exposé des motifs', pdf: await exposePdf() }];
         for (const d of delibs) parts.push({ titre: `Délibération : ${d.titre}`, pdf: await delibPdf(d) });
         parts.push(...(await svc.annexParts(acte)));

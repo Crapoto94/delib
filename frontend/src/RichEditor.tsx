@@ -3,8 +3,13 @@ import { Extension } from '@tiptap/core';
 import { EditorContent, useEditor, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
+import Table from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableHeader from '@tiptap/extension-table-header';
+import TableCell from '@tiptap/extension-table-cell';
 import { Plugin } from '@tiptap/pm/state';
-import { Bold, Italic, List, ListOrdered, Plus, Redo2, Undo2 } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Plus, Redo2, Undo2, Image as ImageIcon, Table as TableIcon, Columns3, Rows3, Trash2 } from 'lucide-react';
 import { docToMd, mdToHtml } from './mdconv';
 
 export type EditorMode = 'expose' | 'visas' | 'dispositif';
@@ -47,12 +52,20 @@ const Articles = Extension.create({
   },
 });
 
+function readImage(file: File): Promise<string> { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(file); }); }
+
+/** Insère des fichiers image (collage, dépôt, sélection) sous forme de data-URL (stockées dans le markdown). */
+async function insertImages(editor: Editor, files: FileList | File[]) {
+  for (const f of Array.from(files)) { if (!f.type.startsWith('image/')) continue; const src = await readImage(f); editor.chain().focus().setImage({ src, alt: f.name }).run(); }
+}
+
 function Btn({ active, onClick, title, children, disabled }: { active?: boolean; onClick: () => void; title: string; children: React.ReactNode; disabled?: boolean }) {
   return <button type="button" title={title} aria-label={title} disabled={disabled} onMouseDown={(e) => e.preventDefault()} onClick={onClick}
     className={`rounded p-2 hover:bg-slate-100 disabled:opacity-40 ${active ? 'bg-primary text-white hover:bg-primary' : 'text-slate-700'}`}>{children}</button>;
 }
 
 function Toolbar({ editor, mode }: { editor: Editor; mode: EditorMode }) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const addPara = (prefix: string) => editor.chain().focus().command(({ tr, state, dispatch }) => {
     const end = state.doc.content.size; const p = state.schema.nodes.paragraph;
     if (dispatch) { const last = state.doc.lastChild; const empty = !!last && last.type.name === 'paragraph' && last.content.size === 0; tr.insert(empty ? end - 1 : end, p.create(null, state.schema.text(prefix))); }
@@ -68,6 +81,15 @@ function Toolbar({ editor, mode }: { editor: Editor; mode: EditorMode }) {
       {mode === 'expose' && <>
         <Btn title="Liste à puces" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}><List className="h-4 w-4" /></Btn>
         <Btn title="Liste numérotée" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-4 w-4" /></Btn>
+      </>}
+      <span className="mx-1 h-5 w-px bg-line" />
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={async (e) => { const fs = e.target.files; if (fs) await insertImages(editor, fs); e.target.value = ''; }} />
+      <Btn title="Insérer une image (ou copier/coller)" onClick={() => fileRef.current?.click()}><ImageIcon className="h-4 w-4" /></Btn>
+      <Btn title="Insérer un tableau (ou copier/coller depuis Word)" active={editor.isActive('table')} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}><TableIcon className="h-4 w-4" /></Btn>
+      {editor.isActive('table') && <>
+        <Btn title="Ajouter une ligne" onClick={() => editor.chain().focus().addRowAfter().run()}><Rows3 className="h-4 w-4" /></Btn>
+        <Btn title="Ajouter une colonne" onClick={() => editor.chain().focus().addColumnAfter().run()}><Columns3 className="h-4 w-4" /></Btn>
+        <Btn title="Supprimer le tableau" onClick={() => editor.chain().focus().deleteTable().run()}><Trash2 className="h-4 w-4" /></Btn>
       </>}
       {mode === 'visas' && <>
         <span className="mx-1 h-5 w-px bg-line" />
@@ -85,15 +107,25 @@ function Toolbar({ editor, mode }: { editor: Editor; mode: EditorMode }) {
 
 export default function RichEditor({ value, onChange, mode, readOnly, placeholder }: { value: string; onChange: (md: string) => void; mode: EditorMode; readOnly?: boolean; placeholder?: string }) {
   const last = useRef(value);
+  const edRef = useRef<Editor | null>(null);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: false, codeBlock: false, blockquote: false, horizontalRule: false, code: false, strike: false, ...(mode === 'expose' ? {} : { bulletList: false, orderedList: false, listItem: false }) }),
       Placeholder.configure({ placeholder: placeholder || '' }),
+      Image.configure({ allowBase64: true }),
+      Table.configure({ resizable: false }),
+      TableRow, TableHeader, TableCell,
       ...(mode === 'dispositif' ? [Articles] : []),
     ],
     content: mdToHtml(value),
     editable: !readOnly,
-    editorProps: { attributes: { class: 'prose-doc', 'aria-label': 'Zone de saisie du texte', spellcheck: 'true', lang: 'fr' } },
+    onCreate: ({ editor: ed }) => { edRef.current = ed; },
+    editorProps: {
+      attributes: { class: 'prose-doc', 'aria-label': 'Zone de saisie du texte', spellcheck: 'true', lang: 'fr' },
+      // Copier/coller ou dépôt d'une image : insérée en data-URL (les images collées de Word arrivent en fichiers).
+      handlePaste: (_view, event) => { const files = Array.from(event.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/')); if (files.length && edRef.current) { event.preventDefault(); void insertImages(edRef.current, files); return true; } return false; },
+      handleDrop: (_view, event) => { const files = Array.from((event as DragEvent).dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/')); if (files.length && edRef.current) { event.preventDefault(); void insertImages(edRef.current, files); return true; } return false; },
+    },
     onUpdate: ({ editor: ed }) => { const md = docToMd(ed.getJSON() as any); last.current = md; onChange(md); },
     onFocus: ({ editor: ed }) => {
       // dispositif vide : « Article 1 : » est déjà là

@@ -159,7 +159,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
 
 /* --------------------------------------------------------------------------------------------------------- textes */
 /** Aperçu d'un texte dans la page ; un clic ouvre l'éditeur plein écran (D39). */
-function Textes({ acte, editable, onChanged, toast }: { acte: any; editable: boolean; onChanged: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
+function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; editable: boolean; onChanged: () => void; onApercu: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth();
   const texts = useLoad(async () => (await api.get(orgPath(org!.id, `/actes/${acte.id}/textes`))).data.items as any[], [acte.id, acte.statut]);
   const previews = useLoad(async () => {
@@ -186,8 +186,10 @@ function Textes({ acte, editable, onChanged, toast }: { acte: any; editable: boo
   const list = texts.data ?? [];
   return (
     <section className="card p-5" aria-labelledby="textes">
-      <div className="mb-4 flex items-center justify-between"><h3 id="textes">Textes de la délibération</h3>
-        {list.length > 0 && <button className="btn-primary" onClick={() => setOpen(list[0].id)}><Pencil className="h-4 w-4" /> {editable ? "Ouvrir l'éditeur" : 'Ouvrir en plein écran'}</button>}</div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h3 id="textes">Textes de la délibération</h3>
+        {list.length > 0 && <div className="flex items-center gap-2">
+          <button className="btn-secondary" onClick={onApercu}><Eye className="h-4 w-4" /> Prévisualiser</button>
+          <button className="btn-primary" onClick={() => setOpen(list[0].id)}><Pencil className="h-4 w-4" /> {editable ? "Ouvrir l'éditeur" : 'Ouvrir en plein écran'}</button></div>}</div>
       <div className="space-y-4">
         {list.map((t) => {
           const d = dels.find((x: any) => x.id === t.deliberationId);
@@ -543,7 +545,7 @@ export default function Dossier() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
           <Fiche acte={a} editable={editable} onSaved={() => { reloadAll(); toast('Fiche enregistrée'); }} />
-          <Textes acte={a} editable={editable || !!c?.actions?.validate} onChanged={acte.reload} toast={toast} />
+          <Textes acte={a} editable={editable || !!c?.actions?.validate} onChanged={acte.reload} onApercu={apercuDossier} toast={toast} />
           <Annexes acte={a} editable={editable} toast={toast} />
           <Discussion acte={a} toast={toast} />
         </div>
