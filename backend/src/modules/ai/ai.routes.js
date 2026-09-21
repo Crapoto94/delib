@@ -16,6 +16,14 @@ const AideQ = z.object({
   extraits: z.array(z.object({ titre: z.string().max(300).optional(), texte: z.string().min(1).max(8000) })).min(1).max(8)
     .describe("Extraits pertinents du manifeste, sélectionnés par l'interface ; l'IA ne répond qu'à partir d'eux"),
 });
+const DelIa = z.object({
+  question: z.string().trim().min(3).max(1000),
+  extraits: z.array(z.object({ titre: z.string().max(300).optional(), texte: z.string().min(1).max(8000) })).min(1).max(8)
+    .describe("Extraits de documentation sélectionnés par l'interface"),
+});
+const DelIaP = z.object({ orgId: Id, aid: Id });
+const Note = z.object({ note: z.number().int().min(1).max(4), commentaire: z.string().trim().max(2000).nullable().optional() });
+const JournalQ = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0) });
 const T = ['assistant IA'];
 
 const JP = z.object({ orgId: Id, jid: Id });
@@ -75,6 +83,13 @@ module.exports = ({ makeRouter, ai, aiQueue, aiPrompts }) => {
   q.post('/manifeste', { summary: "Aide IA fondée sur le manifeste (réponse strictement limitée aux extraits fournis)", tags: T, org: true, params: OrgP, body: AideQ,
     description: "L'interface sélectionne les extraits pertinents du manifeste (MANIFEST.md) et pose la question ; l'IA répond uniquement à partir de ces extraits, sans connaissance extérieure, et dit quand l'information n'y est pas. Usage `aide` activable/désactivable par l'administration. Appel synchrone." },
   async (req, res) => res.json(await ai.aideManifeste(req.ctx, req.org.id, req.valid.body)));
+  q.post('/delia', { summary: "Del-IA : question libre, réponse fondée sur la documentation, le contexte de l'agent et les délibérations", tags: T, org: true, params: OrgP, body: DelIa,
+    description: "Réponse synchrone, journalisée (question, réponse) ; l'agent peut ensuite la noter (1 à 4 étoiles). L'IA s'appuie sur les extraits de documentation fournis, le contexte de hiérarchie de l'agent et une recherche dans les délibérations visibles par lui. Elle ne nomme pas ses sources internes." },
+  async (req, res) => res.json(await ai.delIaDemander(req.ctx, req.org.id, req.valid.body)));
+  q.post('/delia/:aid/note', { summary: "Note (1 à 4 étoiles) et commentaire d'une réponse de Del-IA", tags: T, org: true, params: DelIaP, body: Note },
+    async (req, res) => res.json(await ai.delIaNoter(req.ctx, req.org.id, req.valid.params.aid, req.valid.body)));
+  q.get('/delia/journal', { summary: "Journal de l'aide IA (questions, réponses, notes, commentaires) et moyenne des notes", tags: T, org: true, roles: ['org_admin', 'scc'], params: OrgP, query: JournalQ },
+    async (req, res) => res.json(await ai.delIaJournal(req.org.id, req.valid.query)));
   q.get('/prompts', { summary: "Consignes envoyées à l'IA et modèle choisi pour chacune (administration)", tags: T, org: true, roles: ['org_admin'], params: OrgP,
     description: "Pour chaque fonction (orthographe, style, visas, copie assistée) : la consigne en vigueur et celle par défaut, le format de réponse imposé (non modifiable) et le modèle. `modeles` : liste fournie par l'IA interne (`null` si indisponible)." },
   async (req, res) => res.json(await aiPrompts.list(req.org.id)));

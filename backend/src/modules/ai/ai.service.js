@@ -18,6 +18,17 @@ const toS = (r) => ({
   id: r.id, acteId: r.acte_id, textId: r.text_id, kind: r.kind, categorie: r.categorie ?? null, gravite: r.gravite ?? null, analyse: r.fonction ?? null, find: r.find, replacement: r.replacement, reason: r.reason, status: r.status,
   decidedBy: r.decided_by, decidedAt: r.decided_at, appliedVersion: r.applied_version, createdAt: r.created_at,
 });
+const toJournal = (r) => ({
+  id: Number(r.id), username: r.username, question: r.question, reponse: r.reponse, note: r.note === null ? null : Number(r.note),
+  commentaire: r.commentaire, modele: r.modele, contexte: r.contexte, createdAt: r.created_at, noteeAt: r.notee_at,
+});
+
+/** Mots significatifs d'une question (sans accents, sans mots vides) : servent à interroger la base des délibérations. */
+const MOTS_VIDES = new Set(['avec', 'dans', 'pour', 'plus', 'sont', 'cette', 'cettes', 'elle', 'elles', 'nous', 'vous', 'etre', 'avoir', 'fait', 'quel', 'quelle', 'quels', 'quelles', 'comment', 'quoi', 'qui', 'que', 'des', 'les', 'une', 'aux', 'sur', 'par', 'pas', 'est', 'son', 'ses', 'lui', 'ils', 'leur', 'votre', 'notre', 'tout', 'tous', 'toute', 'toutes', 'mais', 'donc', 'ou', 'et', 'en', 'au', 'du', 'de', 'la', 'le', 'un', 'il', 'je', 'tu', 'on', 'ne', 'se', 'ce', 'sa', 'mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'ces', 'puis', 'peut', 'peuvent', 'doit', 'doivent', 'faire', 'faut', 'comme', 'aussi', 'bien', 'tres', 'sans', 'sous', 'vers', 'chez', 'existe', 'existent', 'exister', 'deliberation', 'deliberations', 'parle', 'parlent', 'parler', 'sujet', 'concernant', 'trouve', 'trouver']);
+function motsCles(question) {
+  const sansAccent = String(question || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  return [...new Set(sansAccent.split(/[^a-z0-9]+/).filter((w) => w.length > 3 && !MOTS_VIDES.has(w)))];
+}
 
 /** Extrait l'objet JSON d'une réponse de modèle (avec ou sans bloc de code). */
 function parseJson(text) {
@@ -27,7 +38,7 @@ function parseJson(text) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts, visas }) {
+function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts, visas, late }) {
   /** Dépose les constats d'un rapport de références comme alertes du dossier (IA-36) : extrait dans « find », jamais appliqués automatiquement. */
   const deposer = async (a, runId, rapport, fonction) => {
     const out = [];
@@ -71,9 +82,76 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts, visa
       }
       if (!morceaux.length) throw E.badRequest('Aucun extrait du manifeste fourni');
       const prompt = `Question de l'agent :\n${question.trim()}\n\nExtraits du manifeste de l'application (source unique autorisée) :\n<EXTRAITS>\n${morceaux.join('\n\n')}\n</EXTRAITS>`;
-      const r = await ai.query({ system, prompt, maxTokens: 1200, temperature: 0.1, model: modele || undefined });
+      let r;
+      try { r = await ai.query({ system, prompt, maxTokens: 1200, temperature: 0.1, model: modele || undefined }); }
+      catch (e) { if (e?.status) throw e; throw E.upstream(`L'IA n'a pas pu répondre : ${e?.message || 'erreur inconnue'}`); }
       await audit.log(ctx, { organismeId, action: 'ia.aide_manifeste', entity: 'ia', after: { question: question.slice(0, 200), extraits: morceaux.length, modele: r.model ?? modele ?? null } });
       return { reponse: r.text, modele: r.model ?? null };
+    },
+
+    /**
+     * Del-IA : question libre posée depuis le guide. La réponse s'appuie sur la documentation (extraits, jamais nommés à
+     * l'agent), sur le contexte de l'agent (droits, hiérarchie) et sur une recherche dans les délibérations de
+     * l'application (limités à ses droits). La question et la réponse sont journalisées ; l'agent pourra la noter.
+     */
+    async delIaDemander(ctx, organismeId, { question, extraits }) {
+      await prompts.assertActif(organismeId, 'aide');
+      const { system, modele } = await prompts.resolve(organismeId, 'aide');
+      const morceaux = []; let total = 0;
+      for (const e of extraits.slice(0, 8)) {
+        const texte = String(e.texte || '').slice(0, 8000); total += texte.length;
+        if (total > 24000) break;
+        morceaux.push(`### ${String(e.titre || 'Documentation').slice(0, 300)}\n${texte}`);
+      }
+      if (!morceaux.length) throw E.badRequest('Aucun extrait fourni');
+      const agent = ctx.agent || {};
+      const hierarchie = `- Direction : ${agent.direction_label || 'non précisée'}\n- Service : ${agent.service_label || 'non précisé'}\n- Poste : ${agent.poste || 'non précisé'}\n- Administrateur de plateforme : ${ctx.isPlatformAdmin ? 'oui' : 'non'}`;
+      let resultats = [];
+      try {
+        const clefs = motsCles(question).slice(0, 8);
+        if (clefs.length && late?.recherche) {
+          const r = await late.recherche.chercher(ctx, organismeId, { q: clefs.join(' OR '), limit: 5 });
+          resultats = r.items.map((i) => ({ numeroSuivi: i.numeroSuivi, numero: i.numero, titre: i.titre, statut: i.statut, dateSeance: i.dateSeance, resultat: i.resultat?.libelle || null }));
+        }
+      } catch (e) { log?.warn?.({ err: e.message }, 'aide IA : recherche indisponible'); }
+      const blocResultats = resultats.length
+        ? `Délibérations trouvées dans l'application (résultats de recherche, dans la limite des droits de l'agent) :\n${resultats.map((x, i) => `${i + 1}. n° ${x.numeroSuivi} — « ${x.titre} » (${x.statut}${x.dateSeance ? `, séance du ${String(x.dateSeance).slice(0, 10)}` : ''}${x.resultat ? `, ${x.resultat}` : ''})`).join('\n')}`
+        : "Aucune délibération de l'application ne correspond à cette question.";
+      const prompt = `Ce que je sais de l'agent qui pose la question :\n${hierarchie}\n\n${blocResultats}\n\nExtraits de documentation interne (à utiliser sans les nommer) :\n<DOC>\n${morceaux.join('\n\n')}\n</DOC>\n\nQuestion :\n${question.trim()}`;
+      let r;
+      try { r = await ai.query({ system, prompt, maxTokens: 1200, temperature: 0.1, model: modele || undefined }); }
+      catch (e) { if (e?.status) throw e; throw E.upstream(`L'IA n'a pas pu répondre : ${e?.message || 'erreur inconnue'}`); }
+      let id = null;
+      try {
+        const row = await db.get(
+          'INSERT INTO aide_ia_journal (organisme_id, username, question, reponse, contexte, modele) VALUES ($1,$2,$3,$4,$5::jsonb,$6) RETURNING id',
+          [organismeId, ctx.username, question.slice(0, 2000), r.text.slice(0, 20000),
+            JSON.stringify({ direction: agent.direction_label || null, service: agent.service_label || null, resultats: resultats.map((x) => x.numeroSuivi), extraits: morceaux.length }), r.model ?? modele ?? null]);
+        id = Number(row.id);
+        await audit.log(ctx, { organismeId, action: 'ia.aide_delia', entity: 'aide_ia_journal', entityId: id, after: { question: question.slice(0, 200) } });
+      } catch (e) { log?.warn?.({ err: e.message }, 'aide IA : journalisation impossible (table aide_ia_journal absente ? migration 0055 à appliquer)'); }
+      return { id, reponse: r.text };
+    },
+
+    /** Note (1 à 4) et commentaire de l'agent sur une réponse de Del-IA qu'il a reçue. */
+    async delIaNoter(ctx, organismeId, id, { note, commentaire }) {
+      const com = commentaire ? String(commentaire).slice(0, 2000) : null;
+      const r = await db.get('UPDATE aide_ia_journal SET note = $4, commentaire = $5, notee_at = now() WHERE id = $1 AND organisme_id = $2 AND username = $3 RETURNING id', [id, organismeId, ctx.username, note, com]);
+      if (!r) throw E.notFound('Réponse introuvable');
+      await audit.log(ctx, { organismeId, action: 'ia.aide_note', entity: 'aide_ia_journal', entityId: id, after: { note } });
+      return { id: Number(r.id), note, commentaire: com };
+    },
+
+    /** Journal des questions/réponses de Del-IA et moyenne des notes (administration). */
+    async delIaJournal(organismeId, { limit = 50, offset = 0 } = {}) {
+      const total = (await db.get('SELECT count(*)::int AS n FROM aide_ia_journal WHERE organisme_id = $1', [organismeId])).n;
+      const rows = await db.all('SELECT * FROM aide_ia_journal WHERE organisme_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3', [organismeId, limit, offset]);
+      const st = await db.get(
+        `SELECT count(*) FILTER (WHERE note IS NOT NULL)::int AS notes, avg(note) AS moyenne,
+           count(*) FILTER (WHERE note = 1)::int AS n1, count(*) FILTER (WHERE note = 2)::int AS n2,
+           count(*) FILTER (WHERE note = 3)::int AS n3, count(*) FILTER (WHERE note = 4)::int AS n4
+         FROM aide_ia_journal WHERE organisme_id = $1`, [organismeId]);
+      return { total, limit, offset, items: rows.map(toJournal), stats: { notes: st.notes, moyenne: st.moyenne === null ? null : Math.round(Number(st.moyenne) * 100) / 100, repartition: { 1: st.n1, 2: st.n2, 3: st.n3, 4: st.n4 } } };
     },
 
     /** Redemande les propositions pour un brouillon : tâche en arrière plan. */

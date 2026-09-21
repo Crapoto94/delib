@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Star } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
-import { Badge, MailSwitch, Field, Loading, Spinner, useLoad, useToast } from '../ui';
+import { Badge, ErrorBox, MailSwitch, Field, Loading, Spinner, useLoad, useToast } from '../ui';
 import { AgentName } from '../AgentName';
 import { oublierIa } from '../useIa';
 import { Select } from '../Select';
@@ -66,6 +67,47 @@ function Prompts() {
   );
 }
 
+/** Journal de l'aide IA de Del-IA : questions, réponses, notes et commentaires, avec la moyenne des notes. */
+function JournalAide() {
+  const { org } = useAuth(); const o = org!.id;
+  const r = useLoad(async () => (await api.get(orgPath(o, '/ia/delia/journal'))).data, [o]);
+  if (r.loading) return <Loading />;
+  if (r.error) return <section className="card p-5"><ErrorBox msg={r.error} /></section>;
+  const st = r.data?.stats ?? { notes: 0, moyenne: null, repartition: { 1: 0, 2: 0, 3: 0, 4: 0 } };
+  const Etoiles = ({ n }: { n: number | null }) => n ? <span className="whitespace-nowrap">{[1, 2, 3, 4].map((k) => <Star key={k} className={`inline h-3.5 w-3.5 ${k <= n ? 'fill-warn text-warn' : 'text-mute'}`} />)}</span> : <span className="text-mute">—</span>;
+  return (
+    <section className="card p-5">
+      <h3 className="mb-1">Aide IA d'Evelyne Del-IA — journal et satisfaction</h3>
+      <p className="mb-4 text-[13px] text-mute">Questions posées à Evelyne Del-IA, réponses apportées, note de l'agent (« ma réponse vous a-t-elle convenu ? », 1 à 4 étoiles) et commentaire éventuel. La moyenne des notes mesure la qualité des réponses.</p>
+      <div className="mb-4 grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border border-line p-4">
+          <div className="text-[12px] text-mute">Note moyenne</div>
+          <div className="text-[28px] font-bold text-head">{st.moyenne ?? '—'}{st.moyenne !== null && <span className="text-[14px] font-normal text-mute"> / 4</span>}</div>
+          <div className="text-[12px] text-mute">{st.notes} réponse(s) notée(s)</div>
+        </div>
+        <div className="rounded-lg border border-line p-4"><div className="text-[12px] text-mute">Questions posées</div><div className="text-[28px] font-bold text-head">{r.data?.total ?? 0}</div></div>
+        <div className="rounded-lg border border-line p-4">
+          <div className="text-[12px] text-mute">Répartition des notes</div>
+          <ul className="mt-1 space-y-0.5 text-[12px]">{[4, 3, 2, 1].map((k) => <li key={k} className="flex items-center gap-2"><Etoiles n={k} /> <b>{st.repartition[k]}</b></li>)}</ul>
+        </div>
+      </div>
+      {!r.data?.items.length ? <p className="p-6 text-center text-mute">Aucune question posée pour l'instant.</p> : (
+        <div className="overflow-x-auto"><table className="w-full"><thead><tr><th>Date</th><th>Agent</th><th>Question</th><th>Réponse</th><th>Note</th><th>Commentaire</th></tr></thead><tbody>
+          {r.data.items.map((j: any) => (
+            <tr key={j.id}>
+              <td className="whitespace-nowrap text-[12px] text-mute">{dt(j.createdAt, { dateStyle: 'short', timeStyle: 'short' })}</td>
+              <td><AgentName u={j.username} /></td>
+              <td className="max-w-[280px] text-[12px]">{j.question}</td>
+              <td className="max-w-[380px] text-[12px]"><details><summary className="cursor-pointer text-action">Voir la réponse</summary><div className="mt-1 whitespace-pre-wrap text-slate-700">{j.reponse}</div></details></td>
+              <td><Etoiles n={j.note} /></td>
+              <td className="max-w-[220px] text-[12px] text-slate-700">{j.commentaire || <span className="text-mute">—</span>}</td>
+            </tr>))}
+        </tbody></table></div>
+      )}
+    </section>
+  );
+}
+
 /** Paramétrage et supervision de la file d'attente de l'IA (D52). */
 export default function AdminIa() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
@@ -87,6 +129,7 @@ export default function AdminIa() {
   return (
     <div className="space-y-6">
       <Prompts />
+      <JournalAide />
       <p className="text-mute">Toute interrogation de l'IA se fait <b>en arrière plan</b>, dans une file d'attente : les agents continuent à travailler et voient un indicateur d'avancement. Ces limites évitent de surcharger l'IA.</p>
       <div className="grid gap-4 md:grid-cols-4">{[['En attente', ov.data.queued], ['En cours', ov.data.running], ['Terminées (24 h)', ov.data.done], ['En échec (24 h)', ov.data.errors]].map(([l, v]) => (
         <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[28px] font-bold text-head">{v}</div></div>))}</div>

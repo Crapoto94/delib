@@ -128,7 +128,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
   const aiPrompts = createPrompts({ settings, ai: aiAdapter, log });
   const visas = createVisas({ db, audit, actes, settings, log });
-  const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log, queue: aiQueue, prompts: aiPrompts, visas });
+  const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log, queue: aiQueue, prompts: aiPrompts, visas, late });
   const users = createUsers({ db, audit, dir, organismes, access, log, settings, acl });
   const delegations = createDelegations({ db, audit, access, titulaires, dir, bus });
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
@@ -157,11 +157,12 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const configuration = createConfiguration({ db, audit, settings, circuits, champs });
   const rgpd = createRgpd({ db, audit, config, settings });
   const recherche = createRecherche({ db, audit, acl, settings, storage, bus, log });
+  late.recherche = recherche;
   const alertes = createAlertes({ db, access, recherche, log, notifications, config });
   const apiKeys = createApiKeys({ db, audit, log });
   const externe = createExterne({ db, render, storage });
   const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
-  const airs = createAirs({ db, audit, dir, source: airsSource }); // import de l'historique AIRS DELIB (section 25 bis, D111)
+  const airs = createAirs({ db, audit, dir, source: airsSource, ad }); // import de l'historique AIRS DELIB (section 25 bis, D111)
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
   // sauvegarde nocturne (SAV-04) : plateforme entière, donc une seule fois par tick — portée par l'organisme par défaut

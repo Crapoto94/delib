@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, ChevronDown, Circle, CircleDot, GripVertical, GraduationCap, Info, ListChecks, Minus, PartyPopper, Sparkles, X } from 'lucide-react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowRight, Check, ChevronDown, Circle, CircleDot, GripVertical, GraduationCap, Info, ListChecks, MessageCircleQuestion, Minus, PartyPopper, Sparkles, Star, X } from 'lucide-react';
 import { api, errMsg, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { Badge, Spinner } from './ui';
+import { useIa } from './useIa';
+import { chargerExtraits } from './aideIa';
 
 /** Nom de l'avatar d'aide. Modifiable ici : il apparaît partout (bulle, panneau). */
-export const AVATAR_NOM = 'Del-IA';
+export const AVATAR_NOM = 'Evelyne Del-IA';
 const AVATAR_ROLE = "assistant de rédaction";
 
 /** Codes de complétude qui relèvent de la fiche (CRE-02) : si aucun ne manque, la fiche est complète. */
@@ -115,6 +117,7 @@ export default function DossierAssiste({ acte, editable, onReload, onApercu, toa
   acte: any; editable: boolean; onReload: () => void; onApercu?: () => void; toast: (m: string, k?: 'ok' | 'ko') => void;
 }) {
   const { org } = useAuth(); const o = org!.id;
+  const ia = useIa();
   const etatServeur = acte.custom?.assiste && typeof acte.custom.assiste === 'object' ? acte.custom.assiste : {};
   const passees: string[] = etatServeur.passees ?? [];
   const { etapes, courante, terminee, envoye, nbFaites } = construire(acte, passees);
@@ -122,6 +125,22 @@ export default function DossierAssiste({ acte, editable, onReload, onApercu, toa
   const [ouvert, setOuvert] = useState(true);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
+  // Question libre posée à Del-IA (réponse IA) et notation de la réponse.
+  const [qOuvert, setQOuvert] = useState(false);
+  const [question, setQuestion] = useState('');
+  const [qBusy, setQBusy] = useState(false);
+  const [qErr, setQErr] = useState<string | null>(null);
+  const [reponse, setReponse] = useState<{ id: number | null; texte: string } | null>(null);
+  const demander = async () => {
+    const q = question.trim(); if (q.length < 3 || qBusy) return;
+    setQBusy(true); setQErr(null); setReponse(null);
+    try {
+      const extraits = await chargerExtraits(q);
+      const r = (await api.post(orgPath(o, '/ia/delia'), { question: q, extraits })).data;
+      setReponse({ id: r.id ?? null, texte: r.reponse }); setQuestion('');
+    } catch (x) { setQErr(errMsg(x)); } finally { setQBusy(false); }
+  };
+  const soumettre = (e: FormEvent) => { e.preventDefault(); void demander(); };
   // Position libre sur la fenêtre (déplaçable) : mémorisée localement, sinon ancrée en bas à droite.
   const CLE_POS = `vibedelib.assiste.pos.${acte.id}`;
   const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
@@ -299,6 +318,33 @@ export default function DossierAssiste({ acte, editable, onReload, onApercu, toa
             </ol>
           </div>
 
+          {ia.loaded && ia.aide && (
+            <div className="border-t border-line px-3 py-2">
+              <button type="button" onClick={() => setQOuvert(!qOuvert)} className="flex w-full items-center gap-2 text-left" aria-expanded={qOuvert}>
+                <MessageCircleQuestion className="h-4 w-4 shrink-0 text-action" />
+                <span className="min-w-0 flex-1 text-[13px] font-semibold">Poser une question</span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-mute transition-transform motion-reduce:transition-none ${qOuvert ? 'rotate-180' : ''}`} />
+              </button>
+              {qOuvert && (
+                <div className="mt-2 space-y-2">
+                  <form onSubmit={soumettre} className="flex items-end gap-2">
+                    <textarea className="input !text-[13px]" rows={2} placeholder="Votre question…" value={question} onChange={(e) => setQuestion(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void demander(); } }} aria-label="Votre question" />
+                    <button className="btn-primary !py-2" disabled={qBusy || question.trim().length < 3}>{qBusy && <Spinner />} Demander</button>
+                  </form>
+                  {qBusy && <p className="flex items-center gap-2 text-[12px] text-mute"><Spinner /> {AVATAR_NOM} réfléchit…</p>}
+                  {qErr && <p role="alert" className="rounded border border-ko/30 bg-ko-bg px-2 py-1 text-[12px] text-ko">{qErr}</p>}
+                  {reponse && (
+                    <div className="rounded border border-line bg-soft p-2 text-[13px] leading-relaxed text-slate-700">
+                      <p className="whitespace-pre-wrap">{reponse.texte}</p>
+                      {reponse.id !== null && <NotationDelIa journalId={reponse.id} toast={toast} />}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-[11px] text-mute">
             <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5" /> L'étape avance toute seule.</span>
             {editable && <button type="button" className="font-semibold text-action hover:underline" onClick={arreter} disabled={busy}>{busy && <Spinner />} Ne plus m'aider</button>}
@@ -306,6 +352,39 @@ export default function DossierAssiste({ acte, editable, onReload, onApercu, toa
         </div>
       )}
     </>
+  );
+}
+
+/** Notation d'une réponse de Del-IA : « Ma réponse vous a-t-elle convenu ? » (1 à 4 étoiles + commentaire). */
+function NotationDelIa({ journalId, toast }: { journalId: number; toast: (m: string, k?: 'ok' | 'ko') => void }) {
+  const { org } = useAuth(); const o = org!.id;
+  const [note, setNote] = useState(0); const [commentaire, setCommentaire] = useState('');
+  const [busy, setBusy] = useState(false); const [fait, setFait] = useState(false);
+  if (fait) return <p className="mt-2 text-[12px] font-semibold text-ok-text">Merci, votre avis a été enregistré.</p>;
+  const LIBELLE: Record<number, string> = { 1: 'Pas du tout', 2: 'Peu', 3: 'Bien', 4: 'Très bien' };
+  const envoyer = async () => {
+    if (!note) return; setBusy(true);
+    try { await api.post(orgPath(o, `/ia/delia/${journalId}/note`), { note, commentaire: commentaire.trim() || null }); setFait(true); toast('Merci pour votre retour'); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
+  return (
+    <div className="mt-2 border-t border-line pt-2">
+      <p className="text-[12px] font-semibold">Ma réponse vous a-t-elle convenu ?</p>
+      <div className="mt-1 flex items-center gap-1" role="radiogroup" aria-label="Note de la réponse">
+        {[1, 2, 3, 4].map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={note === n} aria-label={`${n} étoile${n > 1 ? 's' : ''}`} onClick={() => setNote(n)}>
+            <Star className={`h-5 w-5 ${n <= note ? 'fill-warn text-warn' : 'text-mute'}`} />
+          </button>
+        ))}
+        <span className="ml-1 text-[11px] text-mute">{note ? LIBELLE[note] : '1 à 4 étoiles'}</span>
+      </div>
+      {note > 0 && (
+        <div className="mt-2 space-y-2">
+          <textarea className="input !text-[12px]" rows={2} placeholder="Commentaire (facultatif)…" value={commentaire} onChange={(e) => setCommentaire(e.target.value)} />
+          <button type="button" className="btn-primary !py-1 !text-[12px]" disabled={busy} onClick={envoyer}>{busy && <Spinner />} Envoyer mon avis</button>
+        </div>
+      )}
+    </div>
   );
 }
 

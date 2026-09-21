@@ -119,6 +119,13 @@ describe('import AIRS DELIB depuis Oracle (source directe, lecture seule)', () =
     expect(apres).toMatchObject({ etat: 'manuelle', cibleLibelle: 'CCAS et santé', cibleCode: r.cibleCode });
     const cibles = (await api(env, admin).get(`${base(ville)}/cibles?axe=direction`)).body.items;
     expect(cibles.find((x) => x.historique && x.libelle === 'CCAS et santé')).toBeTruthy();
+    // agents non rapprochés : créés dans le référentiel local (nom conservé, jamais de compte)
+    const ag = (await api(env, admin).get(`${base(ville)}/lots/${lot.id}/concordances?axe=agent`)).body.items[0];
+    await env.db.run("UPDATE airs_concordances SET etat = 'ignoree', cible_code = NULL, cible_id = NULL WHERE id = $1", [ag.id]);
+    expect((await api(env, admin).post(`${base(ville)}/lots/${lot.id}/agents/creer`, {})).body.crees).toBeGreaterThanOrEqual(1);
+    const maj = (await api(env, admin).get(`${base(ville)}/lots/${lot.id}/concordances?axe=agent`)).body.items.find((x) => String(x.id) === String(ag.id));
+    expect(maj).toMatchObject({ etat: 'manuelle' });
+    expect(maj.cibleCode).toBeTruthy();
   });
 
   it('complète un mapping existant avec la table source manquante « actes »', async () => {

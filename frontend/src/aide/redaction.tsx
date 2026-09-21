@@ -71,11 +71,12 @@ export const redaction: Article = {
       titre: 'Le guide pas à pas (« dossier assisté »)',
       bloc: (
         <>
-          <P>Si vous créez votre dossier en mode <Terme>assisté</Terme> (case à la création, ou carte « Dossier assisté » sur un brouillon existant), un petit assistant — <Terme>Del-IA</Terme> — vous suit pendant toute la rédaction : il indique à chaque instant l'étape où vous en êtes, donne des conseils et suit votre progression.</P>
+          <P>Si vous créez votre dossier en mode <Terme>assisté</Terme> (case à la création, ou carte « Dossier assisté » sur un brouillon existant), un petit assistant — <Terme>Evelyne Del-IA</Terme> — vous suit pendant toute la rédaction : il indique à chaque instant l'étape où vous en êtes, donne des conseils et suit votre progression.</P>
           <Liste>
             <Li>Le bouton <BoutonUI>Montrer</BoutonUI> vous amène au bon endroit : il ouvre l'éditeur du texte concerné, place le curseur sur le champ à remplir, ou affiche l'aperçu du dossier complet.</Li>
             <Li>La fenêtre est <Terme>déplaçable</Terme> (glissez son en-tête ou la pastille repliée) ; vous pouvez la <Terme>réduire</Terme> à une pastille, ou la <Terme>fermer</Terme> avec la croix.</Li>
-            <Li>À chaque étape franchie, Del-IA vous <Terme>félicite</Terme> et sa zone passe au vert.</Li>
+            <Li>À chaque étape franchie, Evelyne Del-IA vous <Terme>félicite</Terme> et sa zone passe au vert.</Li>
+            <Li>Vous pouvez lui <Terme>poser une question</Terme> à tout moment (bouton « Poser une question ») : il répond en s'appuyant sur la documentation, votre profil et les délibérations de l'application, puis vous dites si la réponse vous a convenu (1 à 4 étoiles).</Li>
           </Liste>
           <Encadre type="astuce" titre="Rouvrir le guide">
             Vous l'avez fermé ? Rouvrez-le depuis le menu <BoutonUI>Aide</BoutonUI> en haut à droite : <Terme>Réafficher le guide du dossier</Terme> (visible quand un dossier assisté est ouvert).

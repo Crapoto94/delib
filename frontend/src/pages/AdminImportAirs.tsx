@@ -215,7 +215,10 @@ function LigneConcordance({ o, lotId, c, cibles, onDone, onVoir }: { o: number; 
   const { toast } = useToast();
   const [verif, setVerif] = useState<any>(null);
   const cle = (x: any) => (x.id != null ? `i${x.id}` : `c${x.code ?? x.libelle}`);
-  const courante = cibles.find((x) => (c.cibleId != null && String(x.id) === String(c.cibleId)) || (c.cibleCode && x.code === c.cibleCode));
+  // La cible proposée (ou déjà décidée) peut ne pas figurer dans la liste chargée (agents notamment) : on l'injecte pour l'afficher.
+  const propose = (c.cibleId != null || c.cibleCode || c.cibleLibelle) ? { id: c.cibleId ?? null, code: c.cibleCode ?? null, libelle: c.cibleLibelle ?? c.cibleCode ?? '' } : null;
+  const courante = cibles.find((x) => (c.cibleId != null && String(x.id) === String(c.cibleId)) || (c.cibleCode && x.code === c.cibleCode)) ?? propose;
+  const liste = propose && !cibles.some((x) => cle(x) === cle(propose)) ? [propose, ...cibles] : cibles;
   const decide = async (x: any | null) => {
     try {
       await api.post(orgPath(o, `/import-airs/lots/${lotId}/concordances/${c.id}`), x ? { cibleType: CIBLE_TYPE[c.axe], cibleId: x.id ?? null, cibleCode: x.code ?? null, cibleLibelle: x.libelle, etat: 'manuelle' } : { etat: 'ignoree' });
@@ -242,7 +245,7 @@ function LigneConcordance({ o, lotId, c, cibles, onDone, onVoir }: { o: number; 
       <td>
         <Select className="input" value={courante ? cle(courante) : ''} onChange={(event) => { const x = cibles.find((y) => cle(y) === event.target.value); if (x) decide(x); }}>
           <option value="">— choisir une cible —</option>
-          {cibles.map((x) => <option key={cle(x)} value={cle(x)}>{x.libelle}{x.historique ? ' (ancienne)' : ''}{x.code && x.code !== x.libelle ? ` (${x.code})` : ''}</option>)}
+          {liste.map((x) => <option key={cle(x)} value={cle(x)}>{x.libelle}{x.historique ? ' (ancienne)' : ''}{x.code && x.code !== x.libelle ? ` (${x.code})` : ''}</option>)}
         </Select>
       </td>
       <td className="whitespace-nowrap text-right">
@@ -271,11 +274,30 @@ function Concordances({ o, lotId, conc, onDone }: { o: number; lotId: number; co
     try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/concordances/valider`), {}, { params: { axe } })).data; toast(`${r.validees} assignation(s) validée(s)`); onDone(); }
     catch (e) { toast(errMsg(e), 'ko'); }
   };
+  const creerAgents = async () => {
+    try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/agents/creer`), {})).data; toast(`${r.crees} agent(s) non rapproché(s) créé(s) — nom conservé`); onDone(); }
+    catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  const creerElus = async () => {
+    try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/elus/creer`), {})).data; toast(`${r.crees} élu(s) non rapproché(s) créé(s)`); onDone(); }
+    catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  const horsCommission = async () => {
+    try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/commissions/hors`), {})).data; toast(`${r.horsCommission} valeur(s) marquée(s) hors commission`); onDone(); }
+    catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  const relancer = async () => {
+    try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/concordances/auto`), {})).data; toast(`${r.proposees} proposition(s) relancée(s)`); onDone(); }
+    catch (e) { toast(errMsg(e), 'ko'); }
+  };
   if (!conc.items.length) return <Empty>Aucune valeur à concorder : analysez le lot.</Empty>;
   if (cibles.loading) return <Loading />;
   return (
     <div className="space-y-4">
       {conc.items.some((c: any) => c.bloquant && !['automatique', 'manuelle', 'ignoree'].includes(c.etat)) && <p className="flex items-center gap-2 rounded bg-warn-bg px-3 py-2 text-[13px] text-warn"><AlertTriangle className="h-4 w-4" /> La publication reste bloquée tant que les concordances bloquantes ne sont pas validées ou ignorées.</p>}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button className="btn-secondary !py-1 text-[12px]" title="Relance le rapprochement automatique (agents ignorés automatiquement inclus)" onClick={relancer}><RefreshCw className="h-3.5 w-3.5" /> Relancer les propositions automatiques</button>
+      </div>
       {axes.map((axe) => {
         const rows = conc.items.filter((c: any) => c.axe === axe);
         const resolue = rows.every((c: any) => ['automatique', 'manuelle', 'ignoree'].includes(c.etat));
@@ -289,6 +311,9 @@ function Concordances({ o, lotId, conc, onDone }: { o: number; lotId: number; co
               </button>
               <span className="flex items-center gap-2 text-[12px] text-mute">
                 {rowCount(rows)}
+                {axe === 'commission' && rows.some((c: any) => c.etat !== 'manuelle' && c.etat !== 'ignoree') && <button className="btn-secondary !px-2 !py-1 text-[12px]" title="Marquer les valeurs restantes comme absentes de l'application" onClick={horsCommission}><Ban className="h-3.5 w-3.5" /> Tout hors commission</button>}
+                {axe === 'elu' && rows.some((c: any) => !c.cibleCode && c.cibleId == null && c.etat !== 'manuelle') && <button className="btn-secondary !px-2 !py-1 text-[12px]" title="Créer ces rapporteurs dans le référentiel des élus" onClick={creerElus}><Plus className="h-3.5 w-3.5" /> Créer les élus non rapprochés</button>}
+                {axe === 'agent' && rows.some((c: any) => !c.cibleCode && c.cibleId == null && c.etat !== 'manuelle') && <button className="btn-secondary !px-2 !py-1 text-[12px]" title="Créer ces agents dans le référentiel local (nom conservé, aucun compte)" onClick={creerAgents}><Plus className="h-3.5 w-3.5" /> Créer les agents non rapprochés</button>}
                 {rows.some((c: any) => ['proposee', 'automatique'].includes(c.etat) && (c.cibleCode || c.cibleId != null)) && <button className="btn-secondary !px-2 !py-1 text-[12px]" onClick={() => validerTout(axe)}><Check className="h-3.5 w-3.5" /> Valider toutes les assignations automatiques</button>}
               </span>
             </div>

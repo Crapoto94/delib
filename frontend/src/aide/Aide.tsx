@@ -45,7 +45,7 @@ export function AideMenu() {
             {surDossier && (
               <button role="menuitem" onClick={() => { setOpen(false); window.dispatchEvent(new Event('vibedelib:guide-dossier')); }} className="flex w-full items-start gap-3 rounded px-3 py-2 text-left hover:bg-soft">
                 <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-head" />
-                <span><span className="block text-[13px] font-semibold text-ink">Réafficher le guide du dossier</span><span className="block text-[12px] text-mute">Del-IA, l'assistant pas à pas de ce dossier.</span></span>
+                <span><span className="block text-[13px] font-semibold text-ink">Réafficher le guide du dossier</span><span className="block text-[12px] text-mute">Evelyne Del-IA, l'assistant pas à pas de ce dossier.</span></span>
               </button>)}
             <Link role="menuitem" to="/aide" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-[13px] font-semibold text-action hover:bg-soft">Ouvrir le centre d'aide</Link>
           </div>

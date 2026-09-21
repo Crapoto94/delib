@@ -88,6 +88,15 @@ module.exports = ({ makeRouter, airs }) => {
     body: z.object({ code: z.string().trim().max(40).optional(), libelle: z.string().trim().min(1).max(200) }) },
   async (req, res) => res.json(await airs.creerConcordanceHistorique(req.ctx, req.org.id, req.valid.params.id, req.valid.params.cid, req.valid.body)));
 
+  r.post('/:orgId/import-airs/lots/:id/agents/creer', { summary: 'Crée les agents non rapprochés dans le référentiel local (nom conservé, jamais de compte utilisateur)', tags: T, org: true, roles: ROLES, params: LotP },
+    async (req, res) => res.json(await airs.creerAgentsNonRappropries(req.ctx, req.org.id, req.valid.params.id)));
+
+  r.post('/:orgId/import-airs/lots/:id/elus/creer', { summary: 'Crée les élus (rapporteurs) non rapprochés dans le référentiel local', tags: T, org: true, roles: ROLES, params: LotP },
+    async (req, res) => res.json(await airs.creerElusNonRappropries(req.ctx, req.org.id, req.valid.params.id)));
+
+  r.post('/:orgId/import-airs/lots/:id/commissions/hors', { summary: "Marque les valeurs de commission restantes comme « hors commission » (absente de l'application)", tags: T, org: true, roles: ROLES, params: LotP },
+    async (req, res) => res.json(await airs.horsCommission(req.ctx, req.org.id, req.valid.params.id)));
+
   r.post('/:orgId/import-airs/lots/:id/concordances/:cid', { summary: 'Décide une concordance (cible choisie, ou valeur ignorée)', tags: T, org: true, roles: ROLES, params: ConcP,
     body: Cible.extend({ etat: z.enum(['proposee', 'automatique', 'manuelle', 'ignoree']).optional() }) },
   async (req, res) => res.json(await airs.decider(req.ctx, req.org.id, req.valid.params.id, req.valid.params.cid, req.valid.body)));

@@ -1,4 +1,15 @@
-const { rapprocher } = require('../../src/modules/import-airs/airs.service');
+const { rapprocher, sansCivilite } = require('../../src/modules/import-airs/airs.service');
+
+describe('civilité des noms (élus, agents)', () => {
+  it('retire « Monsieur », « Madame », « M. » en tête', () => {
+    expect(sansCivilite('Monsieur Romain MARCHAND')).toBe('Romain MARCHAND');
+    expect(sansCivilite('Madame Jeanne DUPONT')).toBe('Jeanne DUPONT');
+    expect(sansCivilite('M. Alain BRIARD')).toBe('Alain BRIARD');
+    expect(sansCivilite('Mme Claire MARTIN')).toBe('Claire MARTIN');
+    expect(sansCivilite('Romain MARCHAND')).toBe('Romain MARCHAND');
+  });
+});
+
 
 describe('rapprochement des directions et services AIRS → VibeDélib', () => {
   const directions = [{ code: 'BF', label: 'Direction des Finances' }, { code: 'RH', label: 'Direction des Ressources Humaines' }];
