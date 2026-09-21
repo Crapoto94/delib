@@ -9,6 +9,20 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.42.0 — Mes actes, « Tous les actes », bibliothèque enrichie et import AIRS des conseils récents
+
+- **Accueil « Mes actes »** refondu : une seule page qui rassemble **tous les actes qui me concernent et ne sont pas encore passés au conseil**, séparés en rubriques — **action attendue de moi**, **rédaction/validation de mon équipe**, **actes que j'ai validés** et qui poursuivent leur circuit, **actes inscrits au conseil** (les miens et ceux de mon équipe). Les **actes en retard** sont distingués d'emblée (ligne rouge + badge). Backend : `GET /circuit/portefeuille`.
+- **Nouvelle page « Tous les actes »** (administrateur, SCC) : les actes **qui ne sont pas encore passés au conseil**, avec une **rupture au choix** — **par étape du circuit** (Rédaction, À corriger, Service financier, Directeur, Service juridique… **Inscrit au conseil**…) ou **par date du conseil pressenti**. Backend : `GET /circuit/en-cours`.
+- **Import AIRS — actes des conseils récents** : reprise des actes des séances **non archivées**, avec leurs **documents Word/Excel convertis en PDF** et leurs annexes (conversion Office sur le serveur) ; l'**origine AIRS** (archivé ou courant) est conservée (`custom.airs.origine`) ; les **élus repris** sont créés comme **anciens élus**.
+- **Annexes** : un **document d'origine + son PDF converti** forment **une seule annexe** avec **deux boutons** (nouvelle colonne `annexes.pdf_file_id`, fusion des doublons) ; une annexe est **communicable ou non communicable** (bascule dans la fiche, choix à l'ajout).
+- **Bibliothèque** : **filtre rapide par état** — archivé / en cours / les deux — avec **pastille colorée** ; les actes issus de l'**import AIRS** sont signalés **en violet** ; le bouton d'annexes affiche leur **nombre** et, **entre parenthèses en rouge**, celles **non publiables** (ex. `5 (1)`) ; les boutons **« exposé des motifs »** et **« extrait du registre »** servent **directement les PDF de l'import** ; la fiche affiche le **PDF à côté du document** d'origine.
+- **Création d'un dossier** : **saisie de mots-clés** et **proposition de délibérations passées** correspondantes (recherche dans la bibliothèque **sans IA**, **acronymes reconnus** — RIFSEEP = R.I.F.S.E.E.P) ; bouton **« Utiliser comme modèle »** qui reprend **tout** (champs, textes, annexes). Le mot-clé est mémorisé (`custom.motsCles`).
+- **Rappel d'une délibération en circuit** : seules les personnes ayant **réellement eu affaire à l'acte** (validation, avis de commission, commentaire, amendement) et le **rédacteur** sont prévenues — plus de diffusion à tout le circuit ; la **liste des destinataires** est affichée avant confirmation (`GET /actes/:id/notifications/destinataires`).
+- **Réouverture d'un ordre du jour arrêté** : `POST /seances/:id/odj/reouverture` (motif obligatoire, réservé SCC/administrateur) — refusée dès que la séance est convoquée ou tenue ; numéros recalculés au prochain arrêt, opération historisée et auditée.
+- **Suppression d'un acte** : un acte **déjà passé au conseil** ne peut être supprimé que par un **administrateur ou le SCC**.
+- **Numéros de suivi** : plus de collision après un import AIRS (`nextCounter` accepte un plancher = plus grand numéro déjà attribué).
+- **Navigation** : onglets **Mes actes · Tous les actes (admin/SCC) · Bibliothèque**.
+
 ## 0.41.0 — Dossier assisté : un guide pas à pas à la rédaction
 
 - **Dossier assisté** : à la création d'un dossier (« Nouveau dossier » → case « Créer en dossier assisté ») ou depuis un brouillon existant (carte « Dossier assisté » dans la fiche), un avatar d'aide — **Evelyne Del-IA** — accompagne le rédacteur : il dit **quoi faire**, donne des **conseils** et suit la **progression** (fiche, exposé des motifs, visas, dispositif, annexes, relecture, envoi).

@@ -11,9 +11,24 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.41.0';
+export const VERSION = '0.42.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.42.0', type: 'minor', titre: 'Mes actes, « Tous les actes », bibliothèque enrichie et import AIRS des conseils récents',
+    items: [
+      "Accueil « Mes actes » : une seule page qui rassemble tous les actes qui vous concernent et ne sont pas encore passés au conseil, séparés en rubriques — action attendue de vous, rédaction/validation de votre équipe, actes que vous avez validés et qui poursuivent leur circuit, actes inscrits au conseil. Les actes en retard sont distingués d'emblée.",
+      "Nouvelle page « Tous les actes » (administrateur, SCC) : les actes qui ne sont pas encore passés au conseil, avec une rupture au choix — par étape du circuit (rédaction, validation directeur, visa finance, inscrit au conseil…) ou par date du conseil pressenti.",
+      "Import AIRS : reprise des actes des séances non archivées (documents Word et annexes), avec conversion automatique en PDF à côté du fichier d'origine ; l'origine AIRS (archivé ou courant) est conservée et les élus repris sont marqués comme anciens élus.",
+      "Annexes : un document d'origine (Word/Excel) et son PDF converti forment une seule annexe, avec deux boutons ; une annexe est communicable ou non communicable.",
+      "Bibliothèque : filtre rapide par état — archivé, en cours, ou les deux — avec pastille colorée ; les actes issus de l'import AIRS sont signalés en violet ; le bouton d'annexes affiche leur nombre et, entre parenthèses en rouge, celles qui ne sont pas publiables ; les boutons « exposé des motifs » et « extrait du registre » servent directement les PDF de l'import.",
+      "Création d'un dossier : saisie de mots-clés ; l'application propose des délibérations passées correspondantes (recherche dans la bibliothèque, sans IA, reconnaissant les acronymes comme RIFSEEP pour R.I.F.S.E.E.P) et permet de les reprendre comme modèle, textes et annexes compris.",
+      "Rappel d'une délibération en circuit : seules les personnes ayant eu affaire à l'acte (validation, avis, commentaire, amendement) et le rédacteur sont prévenues ; la liste des destinataires est affichée avant de confirmer.",
+      "Un ordre du jour arrêté peut être rouvert (avec motif) tant que la séance n'est pas convoquée, pour corriger ou compléter la liste.",
+      "Suppression d'un acte : un acte déjà passé au conseil ne peut être supprimé que par un administrateur ou le SCC.",
+      "Numéros de suivi : plus de collision après un import AIRS, la numérotation reprend toujours au-dessus des numéros déjà attribués.",
+    ],
+  },
   {
     version: '0.41.0', type: 'minor', titre: 'Dossier assisté : un guide pas à pas à la rédaction',
     items: [

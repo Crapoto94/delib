@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.42 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.43 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1879,6 +1879,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.43** | 2026-09-21 | **D112** : portefeuille « Mes actes » (action attendue, rédaction/validation de l'équipe, actes validés en circuit, inscrits au conseil) et vue « Tous les actes » (administrateur/SCC) avec rupture par étape du circuit ou par conseil pressenti ; bibliothèque (filtre d'état, origine AIRS en violet, compteur d'annexes dont non publiables, PDF d'import pour exposé/extrait) ; annexes Word + PDF associé ; import AIRS des conseils récents et origine des actes ; mots-clés et reprise d'un modèle ; rappel ciblé et réouverture d'ordre du jour ; numéros de suivi robustes |
 | **1.42** | 2026-09-21 | **D111** : import de l'historique **AIRS DELIB** par **sas** et **concordances** (IMP-01 à IMP-20) — processus en quatre temps, sas `airs_*` générique (MCD inconnu), axes de concordance ouverts, contrôle AD des agents, publication idempotente et réversible, questions HUB (Q-AIRS1 à 6) |
 | **1.41** | 2026-09-21 | **D110** : séance visée en gras (inscrit à l'ordre du jour) ou en italique (pas encore) — SEA-18 |
 | **1.40** | 2026-09-21 | **D109** : « Se souvenir de moi » (SEC-17) ; séance visée dans les dossiers de l'équipe |
@@ -1946,5 +1947,30 @@ Reprise de données AIRS DELIB, recherche et consultation de la bibliothèque, c
 
 ### Actes — suppression / rappel
 - **Suppression d'un acte hors circuit** : `DELETE /actes/:id` (avec modale de confirmation), refusée si une étape est en cours.
-- **Rappel d'un acte en circuit** : `POST /actes/:id/rappeler` avec **motif obligatoire** — casse le circuit (étape courante marquée « returned ») et **informe les intervenants** (règle de notification `acte.rappele`).
+- **Rappel d'un acte en circuit** : `POST /actes/:id/rappeler` avec **motif obligatoire** — casse le circuit (étape courante marquée « returned ») et **prévient les personnes ayant eu affaire à l'acte** (validation, avis, commentaire, amendement) et le rédacteur (règle `acte.rappele`, résolveur `acteurs`).
 - **Nouvel état `rappele`** (migration `0056_acte_rappel.sql`) avec `rappel_motif` et `rappel_at`.
+
+### Portefeuille et vues d'ensemble
+- **Mes actes** : page unique — tous les actes **non encore passés au conseil** qui me concernent, en rubriques (action attendue de moi, rédaction/validation de mon équipe, actes que j'ai validés et qui poursuivent leur circuit, actes inscrits au conseil) ; **retard distingué**. `GET /circuit/portefeuille`.
+- **Tous les actes** (administrateur, SCC) : actes non passés au conseil, avec **rupture par étape du circuit** ou **par date du conseil pressenti** ; les actes **inscrits à l'ODJ** ont leur propre rupture. `GET /circuit/en-cours`.
+- Navigation principale : **Mes actes · Tous les actes (admin/SCC) · Bibliothèque**.
+
+### Bibliothèque (compléments)
+- **Filtre rapide d'état** (archivé / en cours / les deux) avec pastille ; origine **AIRS en violet** (badge « Import AIRS ») ; le compteur d'annexes affiche les **non publiables en rouge entre parenthèses** (ex. `5 (1)`).
+- Boutons **« exposé des motifs »** et **« extrait du registre »** : servent **directement les PDF de l'import AIRS** (rapport r… / délibération d…) ; la fiche affiche le **PDF à côté du document d'origine**.
+- **Origine AIRS conservée** (`custom.airs.origine`, migration `0058`) : un acte importé d'AIRS « courant » n'est **plus présenté comme archivé**.
+
+### Annexes
+- Un **document d'origine et son PDF converti** forment **une seule annexe, avec deux boutons** (colonne `annexes.pdf_file_id`, migration `0057`, fusion des paires existantes) ; `GET …/annexes/:id/file?format=pdf` sert le PDF associé.
+- **Communicable / non communicable** : bascule dans la fiche, choix à l'ajout.
+
+### Import AIRS (compléments)
+- Reprise des actes des **conseils non archivés** avec leurs documents **Word/Excel convertis en PDF** (conversion Office côté serveur, `shared/convert.js`) et leurs annexes ; `rap_id` extrait pour rattacher documents et annexes.
+- Les **élus créés** lors de l'import sont marqués comme **anciens élus** (`actif = false`).
+
+### Dossiers — mots-clés et reprise d'un modèle
+- **Mots-clés** à la création d'un dossier ; **propositions** de délibérations passées correspondantes (recherche dans la bibliothèque, **sans IA**, **acronymes reconnus** : RIFSEEP = R.I.F.S.E.E.P) ; bouton **« Utiliser comme modèle »** qui reprend **tout** (champs, textes, annexes). `GET /recherche/propositions`, `POST /actes/depuis-modele`.
+
+### Circuit, ordre du jour et suppressions
+- **Réouverture d'un ordre du jour arrêté** : `POST /seances/:id/odj/reouverture` (motif obligatoire, SCC/administrateur), refusée dès que la séance est convoquée ou tenue ; numéros recalculés au prochain arrêt, historisée et auditée.
+- **Suppression d'un acte** : un acte **déjà passé au conseil** n'est supprimable que par un **administrateur ou le SCC** ; **numéros de suivi robustes** (plus de collision avec les numéros issus de l'import AIRS).
