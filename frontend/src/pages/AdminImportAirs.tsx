@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle, Ban, Check, ChevronLeft, Cog, FileJson, Play, Plus, RefreshCw, Upload, Wand2, XCircle } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -6,17 +6,17 @@ import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
 import { Select } from '../Select';
 
-const AXES: Record<string, string> = { organisme: 'Organisme', instance: 'Instance / type de sÃ©ance', direction: 'Direction', service: 'Service', agent: 'Agent', elu: 'Ã‰lu', commission: 'Commission', type_acte: "Type d'acte", nature: 'Nature', rubrique: 'Rubrique', matiere: 'MatiÃ¨re' };
+const AXES: Record<string, string> = { organisme: 'Organisme', instance: 'Instance / type de séance', direction: 'Direction', service: 'Service', agent: 'Agent', elu: 'Élu', commission: 'Commission', type_acte: "Type d'acte", nature: 'Nature', rubrique: 'Rubrique', matiere: 'Matière' };
 const CIBLE_TYPE: Record<string, string> = { direction: 'directions', service: 'services', agent: 'agents', elu: 'elus', commission: 'commissions', instance: 'instances', organisme: 'organismes', type_acte: 'ref_items', nature: 'ref_items', rubrique: 'ref_items', matiere: 'ref_items' };
 const ETAT: Record<string, { label: string; tone: 'ok' | 'warn' | 'ko' | 'gray' | 'blue' }> = {
-  a_faire: { label: 'Ã€ faire', tone: 'gray' }, proposee: { label: 'ProposÃ©e', tone: 'warn' }, automatique: { label: 'Automatique', tone: 'blue' },
-  manuelle: { label: 'ValidÃ©e', tone: 'ok' }, ignoree: { label: 'IgnorÃ©e', tone: 'gray' },
+  a_faire: { label: 'À faire', tone: 'gray' }, proposee: { label: 'Proposée', tone: 'warn' }, automatique: { label: 'Automatique', tone: 'blue' },
+  manuelle: { label: 'Validée', tone: 'ok' }, ignoree: { label: 'Ignorée', tone: 'gray' },
 };
 const LOT: Record<string, { label: string; tone: 'ok' | 'warn' | 'ko' | 'gray' | 'blue' }> = {
-  brouillon: { label: 'Brouillon', tone: 'gray' }, charge: { label: 'ChargÃ©', tone: 'blue' }, analyse: { label: 'AnalysÃ©', tone: 'blue' },
-  concordances: { label: 'Concordances', tone: 'warn' }, pret: { label: 'PrÃªt', tone: 'warn' }, publie: { label: 'PubliÃ©', tone: 'ok' }, annule: { label: 'AnnulÃ©', tone: 'ko' },
+  brouillon: { label: 'Brouillon', tone: 'gray' }, charge: { label: 'Chargé', tone: 'blue' }, analyse: { label: 'Analysé', tone: 'blue' },
+  concordances: { label: 'Concordances', tone: 'warn' }, pret: { label: 'Prêt', tone: 'warn' }, publie: { label: 'Publié', tone: 'ok' }, annule: { label: 'Annulé', tone: 'ko' },
 };
-const clamp = (s: string, n = 90) => (s.length > n ? `${s.slice(0, n)}â€¦` : s);
+const clamp = (s: string, n = 90) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 function NouveauLot({ o, onClose, onDone }: { o: number; onClose: () => void; onDone: (lot: any) => void }) {
   const [f, setF] = useState({ label: `Reprise AIRS ${new Date().getFullYear()}`, sourceKind: 'json', mode: 'passes' });
@@ -26,13 +26,13 @@ function NouveauLot({ o, onClose, onDone }: { o: number; onClose: () => void; on
     <Modal title="Nouveau lot de reprise AIRS DELIB" onClose={onClose}>
       <div className="space-y-3">
         <ErrorBox msg={err} />
-        <Field label="LibellÃ© du lot *"><input className="input" autoFocus value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} /></Field>
+        <Field label="Libellé du lot *"><input className="input" autoFocus value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} /></Field>
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Source"><Select className="input" value={f.sourceKind} onChange={(e) => setF({ ...f, sourceKind: e.target.value })}><option value="json">Fichier / export JSON du HUB</option><option value="tables">Tables airs_* (schÃ©ma partagÃ©)</option></Select></Field>
-          <Field label="PÃ©rimÃ¨tre"><Select className="input" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="passes">SÃ©ances passÃ©es (dÃ©faut)</option><option value="preparation">SÃ©ances passÃ©es + actes en prÃ©paration</option></Select></Field>
+          <Field label="Source"><Select className="input" value={f.sourceKind} onChange={(e) => setF({ ...f, sourceKind: e.target.value })}><option value="json">Fichier / export JSON du HUB</option><option value="tables">Tables airs_* (schéma partagé)</option></Select></Field>
+          <Field label="Périmètre"><Select className="input" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="passes">Séances passées (défaut)</option><option value="preparation">Séances passées + actes en préparation</option></Select></Field>
         </div>
-        <p className="text-[12px] text-mute">Les donnÃ©es sont dÃ©posÃ©es dans un <b>sas</b> : rien n'entre dans l'outil avant la validation des concordances puis la publication.</p>
-        <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || f.label.trim().length < 2} onClick={go}>{busy && <Spinner />} CrÃ©er le lot</button></div>
+        <p className="text-[12px] text-mute">Les données sont déposées dans un <b>sas</b> : rien n'entre dans l'outil avant la validation des concordances puis la publication.</p>
+        <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || f.label.trim().length < 2} onClick={go}>{busy && <Spinner />} Créer le lot</button></div>
       </div>
     </Modal>
   );
@@ -48,10 +48,10 @@ function Charger({ o, lot, onDone, onClose }: { o: number; lot: any; onDone: () 
   };
   const chargerFichier = () => { try { envoyer(JSON.parse(contenu)); } catch { setErr('JSON illisible'); } };
   return (
-    <Modal title="Charger les donnÃ©es AIRS dans le sas" onClose={onClose} wide>
+    <Modal title="Charger les données AIRS dans le sas" onClose={onClose} wide>
       <div className="space-y-3">
         <ErrorBox msg={err} />
-        <p className="text-[13px] text-mute">Format attendu : objet <code>{'{ "seances": [ â€¦ ], "rapports": [ â€¦ ] }'}</code>. Les lignes sont conservÃ©es telles quelles (JSONB) : aucune interprÃ©tation avant l'analyse.</p>
+        <p className="text-[13px] text-mute">Format attendu : objet <code>{'{ "seances": [ … ], "rapports": [ … ] }'}</code>. Les lignes sont conservées telles quelles (JSONB) : aucune interprétation avant l'analyse.</p>
         <div className="flex flex-wrap items-center gap-3">
           <input type="file" accept=".json" onChange={(e) => lire(e.target.files?.[0])} />
           <button className="btn-secondary" disabled={busy} onClick={() => envoyer(null, true)}><Wand2 className="h-4 w-4" /> Charger le jeu d'essai</button>
@@ -69,10 +69,10 @@ function Mapping({ o, onClose, onDone }: { o: number; onClose: () => void; onDon
   const initial = useMemo(() => (d.data ? JSON.stringify(d.data.map((m) => ({ tableName: m.table_name, libelle: m.libelle, entiteCible: m.entite_cible, cleColonne: m.cle_colonne, colonnes: m.colonnes, ordre: m.ordre, actif: m.actif })), null, 2) : ''), [d.data]);
   const save = async () => { setBusy(true); setErr(null); try { await api.put(orgPath(o, '/import-airs/mapping'), { items: JSON.parse(txt) }); onDone(); } catch (e) { setErr(e instanceof SyntaxError ? 'JSON illisible' : errMsg(e)); setBusy(false); } };
   return (
-    <Modal title="Mapping dÃ©claratif des tables AIRS" onClose={onClose} wide>
+    <Modal title="Mapping déclaratif des tables AIRS" onClose={onClose} wide>
       <div className="space-y-3">
         <ErrorBox msg={err} />
-        <p className="text-[13px] text-mute">Le MCD d'AIRS n'Ã©tant pas connu, chaque table source et la correspondance de ses colonnes vers les champs canoniques (<code>titre</code>, <code>direction</code>, <code>service</code>, <code>date</code>â€¦) se dÃ©finissent ici. C'est de la <b>configuration</b>, pas du code.</p>
+        <p className="text-[13px] text-mute">Le MCD d'AIRS n'étant pas connu, chaque table source et la correspondance de ses colonnes vers les champs canoniques (<code>titre</code>, <code>direction</code>, <code>service</code>, <code>date</code>…) se définissent ici. C'est de la <b>configuration</b>, pas du code.</p>
         {d.loading ? <Loading /> : <textarea className="input h-72 font-mono text-[12px]" value={txt || initial} onChange={(e) => setTxt(e.target.value)} onFocus={() => { if (!txt) setTxt(initial); }} />}
         <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Fermer</button><button className="btn-primary" disabled={busy || !(txt || initial)} onClick={save}>{busy && <Spinner />} Enregistrer le mapping</button></div>
       </div>
@@ -88,25 +88,25 @@ function LigneConcordance({ o, lotId, c, cibles, onDone }: { o: number; lotId: n
   const decide = async (x: any | null) => {
     try {
       await api.post(orgPath(o, `/import-airs/lots/${lotId}/concordances/${c.id}`), x ? { cibleType: CIBLE_TYPE[c.axe], cibleId: x.id ?? null, cibleCode: x.code ?? null, cibleLibelle: x.libelle, etat: 'manuelle' } : { etat: 'ignoree' });
-      toast(x ? 'Concordance validÃ©e' : 'Valeur ignorÃ©e'); onDone();
+      toast(x ? 'Concordance validée' : 'Valeur ignorée'); onDone();
     } catch (e) { toast(errMsg(e), 'ko'); }
   };
   const verifierAd = async () => { try { setVerif((await api.post(orgPath(o, '/import-airs/agents/verifier'), { valeurs: [{ nom: c.sourceCode }] })).data.items[0]); } catch (e) { toast(errMsg(e), 'ko'); } };
   const e = ETAT[c.etat] ?? ETAT.a_faire;
   return (
     <tr className={c.bloquant && !['manuelle', 'ignoree'].includes(c.etat) ? 'bg-warn-bg/40' : ''}>
-      <td><div className="font-semibold">{c.sourceCode}</div><div className="text-[11px] text-mute">{c.bloquant && <span className="text-ko">bloquant Â· </span>}{c.occurrence} acte(s)</div></td>
+      <td><div className="font-semibold">{c.sourceCode}</div><div className="text-[11px] text-mute">{c.bloquant && <span className="text-ko">bloquant · </span>}{c.occurrence} acte(s)</div></td>
       <td><Badge tone={e.tone}>{e.label}</Badge>{c.confiance != null && c.etat === 'proposee' && <span className="ml-1 text-[11px] text-mute">{Math.round(c.confiance * 100)} %</span>}</td>
       <td>
         <Select className="input" value={courante ? cle(courante) : ''} onChange={(event) => { const x = cibles.find((y) => cle(y) === event.target.value); if (x) decide(x); }}>
-          <option value="">â€” choisir une cible â€”</option>
+          <option value="">— choisir une cible —</option>
           {cibles.map((x) => <option key={cle(x)} value={cle(x)}>{x.libelle}{x.code && x.code !== x.libelle ? ` (${x.code})` : ''}</option>)}
         </Select>
       </td>
       <td className="whitespace-nowrap text-right">
-        {c.axe === 'agent' && <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" onClick={verifierAd}>ContrÃ´le AD</button>}
+        {c.axe === 'agent' && <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" onClick={verifierAd}>Contrôle AD</button>}
         <button className="rounded p-2 text-ko hover:bg-slate-100" title="Ignorer cette valeur" aria-label={`Ignorer ${c.sourceCode}`} onClick={() => decide(null)}><Ban className="h-4 w-4" /></button>
-        {verif && <div className="mt-1 text-left text-[11px] text-mute">{verif.statut === 'connu' ? `AD : connu (${verif.trouves?.[0]?.libelle ?? ''})` : verif.statut === 'jamais_connecte' ? `AD : ${verif.trouves?.[0]?.libelle ?? 'trouvÃ©'}` : `AD : ${verif.statut}`}</div>}
+        {verif && <div className="mt-1 text-left text-[11px] text-mute">{verif.statut === 'connu' ? `AD : connu (${verif.trouves?.[0]?.libelle ?? ''})` : verif.statut === 'jamais_connecte' ? `AD : ${verif.trouves?.[0]?.libelle ?? 'trouvé'}` : `AD : ${verif.statut}`}</div>}
       </td>
     </tr>
   );
@@ -119,17 +119,17 @@ function Concordances({ o, lotId, conc, onDone }: { o: number; lotId: number; co
     await Promise.all(axes.map(async (axe) => { out[axe] = (await api.get(orgPath(o, '/import-airs/cibles'), { params: { axe } })).data.items as any[]; }));
     return out;
   }, [o, lotId, axes.join(',')]);
-  if (!conc.items.length) return <Empty>Aucune valeur Ã  concorder : analysez le lot.</Empty>;
+  if (!conc.items.length) return <Empty>Aucune valeur à concorder : analysez le lot.</Empty>;
   if (cibles.loading) return <Loading />;
   return (
     <div className="space-y-4">
-      {conc.items.some((c: any) => c.bloquant && !['manuelle', 'ignoree'].includes(c.etat)) && <p className="flex items-center gap-2 rounded bg-warn-bg px-3 py-2 text-[13px] text-warn"><AlertTriangle className="h-4 w-4" /> La publication reste bloquÃ©e tant que les concordances bloquantes ne sont pas validÃ©es ou ignorÃ©es.</p>}
+      {conc.items.some((c: any) => c.bloquant && !['manuelle', 'ignoree'].includes(c.etat)) && <p className="flex items-center gap-2 rounded bg-warn-bg px-3 py-2 text-[13px] text-warn"><AlertTriangle className="h-4 w-4" /> La publication reste bloquée tant que les concordances bloquantes ne sont pas validées ou ignorées.</p>}
       {axes.map((axe) => {
         const rows = conc.items.filter((c: any) => c.axe === axe);
         return (
           <section key={axe} className="card overflow-x-auto">
             <div className="flex items-center justify-between border-b border-line px-4 py-2"><b>{AXES[axe] ?? axe}</b><span className="text-[12px] text-mute">{rowCount(rows)}</span></div>
-            <table className="w-full"><thead><tr><th>Valeur AIRS</th><th>Ã‰tat</th><th>Cible dans VibeDÃ©lib</th><th /></tr></thead>
+            <table className="w-full"><thead><tr><th>Valeur AIRS</th><th>État</th><th>Cible dans VibeDélib</th><th /></tr></thead>
               <tbody>{rows.map((c: any) => <LigneConcordance key={c.id} o={o} lotId={lotId} c={c} cibles={cibles.data?.[axe] ?? []} onDone={onDone} />)}</tbody></table>
           </section>
         );
@@ -138,23 +138,23 @@ function Concordances({ o, lotId, conc, onDone }: { o: number; lotId: number; co
   );
 }
 
-const rowCount = (rows: any[]) => `${rows.filter((c) => ['manuelle', 'ignoree'].includes(c.etat)).length}/${rows.length} rÃ©solue(s)`;
+const rowCount = (rows: any[]) => `${rows.filter((c) => ['manuelle', 'ignoree'].includes(c.etat)).length}/${rows.length} résolue(s)`;
 
 function Actes({ o, lotId, detail, onDone }: { o: number; lotId: number; detail: any; onDone: () => void }) {
   const { toast } = useToast();
   const actes = (detail.items as any[]).filter((x) => x.kind === 'acte');
   const agir = async (fn: () => Promise<any>, ok: string) => { try { await fn(); toast(ok); onDone(); } catch (e) { toast(errMsg(e), 'ko'); } };
-  if (!actes.length) return <Empty>Aucun acte dÃ©tectÃ© dans ce lot.</Empty>;
+  if (!actes.length) return <Empty>Aucun acte détecté dans ce lot.</Empty>;
   return (
     <div className="card overflow-x-auto">
-      <table className="w-full"><thead><tr><th>Acte</th><th>SÃ©ance</th><th>Ã‰tat</th><th /></tr></thead><tbody>{actes.map((x) => (
+      <table className="w-full"><thead><tr><th>Acte</th><th>Séance</th><th>État</th><th /></tr></thead><tbody>{actes.map((x) => (
         <tr key={x.id}>
-          <td><div className="font-semibold">{clamp(String(x.payload.titre ?? x.payload.objet ?? '(sans objet)'))}</div><div className="text-[11px] text-mute">{x.sourceKey} Â· {x.payload.numero ?? ''}</div></td>
-          <td className="text-[12px]">{x.payload.date ? dt(x.payload.date, { dateStyle: 'medium' }) : 'â€”'}</td>
-          <td>{x.statut === 'publie' ? <Badge tone="ok">PubliÃ©</Badge> : x.statut === 'ignore' ? <Badge tone="gray">IgnorÃ©</Badge> : x.problemes?.length ? <span className="text-[12px] text-ko">{x.problemes.map((p: any) => p.label).join(' Â· ')}</span> : <Badge tone="blue">PrÃªt</Badge>}</td>
+          <td><div className="font-semibold">{clamp(String(x.payload.titre ?? x.payload.objet ?? '(sans objet)'))}</div><div className="text-[11px] text-mute">{x.sourceKey} · {x.payload.numero ?? ''}</div></td>
+          <td className="text-[12px]">{x.payload.date ? dt(x.payload.date, { dateStyle: 'medium' }) : '—'}</td>
+          <td>{x.statut === 'publie' ? <Badge tone="ok">Publié</Badge> : x.statut === 'ignore' ? <Badge tone="gray">Ignoré</Badge> : x.problemes?.length ? <span className="text-[12px] text-ko">{x.problemes.map((p: any) => p.label).join(' · ')}</span> : <Badge tone="blue">Prêt</Badge>}</td>
           <td className="whitespace-nowrap text-right">
-            {x.statut !== 'publie' && <button className="btn-primary mr-1 !px-2 !py-1 text-[12px]" disabled={!!x.problemes?.length} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${x.id}/publier`), {}), 'Acte publiÃ©')}><Check className="h-3.5 w-3.5" /> Publier</button>}
-            {x.statut !== 'publie' && <button className="rounded p-2 text-ko hover:bg-slate-100" title="Ignorer" aria-label="Ignorer" onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${x.id}/ignorer`), {}), 'Acte ignorÃ©')}><XCircle className="h-4 w-4" /></button>}
+            {x.statut !== 'publie' && <button className="btn-primary mr-1 !px-2 !py-1 text-[12px]" disabled={!!x.problemes?.length} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${x.id}/publier`), {}), 'Acte publié')}><Check className="h-3.5 w-3.5" /> Publier</button>}
+            {x.statut !== 'publie' && <button className="rounded p-2 text-ko hover:bg-slate-100" title="Ignorer" aria-label="Ignorer" onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${x.id}/ignorer`), {}), 'Acte ignoré')}><XCircle className="h-4 w-4" /></button>}
           </td>
         </tr>))}</tbody></table>
     </div>
@@ -179,21 +179,21 @@ function Detail({ o, lotId, onRetour, onRechargeListe }: { o: number; lotId: num
     <div className="space-y-4">
       <button className="btn-secondary" onClick={onRetour}><ChevronLeft className="h-4 w-4" /> Tous les lots</button>
       <div className="card flex flex-wrap items-center gap-3 p-4">
-        <div className="min-w-0 flex-1"><div className="text-[15px] font-bold text-head">{lot.label}</div><div className="text-[12px] text-mute">{lot.mode === 'passes' ? 'SÃ©ances passÃ©es' : 'SÃ©ances passÃ©es + actes en prÃ©paration'} Â· source {lot.sourceKind} Â· crÃ©Ã© le {dt(lot.createdAt, { dateStyle: 'medium' })}</div></div>
+        <div className="min-w-0 flex-1"><div className="text-[15px] font-bold text-head">{lot.label}</div><div className="text-[12px] text-mute">{lot.mode === 'passes' ? 'Séances passées' : 'Séances passées + actes en préparation'} · source {lot.sourceKind} · créé le {dt(lot.createdAt, { dateStyle: 'medium' })}</div></div>
         <Badge tone={(LOT[lot.statut] ?? LOT.brouillon).tone}>{(LOT[lot.statut] ?? LOT.brouillon).label}</Badge>
         <span className="flex flex-wrap gap-2">
           <button className="btn-secondary" disabled={lot.statut === 'annule'} onClick={() => setCharger(true)}><Upload className="h-4 w-4" /> Charger</button>
-          <button className="btn-secondary" disabled={!['charge', 'concordances', 'pret'].includes(lot.statut)} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/analyser`), {}), 'Lot analysÃ©')}><Play className="h-4 w-4" /> Analyser</button>
+          <button className="btn-secondary" disabled={!['charge', 'concordances', 'pret'].includes(lot.statut)} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/analyser`), {}), 'Lot analysé')}><Play className="h-4 w-4" /> Analyser</button>
           <button className="btn-secondary" onClick={() => setMapping(true)}><Cog className="h-4 w-4" /> Mapping</button>
-          <button className="btn-primary" disabled={!['concordances', 'pret'].includes(lot.statut) || d.data.blocage.bloquantesNonResolues > 0} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/publier`), {}), 'Publication traitÃ©e')}><Check className="h-4 w-4" /> Publier tout</button>
-          {(d.data.compteurs.publies > 0 || lot.statut !== 'annule') && <button className="btn-secondary text-ko" onClick={() => window.confirm('Annuler ce lot et retirer ses publications ?') && agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/annuler`), {}), 'Lot annulÃ©')}><Ban className="h-4 w-4" /> Annuler</button>}
+          <button className="btn-primary" disabled={!['concordances', 'pret'].includes(lot.statut) || d.data.blocage.bloquantesNonResolues > 0} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/publier`), {}), 'Publication traitée')}><Check className="h-4 w-4" /> Publier tout</button>
+          {(d.data.compteurs.publies > 0 || lot.statut !== 'annule') && <button className="btn-secondary text-ko" onClick={() => window.confirm('Annuler ce lot et retirer ses publications ?') && agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/annuler`), {}), 'Lot annulé')}><Ban className="h-4 w-4" /> Annuler</button>}
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-2">{etapes.map((e) => <span key={e.k} className={`rounded-full px-3 py-1 text-[12px] font-semibold ${e.fait ? 'bg-ok-bg text-ok-text' : 'bg-soft text-mute'}`}>{e.fait ? 'âœ“ ' : ''}{e.label}</span>)}</div>
+      <div className="flex flex-wrap gap-2">{etapes.map((e) => <span key={e.k} className={`rounded-full px-3 py-1 text-[12px] font-semibold ${e.fait ? 'bg-ok-bg text-ok-text' : 'bg-soft text-mute'}`}>{e.fait ? '✓ ' : ''}{e.label}</span>)}</div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        {[['SÃ©ances', d.data.compteurs.seances], ['Actes', d.data.compteurs.actes], ['PrÃªts Ã  publier', d.data.compteurs.prets], ['PubliÃ©s', d.data.compteurs.publies]].map(([l, v]) => (
+        {[['Séances', d.data.compteurs.seances], ['Actes', d.data.compteurs.actes], ['Prêts à publier', d.data.compteurs.prets], ['Publiés', d.data.compteurs.publies]].map(([l, v]) => (
           <div key={l as string} className="card p-4"><div className="text-[12px] text-mute">{l}</div><div className="text-[24px] font-bold text-head">{v as number}</div></div>))}
       </div>
 
@@ -220,22 +220,22 @@ export default function AdminImportAirs() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="max-w-3xl text-mute">Reprise de l'historique <b>AIRS DELIB</b> en trois temps : <b>sas</b> (donnÃ©es brutes, invisibles), <b>concordances</b> (rapprochement avec vos Ã©lus, directions, services, agents et rÃ©fÃ©rentiels dÃ©jÃ  paramÃ©trÃ©s, validÃ© par vous), puis <b>publication</b> des actes des sÃ©ances passÃ©es. La source est fournie par le HUB DSI ; rien n'est Ã©crit dans l'outil avant validation.</p>
+        <p className="max-w-3xl text-mute">Reprise de l'historique <b>AIRS DELIB</b> en trois temps : <b>sas</b> (données brutes, invisibles), <b>concordances</b> (rapprochement avec vos élus, directions, services, agents et référentiels déjà paramétrés, validé par vous), puis <b>publication</b> des actes des séances passées. La source est fournie par le HUB DSI ; rien n'est écrit dans l'outil avant validation.</p>
         <button className="btn-primary" onClick={() => setNouveau(true)}><Plus className="h-4 w-4" /> Nouveau lot</button>
       </div>
       <div className="card overflow-x-auto">
-        {liste.loading && !liste.data ? <Loading /> : !liste.data?.items?.length ? <Empty>Aucun lot de reprise. CrÃ©ez un lot, chargez l'export du HUB (ou le jeu d'essai) puis analysez-le.</Empty> : (
-          <table className="w-full"><thead><tr><th>Lot</th><th>PÃ©rimÃ¨tre</th><th>Ã‰tat</th><th>Actes</th><th>PubliÃ©s</th><th /></tr></thead><tbody>{liste.data.items.map((l: any) => (
+        {liste.loading && !liste.data ? <Loading /> : !liste.data?.items?.length ? <Empty>Aucun lot de reprise. Créez un lot, chargez l'export du HUB (ou le jeu d'essai) puis analysez-le.</Empty> : (
+          <table className="w-full"><thead><tr><th>Lot</th><th>Périmètre</th><th>État</th><th>Actes</th><th>Publiés</th><th /></tr></thead><tbody>{liste.data.items.map((l: any) => (
             <tr key={l.id} className="cursor-pointer hover:bg-soft" onClick={() => setLotId(l.id)}>
               <td><div className="font-semibold">{l.label}</div><div className="text-[11px] text-mute">{dt(l.createdAt, { dateStyle: 'medium' })}</div></td>
-              <td className="text-[12px]">{l.mode === 'passes' ? 'SÃ©ances passÃ©es' : '+ prÃ©paration'}</td>
+              <td className="text-[12px]">{l.mode === 'passes' ? 'Séances passées' : '+ préparation'}</td>
               <td><Badge tone={(LOT[l.statut] ?? LOT.brouillon).tone}>{(LOT[l.statut] ?? LOT.brouillon).label}</Badge></td>
               <td>{l.items.actes}</td>
               <td>{l.items.publies}</td>
               <td className="text-right">{l.statut === 'annule' ? <Ban className="ml-auto h-4 w-4 text-mute" /> : <FileJson className="ml-auto h-4 w-4 text-mute" />}</td>
             </tr>))}</tbody></table>)}
       </div>
-      <p className="flex items-center gap-2 text-[12px] text-mute"><RefreshCw className="h-3.5 w-3.5" /> Le mapping des tables AIRS est dÃ©claratif : il sera renseignÃ© dÃ¨s que le MCD d'AIRS sera connu (Q-AIRS2).</p>
+      <p className="flex items-center gap-2 text-[12px] text-mute"><RefreshCw className="h-3.5 w-3.5" /> Le mapping des tables AIRS est déclaratif : il sera renseigné dès que le MCD d'AIRS sera connu (Q-AIRS2).</p>
       {nouveau && <NouveauLot o={o} onClose={() => setNouveau(false)} onDone={(lot) => { setNouveau(false); liste.reload(); setLotId(lot.id); }} />}
     </div>
   );
