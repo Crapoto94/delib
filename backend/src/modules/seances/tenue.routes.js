@@ -45,6 +45,9 @@ module.exports = ({ makeRouter, tenue, amendements }) => {
     async (req, res) => res.json(await tenue.cloturer(req.ctx, req.org.id, req.valid.params.id)));
   r.post('/deverrouillage', { summary: 'Déverrouille une séance close (administrateur, motif obligatoire)', tags: T, org: true, roles: ['org_admin'], params: PS, body: Motif },
     async (req, res) => res.json(await tenue.deverrouiller(req.ctx, req.org.id, req.valid.params.id, req.valid.body.motif)));
+  r.post('/simulation/annuler', { summary: "Annule une séance ouverte en mode simulation et efface tout ce qui y a été saisi", tags: T, org: true, roles: ADMIN, params: PS,
+    description: 'Réservé aux séances ouvertes un autre jour que la date de la séance : la séance revient à son état d’avant l’ouverture (aucune valeur juridique).' },
+  async (req, res) => res.json(await tenue.annulerSimulation(req.ctx, req.org.id, req.valid.params.id)));
 
   r.put('/notes', { summary: 'Notes administratives de la séance', tags: T, org: true, roles: ADMIN, params: PS, body: Notes },
     async (req, res) => res.json(await tenue.setNotes(req.ctx, req.org.id, req.valid.params.id, req.valid.body.notes)));

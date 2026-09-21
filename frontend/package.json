@@ -1,12 +1,13 @@
 {
   "name": "vibedelib-frontend",
   "private": true,
-  "version": "0.39.0",
+  "version": "0.40.0",
+  "license": "SEE LICENSE IN LICENCE.md",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-pdfjs-assets.mjs",
+    "predev": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-legal.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/copy-pdfjs-assets.mjs",
+    "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-legal.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 5160",
     "dev:elus": "vite --config vite.elus.config.ts",

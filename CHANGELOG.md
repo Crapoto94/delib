@@ -9,6 +9,13 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.40.0 — Mode simulation de séance, numéro d'origine, CGU et licence
+
+- **Mode simulation de séance** : ouvrir une séance un autre jour que sa date est autorisé, mais l'application passe en **mode simulation** — un **bandeau** le signale (comme « Afficher en tant que »), aucune valeur juridique n'est engagée, et une action **« Annuler la simulation »** efface tout ce qui a été saisi (présences, pouvoirs, votes, amendements, points) et remet la séance dans son état d'avant ouverture.
+- **Ordre du jour** : le **numéro d'origine** d'un acte repris de l'ancien logiciel (numéro source AIRS) est **affiché** à côté du numéro généré, à la création de l'ordre du jour et dans la liste des dossiers en attente.
+- **Séance visée** : le suffixe « pas encore inscrit » est retiré ; l'*italique* suffit à distinguer un acte simplement visé d'un acte inscrit à l'ordre du jour (gras).
+- **CGU et licence d'usage** : les conditions générales d'utilisation et la licence (PolyForm Noncommercial 1.0.0) sont désormais accessibles depuis l'application (pied de page, écran de connexion, espace élus) et publiées à la racine du dépôt (`CGU.md`, `LICENCE.md`).
+
 ## 0.39.0 — Import AIRS DELIB : sas, concordances et publication
 
 - Nouvel écran **Paramétrages › Import AIRS DELIB** (administrateur d'organisme et SCC) : reprise de l'historique de l'ancien logiciel en trois temps — **sas** (données brutes JSONB, invisibles de l'outil), **concordances** (rapprochement avec les élus, directions, services, agents, commissions, instances et référentiels déjà paramétrés, avec proposition automatique et validation humaine), puis **publication** des actes des séances passées.

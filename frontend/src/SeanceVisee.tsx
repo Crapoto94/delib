@@ -11,7 +11,7 @@ export function SeanceVisee({ acte }: { acte: { seanceVisee?: SeanceViseeInfo | 
   return (
     <Link className={`text-[12px] text-head hover:underline ${s.inscrit ? 'font-bold' : 'font-normal italic'}`} to={`/seances/${s.id}`}
       title={s.inscrit ? "Inscrit à l'ordre du jour de cette séance" : "Séance visée — pas encore inscrit à l'ordre du jour"}>
-      {dt(s.dateSeance, { dateStyle: 'medium' })}<div className="font-normal text-mute">{s.instance}{s.inscrit ? '' : ' · pas encore inscrit'}</div>
+      {dt(s.dateSeance, { dateStyle: 'medium' })}<div className="font-normal text-mute">{s.instance}</div>
     </Link>
   );
 }

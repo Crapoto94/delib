@@ -74,6 +74,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
 
   const rowsOf = (q, seanceId) => q.all(
     `SELECT it.*, a.titre AS acte_titre, a.numero_suivi, a.statut AS acte_statut, a.current_step_key AS acte_step, a.direction_label, a.redacteur, a.rubrique_id, ru.libelle AS rubrique,
+            a.custom->'airs'->>'numero' AS acte_numero_airs,
             trim(e.prenom || ' ' || e.nom) AS rapporteur, d.titre AS delib_titre, d.ordre AS delib_ordre,
             si.label AS etape, si.holders AS etape_holders,
             (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', f.id, 'titre', f.titre, 'nom', fl.original_name, 'mime', fl.mime, 'taille', fl.size, 'pages', fl.pages) ORDER BY f.ordre, f.id), '[]'::jsonb)
@@ -108,6 +109,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
   const toItem = (r, numeros, i) => ({
     id: r.id, position: r.position, kind: r.kind, titre: r.kind === 'deliberation' ? (r.delib_titre || r.acte_titre) : r.titre, description: r.description ?? null, fichiers: r.fichiers || [], numerote: r.numerote,
     numero: numeros.get(r.id) ?? r.numero ?? null, provisoire: !r.numero, statut: r.statut, retireMotif: r.retire_motif, ajouteApresArret: r.ajoute_apres_arret,
+    numeroOrigine: r.acte_numero_airs ?? null,
     acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: r.rapporteur, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
     deliberationId: r.deliberation_id, groupe: r.acte_id ? `a${r.acte_id}` : null, ordreDeliberation: r.delib_ordre ?? null, index: i,
   });
@@ -193,11 +195,12 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       if (q) { p.push(`%${q}%`); w.push(`(a.titre ILIKE $${p.length} OR a.numero_suivi::text = $${p.length - 0})`); }
       const rows = await db.all(
         `SELECT a.id, a.numero_suivi, a.titre, a.direction_label, a.seance_visee_id, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
+                a.custom->'airs'->>'numero' AS numero_airs,
                 (SELECT count(*)::int FROM deliberations d WHERE d.acte_id = a.id) AS nb_delib,
                 (SELECT count(*)::int FROM acte_commissions c WHERE c.acte_id = a.id AND c.retiree_at IS NULL AND c.avis IS NOT NULL) AS avis_rendus,
                 (SELECT count(*)::int FROM acte_commissions c WHERE c.acte_id = a.id AND c.retiree_at IS NULL) AS nb_commissions
          FROM actes a LEFT JOIN ref_items ru ON ru.id = a.rubrique_id LEFT JOIN elus e ON e.id = a.rapporteur_id WHERE ${w.join(' AND ')} ORDER BY a.numero_suivi`, p);
-      return rows.map((r) => ({ id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, direction: r.direction_label, seanceViseeId: r.seance_visee_id, rubrique: r.rubrique, rapporteur: r.rapporteur, deliberations: r.nb_delib, commissions: r.nb_commissions, avisRendus: r.avis_rendus }));
+      return rows.map((r) => ({ id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, direction: r.direction_label, seanceViseeId: r.seance_visee_id, rubrique: r.rubrique, rapporteur: r.rapporteur, deliberations: r.nb_delib, commissions: r.nb_commissions, avisRendus: r.avis_rendus, numeroOrigine: r.numero_airs ?? null }));
     },
 
     /**

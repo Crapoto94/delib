@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { ThemeToggle } from '../theme';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { errMsg } from '../api';
 import { ErrorBox, Spinner } from '../ui';
@@ -36,6 +36,11 @@ export default function Login() {
         <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={souvenir} onChange={(e) => setSouvenir(e.target.checked)} /> Se souvenir de moi <span className="text-mute">(reste connecté jusqu’à 6 mois, ou jusqu’à la déconnexion ; jamais le mot de passe)</span></label>
         <button className="btn-primary w-full" disabled={busy}>{busy && <Spinner />} Se connecter</button>
         <button type="button" className="w-full text-center text-[12px] text-mute underline" onClick={() => setLocal(!local)}>{local ? 'Retour à la connexion par annuaire' : 'Compte de secours local'}</button>
+        <p className="border-t border-line pt-3 text-center text-[11px] leading-relaxed text-mute">
+          <Link to="/cgu" className="underline hover:text-ink">Conditions générales d'utilisation</Link>
+          <span aria-hidden> · </span>
+          <Link to="/licence" className="underline hover:text-ink">Licence d'usage</Link>
+        </p>
       </form>
     </div>
   );

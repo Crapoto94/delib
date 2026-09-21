@@ -11,9 +11,17 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.39.0';
+export const VERSION = '0.40.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.40.0', type: 'minor', titre: 'Mode simulation de séance, numéro d’origine à l’ordre du jour, CGU et licence',
+    items: [
+      "Ouvrir une séance un autre jour que sa date est désormais possible : l'application passe en mode simulation, avec un bandeau visible, et tout ce qui est saisi peut être annulé d'un geste (présences, pouvoirs, votes, points) pour revenir à l'état d'avant ouverture.",
+      "À la création de l'ordre du jour, le numéro d'origine d'un acte repris d'AIRS est affiché (n° source), à côté du numéro généré.",
+      "Conditions générales d'utilisation et licence d'usage accessibles depuis l'application (pied de page, écran de connexion et espace élus).",
+    ],
+  },
   {
     version: '0.39.0', type: 'minor', titre: 'Import AIRS DELIB : sas, concordances et publication',
     items: [

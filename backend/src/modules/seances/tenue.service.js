@@ -8,6 +8,7 @@
  */
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
+const { parisParts } = require('../../shared/time');
 const rules = require('./tenue.rules');
 
 const CLOS = ['traite', 'sans_vote', 'retire', 'ajourne'];
@@ -106,7 +107,7 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
       const peutSaisir = canWrite(ctx, org);
       const t = await db.get('SELECT * FROM seance_tenue WHERE seance_id = $1', [seanceId]);
       const base = { seance: { id: s.id, dateSeance: s.dateSeance, lieu: s.lieu, instance: s.instance, statut: s.statut, commission: s.commission ?? null }, peutSaisir };
-      if (!t) return { ...base, tenue: { statut: 'non_ouverte', version: 0 }, points: [], groupes: [], procurations: [], quorum: rules.quorum(0, 0) };
+      if (!t) return { ...base, tenue: { statut: 'non_ouverte', version: 0, simulation: false }, points: [], groupes: [], procurations: [], quorum: rules.quorum(0, 0) };
 
       const [ms, presences, procs] = await Promise.all([membres(db, org, s), presencesOf(db, seanceId), procurationsOf(db, seanceId)]);
       // au conseil, le président de séance est par défaut le maire (modifiable) ; jamais pour une commission
@@ -145,6 +146,7 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
         tenue: {
           statut: t.statut, version: t.version, pointCourantId: t.point_courant_id, presidentId: t.president_elu_id, secretaireId: t.secretaire_elu_id,
           ouverteAt: t.ouverte_at, closeAt: t.close_at,
+          simulation: !!t.simulation, simulationAt: t.simulation_at ?? null,
         },
         points, amendements, groupes, procurations: procs.map((p) => ({ mandantId: p.mandant, mandataireId: p.mandataire })),
         quorum: rules.quorum(ms.length, enSalle),
@@ -231,12 +233,15 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
       if (['annulee'].includes(s.statut)) throw E.conflict('Une séance annulée ne peut pas être ouverte');
       const t = await db.get('SELECT statut FROM seance_tenue WHERE seance_id = $1', [seanceId]);
       if (t) return svc.etat(ctx, org, seanceId);
+      // Ouverture un autre jour que la date de la séance : autorisée, mais en MODE SIMULATION (annulable, sans valeur juridique).
+      const sim = parisParts(new Date()).iso !== parisParts(new Date(s.dateSeance)).iso;
       await db.tx(async (q) => {
-        await q.run('INSERT INTO seance_tenue (seance_id, organisme_id, ouverte_par) VALUES ($1,$2,$3)', [seanceId, org, ctx.username]);
+        await q.run('INSERT INTO seance_tenue (seance_id, organisme_id, ouverte_par, simulation, simulation_statut_avant, simulation_at) VALUES ($1,$2,$3,$4,$5,$6)',
+          [seanceId, org, ctx.username, sim, sim ? s.statut : null, sim ? new Date() : null]);
         await q.run("UPDATE seances SET statut = 'tenue' WHERE id = $1 AND statut IN ('planifiee', 'convoquee')", [seanceId]);
-        await journal(q, seanceId, ctx, 'ouverture');
+        await journal(q, seanceId, ctx, 'ouverture', { detail: sim ? { simulation: true, statutAvant: s.statut } : null });
       });
-      await audit.log(ctx, { organismeId: org, action: 'seance.tenue.ouverture', entity: 'seances', entityId: seanceId });
+      await audit.log(ctx, { organismeId: org, action: 'seance.tenue.ouverture', entity: 'seances', entityId: seanceId, after: { simulation: sim } });
       wake(seanceId);
       return svc.etat(ctx, org, seanceId);
     },
@@ -268,6 +273,34 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
       }, { allowClosed: true });
       await audit.log(ctx, { organismeId: org, action: 'seance.tenue.deverrouillage', entity: 'seances', entityId: seanceId, after: { motif } });
       return out;
+    },
+
+    /**
+     * Annule une séance ouverte en MODE SIMULATION : tout ce qui a été saisi pendant la session simulée est effacé
+     * (présences, pouvoirs, votes, amendements, points, journal) et la séance revient à son état d'avant l'ouverture.
+     * Aucune valeur juridique n'est engagée (les actes repassent en « inscrit à l'ordre du jour »).
+     */
+    async annulerSimulation(ctx, organismeId, seanceId) {
+      const org = requireOrg(organismeId);
+      need(ctx, org);
+      const t = await db.get('SELECT * FROM seance_tenue WHERE seance_id = $1', [seanceId]);
+      if (!t) throw E.conflict("La séance n'est pas ouverte");
+      if (!t.simulation) throw E.conflict("Cette séance n'est pas en mode simulation");
+      await db.tx(async (q) => {
+        await q.run('DELETE FROM seance_amendement_votes WHERE amendement_id IN (SELECT id FROM seance_amendements WHERE seance_id = $1)', [seanceId]);
+        await q.run('DELETE FROM seance_amendements WHERE seance_id = $1', [seanceId]);
+        await q.run('DELETE FROM seance_votes WHERE item_id IN (SELECT id FROM seance_items WHERE seance_id = $1)', [seanceId]);
+        await q.run('DELETE FROM seance_presences WHERE seance_id = $1', [seanceId]);
+        await q.run('DELETE FROM seance_procurations WHERE seance_id = $1', [seanceId]);
+        await q.run('DELETE FROM seance_points WHERE seance_id = $1', [seanceId]);
+        await q.run('DELETE FROM seance_journal WHERE seance_id = $1', [seanceId]);
+        await q.run("UPDATE actes SET statut = 'inscrit_odj' WHERE seance_id = $1 AND statut IN ('adopte', 'rejete', 'retire', 'ajourne')", [seanceId]);
+        await q.run('DELETE FROM seance_tenue WHERE seance_id = $1', [seanceId]);
+        await q.run("UPDATE seances SET statut = COALESCE($2, 'planifiee') WHERE id = $1 AND statut IN ('tenue', 'close')", [seanceId, t.simulation_statut_avant]);
+      });
+      await audit.log(ctx, { organismeId: org, action: 'seance.simulation.annulation', entity: 'seances', entityId: seanceId });
+      wake(seanceId);
+      return svc.etat(ctx, org, seanceId);
     },
 
     // ------------------------------------------------------------------------------------------ notes, bureau

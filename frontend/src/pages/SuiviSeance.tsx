@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import FriseSeance from './FriseSeance';
-import { ArrowLeft, ArrowRight, Eye, FileText, Lock, LockOpen, Play, RotateCcw, Square, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Eye, FileText, Lock, LockOpen, Play, RotateCcw, Square, Users } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { AgentName } from '../AgentName';
@@ -86,6 +86,7 @@ export default function SuiviSeance() {
   const root = orgPath(o, `/seances/${sid}/tenue`); const { toast, node } = useToast();
   const [s, setS] = useState<any>(null); const [err, setErr] = useState<string | null>(null); const [live, setLive] = useState(false);
   const [busy, setBusy] = useState(false); const [motif, setMotif] = useState<null | { titre: string; ok: (m: string) => Promise<void> }>(null);
+  const [simConfirm, setSimConfirm] = useState(false); const [simAnnule, setSimAnnule] = useState(false);
   const version = useRef(-1);
 
   const apply = useCallback((d: any) => { if (d?.tenue) { version.current = d.tenue.version; setS(d); } }, []);
@@ -130,6 +131,8 @@ export default function SuiviSeance() {
   if (err) return <div className="p-6"><ErrorBox msg={err} /></div>;
   if (!s) return <Loading />;
   const t = s.tenue; const can: boolean = s.peutSaisir; const ouverte = t.statut === 'ouverte'; const close = t.statut === 'close'; const c = s.courant;
+  const jourLocal = (d: Date | string) => new Date(d).toLocaleDateString('en-CA');
+  const autreJour = jourLocal(new Date()) !== jourLocal(s.seance.dateSeance);
   const editable = can && ouverte && !busy;
   const enCours = c?.etat === 'en_cours';
 
@@ -141,6 +144,12 @@ export default function SuiviSeance() {
   return (
     <div className="space-y-4">
       {node}
+      {s.tenue.simulation && (
+        <div role="status" className="flex flex-wrap items-center justify-center gap-3 rounded border border-warn/40 bg-warn-bg px-4 py-2 text-[13px] font-semibold text-warn">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Mode simulation — séance démarrée un autre jour que sa date ({dt(s.seance.dateSeance, { dateStyle: 'long' })}). Aucune valeur juridique : tout ce qui est saisi ici peut être annulé.</span>
+          {can && <button className="rounded bg-surface px-3 py-1 text-warn" disabled={busy} onClick={() => setSimAnnule(true)}>Annuler la simulation</button>}
+        </div>)}
       <FriseSeance seanceId={sid} rev={s.tenue?.version ?? 0} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -161,7 +170,7 @@ export default function SuiviSeance() {
                 <p className="px-3 py-1 text-[11px] text-mute">L’extrait du registre de chaque délibération votée se trouve sur le point lui-même.</p>
               </div>
             </details>)}
-          {can && t.statut === 'non_ouverte' && <button className="btn-primary" disabled={busy} onClick={() => post('/ouverture', {}, 'Séance ouverte')}><Play className="h-4 w-4" /> Ouvrir la séance</button>}
+          {can && t.statut === 'non_ouverte' && <button className="btn-primary" disabled={busy} onClick={() => (autreJour ? setSimConfirm(true) : post('/ouverture', {}, 'Séance ouverte'))}><Play className="h-4 w-4" /> Ouvrir la séance</button>}
           {can && ouverte && <button className="btn-secondary" disabled={busy} onClick={() => post('/cloture', {}, 'Séance close')}><Square className="h-4 w-4" /> Clore la séance</button>}
           {can && close && <button className="btn-secondary" onClick={() => setMotif({ titre: 'Déverrouiller la séance', ok: (m) => act(() => api.post(`${root}/deverrouillage`, { motif: m }), 'Séance déverrouillée') as Promise<void> })}><LockOpen className="h-4 w-4" /> Déverrouiller</button>}
         </div>
@@ -339,6 +348,19 @@ export default function SuiviSeance() {
         </div>)}
 
       {motif && <MotifModal titre={motif.titre} onClose={() => setMotif(null)} onOk={async (m) => { await motif.ok(m); setMotif(null); }} />}
+      {simConfirm && (
+        <Modal title="Ouvrir la séance en mode simulation ?" onClose={() => setSimConfirm(false)}>
+          <p className="mb-3 leading-relaxed text-slate-700">La séance est prévue le <b>{dt(s.seance.dateSeance, { dateStyle: 'full' })}</b>, mais vous l'ouvrez aujourd'hui ({dt(new Date().toISOString(), { dateStyle: 'full' })}).</p>
+          <p className="mb-3 rounded border border-warn/30 bg-warn-bg px-3 py-2 text-[13px] leading-relaxed text-warn">Ce sera <b>uniquement une simulation</b> : aucune valeur juridique, et <b>tout ce qui sera saisi pourra être annulé</b> d'un geste (présences, pouvoirs, votes, points) pour revenir à l'état actuel.</p>
+          <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setSimConfirm(false)}>Annuler</button>
+            <button className="btn-primary" onClick={async () => { setSimConfirm(false); await post('/ouverture', {}, 'Séance ouverte en mode simulation'); }}>Ouvrir en simulation</button></div>
+        </Modal>)}
+      {simAnnule && (
+        <Modal title="Annuler la simulation ?" onClose={() => setSimAnnule(false)}>
+          <p className="mb-3 leading-relaxed text-slate-700">Tout ce qui a été saisi pendant cette session simulée sera <b>effacé</b> (présences, pouvoirs, votes, amendements, points) et la séance reviendra à son état d'avant ouverture.</p>
+          <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setSimAnnule(false)}>Ne rien annuler</button>
+            <button className="btn-primary" disabled={busy} onClick={async () => { setSimAnnule(false); await act(() => api.post(`${root}/simulation/annuler`), 'Simulation annulée'); }}>Annuler la simulation</button></div>
+        </Modal>)}
     </div>
   );
 }

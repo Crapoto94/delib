@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { HashRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
+import { HashRouter, Link, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { LogOut, Search } from 'lucide-react';
 import { PdfViewerHost } from '../PdfViewer';
 import { api, session } from './api';
@@ -9,6 +9,7 @@ import Seance from './pages/Seance';
 import { Connexion, Invitation } from './pages/Acces';
 import Recherche from './pages/Recherche';
 import { ThemeToggle } from '../theme';
+import Legal from '../pages/Legal';
 
 function Cadre() {
   const nav = useNavigate();
@@ -26,6 +27,11 @@ function Cadre() {
       <ThemeToggle className="text-white/80 hover:bg-white/10 hover:text-white" /></div>
       </header>
       <Outlet />
+      <footer className="mt-8 border-t border-line px-4 py-3 text-center text-[11px] text-mute">
+        <Link to="/cgu" className="underline hover:text-ink">Conditions générales d'utilisation</Link>
+        <span aria-hidden> · </span>
+        <Link to="/licence" className="underline hover:text-ink">Licence d'usage</Link>
+      </footer>
       <PdfViewerHost />
     </div>
   );
@@ -38,6 +44,8 @@ export default function App() {
       <Routes>
         <Route path="/connexion" element={<Connexion />} />
         <Route path="/invitation/:token" element={<Invitation />} />
+        <Route path="/cgu" element={<Legal doc="cgu" />} />
+        <Route path="/licence" element={<Legal doc="licence" />} />
         <Route element={<Cadre />}>
           <Route index element={<Accueil />} />
           <Route path="seances/:id" element={<Seance />} />

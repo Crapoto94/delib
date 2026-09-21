@@ -1,6 +1,6 @@
 import { AgentName } from './AgentName';
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, Eye, LogOut, Search } from 'lucide-react';
 import AgentPicker from './AgentPicker';
 import { Modal, useToast } from './ui';
@@ -142,8 +142,12 @@ export default function Layout() {
             <button className="btn-primary" disabled={!asUser} onClick={async () => { try { await startActAs(asUser); } catch (e: any) { toast(e?.response?.data?.error || 'Impossible', 'ko'); } }}>Afficher</button></div>
         </Modal>)}
       {toastNode}
-      <footer className="fixed bottom-0 left-0 right-0 border-t border-line bg-surface px-6 py-2 text-[11px] text-mute">
-        Ville d'Ivry-sur-Seine · VibeDélib — version {VERSION}
+      <footer className="fixed bottom-0 left-0 right-0 z-20 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 border-t border-line bg-surface px-6 py-2 text-[11px] text-mute">
+        <span>Ville d'Ivry-sur-Seine · VibeDélib — version {VERSION}</span>
+        <span aria-hidden>·</span>
+        <Link to="/cgu" className="underline hover:text-ink">Conditions d'utilisation</Link>
+        <span aria-hidden>·</span>
+        <Link to="/licence" className="underline hover:text-ink">Licence (PolyForm Noncommercial 1.0.0)</Link>
       </footer>
     </div>
   );

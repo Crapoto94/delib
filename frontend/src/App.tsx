@@ -23,6 +23,7 @@ const DevAnnot = import.meta.env.DEV ? lazy(() => import('./elus/dev/DevAnnot'))
 const DevSeances = import.meta.env.DEV ? lazy(() => import('./dev/DevSeances')) : null;
 const DevDesign = import.meta.env.DEV ? lazy(() => import('./dev/DevDesign')) : null;
 import ConvocationPublique from './pages/ConvocationPublique';
+import Legal from './pages/Legal';
 
 export default function App() {
   const { me, loading } = useAuth();
@@ -30,6 +31,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/connexion" element={<Login />} />
+      <Route path="/cgu" element={<Legal doc="cgu" />} />
+      <Route path="/licence" element={<Legal doc="licence" />} />
       <Route path="/c/:token" element={<ConvocationPublique />} />
       {import.meta.env.DEV && <Route path="/dev/editeur" element={<DevEditor />} />}
       {DevAnnot && <Route path="/dev/annot" element={<Suspense fallback={null}><DevAnnot /></Suspense>} />}
