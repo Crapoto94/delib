@@ -22,11 +22,11 @@ function Fiche({ acteId, onClose, onDone }: { acteId: number; onClose: () => voi
   const supprimer = async () => { if (!window.confirm('Retirer cette délibération de la bibliothèque ? L’acte est conservé, mais il n’y sera plus consultable.')) return; try { await api.delete(orgPath(o, `/bibliotheque/actes/${acteId}`)); toast('Délibération retirée de la bibliothèque'); onDone(); } catch (e) { toast(errMsg(e), 'ko'); } };
   const f = d.data;
   return (
-    <Modal title={f ? `${f.numero ? `${f.numero} — ` : ''}${f.titre}` : 'Délibération'} onClose={onClose} wide>
+    <Modal title={f ? <span className={f.airs ? 'text-purple-700' : undefined}>{`${f.numero ? `${f.numero} — ` : ''}${f.titre}`}</span> : 'Délibération'} onClose={onClose} wide>
       {d.loading ? <Loading /> : !f ? <ErrorBox msg={d.error} /> : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
-            <Badge tone="ok">{f.resultatLabel}</Badge>{f.airs && <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700" title="Provient de l'import AIRS">Import AIRS</span>}<span className="text-mute">Séance du {dt(f.seance.dateSeance, { dateStyle: 'long' })} · {f.seance.instance}{f.matiere ? ` · ${f.matiere}` : ''}{f.direction ? ` · ${f.direction}` : ''}</span>
+            <Badge tone="ok">{f.resultatLabel}</Badge><span className="text-mute">Séance du {dt(f.seance.dateSeance, { dateStyle: 'long' })} · {f.seance.instance}{f.matiere ? ` · ${f.matiere}` : ''}{f.direction ? ` · ${f.direction}` : ''}</span>
           </div>
           <div className="flex flex-wrap gap-2">{f.documents.map((x: any) => <button key={x.cible} className="btn-secondary" onClick={() => pdf(x.cible, `${x.label} — ${f.titre}`)}><FileText className="h-4 w-4" /> {x.label}</button>)}</div>
           {f.informations?.filter((x: any) => x.valeur !== null && x.valeur !== undefined && String(x.valeur).trim() !== '').length > 0 && (
@@ -118,12 +118,17 @@ export default function Bibliotheque() {
       </form>
       {d.loading && !d.data ? <Loading /> : !d.data ? <ErrorBox msg={d.error} /> : !d.data.items.length ? <div className="card"><Empty>Aucune délibération adoptée ne correspond.</Empty></div> : (
         <div className="card overflow-x-auto"><table className="w-full"><thead><tr><th>N°</th><th>Délibération</th><th>Rapporteur</th><th>Séance</th><th>Résultat</th><th /></tr></thead><tbody>{d.data.items.map((r: any) => (
-          <tr key={r.acteId}><td className="font-mono text-[12px]"><span title={r.archive ? 'Archivée' : 'En cours'} className={`mr-1 inline-block h-2.5 w-2.5 rounded-full align-middle ${r.archive ? 'bg-slate-400' : 'bg-action-solid'}`} />{r.numero ?? '—'}</td><td><b className={r.airs ? 'text-purple-700' : undefined}>{r.titre}</b>{r.airs && <span className="ml-2 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700" title="Provient de l'import AIRS">Import AIRS</span>}<div className="text-[12px] text-mute">{[r.matiere, r.direction].filter(Boolean).join(' · ')}</div></td>
+          <tr key={r.acteId}><td className="font-mono text-[12px]"><span title={r.archive ? 'Archivée' : 'En cours'} className={`mr-1 inline-block h-2.5 w-2.5 rounded-full align-middle ${r.archive ? 'bg-slate-400' : 'bg-action-solid'}`} />{r.numero ?? '—'}</td><td><button type="button" className={`text-left font-bold hover:underline ${r.airs ? 'text-purple-700' : 'text-head'}`} title="Consulter la fiche" onClick={() => setOuvert(r.acteId)}>{r.titre}</button><div className="text-[12px] text-mute">{[r.matiere, r.direction].filter(Boolean).join(' · ')}</div></td>
             <td className="text-[12px]">{r.rapporteur ?? '—'}</td>
             <td className="text-[12px]">{dt(r.dateSeance, { dateStyle: 'medium' })}<div className="text-mute">{r.instance}</div></td><td><Badge tone="ok">{r.resultatLabel}</Badge></td>
             <td className="whitespace-nowrap text-right">
-              <button className="btn-secondary mr-1 !px-2 !py-1" title="Exposé des motifs (rapport AIRS)" aria-label="Exposé des motifs" onClick={() => pdfActe(r.acteId, 'expose', `Exposé des motifs — ${r.titre}`)}><FileText className="h-3.5 w-3.5" /></button>
-              <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibération (extrait du registre)" aria-label="Délibération" onClick={() => pdfActe(r.acteId, 'extrait', `Extrait du registre — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>
+              <button className="btn-secondary mr-1 !px-2 !py-1" title="Exposé des motifs" aria-label="Exposé des motifs" onClick={() => pdfActe(r.acteId, 'expose', `Exposé des motifs — ${r.titre}`)}><FileText className="h-3.5 w-3.5" /></button>
+              {r.courant ? (<>
+                <button className="btn-secondary mr-1 !px-2 !py-1" title="Visas et considérants" aria-label="Visas et considérants" onClick={() => pdfActe(r.acteId, 'visas', `Visas et considérants — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>
+                <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibéré" aria-label="Délibéré" onClick={() => pdfActe(r.acteId, 'dispositif', `Délibéré — ${r.titre}`)}><FileText className="h-3.5 w-3.5" /></button>
+              </>) : (
+                <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibération (extrait du registre)" aria-label="Extrait du registre" onClick={() => pdfActe(r.acteId, 'extrait', `Extrait du registre — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>
+              )}
               {r.annexesCount > 0 && <button className="btn-secondary mr-1 !px-2 !py-1" title={`${r.annexesCount} annexe(s)${r.annexesNonPubliables ? ` dont ${r.annexesNonPubliables} non publiable(s)` : ''}`} onClick={() => setOuvert(r.acteId)}><Paperclip className="h-3.5 w-3.5" /> {r.annexesCount}{r.annexesNonPubliables > 0 && <span className="ml-1 font-semibold text-ko">({r.annexesNonPubliables})</span>}</button>}
               <button className="btn-secondary !px-2 !py-1" title="Consulter la fiche" aria-label="Consulter" onClick={() => setOuvert(r.acteId)}><BookOpen className="h-3.5 w-3.5" /></button>
             </td></tr>))}</tbody></table>

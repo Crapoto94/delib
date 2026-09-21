@@ -20,6 +20,8 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
   /** Délibération adoptée, séance close, non confidentielle : la seule qui entre dans la bibliothèque. */
   const eligible = (org, acteId) => db.get(`
     SELECT a.id, a.numero_suivi, a.titre, a.statut, a.type_id, a.matiere_id, a.direction_label, a.direction_code, a.confidentialite, a.montant, a.incidence_financiere,
+           (CASE WHEN a.custom->'airs'->>'origine' IS NOT NULL THEN a.custom->'airs'->>'origine' = 'archive' ELSE a.statut = 'archive' END) AS est_archive,
+           (a.custom->'airs'->>'origine' = 'courant') AS airs_courant,
            it.id AS item_id, it.numero, it.deliberation_id, s.id AS seance_id, s.date_seance, i.nom AS instance, sp.resultat
     FROM actes a JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
     JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
@@ -58,7 +60,7 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
         JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite' LEFT JOIN search_index si ON si.acte_id = a.id
         LEFT JOIN ref_items m ON m.id = a.matiere_id LEFT JOIN elus ra ON ra.id = a.rapporteur_id WHERE ${w.join(' AND ')}`;
       const total = (await db.get(`SELECT count(DISTINCT a.id)::int AS n ${from}`, p)).n;
-      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.statut, ${EST_ARCHIVE} AS est_archive, (a.custom ? 'airs') AS airs_imp, a.direction_label, a.direction_code, m.libelle AS matiere, it.numero, s.date_seance, i.nom AS instance, sp.resultat, NULLIF(trim(ra.prenom || ' ' || ra.nom), '') AS rapporteur,
+      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.statut, ${EST_ARCHIVE} AS est_archive, (a.custom ? 'airs') AS airs_imp, (a.custom->'airs'->>'origine' = 'courant') AS airs_courant, a.direction_label, a.direction_code, m.libelle AS matiere, it.numero, s.date_seance, i.nom AS instance, sp.resultat, NULLIF(trim(ra.prenom || ' ' || ra.nom), '') AS rapporteur,
           (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id AND an.titre NOT LIKE '%document d''origine%') AS annexes_n,
           (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id AND NOT an.publiable AND an.titre NOT LIKE '%document d''origine%') AS annexes_np,
           ${rang} AS rang ${from}
@@ -73,7 +75,7 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
         ORDER BY a DESC`, [org])).map((r) => r.a);
       return {
         total, annees, items: rows.slice(Number(offset), Number(offset) + Number(limit)).map((r) => ({
-          acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, numero: r.numero, direction: r.direction_label, directionCode: r.direction_code, matiere: r.matiere, rapporteur: r.rapporteur, dateSeance: r.date_seance, instance: r.instance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null, annexesCount: r.annexes_n, annexesNonPubliables: r.annexes_np, archive: !!r.est_archive, airs: !!r.airs_imp,
+          acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, numero: r.numero, direction: r.direction_label, directionCode: r.direction_code, matiere: r.matiere, rapporteur: r.rapporteur, dateSeance: r.date_seance, instance: r.instance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null, annexesCount: r.annexes_n, annexesNonPubliables: r.annexes_np, archive: !!r.est_archive, courant: !!r.airs_courant, airs: !!r.airs_imp,
         })),
       };
     },
@@ -132,8 +134,12 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
         seance: { id: a.seance_id, dateSeance: a.date_seance, instance: a.instance }, resultat: a.resultat, resultatLabel: RESULTATS[a.resultat] || null,
         expose: pick('expose'), visas: pick('visas'), dispositif: pick('dispositif'),
         annexes: annexes.map((x) => ({ id: x.id, titre: x.titre || x.original_name, nom: x.original_name, mime: x.mime, taille: Number(x.size), pdf: x.pdf_name ? { nom: x.pdf_name, mime: x.pdf_mime, taille: Number(x.pdf_size) } : null })),
-        airs: !!full.custom?.airs,
-        documents: [{ cible: 'expose', label: 'Exposé des motifs' }, { cible: 'extrait', label: 'Extrait du registre' }],
+        airs: !!full.custom?.airs, archive: !!a.est_archive, courant: !!a.airs_courant,
+        // Acte importé d'AIRS non archivé (origine « courant ») : pas d'extrait du registre, mais les deux parties du
+        // texte — visas et considérants, et le délibéré. Acte archivé (ou créé dans l'appli) : extrait du registre.
+        documents: a.airs_courant
+          ? [{ cible: 'expose', label: 'Exposé des motifs' }, { cible: 'visas', label: 'Visas et considérants' }, { cible: 'dispositif', label: 'Délibéré' }]
+          : [{ cible: 'expose', label: 'Exposé des motifs' }, { cible: 'extrait', label: 'Extrait du registre' }],
         informations,
       };
     },
@@ -147,7 +153,7 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
       // Document d'origine importé (AIRS) : on sert le PDF de l'import plutôt que la recréation.
       // « Exposé des motifs » → rapport (r… / rap_) ; « Extrait du registre » → délibération (d… / del_).
       // On préfère le PDF associé (annexe Word convertie), sinon le fichier lui-même s'il est déjà PDF.
-      if (storage) {
+      if (storage && (cible === 'expose' || cible === 'extrait')) {
         const [motif, prefixe] = cible === 'expose' ? ['%exposé%document d%origine%', '^(r[0-9]|rap_)'] : ['%délibération%document d%origine%', '^(d[0-9]|del_)'];
         const fichier = await db.get(`SELECT COALESCE(pf.storage_key, f.storage_key) AS storage_key, COALESCE(pf.original_name, f.original_name) AS original_name
           FROM annexes an JOIN files f ON f.id = an.file_id LEFT JOIN files pf ON pf.id = an.pdf_file_id
@@ -158,7 +164,9 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
       if (cible === 'extrait') return pv.extrait(s, org, a.seance_id, a.item_id);
       if (cible === 'expose') { const r = await render.renderActe(s, org, a.id, { cible: 'expose', mode: 'propre' }); return { buffer: r.buffer, name: `expose-des-motifs-${a.numero || a.numero_suivi}.pdf` }; }
       if (cible === 'deliberation') { const r = await render.renderActe(s, org, a.id, { cible: 'deliberation', deliberationId: a.deliberation_id, mode: 'propre' }); return { buffer: r.buffer, name: `deliberation-${a.numero || a.numero_suivi}.pdf` }; }
-      throw E.badRequest('Document inconnu : expose, deliberation ou extrait');
+      if (cible === 'visas') { const r = await render.renderActe(s, org, a.id, { cible: 'visas', deliberationId: a.deliberation_id, mode: 'propre' }); return { buffer: r.buffer, name: `visas-considerants-${a.numero || a.numero_suivi}.pdf` }; }
+      if (cible === 'dispositif') { const r = await render.renderActe(s, org, a.id, { cible: 'dispositif', deliberationId: a.deliberation_id, mode: 'propre' }); return { buffer: r.buffer, name: `delibere-${a.numero || a.numero_suivi}.pdf` }; }
+      throw E.badRequest('Document inconnu : expose, deliberation, extrait, visas ou dispositif');
     },
 
     /** Retire une délibération de la bibliothèque (administrateur ou SCC) : elle n'y est plus consultable, l'acte reste conservé. */

@@ -80,11 +80,11 @@ export function Field({ label, children, hint, missing }: { label: string; child
   );
 }
 
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => { const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-slate-900/60 p-4 pt-16" onMouseDown={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={`card w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} shadow-float`} onMouseDown={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} className={`card w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} shadow-float`} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-3"><h3>{title}</h3><button className="text-mute hover:text-ink" onClick={onClose} aria-label="Fermer"><X className="h-5 w-5" /></button></div>
         <div className="p-5">{children}</div>
       </div>

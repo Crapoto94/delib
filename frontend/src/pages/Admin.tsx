@@ -161,7 +161,7 @@ export function menu(isAdmin: boolean, plateforme: boolean, scc = false): Groupe
       { k: 'identite', label: 'Identité & logo', icon: Building2 }, { k: 'utilisateurs', label: 'Utilisateurs & rôles', icon: Users },
       { k: 'titulaires', label: 'Titulaires & droits', icon: ShieldCheck }, { k: 'calendrier', label: 'Jours fériés', icon: CalendarDays }] },
     { titre: 'Circuits et rédaction', entrees: [
-      { k: 'circuits', label: 'Circuits', icon: GitBranch }, { k: 'gabarits', label: 'Gabarits PDF', icon: FileText },
+      { k: 'circuits', label: 'Circuits', icon: GitBranch }, { k: 'gabarits', label: 'Gabarits', icon: FileText },
       ...(isAdmin ? [{ k: 'champs', label: 'Champs personnalisés', icon: ListPlus }] : []),
       { k: 'notifications', label: 'Notifications & relances', icon: Bell }, { k: 'ia', label: 'Assistant IA', icon: Sparkles },
       { k: 'visas', label: 'Visas et références', icon: BookMarked }] },

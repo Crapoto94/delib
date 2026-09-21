@@ -1,6 +1,8 @@
 # VibeDélib — backend. Image minimale, exécutée par un utilisateur non privilégié.
 FROM node:22-alpine
 ENV NODE_ENV=production
+# LibreOffice (Writer) : conversion des modèles Word .docx (gabarits bureautiques) et des documents Office en PDF.
+RUN apk add --no-cache libreoffice-writer ttf-dejavu fontconfig
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev

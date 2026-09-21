@@ -741,9 +741,28 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
 
   const mapResultat = (r) => { const v = norm(r); if (!v) return null; if (v.includes('REJET')) return 'rejete'; if (v.includes('UNANIM')) return 'adopte_unanimite'; if (v.includes('ADOPT')) return 'adopte_majorite'; return null; };
 
+  /**
+   * Une séance reprise d'AIRS ne doit jamais rester close par l'import (AIRS ne transmet pas la clôture) : on rouvre
+   * une séance close qui ne porte aucune saisie de suivi (ni présence, ni vote, ni amendement, ni journal).
+   */
+  async function reparerClotureImport(o, seanceId) {
+    const s = await db.get('SELECT statut FROM seances WHERE id = $1 AND organisme_id = $2', [seanceId, o]);
+    if (!s || s.statut !== 'close') return;
+    const activite = await db.get(`SELECT 1 AS x WHERE
+      EXISTS (SELECT 1 FROM seance_journal WHERE seance_id = $1)
+      OR EXISTS (SELECT 1 FROM seance_presences WHERE seance_id = $1)
+      OR EXISTS (SELECT 1 FROM seance_amendements WHERE seance_id = $1)
+      OR EXISTS (SELECT 1 FROM seance_votes v JOIN seance_items i ON i.id = v.item_id WHERE i.seance_id = $1)`, [seanceId]);
+    if (activite) return;
+    await db.run("UPDATE seance_tenue SET statut = 'ouverte', close_at = NULL, close_par = NULL WHERE seance_id = $1", [seanceId]);
+    await db.run("UPDATE seances SET statut = 'tenue' WHERE id = $1", [seanceId]);
+  }
+
   async function publierSeance(ctx, o, importId, item, { implicite = false } = {}) {
     const link = await db.get(`SELECT entity_id FROM airs_links WHERE organisme_id = $1 AND kind = 'seance' AND source_key = $2`, [o, item.source_key]);
     if (link) {
+      // Séance déjà reprise : on corrige une éventuelle clôture laissée par un import antérieur.
+      if ((await db.get('SELECT mode FROM airs_imports WHERE id = $1', [importId])).mode === 'passes') await reparerClotureImport(o, link.entity_id);
       // Import implicite (via un acte) : la séance est créée, mais le conseil n'est PAS marqué « importé ».
       if (implicite) await db.run(`UPDATE airs_import_items SET seance_id = $2 WHERE id = $1`, [item.id, link.entity_id]);
       else await db.run(`UPDATE airs_import_items SET seance_id = $2, statut = 'publie', pubie_at = now(), pubie_par = $3 WHERE id = $1`, [item.id, link.entity_id, ctx.username]);
@@ -753,11 +772,12 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
     const instanceId = resolved.instanceId ?? (await db.get('SELECT id FROM instances WHERE organisme_id = $1 ORDER BY id LIMIT 1', [o]))?.id;
     if (!instanceId) throw E.incomplete('Aucune instance de séance : paramétrez une instance avant de publier', { missing: [{ code: 'instance', label: 'Instance de séance' }] });
     const date = item.payload.date && !Number.isNaN(Date.parse(item.payload.date)) ? item.payload.date : new Date().toISOString();
+    // Reprise d'historique : la séance est marquée « tenue » mais JAMAIS « close ». AIRS ne dit pas qu'une séance
+    // est clôturée et une séance close est verrouillée (aucune saisie) : le SCC clôturera le suivi s'il y a lieu.
     const passe = (await db.get('SELECT mode FROM airs_imports WHERE id = $1', [importId])).mode === 'passes';
     const seance = await db.get(`INSERT INTO seances (organisme_id, instance_id, type, date_seance, lieu, statut, odj_statut, odj_arrete_at, created_by)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-    [o, instanceId, resolved.typeSeance ?? 'ordinaire', date, item.payload.lieu ?? null, passe ? 'close' : 'planifiee', passe ? 'tenue' : 'en_preparation', passe ? date : null, ctx.username]);
-    if (passe) await db.run(`INSERT INTO seance_tenue (seance_id, organisme_id, statut, close_at, close_par, ouverte_par) VALUES ($1,$2,'close',$3,$4,$4) ON CONFLICT (seance_id) DO NOTHING`, [seance.id, o, date, ctx.username]);
+    [o, instanceId, resolved.typeSeance ?? 'ordinaire', date, item.payload.lieu ?? null, passe ? 'tenue' : 'planifiee', passe ? 'tenue' : 'en_preparation', passe ? date : null, ctx.username]);
     await db.run(`INSERT INTO airs_links (organisme_id, kind, source_key, entity_id, import_id) VALUES ($1,'seance',$2,$3,$4) ON CONFLICT (organisme_id, kind, source_key) DO UPDATE SET entity_id = EXCLUDED.entity_id`, [o, item.source_key, seance.id, importId]);
     if (implicite) await db.run(`UPDATE airs_import_items SET seance_id = $2 WHERE id = $1`, [item.id, seance.id]);
     else await db.run(`UPDATE airs_import_items SET seance_id = $2, statut = 'publie', pubie_at = now(), pubie_par = $3 WHERE id = $1`, [item.id, seance.id, ctx.username]);

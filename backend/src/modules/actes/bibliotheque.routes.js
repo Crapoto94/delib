@@ -9,7 +9,7 @@ const Chercher = z.object({ q: z.string().trim().max(300).optional().describe('M
   directionCode: z.string().trim().max(40).optional(), du: z.iso.date().optional(), au: z.iso.date().optional(),
   etat: z.enum(['tous', 'archive', 'en_cours']).default('tous').describe('État : délibérations archivées, en cours, ou les deux'),
   limit: z.coerce.number().int().min(1).max(100).default(20), offset: z.coerce.number().int().min(0).default(0) });
-const Pdf = z.object({ cible: z.enum(['expose', 'deliberation', 'extrait']).default('extrait') });
+const Pdf = z.object({ cible: z.enum(['expose', 'deliberation', 'extrait', 'visas', 'dispositif']).default('extrait') });
 const Mes = z.object({ q: z.string().trim().max(200).optional(), annee: z.coerce.number().int().min(1900).max(2200).optional(), statut: z.string().trim().max(40).optional(), hors: z.string().trim().max(40).optional(),
   role: z.enum(['redacteur', 'co_redacteur', 'valideur', 'remplacant', 'commentateur', 'participant']).optional(), limit: z.coerce.number().int().min(1).max(100).default(30), offset: z.coerce.number().int().min(0).default(0) });
 

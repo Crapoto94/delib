@@ -1,7 +1,8 @@
 /**
  * Conversion de documents Office en PDF, côté serveur.
- * Sur Windows, s'appuie sur Microsoft Office installé (Word / Excel / PowerPoint) via COM.
- * Ailleurs (ou sans Office), la conversion échoue proprement (l'appelant attache alors le fichier d'origine seul).
+ *  - Windows : s'appuie sur Microsoft Office installé (Word / Excel / PowerPoint) via COM.
+ *  - Linux / Docker : s'appuie sur LibreOffice (`soffice`), installé dans l'image backend.
+ * Sans l'un ou l'autre, la conversion échoue proprement (l'appelant attache alors le fichier d'origine seul).
  */
 const fs = require('fs');
 const os = require('os');
@@ -28,10 +29,10 @@ try {
   } else { throw "Extension non gérée : $ext" }
 } catch { Write-Error $_.Exception.Message; exit 1 }`;
 
-/** Convertit un tampon Office en PDF ; renvoie le tampon PDF ou `null` si la conversion n'est pas possible. */
-async function convertirEnPdf(buffer, ext) {
-  const e = String(ext || '').toLowerCase().replace(/^\./, '');
-  if (process.platform !== 'win32' || !EXT_CONVERTIBLES.has(e)) return null;
+/** Binaires LibreOffice essayés dans l'ordre (surchargeable par SOFFICE_BIN). */
+const SOFFICE_BIN = [process.env.SOFFICE_BIN, 'soffice', 'libreoffice', 'soffice.bin'].filter(Boolean);
+
+async function viaWord(buffer, e) {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vdconv-'));
   const input = path.join(dir, `in.${e}`);
   const output = path.join(dir, 'out.pdf');
@@ -43,6 +44,32 @@ async function convertirEnPdf(buffer, ext) {
     return await fs.promises.readFile(output);
   } catch { return null; }
   finally { await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {}); }
+}
+
+async function viaLibreOffice(buffer, e) {
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vdconv-'));
+  const input = path.join(dir, `in.${e}`);
+  const outDir = path.join(dir, 'out');
+  const profile = path.join(dir, 'profile');
+  try {
+    await fs.promises.writeFile(input, buffer);
+    await fs.promises.mkdir(outDir, { recursive: true });
+    for (const bin of SOFFICE_BIN) {
+      try {
+        await execFileP(bin, ['--headless', '--norestore', '--nolockcheck', '--convert-to', 'pdf', '--outdir', outDir, `-env:UserInstallation=file://${profile}`, input], { timeout: 180000 });
+        return await fs.promises.readFile(path.join(outDir, 'in.pdf'));
+      } catch { /* binaire suivant */ }
+    }
+    return null;
+  } catch { return null; }
+  finally { await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {}); }
+}
+
+/** Convertit un tampon Office en PDF ; renvoie le tampon PDF ou `null` si la conversion n'est pas possible. */
+async function convertirEnPdf(buffer, ext) {
+  const e = String(ext || '').toLowerCase().replace(/^\./, '');
+  if (!EXT_CONVERTIBLES.has(e)) return null;
+  return process.platform === 'win32' ? viaWord(buffer, e) : viaLibreOffice(buffer, e);
 }
 
 module.exports = { convertirEnPdf, EXT_CONVERTIBLES };

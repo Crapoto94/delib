@@ -8,12 +8,36 @@ const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
 const { inspectPdf } = require('../../shared/infra');
 const { resolveConfig, DEFAULTS } = require('./defaults');
+const { convertirEnPdf } = require('../../shared/convert');
+const D = require('./docx.service');
 const T = require('./typeset');
 
 const DOC_TYPES = Object.keys(DEFAULTS);
 const FINAL = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre', 'transmis', 'ar_recu', 'publie', 'executoire', 'archive'];
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const A4_TOL = 6; // points
+
+// ---- mise en forme des listes d'élus (présences) ----------------------------------------------------------------
+const sansAccent = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const CIV_FEMININ = new Set(['mehadee', 'fenda', 'kheira', 'farida', 'ouarda', 'alexandra', 'audrey', 'fabienne', 'malika', 'marie', 'claire', 'sophie', 'nathalie', 'isabelle', 'sandrine', 'celine', 'valerie', 'caroline', 'emilie', 'julie', 'aurelie', 'helene', 'chantal', 'michele', 'francoise', 'monique', 'christine', 'patricia', 'catherine', 'sylvie', 'veronique', 'laurence', 'anne', 'brigitte', 'nicole', 'danielle', 'martine', 'josette', 'colette', 'genevieve', 'yvette', 'odette', 'eva', 'sarah', 'lea', 'emma', 'nora', 'amira', 'ines', 'lucie', 'camille', 'charlotte', 'manon', 'juliette', 'oceane', 'elodie', 'anais', 'margaux', 'coralie', 'amelie', 'pauline', 'mathilde', 'clara', 'lise', 'lisa', 'agathe', 'alice', 'louise', 'jade', 'lina', 'rose', 'anna', 'laura', 'nina', 'zoe']);
+const CIV_MASCULIN = new Set(['pierre', 'philippe', 'antoine', 'baptiste', 'alexandre', 'guillaume', 'jerome', 'frederic', 'olivier', 'paul', 'pascal', 'michel', 'daniel', 'gabriel', 'samuel', 'emile', 'raphael', 'thibault', 'thibaut', 'claude', 'dominique', 'maxime', 'charles', 'georges', 'jacques', 'francois', 'nicolas', 'vincent', 'simon', 'sebastien', 'karim', 'ayoub', 'malik', 'jubaid', 'laurent', 'stephane', 'christophe', 'david', 'julien', 'benjamin', 'mathieu', 'romain', 'florian', 'quentin', 'lucas', 'hugo', 'theo', 'nathan', 'adrien', 'fabien', 'damien', 'cyril', 'gregory', 'arnaud', 'bertrand', 'clement', 'remi', 'yann', 'gael', 'loic', 'sacha', 'jean-francois']);
+/** Genre déduit du prénom (les élus n'ont pas de champ « genre ») : masculin par défaut. */
+function femininElu(m) {
+  const p = sansAccent(m?.prenom);
+  return CIV_FEMININ.has(p) || (!CIV_MASCULIN.has(p) && /(?:a|ie|ine|ette|elle|enne|yne|ise|ande|ude)$/.test(p));
+}
+/** Civilité : « Mme NOM » ou « M. NOM ». */
+const civElu = (m) => `${femininElu(m) ? 'Mme' : 'M.'} ${String(m?.nom || '').trim()}`.trim();
+/** Absent représenté : accord au féminin (« Mme X, représentée par M. Y »). */
+const representePar = (mandant, mandataire) => `${civElu(mandant)}, ${femininElu(mandant) ? 'représentée' : 'représenté'} par ${civElu(mandataire)}`;
+const GROUPE_ROLE = (m) => { const r = sansAccent(m?.role); return (r.includes('maire') && !r.includes('adjoint')) ? 0 : r.includes('adjoint') ? 1 : r.includes('conseiller') ? 2 : 3; };
+const LIBELLE_GROUPE = { 0: 'Maire', 1: 'adjoints au Maire', 2: 'conseillers municipaux.', 3: 'membres' };
+/** Liste des élus groupés par rôle : « M. X, Maire » puis les adjoints, puis les conseillers (lignes séparées). */
+function listeParRole(membres) {
+  const groupes = new Map();
+  for (const m of membres || []) { const g = GROUPE_ROLE(m); if (!groupes.has(g)) groupes.set(g, []); groupes.get(g).push(civElu(m)); }
+  return [...groupes.keys()].sort((a, b) => a - b).map((g) => `${groupes.get(g).join(', ')}, ${LIBELLE_GROUPE[g]}`).join('\n\n');
+}
 
 function createRender({ db, audit, storage, actes, config }) {
   const measures = new Map();
@@ -31,7 +55,8 @@ function createRender({ db, audit, storage, actes, config }) {
       const r = await db.get('SELECT * FROM render_templates WHERE organisme_id = $1 AND doc_type = $2', [org, docType]);
       return {
         docType, id: r?.id ?? null, version: r?.version ?? 0, cfg: resolveConfig(docType, r?.config || {}),
-        bgFirstFileId: r?.bg_first_file_id ?? null, bgNextFileId: r?.bg_next_file_id ?? null, personnalise: !!r,
+        bgFirstFileId: r?.bg_first_file_id ?? null, bgNextFileId: r?.bg_next_file_id ?? null,
+        docxFileId: r?.docx_file_id ?? null, docx: !!r?.docx_file_id, personnalise: !!r,
       };
     },
     async listTemplates(organismeId) { return Promise.all(DOC_TYPES.map((d) => svc.getTemplate(organismeId, d))); },
@@ -83,6 +108,202 @@ function createRender({ db, audit, storage, actes, config }) {
       if (!fileId) return null;
       const f = await db.get('SELECT storage_key, sha256 FROM files WHERE id = $1', [fileId]);
       return f ? { bytes: await storage.get(f.storage_key), sha256: f.sha256 } : null;
+    },
+
+    // ---- modèles Word (.docx) -----------------------------------------------------------------------------------------
+    /** Dépose le modèle Word (.docx) d'un gabarit : c'est lui qui est fusionné avec les zones à la génération. */
+    async setDocxTemplate(ctx, organismeId, docType, file) {
+      const org = requireOrg(organismeId);
+      if (!file?.buffer) throw E.badRequest('Fichier manquant (champ « file »)');
+      const nom = String(file.originalname || 'modele.docx');
+      const zip = file.buffer.length > 3 && file.buffer[0] === 0x50 && file.buffer[1] === 0x4b;
+      if (!/\.docx$/i.test(nom) || !zip) throw E.badRequest('Le modèle doit être un fichier Word .docx');
+      const put = await storage.put(file.buffer, { organismeId: org, ext: 'docx' });
+      const f = await db.get(
+        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,$4,$5,NULL,$6,$7) RETURNING *`,
+        [org, put.key, nom.slice(0, 200), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', put.size, put.sha256, ctx.username]);
+      const r = await db.get(
+        `INSERT INTO render_templates (organisme_id, doc_type, config, docx_file_id, updated_by) VALUES ($1,$2,'{}'::jsonb,$3,$4)
+         ON CONFLICT (organisme_id, doc_type) DO UPDATE SET docx_file_id = EXCLUDED.docx_file_id, version = render_templates.version + 1, updated_by = EXCLUDED.updated_by, updated_at = now() RETURNING *`,
+        [org, docType, f.id, ctx.username]);
+      await db.run('INSERT INTO render_template_versions (template_id, version, config, bg_first_file_id, bg_next_file_id, docx_file_id, saved_by) VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7)',
+        [r.id, r.version, JSON.stringify(r.config), r.bg_first_file_id, r.bg_next_file_id, r.docx_file_id, ctx.username]);
+      await audit.log(ctx, { organismeId: org, action: 'gabarit.docx', entity: 'render_templates', entityId: r.id, after: { docType, sha256: f.sha256, nom: f.original_name } });
+      return svc.getTemplate(org, docType);
+    },
+    async removeDocxTemplate(ctx, organismeId, docType) {
+      const org = requireOrg(organismeId);
+      await db.run('UPDATE render_templates SET docx_file_id = NULL, version = version + 1 WHERE organisme_id = $1 AND doc_type = $2', [org, docType]);
+      await audit.log(ctx, { organismeId: org, action: 'gabarit.docx_retire', entity: 'render_templates', after: { docType } });
+      return svc.getTemplate(org, docType);
+    },
+    async docxBytes(fileId) {
+      if (!fileId) return null;
+      const f = await db.get('SELECT storage_key, original_name, sha256 FROM files WHERE id = $1', [fileId]);
+      return f ? { bytes: await storage.get(f.storage_key), name: f.original_name, sha256: f.sha256 } : null;
+    },
+
+    /**
+     * État de présence d'une séance (saisi à la tenue de séance) : membres, présents, absents représentés (pouvoirs),
+     * absents excusés et non excusés, et les listes de noms. Mêmes règles que l'extrait du registre (pv.service).
+     */
+    async presenceSeance(organismeId, seanceId) {
+      const org = requireOrg(organismeId);
+      const vide = { membres: 0, presents: 0, representes: 0, excuses: 0, nonExcuses: 0, listePresents: '', listeRepresentes: '', listeExcuses: '', listeNonExcuses: '' };
+      if (!seanceId) return vide;
+      const s = await db.get('SELECT s.id, i.commission_id FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1', [seanceId]);
+      if (!s) return vide;
+      const membres = s.commission_id
+        ? await db.all('SELECT e.id, e.nom, e.prenom FROM commission_membres cm JOIN elus e ON e.id = cm.elu_id WHERE cm.commission_id = $1 AND e.actif', [s.commission_id])
+        : await db.all('SELECT id, nom, prenom FROM elus WHERE organisme_id = $1 AND actif', [org]);
+      const presences = new Map((await db.all('SELECT elu_id, statut FROM seance_presences WHERE seance_id = $1', [seanceId])).map((r) => [r.elu_id, r.statut]));
+      const procs = await db.all('SELECT mandant_elu_id AS mandant, mandataire_elu_id AS mandataire FROM seance_procurations WHERE seance_id = $1', [seanceId]);
+      const ids = new Set(membres.map((m) => m.id));
+      const parId = new Map(membres.map((m) => [m.id, m]));
+      const presents = membres.filter((m) => presences.get(m.id) === 'present');
+      const excuses = membres.filter((m) => presences.get(m.id) === 'excuse');
+      const absents = membres.filter((m) => !presences.get(m.id) || presences.get(m.id) === 'absent');
+      const pouvoirs = procs.filter((p) => ids.has(p.mandant) && ids.has(p.mandataire));
+      const representes = new Set(pouvoirs.map((p) => p.mandant));
+      const exNrep = excuses.filter((m) => !representes.has(m.id));
+      const abNrep = absents.filter((m) => !representes.has(m.id));
+      return {
+        membres: membres.length, presents: presents.length, representes: pouvoirs.length, excuses: exNrep.length, nonExcuses: abNrep.length,
+        listePresents: listeParRole(presents),
+        listeRepresentes: pouvoirs.map((p) => representePar(parId.get(p.mandant), parId.get(p.mandataire))).join('\n'),
+        listeExcuses: exNrep.map((m) => civElu(m)).join(', '),
+        listeNonExcuses: abNrep.map((m) => civElu(m)).join(', '),
+      };
+    },
+
+    /**
+     * Mentions de transmission à la préfecture (télégransmission) : numéro transmis, dates de transmission, d'accusé de
+     * réception (préfecture) et de publication par voie d'affichage. Mêmes règles que l'extrait du registre (pv.service).
+     */
+    async prefecture(organismeId, acteId) {
+      requireOrg(organismeId);
+      const tx = await db.get("SELECT numero_transmis, ar_id, ar_at, sent_at, date_affichage FROM tlt_transactions WHERE acte_id = $1 AND etat = 'poste' AND ar_id IS NOT NULL ORDER BY id DESC LIMIT 1", [acteId]);
+      const jourFr = (x) => (x ? new Date(x).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Paris' }) : '');
+      const affichage = jourFr(tx?.date_affichage ? `${String(tx.date_affichage).slice(0, 10)}T12:00:00Z` : tx?.ar_at);
+      const transmis = jourFr(tx?.sent_at); const recu = jourFr(tx?.ar_at);
+      const mention = (transmis || recu || affichage)
+        ? `TRANSMIS EN PRÉFECTURE LE ${transmis}\nREÇU EN PRÉFECTURE LE ${recu}\nPUBLIÉ PAR VOIE D'AFFICHAGE LE ${affichage}`
+        : '';
+      return { numero: tx?.numero_transmis || '', transmis, recu, affichage, mention };
+    },
+
+    /** Variables du modèle Word : métadonnées de l'acte (varsFor) + zones de la délibération (exposé, visas, dispositif). */
+    async docxVariables(ctx, organismeId, acteId, { deliberationId } = {}) {
+      const org = requireOrg(organismeId);
+      const acte = await actes.load(ctx, org, acteId);
+      const { pick, delibs } = await svc.textsFor(ctx, acte);
+      const d = delibs.find((x) => x.id === Number(deliberationId)) || (delibs.length === 1 ? delibs[0] : null);
+      const base = await svc.varsFor(acte, d);
+      const md = (row) => D.markdownToRich(row?.markdown || '');
+      const out = {};
+      for (const [k, v] of Object.entries(base)) out[`{${k}}`] = v === null || v === undefined ? '' : String(v);
+      out['{titre}'] = acte.titre || '';
+      out['{numero_suivi}'] = String(acte.numero_suivi ?? '');
+      out['{deliberation}'] = d?.titre || '';
+      out['{expose}'] = md(pick('expose', null));
+      out['{visas}'] = md(pick('visas', d?.id));
+      out['{considere}'] = md(pick('visas', d?.id));
+      out['{visas_considerants}'] = md(pick('visas', d?.id));
+      out['{dispositif}'] = md(pick('dispositif', d?.id));
+      out['{delibere}'] = md(pick('dispositif', d?.id));
+      // État de présence de la séance (tenue de séance) : membres, présents, représentés, excusés, non excusés.
+      const p = await svc.presenceSeance(org, acte.seance_id || acte.seance_visee_id);
+      out['{membres_conseil}'] = String(p.membres);
+      out['{conseillers_exercice}'] = String(p.membres);
+      out['{presents}'] = String(p.presents);
+      out['{absents_representes}'] = String(p.representes);
+      out['{absents_excuses}'] = String(p.excuses);
+      out['{absents_non_excuses}'] = String(p.nonExcuses);
+      out['{liste_presents}'] = p.listePresents;
+      out['{liste_absents_representes}'] = p.listeRepresentes;
+      out['{liste_absents_excuses}'] = p.listeExcuses;
+      out['{liste_absents_non_excuses}'] = p.listeNonExcuses;
+      // Mentions de transmission à la préfecture (télégransmission).
+      const tx = await svc.prefecture(org, acteId);
+      out['{numero_transmis}'] = tx.numero;
+      out['{transmis_prefecture}'] = tx.transmis;
+      out['{recu_prefecture}'] = tx.recu;
+      out['{publie_affichage}'] = tx.affichage;
+      out['{mention_transmission}'] = tx.mention;
+      return out;
+    },
+
+    /** Modèle Word fusionné pour un acte : renvoie un tampon .docx. */
+    async renderDocx(ctx, organismeId, acteId, { docType = 'deliberation', deliberationId } = {}) {
+      const org = requireOrg(organismeId);
+      const tpl = await svc.getTemplate(org, docType);
+      if (!tpl.docxFileId) throw E.badRequest(`Aucun modèle Word n'est défini pour le gabarit « ${docType} »`);
+      const modele = await svc.docxBytes(tpl.docxFileId);
+      const vars = await svc.docxVariables(ctx, org, acteId, { deliberationId });
+      const buffer = await D.remplir(modele.bytes, vars);
+      return { buffer, name: `modele-${docType}-${acteId}.docx`, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+    },
+
+    /** Modèle Word fusionné puis converti en PDF (LibreOffice). */
+    async renderDocxPdf(ctx, organismeId, acteId, opts) {
+      const d = await svc.renderDocx(ctx, organismeId, acteId, opts);
+      const pdf = await convertirEnPdf(d.buffer, 'docx');
+      if (!pdf) throw E.incomplete('Conversion Word → PDF indisponible sur le serveur (LibreOffice absent)');
+      const info = await inspectPdf(pdf);
+      return { buffer: pdf, pageCount: info.pages, name: d.name.replace(/\.docx$/, '.pdf') };
+    },
+
+    /** Aperçu du modèle Word avec des DONNÉES DE TEST (aucun acte réel) : sert à contrôler le gabarit. */
+    async docxSample(ctx, organismeId, docType) {
+      const org = requireOrg(organismeId);
+      const tpl = await svc.getTemplate(org, docType);
+      if (!tpl.docxFileId) throw E.badRequest(`Aucun modèle Word n'est défini pour le gabarit « ${docType} »`);
+      const visas = 'Vu le code général des collectivités territoriales, notamment ses articles L. 2121-29 et suivants ;\nConsidérant que la subvention demandée correspond aux objectifs de la politique municipale ;';
+      // Présences : les VRAIS élus de la collectivité, répartis (la plupart présents, quelques absents) pour juger la mise en page.
+      const elus = await db.all(`SELECT id, nom, prenom, role FROM elus WHERE organisme_id = $1 AND actif
+        ORDER BY (role = 'Maire') DESC, (role ILIKE 'Adjoint%') DESC, nom, prenom`, [org]);
+      let pres = { liste_presents: 'M. Exemple, Maire', liste_absents_representes: '', liste_absents_excuses: '', liste_absents_non_excuses: '', membres_conseil: '1', presents: '1', absents_representes: '0', absents_excuses: '0', absents_non_excuses: '0' };
+      if (elus.length >= 5) {
+        const nRep = 2; const nExc = 1; const nNon = 1;
+        const pList = elus.slice(0, elus.length - (nRep + nExc + nNon));
+        const rList = elus.slice(pList.length, pList.length + nRep);
+        const eList = elus.slice(pList.length + nRep, pList.length + nRep + nExc);
+        const nList = elus.slice(pList.length + nRep + nExc);
+        pres = {
+          liste_presents: listeParRole(pList),
+          liste_absents_representes: rList.map((m, i) => `${civElu(m)}, représenté par ${civElu(pList[i % pList.length])}`).join('\n'),
+          liste_absents_excuses: eList.map((m) => civElu(m)).join(', '),
+          liste_absents_non_excuses: nList.map((m) => civElu(m)).join(', '),
+          membres_conseil: String(elus.length), presents: String(pList.length),
+          absents_representes: String(rList.length), absents_excuses: String(eList.length), absents_non_excuses: String(nList.length),
+        };
+      }
+      const variables = {
+        organisme: 'Ville d’Ivry-sur-Seine', adresse: 'Esplanade Georges Marrane — 94200 Ivry-sur-Seine', ville: 'Ivry-sur-Seine', code_postal: '94200',
+        telephone: '01 49 60 20 00', email: 'contact@ivry94.fr', site_web: 'www.ivry94.fr', signataire: 'Le Maire',
+        titre: 'Attribution d’une subvention à l’association Les Amis du Sport (exemple)', numero_suivi: '1', numero: '2030-01-001',
+        deliberation: 'Délibération (exemple)', date_seance: '1ER JANVIER 2030', date_du_jour: new Date().toLocaleDateString('fr-FR'),
+        direction: 'Direction des finances', service: 'Budget', redacteur: 'agent', matiere: '7.5 Subventions', rubrique: 'SPORTS', nature: 'Délibérations', statut: 'brouillon',
+        expose: 'Il est proposé d’attribuer une subvention de fonctionnement de 1 500 € à l’association « Les Amis du Sport ».',
+        visas, considere: visas, visas_considerants: visas,
+        dispositif: 'Article 1 : une subvention de 1 500 € est attribuée à l’association « Les Amis du Sport ».\nArticle 2 : la présente délibération sera transmise au contrôle de légalité.',
+        ...pres, conseillers_exercice: pres.membres_conseil,
+        numero_transmis: 'PR-2030-001', transmis_prefecture: '02/01/2030', recu_prefecture: '06/01/2030', publie_affichage: '06/01/2030',
+        mention_transmission: "TRANSMIS EN PRÉFECTURE LE 02/01/2030\nREÇU EN PRÉFECTURE LE 06/01/2030\nPUBLIÉ PAR VOIE D'AFFICHAGE LE 06/01/2030",
+      };
+      const vars = Object.fromEntries(Object.entries(variables).map(([k, v]) => [`{${k}}`, String(v ?? '')]));
+      const modele = await svc.docxBytes(tpl.docxFileId);
+      const buffer = await D.remplir(modele.bytes, vars);
+      return { buffer, name: `apercu-${docType}.docx`, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+    },
+
+    /** Aperçu du modèle Word (données de test) converti en PDF. */
+    async docxSamplePdf(ctx, organismeId, docType) {
+      const d = await svc.docxSample(ctx, organismeId, docType);
+      const pdf = await convertirEnPdf(d.buffer, 'docx');
+      if (!pdf) throw E.incomplete('Conversion Word → PDF indisponible sur le serveur (LibreOffice absent)');
+      const info = await inspectPdf(pdf);
+      return { buffer: pdf, pageCount: info.pages, name: d.name.replace(/\.docx$/, '.pdf') };
     },
 
     // ---- composition --------------------------------------------------------------------------------------------------
@@ -188,11 +409,30 @@ function createRender({ db, audit, storage, actes, config }) {
         ];
         return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Délibération — ${d.titre}` });
       };
+      const visasPdf = async (d) => {
+        const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
+        const vars = await svc.varsFor(acte, d);
+        const content = [...svc.headerItems(tpl.cfg), { type: 'runs', runs: await runs(pick('visas', d.id)) }];
+        return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Visas et considérants — ${d.titre}` });
+      };
+      const dispositifPdf = async (d) => {
+        const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
+        const vars = await svc.varsFor(acte, d);
+        const dispLabel = tpl.cfg.sections?.dispositif ?? 'Après en avoir délibéré, le conseil DÉCIDE :';
+        const content = [
+          ...svc.headerItems(tpl.cfg),
+          ...(dispLabel ? [{ type: 'title', text: dispLabel, size: 11, bold: true, align: 'left', after: 4 }] : []),
+          { type: 'runs', runs: await runs(pick('dispositif', d.id)) },
+        ];
+        return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Délibéré — ${d.titre}` });
+      };
 
       if (cible === 'expose') return exposePdf();
-      if (cible === 'deliberation') {
+      if (cible === 'deliberation' || cible === 'visas' || cible === 'dispositif') {
         const d = delibs.find((x) => x.id === Number(deliberationId)) || (delibs.length === 1 ? delibs[0] : null);
         if (!d) throw E.badRequest('deliberationId requis (le dossier comporte plusieurs délibérations)');
+        if (cible === 'visas') return visasPdf(d);
+        if (cible === 'dispositif') return dispositifPdf(d);
         return delibPdf(d);
       }
       if (cible === 'dossier') {
@@ -259,4 +499,4 @@ function createRender({ db, audit, storage, actes, config }) {
   return svc;
 }
 
-module.exports = { createRender, DOC_TYPES };
+module.exports = { createRender, DOC_TYPES, listeParRole, civElu };

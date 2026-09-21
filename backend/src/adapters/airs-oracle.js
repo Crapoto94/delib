@@ -40,8 +40,9 @@ const ACTES_SQL = `
 SELECT * FROM (
   SELECT 'act:' || dl.DEL_ID AS "id",
          CASE WHEN p.SEA_ID IS NOT NULL THEN 'sea:' || p.SEA_ID END AS "seance",
-         d.DDE_TITRE AS "titre", d.DDE_RESULTAT AS "resultat",
-         TO_CHAR(d.DDE_DT_VOTE, 'YYYY-MM-DD"T"HH24:MI:SS') AS "date",
+         COALESCE(d.DDE_TITRE, r.RAP_TITRE) AS "titre", d.DDE_RESULTAT AS "resultat",
+         -- Acte non encore voté : pas de DDE_DT_VOTE — on prend la date de la séance (ou du rapport) pour le rattacher à son année.
+         TO_CHAR(COALESCE(d.DDE_DT_VOTE, s.SEA_DT_DEBUT, r.RAP_DATE_DEC, r.RAP_DATE_ACTE), 'YYYY-MM-DD"T"HH24:MI:SS') AS "date",
          r.RAP_DIRECTION AS "direction", r.RAP_SERVICE AS "service", r.RAP_RUB AS "rubrique",
          u.USR_LOGIN AS "redacteur", r.RAP_INSTRUCTEUR AS "redacteur_nom",
          COALESCE(e.ELD_PRENOM || ' ' || e.ELD_NOM, r.RAP_RAPPORTEUR) AS "rapporteur",
@@ -59,8 +60,8 @@ SELECT * FROM (
   LEFT JOIN AIRSUSER.USERS u ON u.USR_ID = p.USR_ID
   LEFT JOIN DELIBUSER.COMMISSION c ON c.COM_ID = p.COM_ID
   LEFT JOIN DELIBUSER.FAST_RAPPORT_CLASSIF f ON f.RAP_ID = p.RAP_ID
-  WHERE (:annee IS NULL OR EXTRACT(YEAR FROM d.DDE_DT_VOTE) = :annee)
-  UNION ALL
+   WHERE (:annee IS NULL OR EXTRACT(YEAR FROM COALESCE(d.DDE_DT_VOTE, s.SEA_DT_DEBUT, r.RAP_DATE_DEC, r.RAP_DATE_ACTE)) = :annee)
+   UNION ALL
   SELECT 'act:' || a.DOC_ID,
          CASE WHEN a.ARC_SEANCE_REF IS NOT NULL THEN 'sea:' || REGEXP_SUBSTR(a.ARC_SEANCE_REF, '[0-9]+') END,
          COALESCE(a.DDE_TITRE, a.RAP_TITRE), a.DDE_RESULTAT,

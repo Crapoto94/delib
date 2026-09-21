@@ -55,7 +55,7 @@ type Synth = { jours: number; cloture: { date: string; jours: number; passe: boo
 
 /** Carte d'une séance à venir (SEA-15) : bloc date, pastilles, titre, indicateurs, jalons, actions. `compacte` : une seule ligne. */
 export function CarteSeance({ s, synth, isScc, compacte, onEdit, onDelete, onRelancer }: { s: any; synth?: Synth; isScc: boolean; compacte: boolean; onEdit: () => void; onDelete: () => void; onRelancer: () => void }) {
-  const j = jours(s.dateSeance); const conseil = s.kind !== 'commission'; const annulee = s.statut === 'annulee'; const ok = synth && !synth.indisponible;
+  const j = jours(s.dateSeance); const conseil = s.kind !== 'commission'; const annulee = s.statut === 'annulee'; const cloturee = s.statut === 'close'; const ok = synth && !synth.indisponible;
   const titre = `${s.instance} — ${dt(s.dateSeance, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} à ${dt(s.dateSeance, { hour: '2-digit', minute: '2-digit' })}`;
   const jal = ok ? synth!.jalons.filter((x) => x.code !== 'seance') : [];
   const nbServices = ok ? (synth!.directionsEnRetard || synth!.directionsATerminer) : 0;
@@ -74,6 +74,7 @@ export function CarteSeance({ s, synth, isScc, compacte, onEdit, onDelete, onRel
       <article className={`card flex flex-wrap items-center gap-3 p-3 ${annulee ? 'opacity-60' : ''}`}>
         <BlocDate date={s.dateSeance} sombre={j !== null && j >= 0 && j <= 14} />
         <div className="min-w-0 flex-1"><div className="truncate font-bold text-head">{titre}</div><div className="text-[12px] text-mute">{s.lieu || 'Lieu à définir'}{j !== null && j >= 0 ? ` · dans ${j} jour(s)` : ''}{ok ? ` · ${synth!.dansOdj}/${synth!.dossiers} inscrites · ${synth!.tauxRealisation} % instruits` : ''}</div></div>
+        {!annulee && <Badge tone={cloturee ? 'gray' : 'blue'}>{cloturee ? 'Clôturée' : 'Non clôturée'}</Badge>}
         {actions}
       </article>);
   }
@@ -85,6 +86,7 @@ export function CarteSeance({ s, synth, isScc, compacte, onEdit, onDelete, onRel
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">{s.kind === 'commission' ? 'Commission' : s.instance}</span>
             {annulee ? <Badge tone="ko">Annulée</Badge> : conseil ? <Badge tone={ODJ[s.odjStatut]?.tone ?? 'gray'}>{ODJ[s.odjStatut]?.label ?? s.odjStatut}</Badge> : <Badge tone="blue">Projets présentés</Badge>}
+            {!annulee && <Badge tone={cloturee ? 'gray' : 'blue'}>{cloturee ? 'Clôturée' : 'Non clôturée'}</Badge>}
             {s.type && s.type !== 'ordinaire' && <Badge tone="warn">{s.type}</Badge>}
             {j !== null && j >= 0 && j <= 9 && !annulee && <Badge tone="ko">Séance dans {j === 0 ? 'moins d’un jour' : `${j} jour(s)`}</Badge>}
           </div>

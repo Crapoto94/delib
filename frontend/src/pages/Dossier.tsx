@@ -503,6 +503,7 @@ export default function Dossier() {
   const { toast, node } = useToast();
   const acte = useLoad(async () => (await api.get(orgPath(o, `/actes/${id}`))).data, [o, id]);
   const circuit = useLoad(async () => (await api.get(orgPath(o, `/actes/${id}/circuit`))).data, [o, id]);
+  const gabarits = useLoad(async () => (await api.get(orgPath(o, '/gabarits'))).data.items as any[], [o]);
   const reloadAll = useCallback(() => { acte.reload(); circuit.reload(); }, [acte, circuit]);
   const [copying, setCopying] = useState(false);
   const [envoi, setEnvoi] = useState<{ data: any; premier: boolean } | null>(null);
@@ -519,6 +520,9 @@ export default function Dossier() {
     try { await api.delete(orgPath(o, `/actes/${a.id}`)); toast('Dossier supprimé'); nav('/dossiers'); } catch (e) { toast(errMsg(e), 'ko'); }
   };
   const apercuDossier = async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }), `Dossier #${a.numeroSuivi} — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };
+  const modeleDocx = !!gabarits.data?.find((t) => t.docType === 'deliberation')?.docx;
+  const telechargerDocx = async () => { try { const r = await api.get(orgPath(o, `/actes/${a.id}/docx`), { params: { docType: 'deliberation' }, responseType: 'blob' }); const url = URL.createObjectURL(r.data); const el = document.createElement('a'); el.href = url; el.download = `deliberation-${a.numeroSuivi}.docx`; el.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const apercuModele = async () => { const m = await openPdf(() => api.get(orgPath(o, `/actes/${a.id}/docx-pdf`), { params: { docType: 'deliberation' }, responseType: 'blob' }), `Délibération (modèle Word) — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };
   const onEnvoye = (data: any) => {
     let premier = true;
     try { const k = `vibedelib.premier-envoi.${me?.username ?? 'x'}`; premier = !localStorage.getItem(k); localStorage.setItem(k, '1'); } catch { /* stockage indisponible : message générique */ }
@@ -531,6 +535,8 @@ export default function Dossier() {
         <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><StatutBadge statut={a.statut} />
           <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
           <button className="btn-secondary" onClick={apercuDossier}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button>
+          {modeleDocx && <button className="btn-secondary" onClick={telechargerDocx}><FileText className="h-4 w-4" /> Délibération Word</button>}
+          {modeleDocx && <button className="btn-secondary" onClick={apercuModele}><Eye className="h-4 w-4" /> Délibération (modèle)</button>}
           {peutSupprimer && <button className="btn-secondary text-ko" onClick={supprimer}><Trash2 className="h-4 w-4" /> Supprimer</button>}</div>
       </div>
       {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}

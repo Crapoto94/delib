@@ -28,7 +28,7 @@ export const parametrage: Article = {
             [<>Notifications & relances</>, <>Consultation</>, <>Édition des règles, jours fériés</>],
             [<>TDT et GED</>, <>Exploitation, envois, synchronisation</>, <>Connexions, tests, plan de classement</>],
             [<>Identité & logo, utilisateurs & rôles</>, <>Consultation selon droits</>, <>Oui</>],
-            [<>Gabarits PDF, champs personnalisés, référentiels, IA, recherche, export/import</>, <>Non</>, <>Oui</>],
+            [<>Gabarits, champs personnalisés, référentiels, IA, recherche, export/import</>, <>Non</>, <>Oui</>],
             [<>Collectivités, référentiels communs, admins de plateforme</>, <>Non</>, <>Administrateur de plateforme</>],
           ]} />
           <Encadre type="attention" titre="Pourquoi certains écrans sont visibles mais non modifiables">
@@ -91,15 +91,16 @@ export const parametrage: Article = {
     },
     {
       id: 'p-gabarits',
-      titre: 'Gabarits PDF',
+      titre: 'Gabarits',
       bloc: (
         <>
-          <P>Les <BoutonUI>Gabarits PDF</BoutonUI> définissent l'apparence des documents produits : exposé, délibération, dossier complet, page de garde, intercalaire, sommaire, ordre du jour, convocation, extrait du registre.</P>
+          <P>Les <BoutonUI>Gabarits</BoutonUI> définissent l'apparence des documents produits : exposé, délibération, dossier complet, page de garde, intercalaire, sommaire, ordre du jour, convocation, extrait du registre.</P>
           <Tableau entetes={['Réglage', 'Détail']} lignes={[
             [<>Texte</>, <>Police, taille, interligne, justification.</>],
             [<>Marges</>, <>Marges du document.</>],
             [<>Entête & pied</>, <>Lignes d'en-tête, pied de page, pagination, filigrane.</>],
             [<>Fond de page</>, <>PDF de fond, éventuellement un pour la première page et un pour les suivantes ; option d'affichage du logo.</>],
+            [<>Modèle Word (.docx)</>, <>Fichier Word à variables <code>{'{titre} {expose} {visas} {dispositif}…'}</code>, fusionné à la génération du document (puis converti en PDF) ; sans modèle, la mise en page ci-dessus est utilisée.</>],
           ]} />
           <P>Un bouton d'<BoutonUI>Aperçu d'étalonnage</BoutonUI> génère un PDF de contrôle pour vérifier le rendu avant de valider.</P>
         </>

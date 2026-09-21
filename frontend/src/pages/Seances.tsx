@@ -75,6 +75,7 @@ function SeancesList() {
   const [editing, setEditing] = useState<any>(null); const [deleting, setDeleting] = useState<any>(null); const [relance, setRelance] = useState<any>(null); const [calendrier, setCalendrier] = useState(false);
   const [tab, setTab] = useState<'avenir' | 'passees' | 'hors'>('avenir'); const [creating, setCreating] = useState(false);
   const [instanceId, setInstanceId] = useState<number | ''>(''); const [annee, setAnnee] = useState<number | ''>(''); const [q, setQ] = useState('');
+  const [etat, setEtat] = useState<'' | 'ouvertes' | 'closes'>('');
   const [vue, setVue] = useState<'detaillee' | 'compacte'>(() => { try { return localStorage.getItem('vd.seances.vue') === 'compacte' ? 'compacte' : 'detaillee'; } catch { return 'detaillee'; } });
   const changerVue = (v: 'detaillee' | 'compacte') => { setVue(v); try { localStorage.setItem('vd.seances.vue', v); } catch { /* préférence non conservée */ } };
   const instances = useLoad(async () => (await api.get(orgPath(o, '/instances'))).data.items as any[], [o]);
@@ -91,6 +92,7 @@ function SeancesList() {
     return tab === 'passees' ? items : [...items].sort((x, y) => +new Date(x.dateSeance) - +new Date(y.dateSeance)); // les prochaines d'abord ; les passées, la plus récente d'abord
   }, [o, tab, instanceId]);
   const filtrees = (list.data ?? []).filter((x) => (!annee || new Date(x.dateSeance).getFullYear() === annee)
+    && (!etat || (etat === 'closes' ? x.statut === 'close' : x.statut !== 'close'))
     && (!q.trim() || `${x.instance} ${x.lieu ?? ''} ${dt(x.dateSeance, { dateStyle: 'full' })}`.toLowerCase().includes(q.trim().toLowerCase())));
   const ids = tab === 'avenir' && isScc ? filtrees.filter((x) => x.kind !== 'commission').map((x) => x.id).slice(0, 40) : [];
   const synth = useLoad(async () => (ids.length ? (await api.get(orgPath(o, '/seances-synthese'), { params: { ids: ids.join(',') } })).data : null), [o, ids.join(',')]);
@@ -117,7 +119,11 @@ function SeancesList() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex w-fit max-w-full overflow-x-auto rounded-lg bg-soft p-1" role="tablist">{([['avenir', 'Séances à venir', compteurs.data?.avenir], ['passees', 'Séances passées', compteurs.data?.passees], ...(isScc ? [['hors', 'Hors délai & dérogations', compteurs.data?.hors]] : [])] as [string, string, number | undefined][]).map(([k, l, n]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k as any)} className={`flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-[13px] font-semibold ${tab === k ? 'bg-primary text-white shadow-lift' : 'text-slate-700 hover:bg-surface'}`}>{l}{n !== undefined && <span className={`rounded-full px-1.5 text-[11px] ${tab === k ? 'bg-white/25' : k === 'hors' && n > 0 ? 'bg-ko-bg text-ko' : 'bg-line'}`}>{n}</span>}</button>))}</div>
-          {tab !== 'hors' && <div className="ml-auto flex items-center gap-2">
+          {tab !== 'hors' && <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg bg-soft p-1" role="group" aria-label="État de clôture">
+              {([['', 'Toutes'], ['ouvertes', 'Non clôturées'], ['closes', 'Clôturées']] as ['' | 'ouvertes' | 'closes', string][]).map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={etat === k} onClick={() => setEtat(k)} className={`rounded-md px-2.5 py-1 text-[12px] font-semibold ${etat === k ? 'bg-primary text-white' : ''}`}>{l}</button>))}
+            </div>
             <div className="flex rounded-lg bg-soft p-1" role="group" aria-label="Année">
               <button type="button" aria-pressed={annee === ''} onClick={() => setAnnee('')} className={`rounded-md px-2.5 py-1 text-[12px] font-semibold ${annee === '' ? 'bg-primary text-white' : ''}`}>Toutes</button>
               {annees.map((a) => <button key={a} type="button" aria-pressed={annee === a} onClick={() => setAnnee(a)} className={`rounded-md px-2.5 py-1 text-[12px] font-semibold ${annee === a ? 'bg-primary text-white' : ''}`}>{a}</button>)}</div>
@@ -135,7 +141,7 @@ function SeancesList() {
           </div>)}
       </div>
 
-      {tab === 'hors' ? <HorsDelai /> : list.loading && !list.data ? <Loading /> : !filtrees.length ? <div className="card"><Empty>{q || annee || instanceId ? 'Aucune séance ne correspond au filtre.' : tab === 'passees' ? 'Aucune séance passée.' : 'Aucune séance à venir.'}</Empty></div> : (
+      {tab === 'hors' ? <HorsDelai /> : list.loading && !list.data ? <Loading /> : !filtrees.length ? <div className="card"><Empty>{q || annee || instanceId || etat ? 'Aucune séance ne correspond au filtre.' : tab === 'passees' ? 'Aucune séance passée.' : 'Aucune séance à venir.'}</Empty></div> : (
         <div className="space-y-4">{filtrees.map((x) => (
           <CarteSeance key={x.id} s={x} synth={parId.get(x.id)} isScc={isScc} compacte={vue === 'compacte' || tab === 'passees'} onEdit={() => setEditing(x)} onDelete={() => setDeleting(x)} onRelancer={() => setRelance(x)} />))}</div>)}
 

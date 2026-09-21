@@ -87,32 +87,24 @@ export function Utilisateurs() {
   );
 }
 
-/* --------------------------------------------------------------------------------------------------- gabarits PDF */
+/* ------------------------------------------------------------------------------------------------------- gabarits */
 const DOCS: Record<string, string> = {
   expose: 'Exposé des motifs', deliberation: 'Délibération', dossier: 'Dossier complet', garde: 'Page de garde', intercalaire: 'Intercalaire de point', sommaire: 'Sommaire', odj: 'Ordre du jour', convocation: 'Convocation', registre: 'Extrait du registre',
 };
-const VARS = '{organisme} {titre} {rubrique} {matiere} {nature} {direction} {service} {redacteur} {numero_suivi} {numero} {date_seance} {date_du_jour} {statut}';
-
 export function Gabarits() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const list = useLoad(async () => (await api.get(orgPath(o, '/gabarits'))).data.items as any[], [o]);
-  const fonts = useLoad(async () => (await api.get(orgPath(o, '/gabarits-polices'))).data.items as any[], [o]);
-  const [sel, setSel] = useState('deliberation'); const [cfg, setCfg] = useState<any>(null); const [busy, setBusy] = useState(false);
+  const [sel, setSel] = useState('deliberation'); const [busy, setBusy] = useState(false);
   const cur = list.data?.find((t) => t.docType === sel);
-  useEffect(() => { if (cur) setCfg(JSON.parse(JSON.stringify(cur.cfg))); }, [cur?.docType, cur?.version, list.data]);
-  const first = useRef<HTMLInputElement>(null); const next = useRef<HTMLInputElement>(null);
+  const vars = useLoad(async () => (await api.get(orgPath(o, `/gabarits/${sel}/docx/variables`))).data.items as any[], [o, sel]);
+  const docxInput = useRef<HTMLInputElement>(null);
   if (list.loading && !list.data) return <Loading />;
-  if (!cur || !cfg) return <Empty>Aucun gabarit.</Empty>;
-  const set = (path: string[], v: any) => { const c = JSON.parse(JSON.stringify(cfg)); let t = c; path.slice(0, -1).forEach((k) => { t[k] = t[k] ?? {}; t = t[k]; }); t[path[path.length - 1]] = v; setCfg(c); };
-  const save = async () => {
-    setBusy(true);
-    try { await api.put(orgPath(o, `/gabarits/${sel}`), { marges: cfg.marges, police: cfg.police, pied: cfg.pied, entete: cfg.entete, filigrane: cfg.filigrane, a4Strict: cfg.a4Strict }); toast('Gabarit enregistré (nouvelle version)'); list.reload(); }
-    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
-  };
-  const upload = async (which: 'first' | 'next', file: File) => {
-    try { const fd = new FormData(); fd.append('file', file); await api.post(orgPath(o, `/gabarits/${sel}/fond/${which}`), fd); toast('Fond déposé'); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); }
-  };
-  const calibrate = async () => { const m = await openPdf(() => api.get(orgPath(o, `/gabarits/${sel}/etalonnage`), { responseType: 'blob' }), `Étalonnage du gabarit « ${sel} »`); if (m) toast(`Étalonnage impossible : ${m}`, 'ko'); };
+  if (!cur) return <Empty>Aucun gabarit.</Empty>;
+  const uploadDocx = async (file: File) => { try { const fd = new FormData(); fd.append('file', file); await api.post(orgPath(o, `/gabarits/${sel}/docx`), fd); toast('Modèle Word déposé'); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const removeDocx = async () => { try { await api.delete(orgPath(o, `/gabarits/${sel}/docx`)); toast('Modèle Word retiré'); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const downloadDocx = async () => { try { const r = await api.get(orgPath(o, `/gabarits/${sel}/docx`), { responseType: 'blob' }); const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = `modele-${sel}.docx`; a.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const apercuDocx = async () => { try { const r = await api.get(orgPath(o, `/gabarits/${sel}/docx/apercu`), { responseType: 'blob' }); const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = `apercu-${sel}.docx`; a.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const apercuPdf = async () => { setBusy(true); try { const m = await openPdf(() => api.get(orgPath(o, `/gabarits/${sel}/docx/apercu-pdf`), { responseType: 'blob' }), `Aperçu (données de test) — ${DOCS[sel] ?? sel}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); } finally { setBusy(false); } };
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
       <nav aria-label="Gabarits" className="card h-fit p-2">
@@ -122,42 +114,27 @@ export function Gabarits() {
           </button>))}
       </nav>
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h2>{DOCS[sel] ?? sel} {cur.personnalise ? <Badge tone="blue">v{cur.version}</Badge> : <Badge>par défaut</Badge>}</h2>
-          <div className="flex gap-2"><button className="btn-secondary" onClick={calibrate}>Aperçu d'étalonnage (PDF)</button><button className="btn-primary" onClick={save} disabled={busy}>{busy && <Spinner />} Enregistrer</button></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2>{DOCS[sel] ?? sel} {cur.docx ? <Badge tone="ok">modèle Word</Badge> : <Badge>aucun modèle</Badge>}</h2>
+          <div className="flex gap-2">
+            <button className="btn-secondary" disabled={!cur.docx} onClick={apercuDocx}><FileText className="h-4 w-4" /> Aperçu (.docx, données de test)</button>
+            <button className="btn-secondary" disabled={!cur.docx || busy} onClick={apercuPdf}>{busy && <Spinner />} Aperçu (PDF)</button>
+          </div></div>
 
-        <section className="card p-5"><h3 className="mb-3">Police et texte</h3>
-          <div className="grid gap-4 md:grid-cols-4">
-            <Field label="Police"><Select className="input" value={cfg.police.famille ?? 'interstate'} onChange={(e) => set(['police', 'famille'], e.target.value)}>
-              {fonts.data?.map((f) => <option key={f.id} value={f.id} disabled={!f.disponible}>{f.label}{f.disponible ? '' : ' — non installée'}</option>)}</Select></Field>
-            <Field label="Taille (pt)"><input className="input" type="number" min={7} max={18} step={0.5} value={cfg.police.taille} onChange={(e) => set(['police', 'taille'], Number(e.target.value))} /></Field>
-            <Field label="Interligne"><input className="input" type="number" min={1} max={2.5} step={0.05} value={cfg.police.interligne} onChange={(e) => set(['police', 'interligne'], Number(e.target.value))} /></Field>
-            <label className="mt-6 flex items-center gap-2"><input type="checkbox" checked={!!cfg.police.justifie} onChange={(e) => set(['police', 'justifie'], e.target.checked)} /> Texte justifié</label>
-          </div></section>
-
-        <section className="card p-5"><h3 className="mb-3">Marges (mm) et pied de page</h3>
-          <div className="grid gap-4 md:grid-cols-4">{(['haut', 'bas', 'gauche', 'droite'] as const).map((k) => <Field key={k} label={k[0].toUpperCase() + k.slice(1)}><input className="input" type="number" min={0} max={80} value={cfg.marges[k]} onChange={(e) => set(['marges', k], Number(e.target.value))} /></Field>)}</div>
-          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]"><Field label="Texte du pied de page" hint={`Variables : ${VARS}`}><input className="input" value={cfg.pied.texte ?? ''} onChange={(e) => set(['pied', 'texte'], e.target.value)} /></Field>
-            <label className="mt-6 flex items-center gap-2"><input type="checkbox" checked={cfg.pied.pagination !== false} onChange={(e) => set(['pied', 'pagination'], e.target.checked)} /> Pagination</label></div>
-          <Field label="Filigrane (vide = aucun)"><input className="input" value={cfg.filigrane ?? ''} onChange={(e) => set(['filigrane'], e.target.value)} /></Field></section>
-
-        <section className="card p-5"><h3 className="mb-1">En-tête</h3><p className="mb-3 text-[12px] text-mute">Variables : {VARS}</p>
-          <ul className="space-y-2">{cfg.entete.map((b: any, i: number) => (
-            <li key={i} className="grid items-center gap-2 rounded border border-line p-2 md:grid-cols-[1fr_90px_110px_auto_auto_auto]">
-              <input className="input" aria-label="Texte" value={b.texte} onChange={(e) => set(['entete', String(i), 'texte'], e.target.value)} />
-              <input className="input" aria-label="Taille" type="number" min={6} max={40} value={b.taille ?? 11} onChange={(e) => set(['entete', String(i), 'taille'], Number(e.target.value))} />
-              <Select className="input" aria-label="Alignement" value={b.align ?? 'left'} onChange={(e) => set(['entete', String(i), 'align'], e.target.value)}><option value="left">Gauche</option><option value="center">Centré</option><option value="right">Droite</option></Select>
-              <label className="flex items-center gap-1 text-[12px]"><input type="checkbox" checked={!!b.gras} onChange={(e) => set(['entete', String(i), 'gras'], e.target.checked)} /> Gras</label>
-              <label className="flex items-center gap-1 text-[12px]"><input type="checkbox" checked={!!b.encadre} onChange={(e) => set(['entete', String(i), 'encadre'], e.target.checked)} /> Encadré</label>
-              <button className="text-ko" aria-label="Supprimer la ligne" onClick={() => set(['entete'], cfg.entete.filter((_: any, j: number) => j !== i))}><Trash2 className="h-4 w-4" /></button>
-            </li>))}</ul>
-          <button className="btn-secondary mt-3" onClick={() => set(['entete'], [...cfg.entete, { texte: '', align: 'left', taille: 11, apres: 6 }])}>+ Ajouter une ligne</button></section>
-
-        <section className="card p-5"><h3 className="mb-1">PDF de fond (papier à en-tête)</h3><p className="mb-3 text-[12px] text-mute">Un PDF A4 sert de fond de page : première page et pages suivantes, ou un seul pour toutes.</p>
-          <div className="grid gap-4 md:grid-cols-2">{([['first', 'Première page', cur.bgFirstFileId, first], ['next', 'Pages suivantes', cur.bgNextFileId, next]] as const).map(([w, l, id, ref]) => (
-            <div key={w} className="rounded border border-line p-3"><b>{l}</b><div className="my-2">{id ? <Badge tone="ok">fond déposé</Badge> : <span className="text-mute">aucun</span>}</div>
-              <input ref={ref} type="file" accept="application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(w, f); e.target.value = ''; }} />
-              <div className="flex gap-2"><button className="btn-secondary" onClick={() => ref.current?.click()}><Upload className="h-3.5 w-3.5" /> Déposer un PDF</button>
-                {id && <button className="btn-ko" onClick={async () => { await api.delete(orgPath(o, `/gabarits/${sel}/fond/${w}`)); list.reload(); }}>Retirer</button>}</div></div>))}</div></section>
+        <section className="card p-5"><h3 className="mb-1">Modèle Word (.docx) à variables</h3>
+          <p className="mb-3 text-[12px] text-mute">Importez un fichier Word contenant des variables <code>{'{…}'}</code> : à la génération du document, elles sont remplacées par les valeurs de l'acte et de ses zones (exposé des motifs, visas et considérants, délibéré). Un document par type.</p>
+          <div className="mb-2">{cur.docx ? <Badge tone="ok">modèle déposé</Badge> : <span className="text-mute">aucun</span>}</div>
+          <input ref={docxInput} type="file" accept=".docx" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadDocx(f); e.target.value = ''; }} />
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={() => docxInput.current?.click()}><Upload className="h-3.5 w-3.5" /> Déposer un .docx</button>
+            {cur.docx && <button className="btn-secondary" onClick={downloadDocx}>Télécharger le modèle</button>}
+            {cur.docx && <button className="btn-ko" onClick={removeDocx}>Retirer</button>}
+          </div>
+          <div className="mt-3 rounded border border-line p-3 text-[12px]">
+            <b>Variables disponibles</b>
+            <ul className="mt-1 grid gap-1 sm:grid-cols-2">{vars.data?.map((v) => <li key={v.nom}><code className="font-mono">{v.nom}</code> — <span className="text-mute">{v.description}</span></li>)}</ul>
+            <p className="mt-2 text-mute">Conditionnel : <code>{'{IF visas|texte}'}</code> n'affiche « texte » que si la variable a une valeur.</p>
+          </div>
+        </section>
       </div>{node}
     </div>
   );
