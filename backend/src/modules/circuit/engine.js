@@ -16,6 +16,13 @@ const { addBusinessDays } = require('../../shared/time');
 
 /** Statuts où l'acte parcourt le circuit ; « en_attente_scc » = étape SCC en cours (l'acte y reste une fois le circuit terminé). */
 const IN_CIRCUIT = ['en_circuit', 'modification_demandee', 'en_attente_scc'];
+// Actes qui ne sont pas encore passés au conseil (rédaction → prêts), pour la vue « Tous les actes ».
+const EN_COURS_ACTIFS = ['brouillon', 'modification_demandee', 'en_circuit', 'valide_dgs', 'en_attente_scc', 'mis_a_disposition', 'avis_rendu', 'inscrit_odj', 'texte_definitif_pret', 'pret_a_transmettre'];
+// Libellé d'étape pour les actes sortis du circuit (plus d'étape courante) : chacun a sa rupture.
+const ETAPE_HORS_CIRCUIT = {
+  valide_dgs: 'Validé DGS', en_attente_scc: 'En attente SCC', mis_a_disposition: 'Mis à disposition', avis_rendu: 'Avis rendu',
+  inscrit_odj: 'Inscrit au conseil', texte_definitif_pret: 'Texte définitif prêt', pret_a_transmettre: 'Prêt à transmettre',
+};
 
 function createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late }) {
   const graphCache = new Map();
@@ -519,6 +526,59 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       }
       await actes.attachSeance([...team, ...validatedShaped].map((t) => t.acte));
       return { equipe: team, valides: validatedShaped };
+    },
+
+    /**
+     * Mon portefeuille : TOUS les actes non encore passés au conseil qui me concernent —
+     * action attendue de moi, rédaction/validation par mon équipe, acte que j'ai validé et qui poursuit son circuit,
+     * acte inscrit au conseil (le mien ou celui de mon équipe). Le retard est distingué (étape courante dépassée).
+     */
+    async portefeuille(ctx, organismeId) {
+      const org = organismeId;
+      const [todos, suivi] = await Promise.all([svc.todo(ctx, org), svc.tracking(ctx, org)]);
+      const map = new Map();
+      const put = (acte, raison, step) => {
+        const e = map.get(acte.id) || { acte, raisons: new Set(), step: null };
+        e.raisons.add(raison);
+        if (step?.dueAt && (!e.step?.dueAt || new Date(step.dueAt) < new Date(e.step.dueAt))) e.step = step;
+        else if (step && !e.step) e.step = step;
+        map.set(acte.id, e);
+      };
+      for (const t of todos) put(t.acte, 'action', t.step);
+      for (const t of suivi.equipe) put(t.acte, t.phase ?? 'validation', t.step);
+      for (const t of suivi.valides) put(t.acte, 'valide', t.step);
+      // Inscrits au conseil : les miens et ceux de mon équipe (périmètre hiérarchique).
+      const h = await titulaires.hierarchyScope(ctx.username, org);
+      const isDgs = (await titulaires.resolve(org, 'dgs', {})).some((t) => t.username === ctx.username || t.suppleant === ctx.username);
+      const p = [org, ctx.username]; const or = ['a.redacteur = $2', 'a.co_redacteurs ? $2'];
+      if (isDgs || h.dgaOrganisme) or.push('TRUE');
+      if (h.directions.length) { p.push(h.directions); or.push(`a.direction_code = ANY($${p.length}::text[])`); }
+      for (const [d, sv] of h.services) { p.push(d, sv); or.push(`(a.direction_code = $${p.length - 1} AND a.service_code = $${p.length})`); }
+      const inscrits = await db.all(`SELECT * FROM actes a WHERE a.organisme_id = $1 AND a.statut = 'inscrit_odj' AND (${or.join(' OR ')})`, p);
+      for (const a of inscrits) put(actes.toActe(a), 'inscrit', null);
+      const items = [...map.values()].map((e) => ({ acte: e.acte, raisons: [...e.raisons], step: e.step, enRetard: !!(e.step?.dueAt && new Date(e.step.dueAt) < new Date()) }));
+      items.sort((x, y) => (Number(y.enRetard) - Number(x.enRetard)) || ((x.step?.dueAt ? new Date(x.step.dueAt) : Infinity) - (y.step?.dueAt ? new Date(y.step.dueAt) : Infinity)) || (y.acte.id - x.acte.id));
+      await actes.attachSeance(items.map((i) => i.acte));
+      return { items };
+    },
+
+    /** Tous les actes non encore passés au conseil, avec leur état courant (étape) et la séance pressentie — pour la vue admin/SCC. */
+    async enCours(ctx, organismeId) {
+      const org = organismeId;
+      const rows = await db.all(
+        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due
+         FROM actes a LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+         WHERE a.organisme_id = $1 AND a.statut = ANY($2::text[])
+         ORDER BY a.updated_at DESC LIMIT 1000`, [org, EN_COURS_ACTIFS]);
+      const items = rows.map((r) => {
+        const etape = r.statut === 'brouillon' ? { key: 'redaction', label: 'Rédaction' }
+          : r.statut === 'modification_demandee' ? { key: 'correction', label: 'À corriger' }
+            : r.cur_key ? { key: r.cur_key, label: r.cur_label || r.cur_key, holders: r.cur_holders, dueAt: r.cur_due, late: !!r.cur_due && new Date(r.cur_due) < new Date() }
+              : { key: r.statut, label: ETAPE_HORS_CIRCUIT[r.statut] || r.statut };
+        return { acte: actes.toActe(r), etape, enRetard: !!etape.late };
+      });
+      await actes.attachSeance(items.map((i) => i.acte));
+      return { items };
     },
 
     async lateActes(ctx, organismeId) {

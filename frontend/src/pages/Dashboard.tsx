@@ -1,32 +1,24 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ClipboardCheck, PenLine, Route, Users } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, ClipboardCheck, PenLine, Route, Users } from 'lucide-react';
 import { api, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
-import { Badge, Empty, ErrorBox, Loading, PageTitle, useLoad } from '../ui';
+import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutBadge, useLoad } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
 import { SeanceVisee } from '../SeanceVisee';
 import { Mascotte } from '../DossierAssiste';
 
-export default function Dashboard() {
-  const { me, org } = useAuth();
+/** Synthèse : ce qui m'attend (widgets). Réutilisée par la page unique « Mon espace ». */
+export function Synthese() {
+  const { org } = useAuth();
   const o = org!.id;
   const todo = useLoad(async () => (await api.get(orgPath(o, '/circuit/a-traiter'))).data.items as any[], [o]);
-  const mine = useLoad(async () => (await api.get(orgPath(o, '/actes'), { params: { scope: 'mine', limit: 8 } })).data.items as any[], [o]);
   const late = useLoad(async () => (await api.get(orgPath(o, '/circuit/en-retard'))).data.items as any[], [o]);
   const suivi = useLoad(async () => (await api.get(orgPath(o, '/circuit/suivi'))).data as { equipe: any[]; valides: any[] }, [o]);
-  // prénom de l'agent (fiche RH), sinon premier mot du nom affiché ; « MARC-ANTOINE » -> « Marc-Antoine »
-  const cap = (s: string) => s.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_m, a, b) => a + b.toUpperCase());
-  const first = me ? cap(me.agent?.prenom || me.displayName.split(' ')[0] || '') : '';
+  const inscrits = useLoad(async () => (await api.get(orgPath(o, '/actes'), { params: { statut: 'inscrit_odj', scope: 'all', limit: 30 } })).data.items as any[], [o]);
 
   return (
     <div className="space-y-8">
-      <PageTitle title={`Bonjour ${first ?? ''}`} sub={`Voici ce qui vous attend à ${org!.nom}.`} actions={
-        <>
-          <Link to="/dossiers?nouveau=1&assiste=1" className="btn-secondary"><Mascotte className="h-4 w-4" humeur="content" /> Dossier assisté</Link>
-          <Link to="/dossiers?nouveau=1" className="btn-primary"><PenLine className="h-4 w-4" /> Nouveau dossier</Link>
-        </>
-      } />
 
       <section aria-labelledby="atraiter" className="card">
         <div className="flex items-center gap-2 border-b border-line px-5 py-3"><ClipboardCheck className="h-5 w-5 text-action" /><h3 id="atraiter">À traiter</h3>{todo.data && <Badge tone="blue">{todo.data.length}</Badge>}</div>
@@ -79,19 +71,23 @@ export default function Dashboard() {
           </tbody></table>
         </section>)}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section aria-labelledby="mesdossiers" className="card">
-          <div className="flex items-center justify-between border-b border-line px-5 py-3"><h3 id="mesdossiers">Mes derniers dossiers</h3><Link className="text-[12px] font-semibold text-action" to="/dossiers?scope=mine">Tout voir</Link></div>
-          {mine.loading ? <Loading /> : !mine.data?.length ? <Empty>Vous n'avez pas encore rédigé d'acte.</Empty> : (
-            <ul>{mine.data.map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line px-5 py-3 last:border-0">
-                <Link to={`/dossiers/${a.id}`} className="min-w-0"><div className="truncate font-semibold text-head hover:underline">{a.titre}</div><div className="text-[12px] text-mute">#{a.numeroSuivi} · modifié {dt(a.updatedAt, { dateStyle: 'short' })}</div></Link>
-                <Badge tone={a.statut === 'brouillon' ? 'gray' : a.statut === 'modification_demandee' ? 'warn' : 'blue'}>{a.statut.replace(/_/g, ' ')}</Badge>
-              </li>))}
-            </ul>
-          )}
-        </section>
-        <section aria-labelledby="retard" className="card">
+      {(inscrits.data?.length ?? 0) > 0 && (
+        <section aria-labelledby="inscrits" className="card">
+          <div className="flex items-center gap-2 border-b border-line px-5 py-3"><CalendarCheck className="h-5 w-5 text-primary" /><h3 id="inscrits">Actes inscrits au conseil</h3><Badge tone="blue">{inscrits.data!.length}</Badge>
+            <span className="ml-2 text-[12px] text-mute">Circuit terminé, en attente de leur séance.</span></div>
+          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Direction</th><th>Séance visée</th><th>Statut</th></tr></thead><tbody>
+            {inscrits.data!.slice(0, 25).map((a) => (
+              <tr key={a.id} className="hover:bg-soft">
+                <td className="w-20 font-mono text-[12px]">#{a.numeroSuivi}</td>
+                <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link></td>
+                <td className="text-mute">{a.direction?.label}</td>
+                <td><SeanceVisee acte={a} /></td>
+                <td><StatutBadge statut={a.statut} /></td>
+              </tr>))}
+          </tbody></table>
+        </section>)}
+
+      <section aria-labelledby="retard" className="card">
           <div className="flex items-center gap-2 border-b border-line px-5 py-3"><AlertTriangle className="h-5 w-5 text-warn" /><h3 id="retard">Actes en retard dans mon périmètre</h3></div>
           {late.loading ? <Loading /> : !late.data?.length ? <Empty>Aucun retard. Bravo !</Empty> : (
             <ul>{late.data.map((t) => (
@@ -100,7 +96,24 @@ export default function Dashboard() {
             </ul>
           )}
         </section>
-      </div>
+    </div>
+  );
+}
+
+/** Ancienne page d'accueil (conservée pour compatibilité) : titre + synthèse. */
+export default function Dashboard() {
+  const { me, org } = useAuth();
+  const cap = (s: string) => s.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_m, a, b) => a + b.toUpperCase());
+  const first = me ? cap(me.agent?.prenom || me.displayName.split(' ')[0] || '') : '';
+  return (
+    <div className="space-y-8">
+      <PageTitle title={`Bonjour ${first ?? ''}`} sub={`Voici ce qui vous attend à ${org!.nom}.`} actions={
+        <>
+          <Link to="/?nouveau=1&assiste=1" className="btn-secondary"><Mascotte className="h-4 w-4" humeur="content" /> Dossier assisté</Link>
+          <Link to="/?nouveau=1" className="btn-primary"><PenLine className="h-4 w-4" /> Nouveau dossier</Link>
+        </>
+      } />
+      <Synthese />
     </div>
   );
 }

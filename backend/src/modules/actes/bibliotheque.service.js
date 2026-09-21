@@ -13,7 +13,7 @@ const { analyser } = require('../recherche/recherche.service');
 const CLOSES = "s.statut IN ('close', 'tenue') AND EXISTS (SELECT 1 FROM seance_tenue t WHERE t.seance_id = s.id AND t.statut = 'close')";
 const RESULTATS = { adopte_unanimite: 'Adoptée à l’unanimité', adopte_majorite: 'Adoptée à la majorité', adopte_preponderante: 'Adoptée (voix prépondérante)', rejete: 'Rejetée', rejete_preponderante: 'Rejetée (voix prépondérante)' };
 
-function createBibliotheque({ db, audit, render, pv, textes }) {
+function createBibliotheque({ db, audit, render, pv, textes, storage }) {
   /** Contexte technique : la bibliothèque ouvre des actes que la personne ne peut pas voir autrement ; l'accès est contrôlé ici, et journalisé au nom de la personne. */
   const sys = (ctx) => ({ ...ctx, isPlatformAdmin: true });
 
@@ -32,13 +32,18 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
     RESULTATS,
 
     // ---------------------------------------------------------------------------------------------------------- 1. bibliothèque
-    async chercher(ctx, organismeId, { q = '', annee, matiereId, natureId, rubriqueId, instanceId, rapporteurId, directionCode, du, au, limit = 20, offset = 0 } = {}) {
+    async chercher(ctx, organismeId, { q = '', annee, matiereId, natureId, rubriqueId, instanceId, rapporteurId, directionCode, du, au, etat = 'tous', limit = 20, offset = 0 } = {}) {
       const org = requireOrg(organismeId); const p = [org]; const add = (v) => { p.push(v); return `$${p.length}`; };
       const w = ['a.organisme_id = $1', "a.confidentialite = 'normale'", "a.statut NOT IN ('abandonne', 'retire')", "NOT (a.custom ? 'biblio_exclu')", "sp.resultat LIKE 'adopte%'"];
+      // « Archivé » suit l'origine AIRS quand elle est connue (un acte importé d'AIRS « courant » n'est pas archivé),
+      // sinon le statut local.
+      const EST_ARCHIVE = `(CASE WHEN a.custom->'airs'->>'origine' IS NOT NULL THEN a.custom->'airs'->>'origine' = 'archive' ELSE a.statut = 'archive' END)`;
+      if (etat === 'archive') w.push(EST_ARCHIVE);
+      else if (etat === 'en_cours') w.push(`NOT ${EST_ARCHIVE}`);
       let rang = '0::float4';
       const an = analyser(q, { poids: 'ABC' }); // titre, objet, matière, dispositif, exposé, visas : jamais les annexes
       if (an.numero) { if (an.numero.suivi !== null) w.push(`a.numero_suivi = ${add(an.numero.suivi)}`); else w.push(`upper(it.numero) = ${add(an.numero.ref.toUpperCase())}`); }
-      else if (an.tsq) { const t = add(an.tsq); w.push(`si.tsv @@ to_tsquery('fr_unaccent', ${t})`); rang = `ts_rank(si.tsv, to_tsquery('fr_unaccent', ${t}))`; }
+      else if (an.tsq) { const t = add(an.tsq); const raw = add(`%${String(q).trim().replace(/[%_]/g, '')}%`); w.push(`(si.tsv @@ to_tsquery('fr_unaccent', ${t}) OR a.titre ILIKE ${raw})`); rang = `ts_rank(si.tsv, to_tsquery('fr_unaccent', ${t}))`; }
       if (annee) w.push(`EXTRACT(year FROM s.date_seance AT TIME ZONE 'Europe/Paris') = ${add(Number(annee))}`);
       if (matiereId) w.push(`a.matiere_id = ${add(Number(matiereId))}`);
       if (natureId) w.push(`a.nature_id = ${add(Number(natureId))}`);
@@ -53,12 +58,22 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
         JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite' LEFT JOIN search_index si ON si.acte_id = a.id
         LEFT JOIN ref_items m ON m.id = a.matiere_id LEFT JOIN elus ra ON ra.id = a.rapporteur_id WHERE ${w.join(' AND ')}`;
       const total = (await db.get(`SELECT count(DISTINCT a.id)::int AS n ${from}`, p)).n;
-      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.direction_label, a.direction_code, m.libelle AS matiere, it.numero, s.date_seance, i.nom AS instance, sp.resultat, NULLIF(trim(ra.prenom || ' ' || ra.nom), '') AS rapporteur, ${rang} AS rang ${from}
+      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.statut, ${EST_ARCHIVE} AS est_archive, (a.custom ? 'airs') AS airs_imp, a.direction_label, a.direction_code, m.libelle AS matiere, it.numero, s.date_seance, i.nom AS instance, sp.resultat, NULLIF(trim(ra.prenom || ' ' || ra.nom), '') AS rapporteur,
+          (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id AND an.titre NOT LIKE '%document d''origine%') AS annexes_n,
+          (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id AND NOT an.publiable AND an.titre NOT LIKE '%document d''origine%') AS annexes_np,
+          ${rang} AS rang ${from}
         ORDER BY a.id, s.date_seance DESC`, p);
       rows.sort((x, y) => (Number(y.rang) - Number(x.rang)) || (new Date(y.date_seance) - new Date(x.date_seance)));
+      // Années réellement présentes dans la bibliothèque (pour le filtre « Année »).
+      const annees = (await db.all(`SELECT DISTINCT EXTRACT(year FROM s.date_seance AT TIME ZONE 'Europe/Paris')::int AS a
+        FROM actes a JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
+        JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
+        JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite'
+        WHERE a.organisme_id = $1 AND a.confidentialite = 'normale' AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu') AND sp.resultat LIKE 'adopte%'
+        ORDER BY a DESC`, [org])).map((r) => r.a);
       return {
-        total, items: rows.slice(Number(offset), Number(offset) + Number(limit)).map((r) => ({
-          acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, numero: r.numero, direction: r.direction_label, directionCode: r.direction_code, matiere: r.matiere, rapporteur: r.rapporteur, dateSeance: r.date_seance, instance: r.instance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null,
+        total, annees, items: rows.slice(Number(offset), Number(offset) + Number(limit)).map((r) => ({
+          acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, numero: r.numero, direction: r.direction_label, directionCode: r.direction_code, matiere: r.matiere, rapporteur: r.rapporteur, dateSeance: r.date_seance, instance: r.instance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null, annexesCount: r.annexes_n, annexesNonPubliables: r.annexes_np, archive: !!r.est_archive, airs: !!r.airs_imp,
         })),
       };
     },
@@ -69,7 +84,9 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
       if (!a) throw E.notFound("Cet acte n'est pas dans la bibliothèque (il n'est pas adopté, sa séance n'est pas close ou il est confidentiel)");
       const rows = await db.all('SELECT id, kind, deliberation_id, markdown FROM tracked_texts WHERE acte_id = $1 ORDER BY id', [a.id]);
       const pick = (kind) => rows.find((t) => t.kind === kind && (kind === 'expose' ? true : t.deliberation_id === a.deliberation_id))?.markdown || '';
-      const annexes = await db.all(`SELECT an.id, an.titre, f.original_name, f.mime, f.size FROM annexes an JOIN files f ON f.id = an.file_id WHERE an.acte_id = $1 AND an.publiable ORDER BY an.ordre, an.id`, [a.id]);
+      const annexes = await db.all(`SELECT an.id, an.titre, f.original_name, f.mime, f.size, pf.original_name AS pdf_name, pf.mime AS pdf_mime, pf.size AS pdf_size
+        FROM annexes an JOIN files f ON f.id = an.file_id LEFT JOIN files pf ON pf.id = an.pdf_file_id
+        WHERE an.acte_id = $1 AND an.publiable AND an.titre NOT LIKE '%document d''origine%' ORDER BY an.ordre, an.id`, [a.id]);
       const matiere = a.matiere_id ? (await db.get('SELECT libelle FROM ref_items WHERE id = $1', [a.matiere_id]))?.libelle : null;
       // Fiche complète (toutes les informations de la base sur la délibération), structurée par groupes.
       const full = await db.get('SELECT * FROM actes WHERE id = $1', [a.id]);
@@ -113,8 +130,10 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
       return {
         acteId: a.id, numeroSuivi: a.numero_suivi, titre: a.titre, numero: a.numero, matiere, direction: a.direction_label, montant: a.montant === null ? null : Number(a.montant),
         seance: { id: a.seance_id, dateSeance: a.date_seance, instance: a.instance }, resultat: a.resultat, resultatLabel: RESULTATS[a.resultat] || null,
-        expose: pick('expose'), visas: pick('visas'), dispositif: pick('dispositif'), annexes: annexes.map((x) => ({ id: x.id, titre: x.titre || x.original_name, nom: x.original_name, mime: x.mime, taille: Number(x.size) })),
-        documents: [{ cible: 'expose', label: 'Exposé des motifs' }, { cible: 'deliberation', label: 'Délibération' }, { cible: 'extrait', label: 'Extrait du registre' }],
+        expose: pick('expose'), visas: pick('visas'), dispositif: pick('dispositif'),
+        annexes: annexes.map((x) => ({ id: x.id, titre: x.titre || x.original_name, nom: x.original_name, mime: x.mime, taille: Number(x.size), pdf: x.pdf_name ? { nom: x.pdf_name, mime: x.pdf_mime, taille: Number(x.pdf_size) } : null })),
+        airs: !!full.custom?.airs,
+        documents: [{ cible: 'expose', label: 'Exposé des motifs' }, { cible: 'extrait', label: 'Extrait du registre' }],
         informations,
       };
     },
@@ -125,6 +144,17 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
       if (!a) throw E.notFound("Cet acte n'est pas dans la bibliothèque");
       const s = sys(ctx);
       await audit.log(ctx, { organismeId: org, action: 'bibliotheque.pdf', entity: 'actes', entityId: a.id, after: { cible } });
+      // Document d'origine importé (AIRS) : on sert le PDF de l'import plutôt que la recréation.
+      // « Exposé des motifs » → rapport (r… / rap_) ; « Extrait du registre » → délibération (d… / del_).
+      // On préfère le PDF associé (annexe Word convertie), sinon le fichier lui-même s'il est déjà PDF.
+      if (storage) {
+        const [motif, prefixe] = cible === 'expose' ? ['%exposé%document d%origine%', '^(r[0-9]|rap_)'] : ['%délibération%document d%origine%', '^(d[0-9]|del_)'];
+        const fichier = await db.get(`SELECT COALESCE(pf.storage_key, f.storage_key) AS storage_key, COALESCE(pf.original_name, f.original_name) AS original_name
+          FROM annexes an JOIN files f ON f.id = an.file_id LEFT JOIN files pf ON pf.id = an.pdf_file_id
+          WHERE an.acte_id = $1 AND (pf.id IS NOT NULL OR f.mime = 'application/pdf') AND (an.titre ILIKE $2 OR f.original_name ~* $3)
+          ORDER BY (an.titre ILIKE $2) DESC, an.ordre LIMIT 1`, [a.id, motif, prefixe]);
+        if (fichier) return { buffer: await storage.get(fichier.storage_key), name: fichier.original_name };
+      }
       if (cible === 'extrait') return pv.extrait(s, org, a.seance_id, a.item_id);
       if (cible === 'expose') { const r = await render.renderActe(s, org, a.id, { cible: 'expose', mode: 'propre' }); return { buffer: r.buffer, name: `expose-des-motifs-${a.numero || a.numero_suivi}.pdf` }; }
       if (cible === 'deliberation') { const r = await render.renderActe(s, org, a.id, { cible: 'deliberation', deliberationId: a.deliberation_id, mode: 'propre' }); return { buffer: r.buffer, name: `deliberation-${a.numero || a.numero_suivi}.pdf` }; }
@@ -165,12 +195,14 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
       return Object.entries({ redacteur: 'Rédacteur', co_redacteur: 'Co-rédacteur', valideur: 'Valideur', remplacant: 'Remplaçant', commentateur: 'Commentaire', participant: 'Dans le circuit' }).filter(([k]) => r[k]).map(([k, label]) => ({ code: k, label }));
     },
 
-    async mesActes(ctx, organismeId, { annee, role, q, limit = 30, offset = 0 } = {}) {
+    async mesActes(ctx, organismeId, { annee, role, q, statut, hors, limit = 30, offset = 0 } = {}) {
       const org = requireOrg(organismeId); const u = ctx.username; const p = [org, u]; const add = (v) => { p.push(v); return `$${p.length}`; };
       const w = ['a.organisme_id = $1', `(a.redacteur = $2 OR a.co_redacteurs ? $2 OR a.participants ? $2 OR EXISTS (SELECT 1 FROM step_instances i WHERE i.acte_id = a.id AND (i.acted_by = $2 OR i.on_behalf_of = $2 OR i.holders ? $2))
         OR EXISTS (SELECT 1 FROM comments c WHERE c.acte_id = a.id AND c.author = $2 AND NOT c.hidden))`];
       if (q) w.push(`(lower(a.titre) LIKE ${add(`%${String(q).trim().toLowerCase()}%`)} OR a.numero_suivi::text = ${add(String(q).trim())})`);
       if (annee) w.push(`EXTRACT(year FROM a.created_at) = ${add(Number(annee))}`);
+      if (statut) w.push(`a.statut = ${add(statut)}`);
+      if (hors) w.push(`a.statut <> ${add(hors)}`);
       const rows = await db.all(`SELECT a.id, a.numero_suivi, a.titre, a.statut, a.created_at, a.redacteur,
           (SELECT s.date_seance FROM seance_items it JOIN seances s ON s.id = it.seance_id WHERE it.acte_id = a.id AND it.statut = 'a_traiter' ORDER BY s.date_seance DESC LIMIT 1) AS date_seance,
           (SELECT sp.resultat FROM seance_items it JOIN seance_points sp ON sp.item_id = it.id WHERE it.acte_id = a.id ORDER BY it.id DESC LIMIT 1) AS resultat

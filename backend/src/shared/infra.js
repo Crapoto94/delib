@@ -8,11 +8,11 @@ const crypto = require('crypto');
 const { PDFDocument } = require('pdf-lib');
 const { E } = require('./errors');
 
-/** Compteur atomique par (organisme, clé) : n° de suivi, numérotation… Ne réutilise jamais un numéro. */
-async function nextCounter(runner, organismeId, key) {
+/** Compteur atomique par (organisme, clé) : n° de suivi, numérotation… Ne réutilise jamais un numéro. `plancher` = plus grand numéro déjà utilisé ailleurs (ex. import AIRS), pour ne jamais entrer en collision. */
+async function nextCounter(runner, organismeId, key, { plancher = 0 } = {}) {
   const r = await runner.get(
-    `INSERT INTO counters (organisme_id, key, value) VALUES ($1, $2, 1)
-     ON CONFLICT (organisme_id, key) DO UPDATE SET value = counters.value + 1 RETURNING value`, [organismeId, key]);
+    `INSERT INTO counters (organisme_id, key, value) VALUES ($1, $2, GREATEST(1, $3::int + 1))
+     ON CONFLICT (organisme_id, key) DO UPDATE SET value = GREATEST(counters.value + 1, $3::int + 1) RETURNING value`, [organismeId, key, plancher]);
   return Number(r.value);
 }
 

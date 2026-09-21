@@ -40,6 +40,12 @@ module.exports = ({ makeRouter, airs }) => {
   r.get('/:orgId/import-airs/source', { summary: 'État de la source Oracle AIRS DELIB (lecture seule)', tags: T, org: true, roles: ROLES, params: OrgP },
     async (req, res) => res.json(await airs.etatSource()));
 
+  r.get('/:orgId/import-airs/fichiers', { summary: "État d'accès au partage de fichiers AIRS (documents d'origine) ", tags: T, org: true, roles: ROLES, params: OrgP },
+    async (req, res) => res.json(await airs.etatFichiers(req.org.id)));
+  r.post('/:orgId/import-airs/fichiers/tester', { summary: "Teste l'accès au partage de fichiers AIRS (net use) avec le compte fourni", tags: T, org: true, roles: ROLES, params: OrgP,
+    body: z.object({ share: z.string().max(300).optional(), domaine: z.string().max(80).optional(), utilisateur: z.string().max(80).optional(), motDePasse: z.string().min(1).max(200) }) },
+  async (req, res) => res.json(await airs.testerFichiers(req.ctx, req.org.id, req.valid.body)));
+
   r.get('/:orgId/import-airs/tables', { summary: 'Tables source AIRS et état de validation', tags: T, org: true, roles: ROLES, params: OrgP },
     async (req, res) => res.json(await airs.tablesSource(req.ctx, req.org.id)));
   r.get('/:orgId/import-airs/tables/:tableName/apercu', { summary: "Aperçu des données source et de leur transposition (validation avant import)", tags: T, org: true, roles: ROLES, params: TableP,
@@ -124,6 +130,9 @@ module.exports = ({ makeRouter, airs }) => {
 
   r.post('/:orgId/import-airs/lots/:id/actes-importer', { summary: 'Importe TOUS les actes du sas (les séances sont créées au besoin)', tags: T, org: true, roles: ROLES, params: LotP },
     async (req, res) => res.json(await airs.importerTousLesActes(req.ctx, req.org.id, req.valid.params.id)));
+
+  r.post('/:orgId/import-airs/lots/:id/conseils-archives-importer', { summary: 'Importe en masse tous les conseils ARCHIVÉS du sas (actes et documents d’origine compris)', tags: T, org: true, roles: ROLES, params: LotP },
+    async (req, res) => res.json(await airs.importerConseilsArchives(req.ctx, req.org.id, req.valid.params.id)));
 
   r.post('/:orgId/import-airs/lots/:id/depublier', { summary: 'Retire les actes publiés de ce lot (jamais de suppression physique)', tags: T, org: true, roles: ROLES, params: LotP },
     async (req, res) => res.json(await airs.dePublier(req.ctx, req.org.id, req.valid.params.id)));

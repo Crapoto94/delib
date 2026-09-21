@@ -119,7 +119,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const calendrier = createCalendrier({ db, audit, access, config });
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
   const pv = createPv({ db, audit, render, odj, tenue, actes });
-  const bibliotheque = createBibliotheque({ db, audit, render, pv, textes });
+  const bibliotheque = createBibliotheque({ db, audit, render, pv, textes, storage });
   // télétransmission : le simulateur S²LOW tient lieu d'accès tant que le certificat n'est pas obtenu (D20, TLT-19) ; un adaptateur réel peut être injecté
   const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config, access, pv });
   acl.registerEditHook((ctx, a) => tlt.peutModifierTexte(ctx, a)); // le SCC modifie la délibération avant la transmission (TLT-32)
@@ -162,7 +162,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const apiKeys = createApiKeys({ db, audit, log });
   const externe = createExterne({ db, render, storage });
   const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
-  const airs = createAirs({ db, audit, dir, source: airsSource, ad }); // import de l'historique AIRS DELIB (section 25 bis, D111)
+  const airs = createAirs({ db, audit, dir, source: airsSource, ad, storage }); // import de l'historique AIRS DELIB (section 25 bis, D111)
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
   // sauvegarde nocturne (SAV-04) : plateforme entière, donc une seule fois par tick — portée par l'organisme par défaut

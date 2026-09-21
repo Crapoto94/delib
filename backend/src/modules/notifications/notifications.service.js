@@ -43,6 +43,20 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
   }
   const fonctionUsers = async (orgId, fonction, a) => (await titulaires.resolve(orgId, fonction, { directionCode: a.direction_code, serviceCode: a.service_code })).flatMap((t) => [t.username, t.suppleant].filter(Boolean));
 
+  /** Personnes ayant réellement eu affaire à l'acte : validations faites, commentaires, amendements, avis de commission. */
+  async function acteursOf(acteId) {
+    const rows = await db.all(`
+      SELECT DISTINCT u FROM (
+        SELECT actor AS u FROM step_events WHERE acte_id = $1
+        UNION SELECT on_behalf_of FROM step_events WHERE acte_id = $1
+        UNION SELECT acted_by AS u FROM step_instances WHERE acte_id = $1
+        UNION SELECT author AS u FROM comments WHERE acte_id = $1
+        UNION SELECT avis_par AS u FROM acte_commissions WHERE acte_id = $1
+        UNION SELECT sa.created_by AS u FROM seance_amendements sa JOIN seance_items it ON it.id = sa.item_id WHERE it.acte_id = $1
+      ) x WHERE u IS NOT NULL AND u <> ''`, [acteId]);
+    return rows.map((r) => r.u);
+  }
+
   /** Résout une liste de résolveurs en identifiants. `ctx` : { acte, inst, payload }. */
   async function resolveRecipients(orgId, resolvers, { acte, inst, payload = {} }) {
     const out = new Set();
@@ -52,6 +66,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
       else if (r === 'holders') list = inst?.holders || payload.holders || [];
       else if (r === 'delegues') list = (await delegations.activeFromDelegants(orgId, inst?.holders || payload.holders || [])).map((d) => d.delegue);
       else if (r === 'circuit') list = acte.participants || [];
+      else if (r === 'acteurs') list = acte.id ? await acteursOf(acte.id) : [];
       else if (r === 'mentions') list = payload.comment?.mentions || [];
       else if (r === 'delegue') list = [payload.delegation?.delegue];
       else if (r === 'grantee') list = [payload.grant?.username];
@@ -435,6 +450,16 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
       const items = await deliver({ orgId: a.organisme_id, rule, acte: a, usernames: users, vars, keyBase: null, immediate: true, force: true, actor: ctx.username });
       await audit.log(ctx, { organismeId: a.organisme_id, action: 'notification.remind', entity: 'actes', entityId: a.id, after: { to: [...users], message } });
       return { recipients: items.map((i) => i.recipient) };
+    },
+
+    /** Qui serait prévenu par une règle sur cet acte (aperçu, sans rien envoyer). */
+    async destinataires(ctx, organismeId, acteId, code) {
+      const a = await actes.load(ctx, organismeId, acteId);
+      const rule = (await effectiveRules(a.organisme_id)).find((r) => r.code === code);
+      if (!rule) return { code, items: [] };
+      const inst = await db.get("SELECT * FROM step_instances WHERE acte_id = $1 AND status = 'current' ORDER BY id DESC LIMIT 1", [a.id]);
+      const users = await resolveRecipients(a.organisme_id, rule.recipients, { acte: a, inst, payload: {} });
+      return { code, items: [...users] };
     },
 
     // ---- règles (administration)

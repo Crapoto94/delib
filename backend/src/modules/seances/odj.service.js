@@ -10,8 +10,8 @@ const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
 const { parisParts } = require('../../shared/time');
 
-const VARS = ['ANNEE', 'N_SEANCE', 'ORDRE', 'RUBRIQUE'];
-const DEFAULT_PATTERN = '{ANNEE}-{N_SEANCE}-{ORDRE:03}';
+const VARS = ['ANNEE', 'N_SEANCE', 'DATE', 'ORDRE', 'RUBRIQUE'];
+const DEFAULT_PATTERN = 'DEL{DATE}_{ORDRE}';
 const LOCK_MIN = 10;
 const ELIGIBLE_STATUT = 'en_attente_scc';
 /** Statuts d'un acte pouvant être inscrit à l'ordre du jour, circuit terminé ou non (D57). */
@@ -57,13 +57,13 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
   };
   const patternOf = (s) => s.numbering?.pattern || s.instance_numbering?.pattern || DEFAULT_PATTERN;
 
-  /** Variables communes de la séance : année et rang dans l'année (par instance). */
+  /** Variables communes de la séance : année et rang dans l'année (par instance), et date compacte AAAAJJMM. */
   async function seanceVars(q, s) {
-    const annee = parisParts(new Date(s.date_seance)).y;
+    const p = parisParts(new Date(s.date_seance)); const annee = p.y;
     const rank = (await q.get(
       `SELECT count(*)::int + 1 AS n FROM seances WHERE instance_id = $1 AND statut <> 'annulee' AND date_seance < $2
          AND EXTRACT(year FROM date_seance AT TIME ZONE 'Europe/Paris') = $3`, [s.instance_id, s.date_seance, annee])).n;
-    return { ANNEE: annee, N_SEANCE: rank };
+    return { ANNEE: annee, N_SEANCE: rank, DATE: `${p.y}${String(p.m).padStart(2, '0')}${String(p.d).padStart(2, '0')}` };
   }
 
   async function rubriqueOf(q, acteId) {
@@ -496,6 +496,28 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       });
       await audit.log(ctx, { organismeId: org, action: 'odj.arret', entity: 'seances', entityId: seanceId, after: { forcer, anomalies: c.problems } });
       if (!isCommission(before)) for (const [acteId, v] of notified) await bus.emit('odj.arrete', { organismeId: org, acteId, seanceId, numero: v.numero, ordre: v.ordre, ctx });
+      return svc.get(ctx, org, seanceId);
+    },
+
+    /**
+     * Rouvre un ordre du jour arrêté : retour à « en préparation » (de nouveau modifiable, numéros recalculés au prochain arrêt).
+     * Refusé dès que la séance est convoquée ou tenue (le parcours s'appuierait sur un ordre du jour figé). Motif obligatoire.
+     */
+    async reouvrir(ctx, organismeId, seanceId, { motif } = {}) {
+      const org = requireOrg(organismeId);
+      if (!(await canEdit(ctx, org))) throw E.forbidden("Seul le SCC peut rouvrir l'ordre du jour");
+      const m = String(motif || '').trim();
+      if (m.length < 3) throw E.badRequest('Un motif de réouverture est obligatoire');
+      const before = await seanceOf(db, org, seanceId);
+      if (before.odj_statut === 'en_preparation') throw E.conflict("L'ordre du jour est déjà en préparation");
+      if (before.odj_statut !== 'arrete') throw E.conflict(`L'ordre du jour ne peut plus être rouvert (séance « ${before.statut} », ordre du jour « ${before.odj_statut} »)`);
+      await db.tx(async (q) => {
+        const s = await seanceOf(q, org, seanceId, true);
+        if (s.odj_statut !== 'arrete') throw E.conflict("L'ordre du jour n'est pas arrêté");
+        await q.run("UPDATE seances SET odj_statut = 'en_preparation', odj_arrete_at = NULL, odj_arrete_par = NULL WHERE id = $1", [s.id]);
+        await hist(q, s.id, ctx, 'reouverture', { motif: m });
+      });
+      await audit.log(ctx, { organismeId: org, action: 'odj.reouverture', entity: 'seances', entityId: seanceId, before: { odjStatut: before.odj_statut }, after: { odjStatut: 'en_preparation', motif: m } });
       return svc.get(ctx, org, seanceId);
     },
 

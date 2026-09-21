@@ -48,8 +48,8 @@ SELECT * FROM (
          c.COM_LABEL AS "commission", s.SEA_ASSEMBLEE AS "instance",
          f.CODENATURE AS "nature", f.CODEMATIERE AS "matiere",
          r.RAP_NUM_SUIVI AS "num_suivi", r.RAP_NUM_CHRONO AS "num_chrono",
-         d.DDE_NUMERO AS "numero", r.RAP_INCIDENCE AS "incidence_financiere", r.RAP_MONTANT AS "montant",
-         'deliberation' AS "type", 'courant' AS "origine"
+         d.DDE_NUMERO AS "numero", d.DDE_SOUS_NUMERO AS "sous_numero", r.RAP_INCIDENCE AS "incidence_financiere", r.RAP_MONTANT AS "montant",
+         'deliberation' AS "type", 'courant' AS "origine", p.RAP_ID AS "rap_id"
   FROM DELIBUSER.PROJET_DELIB dl
   JOIN DELIBUSER.PROJET_RAPPORT p ON p.RAP_ID = dl.RAP_ID
   LEFT JOIN AIRSUSER.DOC_DEL_DELIB d ON d.DOC_ID = dl.DEL_ID
@@ -68,14 +68,14 @@ SELECT * FROM (
          a.RAP_DIRECTION, a.RAP_SERVICE, a.RAP_RUB,
          a.RAP_UTILISATEUR, a.RAP_INSTRUCTEUR, a.RAP_RAPPORTEUR,
          NULL, a.SEA_ASSEMBLEE, NULL, NULL,
-         a.RAP_NUM_SUIVI, a.RAP_NUM_CHRONO, a.DDE_NUMERO, NULL, a.RAP_MONTANT, 'deliberation', 'archive'
+         a.RAP_NUM_SUIVI, a.RAP_NUM_CHRONO, a.DDE_NUMERO, a.DDE_SOUS_NUMERO, NULL, a.RAP_MONTANT, 'deliberation', 'archive', NULL
   FROM AIRSUSER.DOC_DEL_ARCHIVE a
-  WHERE a.ARC_TYPE = 'Delib'
+  WHERE a.ARC_TYPE IN ('Delib', 'Rapport')
     AND (:annee IS NULL OR EXTRACT(YEAR FROM a.DDE_DT_VOTE) = :annee)
 ) ORDER BY "date"`;
 
 const CHAMPS_SEANCE = ['id', 'titre', 'instance', 'type_seance', 'date', 'heure', 'lieu', 'numero', 'president', 'origine'];
-const CHAMPS_ACTE = ['id', 'seance', 'titre', 'numero', 'num_suivi', 'num_chrono', 'type', 'nature', 'matiere', 'rubrique', 'direction', 'service',
+const CHAMPS_ACTE = ['id', 'seance', 'titre', 'numero', 'sous_numero', 'num_suivi', 'num_chrono', 'rap_id', 'type', 'nature', 'matiere', 'rubrique', 'direction', 'service',
   'redacteur', 'redacteur_nom', 'rapporteur', 'resultat', 'date', 'commission', 'instance', 'incidence_financiere', 'montant', 'origine'];
 
 /** Oracle renvoie les alias en MAJUSCULES : on normalise en minuscules pour les champs canoniques. */
@@ -184,7 +184,49 @@ function createAirsOracle({ config, log } = {}) {
     });
   }
 
-  return { configuree, cible, ping, extraire, apercu, compter };
+  /** Fichiers d'origine d'un acte (courant : liés par FIC_LINK ; archivé : chemin DEL_ARCHIVE par DOC_ID). */
+  async function fichiers({ docId, archive }) {
+    if (!configuree()) return [];
+    return avecConnexion(async (conn, db) => {
+      const sql = archive
+        ? 'SELECT FIC_NOM, FIC_CHEMIN_SERV, FIC_LIBELLE, TFP_ID, CTY_ID FROM AIRSUSER.FIC_PRIMAIRE WHERE CTY_ID = 7 AND FIC_CHEMIN_SERV LIKE :pat'
+        : 'SELECT FIC_NOM, FIC_CHEMIN_SERV, FIC_LIBELLE, TFP_ID, CTY_ID FROM AIRSUSER.FIC_PRIMAIRE WHERE FIC_LINK = :id';
+      const binds = archive ? { pat: `%/${docId}.%` } : { id: Number(docId) };
+      const r = await conn.execute(sql, binds, { outFormat: db.OUT_FORMAT_OBJECT });
+      return (r.rows || []).map((x) => ({ nom: x.FIC_NOM, cheminServ: x.FIC_CHEMIN_SERV, libelle: x.FIC_LIBELLE, tfp: x.TFP_ID, cty: x.CTY_ID }));
+    });
+  }
+
+  /** Documents d'un acte COURANT : corps Word de la délibération (DEL_DELIB/<DEL_ID>.…) et du rapport/exposé (DEL_RAPPORT/<RAP_ID>.…). */
+  async function documentsCourants({ delId, rapId }) {
+    if (!configuree()) return [];
+    return avecConnexion(async (conn, db) => {
+      const lire = async (id, source) => {
+        if (!id) return [];
+        const r = await conn.execute(
+          'SELECT FIC_NOM, FIC_CHEMIN_SERV, FIC_LIBELLE, TFP_ID, CTY_ID FROM AIRSUSER.FIC_PRIMAIRE WHERE FIC_CHEMIN_SERV LIKE :pat',
+          { pat: `%/${id}.%` }, { outFormat: db.OUT_FORMAT_OBJECT });
+        return (r.rows || []).map((x) => ({ nom: x.FIC_NOM, cheminServ: x.FIC_CHEMIN_SERV, libelle: x.FIC_LIBELLE, tfp: x.TFP_ID, cty: x.CTY_ID, source }));
+      };
+      return [...await lire(delId, 'delib'), ...await lire(rapId, 'rapport')];
+    });
+  }
+
+  /** Annexes d'un rapport (acte courant) : DELIBUSER.ANNEXE (RAP_ID) ⋈ DOC_DEL_ANNEXE ⋈ FIC_PRIMAIRE (DEL_ANNEXE/<ANN_ID>.…). */
+  async function annexesDeRapport(rapId) {
+    if (!configuree() || !rapId) return [];
+    return avecConnexion(async (conn, db) => {
+      const r = await conn.execute(
+        `SELECT a.ANN_ID AS "annId", n.ANN_LIBELLE AS "libelle", n.ANN_TYPE AS "type", n.ANN_ORDRE AS "ordre", f.FIC_NOM AS "nom", f.FIC_CHEMIN_SERV AS "cheminServ"
+         FROM DELIBUSER.ANNEXE a
+         JOIN AIRSUSER.DOC_DEL_ANNEXE n ON n.DOC_ID = a.ANN_ID
+         LEFT JOIN AIRSUSER.FIC_PRIMAIRE f ON f.CTY_ID = 3 AND f.FIC_CHEMIN_SERV LIKE '%/' || a.ANN_ID || '.%'
+         WHERE a.RAP_ID = :rapId ORDER BY n.ANN_ORDRE`, { rapId: Number(rapId) }, { outFormat: db.OUT_FORMAT_OBJECT });
+      return (r.rows || []).filter((x) => x.cheminServ).map((x) => ({ annId: x.annId, nom: x.nom, cheminServ: x.cheminServ, libelle: x.libelle, type: x.type, ordre: x.ordre }));
+    });
+  }
+
+  return { configuree, cible, ping, extraire, apercu, compter, fichiers, documentsCourants, annexesDeRapport, tablesSupportees: ['seances', 'actes'] };
 }
 
 module.exports = { createAirsOracle };

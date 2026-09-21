@@ -20,6 +20,7 @@ const Rule = z.object({
   palliers: z.array(z.record(z.string(), z.any())).max(20), subject: z.string().trim().min(2).max(300), body: z.string().trim().min(2).max(5000),
 }).partial();
 const PreviewB = z.object({ acteId: Id.optional() });
+const DestQ = z.object({ code: z.string().regex(/^[a-z0-9_.-]{2,60}$/) });
 const SimB = z.object({ at: z.iso.datetime() });
 const JournalQ = z.object({ acteId: Id.optional(), recipient: z.string().max(128).optional(), rule: z.string().max(60).optional(), status: z.enum(['pending', 'sent', 'failed', 'skipped', 'digest']).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0) });
@@ -48,6 +49,10 @@ module.exports = ({ makeRouter, notifications }) => {
   async (req, res) => res.json(await notifications.setRulePreference(req.ctx, req.org.id, req.valid.params.code, req.valid.body.mode)));
 
   // --- par acte
+  r.get('/actes/:id/notifications/destinataires', {
+    summary: 'Qui serait prévenu par une règle sur cet acte (aperçu)', tags: T, org: true, params: PA, query: DestQ,
+    description: 'Résout les destinataires de la règle indiquée sans rien envoyer. Ex. `acte.rappele` : les personnes qui ont réellement eu affaire à l\'acte (validations, commentaires, amendements, avis), plus le rédacteur.',
+  }, async (req, res) => res.json(await notifications.destinataires(req.ctx, req.org.id, req.valid.params.id, req.valid.query.code)));
   r.get('/actes/:id/notifications/sourdines', { summary: 'Sourdines et suspensions en cours sur un acte', tags: T, org: true, params: PA },
     async (req, res) => res.json({ items: await notifications.mutes(req.ctx, req.org.id, req.valid.params.id) }));
   r.post('/actes/:id/notifications/sourdine', {
@@ -66,7 +71,7 @@ module.exports = ({ makeRouter, notifications }) => {
     async (req, res) => res.json(await notifications.listRules(req.org.id)));
   r.put('/notifications/regles/:code', {
     summary: 'Modifie une règle pour cet organisme (crée une surcharge)', tags: T, org: true, roles: ['org_admin'], params: PC, body: Rule,
-    description: 'Destinataires (résolveurs) : redacteur, holders, delegues, circuit, mentions, scc, admins, superieur, chef_service, directeur, dga, dgs, agent:<login>. Variables de gabarit : {titre} {numero} {etape} {lien} {redacteur} {acteur} {motif} {echeance} {retard}… Audité (avant/après).',
+    description: 'Destinataires (résolveurs) : redacteur, holders, delegues, circuit, acteurs, mentions, scc, admins, superieur, chef_service, directeur, dga, dgs, agent:<login>. Variables de gabarit : {titre} {numero} {etape} {lien} {redacteur} {acteur} {motif} {echeance} {retard}… Audité (avant/après).',
   }, async (req, res) => res.json(await notifications.putRule(req.ctx, req.org.id, req.valid.params.code, req.valid.body)));
   r.delete('/notifications/regles/:code', { summary: 'Supprime la surcharge : retour à la règle de la plateforme', tags: T, org: true, roles: ['org_admin'], params: PC },
     async (req, res) => res.json(await notifications.resetRule(req.ctx, req.org.id, req.valid.params.code)));

@@ -19,6 +19,7 @@ const Criteres = {
 const Q = z.object({ ...Criteres, tri: z.enum(['pertinence', 'date']).default('pertinence'), limit: z.coerce.number().int().min(1).max(100).default(20), offset: z.coerce.number().int().min(0).default(0) });
 const QExport = z.object(Criteres);
 const Similaires = z.object({ acteId: Id.optional(), titre: z.string().trim().max(500).optional(), objet: z.string().trim().max(2000).optional() });
+const Propositions = z.object({ mots: z.union([z.string().trim().max(500), z.array(z.string().trim().max(60)).max(8)]).optional() });
 const Enregistrer = z.object({ nom: z.string().trim().min(2).max(80), requete: z.record(z.string(), z.unknown()) });
 
 module.exports = ({ makeRouter, recherche, alertes }) => {
@@ -37,6 +38,11 @@ module.exports = ({ makeRouter, recherche, alertes }) => {
 
   r.get('/similaires', { summary: 'Actes proches d’un acte (fiche) ou d’un titre en cours de saisie (création) : « des délibérations proches existent »', tags: T, org: true, params: P, query: Similaires },
     async (req, res) => res.json(await recherche.similaires(req.ctx, req.org.id, req.valid.query)));
+
+  r.get('/propositions', {
+    summary: 'Délibérations passées correspondant à des mots-clés, à reprendre comme modèle à la création d’un dossier', tags: T, org: true, params: P, query: Propositions,
+    description: 'Comparaison insensible aux accents sur le titre et l’exposé (les actes importés n’ont pas d’index plein texte). Tri par nombre de mots-clés trouvés ; un acte que je ne peux pas voir n’apparaît jamais.',
+  }, async (req, res) => res.json(await recherche.propositions(req.ctx, req.org.id, req.valid.query)));
 
   r.get('/enregistrees', { summary: 'Mes recherches enregistrées', tags: T, org: true, params: P }, async (req, res) => res.json({ items: await recherche.enregistrees(req.ctx, req.org.id) }));
   r.post('/enregistrees', { summary: 'Enregistre une recherche (critères compris)', tags: T, org: true, params: P, body: Enregistrer, responses: { 201: 'Créée' } },

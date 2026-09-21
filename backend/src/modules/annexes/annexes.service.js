@@ -9,9 +9,13 @@ const { inspectPdf } = require('../../shared/infra');
 const toAnnexe = (r) => ({
   id: r.id, acteId: r.acte_id, titre: r.titre, typeId: r.type_id, ordre: r.ordre, version: r.version,
   communicable: r.communicable, publiable: r.publiable, transmissible: r.transmissible,
-  fichier: { id: r.file_id, nom: r.original_name, taille: Number(r.size), pages: r.pages, sha256: r.sha256 }, createdBy: r.created_by, createdAt: r.created_at,
+  fichier: { id: r.file_id, nom: r.original_name, mime: r.mime, taille: Number(r.size), pages: r.pages, sha256: r.sha256 },
+  pdf: r.pdf_file_id ? { id: r.pdf_file_id, nom: r.pdf_name, mime: r.pdf_mime, taille: Number(r.pdf_size), pages: r.pdf_pages, sha256: r.pdf_sha } : null,
+  createdBy: r.created_by, createdAt: r.created_at,
 });
-const SELECT = `SELECT a.*, f.original_name, f.size, f.pages, f.sha256 FROM annexes a JOIN files f ON f.id = a.file_id`;
+const SELECT = `SELECT a.*, f.original_name, f.mime, f.size, f.pages, f.sha256,
+    pf.original_name AS pdf_name, pf.mime AS pdf_mime, pf.size AS pdf_size, pf.pages AS pdf_pages, pf.sha256 AS pdf_sha
+  FROM annexes a JOIN files f ON f.id = a.file_id LEFT JOIN files pf ON pf.id = a.pdf_file_id`;
 
 function createAnnexes({ db, audit, storage, refs, actes, config, bus }) {
   const svc = {
@@ -99,14 +103,20 @@ function createAnnexes({ db, audit, storage, refs, actes, config, bus }) {
       return svc.list(ctx, organismeId, acteId);
     },
 
-    /** Contenu d'un fichier d'annexe (version courante ou une version précise) ; contrôle de visibilité de l'acte. */
-    async content(ctx, organismeId, acteId, id, version) {
+    /** Contenu d'un fichier d'annexe : original (défaut), sa version, ou le PDF associé (`format = 'pdf'`) ; contrôle de visibilité de l'acte. */
+    async content(ctx, organismeId, acteId, id, version, format) {
       const a = await actes.load(ctx, organismeId, acteId);
-      const row = version
-        ? await db.get(`SELECT f.* FROM annexe_versions v JOIN files f ON f.id = v.file_id JOIN annexes x ON x.id = v.annexe_id WHERE v.annexe_id = $1 AND v.version = $2 AND x.acte_id = $3`, [id, version, a.id])
-        : await db.get('SELECT f.* FROM annexes x JOIN files f ON f.id = x.file_id WHERE x.id = $1 AND x.acte_id = $2', [id, a.id]);
+      let row;
+      if (format === 'pdf') {
+        row = await db.get('SELECT pf.* FROM annexes x JOIN files pf ON pf.id = x.pdf_file_id WHERE x.id = $1 AND x.acte_id = $2', [id, a.id]);
+        if (!row) row = await db.get("SELECT f.* FROM annexes x JOIN files f ON f.id = x.file_id WHERE x.id = $1 AND x.acte_id = $2 AND f.mime = 'application/pdf'", [id, a.id]);
+      } else if (version) {
+        row = await db.get(`SELECT f.* FROM annexe_versions v JOIN files f ON f.id = v.file_id JOIN annexes x ON x.id = v.annexe_id WHERE v.annexe_id = $1 AND v.version = $2 AND x.acte_id = $3`, [id, version, a.id]);
+      } else {
+        row = await db.get('SELECT f.* FROM annexes x JOIN files f ON f.id = x.file_id WHERE x.id = $1 AND x.acte_id = $2', [id, a.id]);
+      }
       if (!row) throw E.notFound('Annexe introuvable');
-      return { buffer: await storage.get(row.storage_key), name: row.original_name, sha256: row.sha256 };
+      return { buffer: await storage.get(row.storage_key), name: row.original_name, sha256: row.sha256, mime: row.mime || 'application/octet-stream' };
     },
   };
   return svc;

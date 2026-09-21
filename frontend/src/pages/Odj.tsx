@@ -94,6 +94,13 @@ export default function Odj() {
     try { await api.post(orgPath(o, `/seances/${id}/odj/arret`), { forcer }); setArret(null); toast('Ordre du jour arrêté : numéros figés'); odj.reload(); }
     catch (e: any) { if (e.response?.status === 422) setArret(e.response.data.details); else toast(errMsg(e), 'ko'); } finally { setBusy(false); }
   };
+  const doReouvrir = async () => {
+    const motif = prompt("Motif de la réouverture de l'ordre du jour (obligatoire) :");
+    if (!motif || motif.trim().length < 3) return;
+    setBusy(true);
+    try { await api.post(orgPath(o, `/seances/${id}/odj/reouverture`), { motif: motif.trim() }); toast('Ordre du jour rouvert : de nouveau modifiable'); odj.reload(); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
   const exportCsv = async () => { const r = await api.get(orgPath(o, `/seances/${id}/odj/export.csv`), { responseType: 'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(r.data); a.download = `odj-${id}.csv`; a.click(); };
   const previewPattern = async (value: string) => { try { setPattern({ value, exemples: (await api.post(orgPath(o, '/numerotation/apercu'), { pattern: value, seanceId: Number(id) })).data.exemples }); } catch (e: any) { setPattern({ value, exemples: [`⚠ ${errMsg(e)}`] }); } };
 
@@ -118,6 +125,7 @@ export default function Odj() {
           <button className="btn-secondary" onClick={exportCsv}><Download className="h-4 w-4" /> Tableau de suivi (CSV)</button>
           {canEdit && !arrete && <button className="btn-secondary" onClick={() => previewPattern(d.pattern)}>Numérotation…</button>}
           {canEdit && !arrete && <button className="btn-primary" onClick={() => doArret(false)} disabled={busy}>Arrêter l'ordre du jour</button>}
+          {canEdit && d.statut === 'arrete' && <button className="btn-secondary" onClick={doReouvrir} disabled={busy}><Undo2 className="h-4 w-4" /> Rouvrir l'ordre du jour</button>}
         </>} />
       {canEdit && <SeanceKpis seanceId={Number(id)} rev={`${d.statut}|${d.items.map((i: any) => `${i.id}:${i.statut}:${i.acte?.etat ?? ''}`).join(',')}`} />}
 

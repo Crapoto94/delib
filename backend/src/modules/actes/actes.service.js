@@ -95,7 +95,9 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       await svc.checkRefs(org, b);
       if (b.custom && late.champs) b.custom = await late.champs.valider(ctx, { organisme_id: org, type_id: type.id, statut: 'brouillon', redacteur: ctx.username, co_redacteurs: [] }, b.custom, {});
       const acte = await db.tx(async (q) => {
-        const numero = await nextCounter(q, org, 'acte');
+        // Les actes importés d'AIRS ont des numéros de suivi élevés : le compteur ne doit jamais les dépasser par le bas.
+        const maxSuivi = (await q.get('SELECT COALESCE(max(numero_suivi), 0)::int AS m FROM actes WHERE organisme_id = $1', [org])).m;
+        const numero = await nextCounter(q, org, 'acte', { plancher: maxSuivi });
         const a = await q.get(
           `INSERT INTO actes (organisme_id, numero_suivi, type_id, titre, redacteur, direction_code, direction_label, service_code, service_label,
              nature_id, matiere_id, rubrique_id, incidence_financiere, montant, rapporteur_id, rapporteur_compl_id, seance_visee_id,
@@ -258,12 +260,16 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
     /** Un acte est « dans le circuit » s'il a une étape courante. */
     async _circuitActif(acteId) { return !!(await db.get("SELECT 1 AS x FROM step_instances WHERE acte_id = $1 AND status = 'current'", [acteId])); },
 
-    /** Supprime un acte HORS circuit (confirmation côté interface). Refusé si une étape est en cours. */
+    /** Supprime un acte HORS circuit (confirmation côté interface). Un acte déjà passé au conseil n'est supprimable que par l'administrateur ou le SCC. */
     async supprimer(ctx, organismeId, id) {
       const a = await svc.load(ctx, organismeId, id);
-      if (!(a.redacteur === ctx.username || acl.isAdmin(ctx, a.organisme_id))) throw E.forbidden('Vous ne pouvez pas supprimer cet acte');
+      const PASSE_CM = ['adopte', 'archive', 'executoire', 'publie', 'transmis', 'ar_recu', 'rejete', 'retire'];
+      if (PASSE_CM.includes(a.statut)) {
+        if (!acl.isAdmin(ctx, a.organisme_id)) throw E.forbidden("Seuls l'administrateur et le SCC peuvent supprimer un acte déjà passé au conseil");
+      } else if (!(a.redacteur === ctx.username || acl.isAdmin(ctx, a.organisme_id))) {
+        throw E.forbidden('Vous ne pouvez pas supprimer cet acte');
+      }
       if (await svc._circuitActif(a.id)) throw E.conflict("Cet acte est dans le circuit : utilisez « Rappeler » (avec motif), la suppression casserait le circuit");
-      if (['transmis', 'ar_recu', 'publie', 'executoire'].includes(a.statut)) throw E.conflict(`Un acte « ${a.statut} » ne peut pas être supprimé`);
       await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.delete', entity: 'actes', entityId: id, before: { titre: a.titre, statut: a.statut } });
       try { await db.run('DELETE FROM actes WHERE id = $1 AND organisme_id = $2', [id, a.organisme_id]); }
       catch (e) { if (e.code === '23503') throw E.conflict('Cet acte est référencé ailleurs : il ne peut pas être supprimé'); throw e; }
@@ -294,6 +300,38 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
         confidentialite: src.confidentialite, custom: src.custom,
       });
       await bus.emit('acte.duplicated', { organismeId: src.organisme_id, sourceId: src.id, acteId: copy.id, ctx });
+      return copy;
+    },
+
+    /**
+     * Crée un dossier en reprenant TOUT d'une délibération passée (modèle) : champs, textes (exposé, visas, dispositif),
+     * délibérations et annexes. Les fichiers d'annexes sont partagés (contenu immuable) : aucune copie inutile.
+     * La direction reste celle du rédacteur (on ne peut pas rédiger pour une autre direction) ; les mots-clés sont mémorisés.
+     */
+    async creerDepuisModele(ctx, organismeId, { modeleId, typeId, titre, motsCles } = {}) {
+      const org = requireOrg(organismeId);
+      const modele = await svc.load(ctx, org, modeleId);
+      const custom = { ...(modele.custom || {}) };
+      const liste = (Array.isArray(motsCles) ? motsCles : String(motsCles || '').split(/[,;]+/)).map((m) => String(m).trim()).filter(Boolean).slice(0, 20);
+      if (liste.length) custom.motsCles = liste;
+      const titreNew = String(titre || '').trim() || modele.titre;
+      const copy = await svc.create(ctx, org, {
+        typeId: typeId ?? modele.type_id, titre: titreNew.slice(0, 500),
+        natureId: modele.nature_id, matiereId: modele.matiere_id, rubriqueId: modele.rubrique_id,
+        incidenceFinanciere: modele.incidence_financiere,
+        montant: modele.montant === null || modele.montant === undefined ? undefined : Number(modele.montant),
+        confidentialite: modele.confidentialite, custom,
+      });
+      const srcDelibs = await db.all('SELECT ordre, titre FROM deliberations WHERE acte_id = $1 ORDER BY ordre, id', [modele.id]);
+      const dst = await db.all('SELECT id FROM deliberations WHERE acte_id = $1 ORDER BY ordre, id', [copy.id]);
+      for (let i = dst.length; i < srcDelibs.length; i++) await db.run('INSERT INTO deliberations (acte_id, ordre, titre) VALUES ($1,$2,$3)', [copy.id, srcDelibs[i].ordre, srcDelibs[i].titre]);
+      await late.texts.copyTexts(modele.id, copy.id);
+      await db.run(
+        `INSERT INTO annexes (acte_id, titre, ordre, file_id, publiable, communicable, transmissible, created_by)
+         SELECT $1, titre, ordre, file_id, publiable, communicable, transmissible, $2 FROM annexes WHERE acte_id = $3`,
+        [copy.id, ctx.username, modele.id]);
+      await bus.emit('acte.duplicated', { organismeId: org, sourceId: modele.id, acteId: copy.id, ctx });
+      await audit.log(ctx, { organismeId: org, action: 'acte.depuis_modele', entity: 'actes', entityId: copy.id, after: { modeleId: modele.id, motsCles: liste } });
       return copy;
     },
 

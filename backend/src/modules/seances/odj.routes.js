@@ -20,6 +20,7 @@ const PointPatch = z.object({ titre: z.string().trim().min(2).max(300).optional(
 const Ordre = z.object({ ids: z.array(Id).max(1000), motif: Motif.optional() });
 const TriQ = z.object({ critere: z.enum(['rubrique', 'rapporteur', 'numero', 'alpha']) });
 const Arret = z.object({ forcer: z.boolean().default(false) });
+const Reouvrir = z.object({ motif: z.string().trim().min(3).max(500) });
 const Verrou = z.object({ force: z.boolean().default(false) });
 const Pattern = z.object({ pattern: z.string().min(3).max(80).describe('Variables : {ANNEE} {N_SEANCE} {ORDRE} {ORDRE:03} {RUBRIQUE}') });
 const Apercu = Pattern.extend({ seanceId: Id.optional() });
@@ -81,6 +82,11 @@ module.exports = ({ makeRouter, odj }) => {
   r.post('/seances/:id/odj/arret', { summary: "Arrête l'ordre du jour (numéros figés)", tags: T, org: true, roles: ADMIN, params: PS, body: Arret,
     description: "422 avec la liste des anomalies, sauf `forcer`. Les notifications de classement partent UNE fois." },
   async (req, res) => res.json(await odj.arreter(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
+  r.post('/seances/:id/odj/reouverture', {
+    summary: "Rouvre un ordre du jour arrêté (retour en préparation ; motif obligatoire)", tags: T, org: true, roles: ADMIN, params: PS, body: Reouvrir,
+    description: "Réservé au SCC / administrateur. Refusé si la séance est déjà convoquée ou tenue. Les numéros redeviennent modifiables et seront recalculés au prochain arrêt ; l'opération est historisée et auditée.",
+  }, async (req, res) => res.json(await odj.reouvrir(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
 
   r.post('/seances/:id/odj/verrou', { summary: "Prend le verrou d'édition (10 min)", tags: T, org: true, params: PS, body: Verrou },
     async (req, res) => res.json(await odj.takeLock(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));

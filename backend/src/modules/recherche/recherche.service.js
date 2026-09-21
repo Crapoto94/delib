@@ -390,6 +390,52 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
       return { items: rows.filter((r) => r.rang > 0.02).map((r) => ({ acteId: r.id, numeroSuivi: r.numero_suivi, numero: r.numero, titre: r.titre, statut: r.statut, pertinence: Math.round(r.rang * 100) / 100 })) };
     },
 
+    // ----------------------------------------------------------------------------------- mots-clés → modèles
+    /**
+     * Délibérations passées correspondant à des mots-clés (pour reprendre un modèle de rédaction à la création d'un dossier).
+     * Recherche de bibliothèque sans IA : comparaison insensible aux accents ET aux séparateurs, donc aux acronymes
+     * (« RIFSEEP » trouve « R.I.F.S.E.E.P »). Les actes importés n'ont pas d'index plein texte : on compare directement.
+     * Candidats : titre, exposé et titres d'annexes. Un acte invisible ne ressort jamais. Tri par nombre de mots-clés trouvés.
+     */
+    async propositions(ctx, organismeId, { mots: entrees } = {}) {
+      const org = requireOrg(organismeId);
+      const brut = (Array.isArray(entrees) ? entrees : String(entrees || '').split(/[,;]+/));
+      const comp = (m) => sansAccent(m).replace(/[^a-z0-9]/g, '');
+      const cles = [...new Set(brut.flatMap((m) => {
+        const entier = comp(m); const mots = sansAccent(m).split(/[^\p{L}\p{N}]+/u).map(comp);
+        return [entier, ...mots].filter((x) => x.length >= 2);
+      }))].slice(0, 8);
+      if (!cles.length) return { items: [] };
+      const vis = await acl.visibilitySql(ctx, org, 2);
+      const p = [org, ...vis.params]; const add = (v) => { p.push(v); return `$${p.length}`; };
+      const compact = (col) => `regexp_replace(unaccent(lower(${col})), '[^a-z0-9]', '', 'g')`;
+      const score = cles.map((m) => {
+        const like = add(`%${m}%`);
+        return `(CASE WHEN ${compact('a.titre')} LIKE ${like} THEN 1 ELSE 0 END
+               + CASE WHEN ${compact("COALESCE(a.commentaire_initial, '')")} LIKE ${like} THEN 1 ELSE 0 END
+               + CASE WHEN EXISTS (SELECT 1 FROM deliberations d WHERE d.acte_id = a.id AND ${compact("COALESCE(d.titre, '')")} LIKE ${like}) THEN 1 ELSE 0 END
+               + CASE WHEN EXISTS (SELECT 1 FROM tracked_texts t WHERE t.acte_id = a.id AND t.kind = 'expose' AND ${compact('t.markdown')} LIKE ${like}) THEN 1 ELSE 0 END
+               + CASE WHEN EXISTS (SELECT 1 FROM annexes an2 WHERE an2.acte_id = a.id AND ${compact("COALESCE(an2.titre, '')")} LIKE ${like}) THEN 1 ELSE 0 END)`;
+      }).join(' + ');
+      const rows = await db.all(
+        `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.direction_label, a.custom->'motsCles' AS mots_cles,
+                m.libelle AS matiere,
+                (SELECT it.numero FROM seance_items it WHERE it.acte_id = a.id AND it.statut = 'a_traiter' ORDER BY it.id DESC LIMIT 1) AS numero,
+                (SELECT s.date_seance FROM seance_items it JOIN seances s ON s.id = it.seance_id WHERE it.acte_id = a.id ORDER BY it.id DESC LIMIT 1) AS date_seance,
+                (${score}) AS score
+         FROM actes a LEFT JOIN ref_items m ON m.id = a.matiere_id
+         WHERE a.organisme_id = $1 AND ${vis.where} AND a.statut = ANY(${add(['adopte', 'executoire', 'publie', 'ar_recu', 'transmis', 'archive'])}::text[])
+         ORDER BY score DESC, a.id DESC LIMIT 12`, p);
+      return {
+        items: rows.filter((r) => Number(r.score) > 0).map((r) => ({
+          acteId: r.id, numeroSuivi: r.numero_suivi, numero: r.numero || null, titre: r.titre, statut: r.statut,
+          direction: r.direction_label || null, matiere: r.matiere || null,
+          dateSeance: r.date_seance, annee: r.date_seance ? new Date(r.date_seance).getFullYear() : null,
+          motsCles: r.mots_cles || null, correspondances: Number(r.score),
+        })),
+      };
+    },
+
     // ----------------------------------------------------------------------------------- recherches enregistrées
     async enregistrees(ctx, organismeId) {
       return (await db.all('SELECT id, nom, requete, created_at FROM search_saved WHERE organisme_id = $1 AND username = $2 ORDER BY nom', [requireOrg(organismeId), ctx.username]))

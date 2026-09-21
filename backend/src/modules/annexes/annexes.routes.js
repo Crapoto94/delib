@@ -12,7 +12,7 @@ const Meta = z.object({
 });
 const Patch = z.object({ titre: z.string().trim().min(1).max(300).optional(), typeId: Id.nullable().optional(), communicable: z.boolean().optional(), publiable: z.boolean().optional(), transmissible: z.boolean().optional() });
 const Order = z.object({ ids: z.array(Id).min(1).max(500) });
-const VersionQ = z.object({ version: z.coerce.number().int().min(1).optional() });
+const VersionQ = z.object({ version: z.coerce.number().int().min(1).optional(), format: z.enum(['original', 'pdf']).optional() });
 
 module.exports = ({ makeRouter, annexes, config }) => {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.storage.maxUploadBytes, files: 1 } });
@@ -43,11 +43,14 @@ module.exports = ({ makeRouter, annexes, config }) => {
   r.get('/:annexeId/versions', { summary: "Versions d'une annexe", tags: ['annexes'], org: true, params: PA },
     async (req, res) => res.json({ items: await annexes.versions(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId) }));
 
-  r.get('/:annexeId/file', { summary: "Télécharge le PDF d'une annexe", tags: ['annexes'], org: true, params: PA, query: VersionQ },
-    async (req, res) => {
-      const f = await annexes.content(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId, req.valid.query.version);
-      res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${encodeURIComponent(f.name)}"`, ETag: `"${f.sha256}"`, 'Cache-Control': 'private, no-store' }).send(f.buffer);
-    });
+  r.get('/:annexeId/file', {
+    summary: "Télécharge un fichier d'annexe (original, PDF associé, ou une version)", tags: ['annexes'], org: true, params: PA, query: VersionQ,
+    description: "`format=pdf` sert le PDF associé (annexe Word/Excel convertie) ; par défaut, le fichier d'origine. `version` sert une version antérieure.",
+  }, async (req, res) => {
+    const f = await annexes.content(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId, req.valid.query.version, req.valid.query.format);
+    const inline = req.valid.query.format === 'pdf' || f.mime === 'application/pdf';
+    res.set({ 'Content-Type': f.mime, 'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(f.name)}"`, ETag: `"${f.sha256}"`, 'Cache-Control': 'private, no-store' }).send(f.buffer);
+  });
 
   r.delete('/:annexeId', { summary: 'Supprime une annexe', tags: ['annexes'], org: true, params: PA, responses: { 204: 'Supprimé' } },
     async (req, res) => { await annexes.remove(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId); res.status(204).end(); });

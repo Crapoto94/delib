@@ -120,9 +120,8 @@ export default function Layout() {
         </div>
         <div className="bg-gradient-to-r from-nav-from to-nav-to"><div className="mx-auto max-w-[1400px] px-4 md:px-8">
         <nav className="flex gap-1 overflow-x-auto py-1" aria-label="Navigation principale">
-            <NavLink to="/" end className={tab} data-tour="nav-dashboard">Tableau de bord</NavLink>
-            <NavLink to="/dossiers" className={tab} data-tour="nav-dossiers">Actes & Dossiers</NavLink>
-            <NavLink to="/mes-actes" className={tab} data-tour="nav-mes-actes">Mes actes</NavLink>
+            <NavLink to="/" end className={tab} data-tour="nav-mes-actes">Mes actes</NavLink>
+            {(isAdmin || isScc) && <NavLink to="/tous-les-actes" className={tab} data-tour="nav-tous-actes">Tous les actes</NavLink>}
             <NavLink to="/bibliotheque" className={tab} data-tour="nav-bibliotheque">Bibliothèque</NavLink>
             <NavLink to="/seances" className={tab} data-tour="nav-seances">Séances & Ordre du jour</NavLink>
             <NavLink to="/commissions" className={tab} data-tour="nav-commissions">Commissions</NavLink>

@@ -17,15 +17,15 @@ export default function MesActes() {
   return id ? <Trajet acteId={Number(id)} /> : <Liste />;
 }
 
-function Liste() {
+/** Liste « mes actes » (rôle, année, recherche) : les dossiers où j'ai eu un rôle, avec accès au trajet. Réutilisée par la page unique. */
+export function ListeTrajets({ statut, hors }: { statut?: string; hors?: string } = {}) {
   const { org } = useAuth(); const o = org!.id;
   const [q, setQ] = useState(''); const [role, setRole] = useState(''); const [annee, setAnnee] = useState(''); const [page, setPage] = useState(1);
   const LIMIT = 50;
-  const d = useLoad(async () => (await api.get(orgPath(o, '/mes-actes'), { params: { q: q || undefined, role: role || undefined, annee: annee || undefined, limit: LIMIT, offset: (page - 1) * LIMIT } })).data, [o, q, role, annee, page]);
+  const d = useLoad(async () => (await api.get(orgPath(o, '/mes-actes'), { params: { q: q || undefined, role: role || undefined, annee: annee || undefined, statut, hors, limit: LIMIT, offset: (page - 1) * LIMIT } })).data, [o, q, role, annee, page, statut, hors]);
   const ans = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
   return (
-    <div>
-      <PageTitle title="Mes actes" sub="Les dossiers pour lesquels j’ai eu un rôle à un moment (rédaction, validation, remplacement, commentaire), avec leur trajet complet — circuit, modifications, amendements. Pour les délibérations de la collectivité, voir la Bibliothèque." />
+    <>
       <div className="card mb-4 flex flex-wrap items-center gap-2 p-3">
         <input className="input max-w-xs" placeholder="Titre ou n° de suivi…" aria-label="Rechercher dans mes actes" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
         <Select className="input w-auto" aria-label="Mon rôle" value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }}>{ROLES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
@@ -41,6 +41,15 @@ function Liste() {
               <td className="text-right"><Link className="btn-secondary !py-1" to={`/mes-actes/${a.acteId}`}>Voir le trajet</Link></td></tr>))}</tbody></table></div>
           <Pagination className="mt-3" total={d.data.total} limit={LIMIT} page={page} onPage={setPage} itemLabel="acte" />
         </>)}
+    </>
+  );
+}
+
+function Liste() {
+  return (
+    <div>
+      <PageTitle title="Mes actes" sub="Les dossiers pour lesquels j’ai eu un rôle à un moment (rédaction, validation, remplacement, commentaire), avec leur trajet complet — circuit, modifications, amendements. Pour les délibérations de la collectivité, voir la Bibliothèque." />
+      <ListeTrajets />
     </div>
   );
 }
@@ -49,11 +58,11 @@ function Trajet({ acteId }: { acteId: number }) {
   const { org } = useAuth(); const o = org!.id;
   const d = useLoad(async () => (await api.get(orgPath(o, `/mes-actes/${acteId}`))).data, [o, acteId]);
   if (d.loading) return <Loading />;
-  if (!d.data) return <div><Link to="/mes-actes" className="text-[12px] text-mute hover:underline">← Mes actes</Link><ErrorBox msg={d.error} /></div>;
+  if (!d.data) return <div><Link to="/" className="text-[12px] text-mute hover:underline">← Mes actes</Link><ErrorBox msg={d.error} /></div>;
   const t = d.data; const a = t.acte;
   return (
     <div className="space-y-4">
-      <div className="text-[12px] text-mute"><Link to="/mes-actes" className="hover:underline">← Mes actes</Link></div>
+      <div className="text-[12px] text-mute"><Link to="/" className="hover:underline">← Mes actes</Link></div>
       <PageTitle title={a.titre} sub={<span>Dossier n° {a.numeroSuivi} · {a.direction ?? '—'} · rédigé par <AgentName u={a.redacteur} /> · <StatutBadge statut={a.statut} /> · mes rôles : {t.roles.map((r: any) => r.label).join(', ')}</span>} />
 
       <section className="card p-4"><h3 className="mb-3">Le circuit qu’a eu ce dossier</h3>

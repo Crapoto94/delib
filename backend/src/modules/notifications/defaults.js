@@ -30,7 +30,7 @@ const RULES = [
     trigger: { event: 'acte.refused' }, recipients: ['redacteur'],
     subject: 'Modification demandée : {titre}', body: "{acteur} demande une modification de l'acte n° {numero} « {titre} ».\nMotif : {motif}\n{lien}" },
   { code: 'acte.rappele', nom: 'Acte rappelé (circuit interrompu)', family: 'validation', kind: 'event', mandatory: true,
-    trigger: { event: 'acte.rappele' }, recipients: ['holders', 'circuit', 'redacteur', 'scc'],
+    trigger: { event: 'acte.rappele' }, recipients: ['acteurs', 'redacteur'],
     subject: 'Acte rappelé : {titre}', body: "{acteur} a rappelé l'acte n° {numero} « {titre} » : le circuit est interrompu, aucune validation n'est plus attendue.\nMotif : {motif}\n{lien}" },
   { code: 'circuit.termine', nom: 'Circuit terminé', family: 'suivi', kind: 'event', mandatory: false,
     trigger: { event: 'circuit.completed' }, recipients: ['redacteur', 'circuit'],

@@ -122,7 +122,7 @@ describe('bibliothèque des actes de la collectivité (REC-30) : consulter sans 
     expect((await as(t.leroy).get(`${base()}/bibliotheque?annee=1999`)).body.total).toBe(0);
     const f = (await as(t.leroy).get(`${base()}/bibliotheque/actes/${A1}`)).body;
     expect(f).toMatchObject({ acteId: A1, resultatLabel: 'Adoptée à l’unanimité' }); expect(f.expose).toMatch(/Texte expose/); expect(f.dispositif).toMatch(/Texte dispositif/);
-    expect(f.documents.map((d) => d.cible)).toEqual(['expose', 'deliberation', 'extrait']);
+    expect(f.documents.map((d) => d.cible)).toEqual(['expose', 'extrait']);
   });
 
   it('recherche avancée : rapporteur, direction, thématique et période', async () => {

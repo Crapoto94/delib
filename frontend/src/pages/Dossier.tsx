@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Check, CheckCircle2, Download, Eye, FileText, Copy, Paperclip, Pencil, RotateCcw, Send, Sparkles, Trash2, Upload } from 'lucide-react';
+import { Check, CheckCircle2, Download, Eye, FileText, Copy, Paperclip, Pencil, RotateCcw, Send, Sparkles, Trash2, Undo2, Upload } from 'lucide-react';
 import TexteModal, { KIND_LABEL } from '../TexteModal';
 import { MentionTextarea } from '../AgentPicker';
 import { Progress, useAiJobs } from '../AiStatus';
@@ -210,29 +210,48 @@ function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toas
   const { org } = useAuth(); const o = org!.id;
   const list = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/annexes`))).data.items as any[], [acte.id]);
   const [busy, setBusy] = useState(false); const input = useRef<HTMLInputElement>(null);
+  const [comm, setComm] = useState(true);
   const upload = async (file: File) => {
     setBusy(true);
-    try { const fd = new FormData(); fd.append('titre', file.name.replace(/\.pdf$/i, '')); fd.append('communicable', 'true'); fd.append('file', file); await api.post(orgPath(o, `/actes/${acte.id}/annexes`), fd); list.reload(); }
+    try { const fd = new FormData(); fd.append('titre', file.name.replace(/\.pdf$/i, '')); fd.append('communicable', comm ? 'true' : 'false'); fd.append('file', file); await api.post(orgPath(o, `/actes/${acte.id}/annexes`), fd); list.reload(); }
     catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
   };
-  const download = async (a: any) => { const m = await openPdf(() => api.get(orgPath(o, `/actes/${acte.id}/annexes/${a.id}/file`), { responseType: 'blob' }), a.titre); if (m) toast(m, 'ko'); };
+  const toggle = async (a: any) => { try { await api.put(orgPath(o, `/actes/${acte.id}/annexes/${a.id}`), { communicable: !a.communicable }); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const voirPdf = async (a: any) => { const m = await openPdf(() => api.get(orgPath(o, `/actes/${acte.id}/annexes/${a.id}/file`), { params: { format: 'pdf' }, responseType: 'blob' }), a.titre); if (m) toast(m, 'ko'); };
+  const telecharger = async (a: any, format?: 'pdf') => {
+    try {
+      const r = await api.get(orgPath(o, `/actes/${acte.id}/annexes/${a.id}/file`), { params: format ? { format } : {}, responseType: 'blob' });
+      const url = URL.createObjectURL(r.data); const link = document.createElement('a'); link.href = url; link.download = format === 'pdf' ? `${a.titre}.pdf` : (a.fichier.nom || a.titre); link.click(); URL.revokeObjectURL(url);
+    } catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  const extDe = (a: any) => (String(a.fichier.nom || '').split('.').pop() || 'doc').toUpperCase();
   return (
     <section className="card p-5" aria-labelledby="annexes">
       <h3 id="annexes" className="mb-3 flex items-center gap-2"><Paperclip className="h-5 w-5 text-action" /> Pièces jointes au dossier</h3>
       {editable && (
-        <div className="mb-4 cursor-pointer rounded-lg border-2 border-dashed border-action/30 bg-soft p-6 text-center" onClick={() => input.current?.click()}
-          onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) upload(f); }}>
-          {busy ? <Spinner /> : <Upload className="mx-auto h-6 w-6 text-action" />}
-          <div className="mt-1 font-semibold">Glissez votre fichier ici ou cliquez pour choisir</div><div className="text-[12px] text-mute">PDF uniquement (annexes, plans, devis…)</div>
-          <input ref={input} type="file" accept="application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
-        </div>)}
+        <>
+          <div className="mb-2 cursor-pointer rounded-lg border-2 border-dashed border-action/30 bg-soft p-6 text-center" onClick={() => input.current?.click()}
+            onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) upload(f); }}>
+            {busy ? <Spinner /> : <Upload className="mx-auto h-6 w-6 text-action" />}
+            <div className="mt-1 font-semibold">Glissez votre fichier ici ou cliquez pour choisir</div><div className="text-[12px] text-mute">PDF uniquement (annexes, plans, devis…)</div>
+            <input ref={input} type="file" accept="application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
+          </div>
+          <label className="mb-4 flex items-center justify-center gap-2 text-[12px] text-mute"><input type="checkbox" checked={comm} onChange={(e) => setComm(e.target.checked)} /> Communicable (visible dans la bibliothèque et par les élus)</label>
+        </>)}
       {list.loading ? <Loading /> : !list.data?.length ? <p className="text-mute">Aucune pièce jointe.</p> : (
         <ul>{list.data.map((a) => (
           <li key={a.id} className="flex items-center gap-3 border-b border-line py-2 last:border-0">
-            <span className="flex h-10 w-10 items-center justify-center rounded bg-ko-bg text-[10px] font-bold text-ko">PDF</span>
-            <div className="min-w-0 flex-1"><div className="truncate font-semibold">{a.titre}</div><div className="text-[12px] text-mute">{a.fichier.pages} p. · {(a.fichier.taille / 1048576).toFixed(1)} Mo · v{a.version} · {a.createdBy}</div></div>
-            {a.communicable && <Badge tone="ok">Communicable</Badge>}
-            <button className="text-slate-600 hover:text-head" aria-label="Télécharger" onClick={() => download(a)}><Download className="h-5 w-5" /></button>
+            <span className="flex h-10 w-10 items-center justify-center rounded bg-ko-bg text-[9px] font-bold text-ko">{extDe(a)}</span>
+            <div className="min-w-0 flex-1"><div className="truncate font-semibold">{a.titre}</div><div className="text-[12px] text-mute">{a.fichier.pages ? `${a.fichier.pages} p. · ` : ''}{(a.fichier.taille / 1048576).toFixed(1)} Mo · v{a.version} · {a.createdBy}</div></div>
+            {editable ? <button type="button" onClick={() => toggle(a)} title="Basculer communicable / non communicable"><Badge tone={a.communicable ? 'ok' : 'warn'}>{a.communicable ? 'Communicable' : 'Non communicable'}</Badge></button> : <Badge tone={a.communicable ? 'ok' : 'warn'}>{a.communicable ? 'Communicable' : 'Non communicable'}</Badge>}
+            {a.pdf ? (
+              <>
+                <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => telecharger(a)} title={`Télécharger l'original (${extDe(a)})`}><Download className="h-4 w-4" /> {extDe(a)}</button>
+                <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => voirPdf(a)} title="Voir le PDF"><Eye className="h-4 w-4" /> PDF</button>
+              </>
+            ) : (
+              <button className="text-slate-600 hover:text-head" aria-label="Télécharger" onClick={() => telecharger(a)}><Download className="h-5 w-5" /></button>
+            )}
             {editable && <button className="text-slate-600 hover:text-ko" aria-label="Supprimer" onClick={async () => { if (confirm(`Supprimer « ${a.titre} » ?`)) { await api.delete(orgPath(o, `/actes/${acte.id}/annexes/${a.id}`)); list.reload(); } }}><Trash2 className="h-5 w-5" /></button>}
           </li>))}</ul>
       )}
@@ -262,8 +281,9 @@ function Discussion({ acte, toast }: { acte: any; toast: (m: string, k?: 'ok' | 
 
 /* ------------------------------------------------------------------------------------- panneau latéral : actions */
 function Actions({ acte, circuit, reload, toast, onEnvoye }: { acte: any; circuit: any; reload: () => void; toast: (m: string, k?: 'ok' | 'ko') => void; onEnvoye?: (data: any) => void }) {
-  const { org } = useAuth(); const o = org!.id;
+  const { org, me } = useAuth(); const o = org!.id;
   const [busy, setBusy] = useState(false); const [refus, setRefus] = useState(false); const [motif, setMotif] = useState('');
+  const [rappel, setRappel] = useState(false); const [rappelMotif, setRappelMotif] = useState(''); const [recap, setRecap] = useState<string[] | null>(null);
   const [target, setTarget] = useState('previous'); const [resume, setResume] = useState('direct'); const [derog, setDerog] = useState<any>(null);
   const act = async (fn: () => Promise<any>, ok: string) => {
     setBusy(true);
@@ -272,6 +292,17 @@ function Actions({ acte, circuit, reload, toast, onEnvoye }: { acte: any; circui
     finally { setBusy(false); }
   };
   const a = circuit?.actions ?? {};
+  const peutRappeler = !!circuit?.submitted && (acte.redacteur === me?.username || acte.droits?.administrer);
+  const ouvrirRappel = async () => {
+    setRappelMotif(''); setRecap(null); setRappel(true);
+    try { const r = await api.get(orgPath(o, `/actes/${acte.id}/notifications/destinataires`), { params: { code: 'acte.rappele' } }); setRecap(r.data.items || []); } catch { setRecap([]); }
+  };
+  const prevenus = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of (circuit?.path ?? [])) for (const h of (p.holders ?? [])) if (h) s.add(h);
+    if (acte.redacteur) s.add(acte.redacteur);
+    return [...s];
+  }, [circuit, acte.redacteur]);
   return (
     <>
       <div className="card p-5" id="actions">
@@ -279,6 +310,7 @@ function Actions({ acte, circuit, reload, toast, onEnvoye }: { acte: any; circui
         {a.submit && <button className="btn-primary w-full" disabled={busy} onClick={async () => { const r = await act(() => api.post(orgPath(o, `/actes/${acte.id}/envoi`)), 'Dossier envoyé au circuit'); if (r?.data) onEnvoye?.(r.data); }}><Send className="h-4 w-4" /> {acte.statut === 'modification_demandee' ? 'Renvoyer au circuit' : 'Envoyer pour validation'}</button>}
         {a.validate && <button className="btn-ok mt-2 w-full" disabled={busy} onClick={() => act(() => api.post(orgPath(o, `/actes/${acte.id}/validation`), {}), 'Étape validée')}><Check className="h-4 w-4" /> Valider{a.onBehalfOf ? ` (pour ${a.onBehalfOf})` : ''}</button>}
         {a.refuse && <button className="btn-ko mt-2 w-full" disabled={busy} onClick={() => setRefus(true)}><RotateCcw className="h-4 w-4" /> Demander une modification…</button>}
+        {peutRappeler && <button className="btn-secondary mt-2 w-full" disabled={busy} onClick={ouvrirRappel}><Undo2 className="h-4 w-4" /> Rappeler la délibération…</button>}
         {!a.submit && !a.validate && !a.refuse && <p className="text-mute">{circuit?.submitted ? 'Vous n\'avez rien à faire sur ce dossier pour le moment.' : 'Vous ne pouvez pas envoyer ce dossier.'}</p>}
         {circuit?.blocked && <p className="mt-2 rounded bg-ko-bg p-2 text-ko">Étape sans titulaire : contactez l'administrateur.</p>}
       </div>
@@ -296,6 +328,22 @@ function Actions({ acte, circuit, reload, toast, onEnvoye }: { acte: any; circui
           </div>
         </Modal>)}
       {derog && <DerogModal acte={acte} info={derog} onClose={() => setDerog(null)} toast={toast} reload={reload} />}
+      {rappel && (
+        <Modal title="Rappeler la délibération" onClose={() => setRappel(false)}>
+          <div className="space-y-4">
+            <p className="rounded bg-warn-bg p-3 text-warn">Le circuit est interrompu : aucune validation n'est plus attendue. Seules les personnes ayant eu affaire à la délibération seront prévenues.</p>
+            <div>
+              <div className="label">Personnes prévenues</div>
+              {recap === null ? <Loading /> : (
+                <ul className="space-y-1 text-[13px]">{(recap.length ? recap : prevenus).map((u) => <li key={u}><AgentName u={u} /></li>)}
+                  {!recap.length && !prevenus.length && <li className="text-mute">Aucune personne identifiée.</li>}</ul>)}
+              <p className="mt-1 text-[12px] text-mute">Validations faites, avis, commentaires et amendements sur cette délibération, plus le rédacteur.</p>
+            </div>
+            <Field label="Motif du rappel (obligatoire)"><textarea className="input" rows={4} value={rappelMotif} onChange={(e) => setRappelMotif(e.target.value)} autoFocus /></Field>
+            <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setRappel(false)}>Annuler</button>
+              <button className="btn-ko" disabled={busy || rappelMotif.trim().length < 3} onClick={() => act(() => api.post(orgPath(o, `/actes/${acte.id}/rappeler`), { motif: rappelMotif }).then(() => setRappel(false)), 'Délibération rappelée : circuit interrompu')}>Rappeler</button></div>
+          </div>
+        </Modal>)}
     </>
   );
 }
@@ -451,6 +499,7 @@ function ActesProches({ acte }: { acte: any }) {
 export default function Dossier() {
   const { id } = useParams();
   const { org, me } = useAuth(); const o = org!.id;
+  const nav = useNavigate();
   const { toast, node } = useToast();
   const acte = useLoad(async () => (await api.get(orgPath(o, `/actes/${id}`))).data, [o, id]);
   const circuit = useLoad(async () => (await api.get(orgPath(o, `/actes/${id}/circuit`))).data, [o, id]);
@@ -458,9 +507,17 @@ export default function Dossier() {
   const [copying, setCopying] = useState(false);
   const [envoi, setEnvoi] = useState<{ data: any; premier: boolean } | null>(null);
   if (acte.loading && !acte.data) return <Loading />;
-  if (acte.error || !acte.data) return <div><ErrorBox msg={acte.error || 'Dossier introuvable'} /><Link className="mt-4 inline-block text-action" to="/dossiers">← Retour aux dossiers</Link></div>;
+  if (acte.error || !acte.data) return <div><ErrorBox msg={acte.error || 'Dossier introuvable'} /><Link className="mt-4 inline-block text-action" to="/">← Retour aux dossiers</Link></div>;
   const a = acte.data; const c = circuit.data;
   const editable = !!a.droits?.modifier;
+  const peutSupprimer = !['en_circuit', 'en_attente_scc'].includes(a.statut)
+    && (['adopte', 'archive', 'executoire', 'publie', 'transmis', 'ar_recu', 'rejete', 'retire'].includes(a.statut)
+      ? !!a.droits?.administrer
+      : (a.redacteur === me?.username || !!a.droits?.administrer));
+  const supprimer = async () => {
+    if (!confirm(`Supprimer définitivement le dossier #${a.numeroSuivi} « ${a.titre} » ?`)) return;
+    try { await api.delete(orgPath(o, `/actes/${a.id}`)); toast('Dossier supprimé'); nav('/dossiers'); } catch (e) { toast(errMsg(e), 'ko'); }
+  };
   const apercuDossier = async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${a.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }), `Dossier #${a.numeroSuivi} — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };
   const onEnvoye = (data: any) => {
     let premier = true;
@@ -470,10 +527,11 @@ export default function Dossier() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="mb-1 text-[12px] text-mute"><Link to="/dossiers" className="hover:underline">Actes & Dossiers</Link> › Dossier #{a.numeroSuivi}</div>
+        <div className="mb-1 text-[12px] text-mute"><Link to="/" className="hover:underline">Mes actes</Link> › Dossier #{a.numeroSuivi}</div>
         <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><StatutBadge statut={a.statut} />
           <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
-          <button className="btn-secondary" onClick={apercuDossier}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button></div>
+          <button className="btn-secondary" onClick={apercuDossier}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button>
+          {peutSupprimer && <button className="btn-secondary text-ko" onClick={supprimer}><Trash2 className="h-4 w-4" /> Supprimer</button>}</div>
       </div>
       {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">

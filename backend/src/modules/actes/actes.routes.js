@@ -28,6 +28,7 @@ const ListQ = z.object({
 const Delib = z.object({ titre: z.string().trim().min(3).max(500) });
 const DelibUpd = z.object({ titre: z.string().trim().min(3).max(500).optional(), ordre: z.number().int().min(1).optional() });
 const Abandon = z.object({ motif: z.string().trim().min(3).max(1000) });
+const DepuisModele = z.object({ modeleId: Id, typeId: Id.optional(), titre: z.string().trim().min(3).max(500).optional(), motsCles: z.array(z.string().trim().min(1).max(60)).max(20).optional() });
 const Assiste = z.object({
   actif: z.boolean().optional(), bienvenue: z.boolean().optional(),
   passees: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
@@ -45,6 +46,11 @@ module.exports = ({ makeRouter, actes }) => {
     summary: 'Crée un acte (brouillon)', tags: ['actes'], org: true, params: Org, body: Create, responses: { 201: 'Créé' },
     description: "Le rédacteur et sa direction sont déduits de l'identité RH ; une direction étrangère exige une autorisation de rédaction (DRO-02). Nature par défaut selon le type. Crée les délibérations minimales du type. Seuls type et titre sont requis : le reste est vérifié par le contrôle de complétude avant l'envoi au circuit.",
   }, async (req, res) => res.status(201).json(await actes.create(req.ctx, req.org.id, req.valid.body)));
+
+  r.post('/depuis-modele', {
+    summary: 'Crée un dossier à partir d’une délibération passée (modèle) : champs, textes et annexes repris', tags: ['actes'], org: true, params: Org, body: DepuisModele, responses: { 201: 'Créé' },
+    description: "Reprend TOUT du modèle : champs, exposé, visas, dispositif, délibérations et annexes (les fichiers sont partagés, pas recopiés). La direction reste celle du rédacteur ; les mots-clés sont mémorisés dans le dossier.",
+  }, async (req, res) => res.status(201).json(await actes.creerDepuisModele(req.ctx, req.org.id, req.valid.body)));
 
   r.get('/:id', { summary: "Fiche d'un acte, avec droits et complétude", tags: ['actes'], org: true, params: IdP },
     async (req, res) => res.json(await actes.get(req.ctx, req.org.id, req.valid.params.id)));

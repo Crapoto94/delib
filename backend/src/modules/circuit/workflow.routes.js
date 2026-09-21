@@ -63,6 +63,16 @@ module.exports = ({ makeRouter, engine }) => {
   r.get('/circuit/en-retard', { summary: 'Actes dont l\'étape courante a dépassé son délai (dans mon périmètre)', tags: ['circuit'], org: true, params: P },
     async (req, res) => res.json({ items: await engine.lateActes(req.ctx, req.org.id) }));
 
+  r.get('/circuit/portefeuille', {
+    summary: 'Mon portefeuille : tous les actes qui me concernent et ne sont pas encore passés au conseil', tags: ['circuit'], org: true, params: P,
+    description: "Réunit : action attendue de moi, rédaction/validation par mon équipe, acte que j'ai validé et qui poursuit son circuit, acte inscrit au conseil (le mien ou celui de mon équipe). Chaque acte porte ses `raisons` et `enRetard` (étape courante dépassée).",
+  }, async (req, res) => res.json(await engine.portefeuille(req.ctx, req.org.id)));
+
+  r.get('/circuit/en-cours', {
+    summary: "Tous les actes non encore passés au conseil : par état (étape courante) ou par conseil pressenti", tags: ['circuit'], org: true, roles: ['org_admin', 'scc'], params: P,
+    description: "Chaque acte porte son `etape` (libellé d'étape, ou « Rédaction » / « À corriger »), son `enRetard` et sa séance pressentie (`acte.seanceVisee`), à regrouper côté écran.",
+  }, async (req, res) => res.json(await engine.enCours(req.ctx, req.org.id)));
+
   r.post('/circuit/lot/validation', {
     summary: 'Valide plusieurs actes d\'un coup', tags: ['circuit'], org: true, params: P, body: Lot,
     description: "Chaque acte est traité séparément : un échec n'arrête pas les autres (CIR-50). Le refus reste unitaire.",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Ban, Check, ChevronDown, ChevronLeft, ChevronRight, Cog, Database, Eye, FileJson, ListChecks, Play, Plus, RefreshCw, Trash2, Upload, Wand2, XCircle } from 'lucide-react';
+import { AlertTriangle, Ban, Check, ChevronDown, ChevronLeft, ChevronRight, Cog, Database, Eye, FileJson, HardDrive, ListChecks, Play, Plus, RefreshCw, Trash2, Upload, Wand2, XCircle } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -43,10 +43,10 @@ function NouveauLot({ o, onClose, onDone }: { o: number; onClose: () => void; on
 function Progression({ p }: { p: any }) {
   if (!p?.enCours) return null;
   const pct = p.total ? Math.min(100, Math.round((p.fait / p.total) * 100)) : 0;
-  const phases: Record<string, string> = { chargement: 'Chargement du sas', analyse: 'Analyse des conseils et des actes', concordances: 'Concordances', proposition: 'Propositions automatiques' };
+  const phases: Record<string, string> = { chargement: 'Chargement du sas', analyse: 'Analyse des conseils et des actes', concordances: 'Concordances', proposition: 'Propositions automatiques', import: 'Import des actes' };
   return (
     <div className="rounded border border-action/30 bg-action/5 p-3" role="status" aria-live="polite">
-      <div className="mb-1 flex items-center justify-between gap-2 text-[13px]"><span className="flex items-center gap-2"><Spinner /> {phases[p.phase] ?? p.phase}…</span><b className="tabular-nums">{p.fait ?? 0} / {p.total ?? 0}</b></div>
+      <div className="mb-1 flex items-center justify-between gap-2 text-[13px]"><span className="flex items-center gap-2"><Spinner /> {p.libelle ?? phases[p.phase] ?? p.phase}…</span><b className="tabular-nums">{p.fait ?? 0} / {p.total ?? 0}</b></div>
       <div className="h-2 overflow-hidden rounded-full bg-line"><div className="h-full bg-action-solid transition-all" style={{ width: `${pct}%` }} /></div>
       <div className="mt-1 text-[12px] text-mute"><span className="tabular-nums">{p.seances ?? 0}</span> séance(s) · <span className="tabular-nums">{p.actes ?? 0}</span> acte(s) en cours · {pct} %</div>
     </div>
@@ -170,7 +170,7 @@ function TablesSource({ o, onChanged }: { o: number; onChanged: () => void }) {
             <td className="text-[12px]">{t.colonnes?.length ?? 0}</td>
             <td>{t.valide ? <Badge tone="ok">validée</Badge> : <Badge tone="warn">à valider</Badge>}{t.valide && t.validePar && <div className="text-[11px] text-mute">{t.validePar}</div>}</td>
             <td className="whitespace-nowrap text-right">
-              <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" onClick={() => setApercu(t)}><Eye className="h-3.5 w-3.5" /> Aperçu</button>
+              {t.supportee === false ? <span className="mr-2 text-[11px] text-mute" title="Réservée à un export JSON du HUB">JSON HUB</span> : <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" onClick={() => setApercu(t)}><Eye className="h-3.5 w-3.5" /> Aperçu</button>}
               {t.valide
                 ? <button className="btn-secondary !px-2 !py-1 text-[12px]" onClick={() => basculer(t, false)}>Retirer</button>
                 : <button className="btn-primary !px-2 !py-1 text-[12px]" onClick={() => basculer(t, true)}><Check className="h-3.5 w-3.5" /> Valider</button>}
@@ -387,16 +387,18 @@ function ApercuConseil({ seance, actes, onClose }: { seance: any; actes: any[]; 
 function Conseils({ o, lotId, detail, onDone }: { o: number; lotId: number; detail: any; onDone: () => void }) {
   const { toast } = useToast();
   const [apercu, setApercu] = useState<any>(null);
+  const [busy, setBusy] = useState<number | null>(null);
   const items = detail.items as any[];
-  const seances = items.filter((x) => x.kind === 'seance');
+  const seances = items.filter((x) => x.kind === 'seance').sort((a, b) => +new Date(a.payload?.date || 0) - +new Date(b.payload?.date || 0));
   const actes = items.filter((x) => x.kind === 'acte');
   const actesTable = (detail.mapping ?? []).find((m: any) => m.table_name === 'actes');
   const actesDe = (s: any) => actes.filter((a) => a.payload.seance && String(a.payload.seance) === s.sourceKey);
   const importer = async (s: any) => {
+    setBusy(s.id);
     try {
       const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${s.id}/publier`), {})).data;
       toast(r.erreurs?.length ? `Conseil importé — ${r.actes} acte(s), ${r.erreurs.length} en erreur` : `Conseil importé (${r.actes} acte(s))`, r.erreurs?.length ? 'ko' : 'ok'); onDone();
-    } catch (e) { toast(errMsg(e), 'ko'); }
+    } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); }
   };
   const ignorer = async (s: any) => { try { await api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${s.id}/ignorer`), {}); toast('Conseil ignoré'); onDone(); } catch (e) { toast(errMsg(e), 'ko'); } };
   const annulerImport = async (id: number) => { try { await api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${id}/depublier`), {}); toast('Import annulé — le conseil redevient à importer'); onDone(); } catch (e) { toast(errMsg(e), 'ko'); } };
@@ -410,7 +412,7 @@ function Conseils({ o, lotId, detail, onDone }: { o: number; lotId: number; deta
         const mes = actesDe(s); const importes = mes.filter((a) => a.statut === 'publie').length; const prets = mes.filter((a) => a.statut === 'publie' || !a.problemes?.length).length;
         return (
           <tr key={s.id}>
-            <td><div className="font-semibold">{s.payload.titre ?? s.payload.numero ?? '(sans intitulé)'}</div><div className="text-[11px] text-mute">{s.sourceKey} · {s.payload.date ? dt(s.payload.date, { dateStyle: 'medium' }) : 'date ?'}</div>{s.payload.origine === 'archive' && <Badge tone="gray">conseil archivé AIRS</Badge>}</td>
+            <td><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{s.payload.titre ?? s.payload.numero ?? '(sans intitulé)'}</span>{s.payload.origine && <Badge tone={s.payload.origine === 'archive' ? 'gray' : 'blue'}>{s.payload.origine === 'archive' ? 'Conseil archivé AIRS' : 'Conseil courant'}</Badge>}</div><div className="text-[11px] text-mute">{s.sourceKey} · {s.payload.date ? dt(s.payload.date, { dateStyle: 'medium' }) : 'date ?'}</div></td>
             <td className="text-[12px]">{s.payload.instance ?? '—'}</td>
             <td className="text-[12px]">{s.payload.type_seance ?? s.payload.type ?? '—'}</td>
             <td className="text-[12px]">{mes.length} acte(s){mes.length > 0 && <span className="text-mute"> · {importes > 0 ? `${importes}/${mes.length} importé(s)` : `${prets}/${mes.length} prêt(s)`}</span>}</td>
@@ -418,7 +420,7 @@ function Conseils({ o, lotId, detail, onDone }: { o: number; lotId: number; deta
             <td className="whitespace-nowrap text-right">
               <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" onClick={() => setApercu(s)}><Eye className="h-3.5 w-3.5" /> Aperçu</button>
               {(s.statut === 'publie' || importes > 0) && <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" title="Annuler l'import de ce conseil et de ses actes" onClick={() => annulerImport(s.id)}><Ban className="h-3.5 w-3.5" /> Annuler l'import</button>}
-              {s.statut !== 'publie' && <button className="btn-primary mr-1 !px-2 !py-1 text-[12px]" disabled={!!s.problemes?.length} onClick={() => importer(s)}><Check className="h-3.5 w-3.5" /> Importer</button>}
+              {s.statut !== 'publie' && <button className="btn-primary mr-1 !px-2 !py-1 text-[12px]" disabled={busy !== null || !!s.problemes?.length} onClick={() => importer(s)}>{busy === s.id ? <Spinner /> : <Check className="h-3.5 w-3.5" />} {busy === s.id ? 'Import en cours…' : 'Importer'}</button>}
               {s.statut !== 'publie' && <button className="rounded p-2 text-ko hover:bg-slate-100" title="Ignorer" aria-label="Ignorer" onClick={() => ignorer(s)}><XCircle className="h-4 w-4" /></button>}
             </td>
           </tr>);
@@ -464,21 +466,48 @@ function ActesIsoles({ o, lotId, detail, onDone }: { o: number; lotId: number; d
   );
 }
 
+function FichiersAirs({ o }: { o: number }) {
+  const { toast } = useToast();
+  const d = useLoad(async () => (await api.get(orgPath(o, '/import-airs/fichiers'))).data as any, [o]);
+  const [f, setF] = useState({ share: '', domaine: '', utilisateur: '', motDePasse: '' });
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { if (d.data) setF((p) => ({ ...p, share: d.data.share || '', domaine: d.data.domaine || '', utilisateur: d.data.utilisateur || '' })); }, [d.data]);
+  const tester = async () => {
+    setBusy(true); setErr(null);
+    try { await api.post(orgPath(o, '/import-airs/fichiers/tester'), f); toast('Accès aux fichiers AIRS vérifié'); setF((p) => ({ ...p, motDePasse: '' })); d.reload(); }
+    catch (e) { setErr(errMsg(e)); } finally { setBusy(false); }
+  };
+  return (
+    <section className="card p-4">
+      <div className="mb-2 flex flex-wrap items-center gap-2"><HardDrive className="h-4 w-4" /><b>Fichiers AIRS (documents d'origine)</b>
+        {d.data?.joignable ? <Badge tone="ok">joignable</Badge> : d.data?.monte ? <Badge tone="warn">configuré, non monté</Badge> : <Badge tone="gray">non configuré</Badge>}
+      </div>
+      <div className="grid gap-2 md:grid-cols-4">
+        <Field label="Partage (UNC)"><input className="input" value={f.share} onChange={(e) => setF({ ...f, share: e.target.value })} placeholder="\\airsdelibv7\filesystem$" /></Field>
+        <Field label="Domaine"><input className="input" value={f.domaine} onChange={(e) => setF({ ...f, domaine: e.target.value })} placeholder="ivry" /></Field>
+        <Field label="Utilisateur"><input className="input" value={f.utilisateur} onChange={(e) => setF({ ...f, utilisateur: e.target.value })} placeholder="machevalier" /></Field>
+        <Field label="Mot de passe"><input className="input" type="password" value={f.motDePasse} onChange={(e) => setF({ ...f, motDePasse: e.target.value })} /></Field>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2"><button className="btn-primary" disabled={busy || !f.motDePasse} onClick={tester}>{busy && <Spinner />} Tester l'accès</button><ErrorBox msg={err} /></div>
+      <p className="mt-2 text-[12px] text-mute">Pour importer les documents d'origine depuis AIRS (archivés : <code>DEL_ARCHIVE</code>). Le mot de passe n'est pas conservé ; le partage reste monté pour la session.</p>
+    </section>
+  );
+}
+
 function Detail({ o, lotId, onRetour, onRechargeListe }: { o: number; lotId: number; onRetour: () => void; onRechargeListe: () => void }) {
   const { toast, node } = useToast();
   const d = useLoad(async () => (await api.get(orgPath(o, `/import-airs/lots/${lotId}`))).data as any, [o, lotId]);
   const [charger, setCharger] = useState(false); const [mapping, setMapping] = useState(false); const [supprimer, setSupprimer] = useState(false);
   const recharger = () => { d.reload(); onRechargeListe(); };
   const agir = async (fn: () => Promise<any>, ok: string) => { try { await fn(); toast(ok); recharger(); } catch (e) { toast(errMsg(e), 'ko'); } };
-  const [prog, setProg] = useState<any>(null); const [enCours, setEnCours] = useState(false);
+  const [prog, setProg] = useState<any>(null); const [enCours, setEnCours] = useState(false); const [busyAction, setBusyAction] = useState<string | null>(null);
   const lireProgression = async () => { try { setProg((await api.get(orgPath(o, `/import-airs/lots/${lotId}/progression`))).data); } catch { /* lot pas encore prêt */ } };
   useEffect(() => { lireProgression(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [o, lotId]);
   useEffect(() => {
-    if (!enCours && !prog?.enCours) return;
-    const t = setInterval(lireProgression, 800);
+    const t = setInterval(lireProgression, 1500);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enCours, prog?.enCours, o, lotId]);
+  }, [o, lotId]);
   const lancerAnalyse = async () => {
     setEnCours(true);
     try { await api.post(orgPath(o, `/import-airs/lots/${lotId}/analyser`), {}); toast('Lot analysé'); }
@@ -486,8 +515,19 @@ function Detail({ o, lotId, onRetour, onRechargeListe }: { o: number; lotId: num
     finally { setEnCours(false); setProg(null); recharger(); }
   };
   const importerActes = async () => {
+    setBusyAction('actes');
     try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/actes-importer`), {})).data; toast(r.ignores?.length ? `${r.publies} acte(s) importé(s), ${r.ignores.length} en erreur` : `${r.publies} acte(s) importé(s)`, r.ignores?.length ? 'ko' : 'ok'); recharger(); }
-    catch (e) { toast(errMsg(e), 'ko'); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusyAction(null); }
+  };
+  const importerConseils = async () => {
+    setBusyAction('conseils');
+    try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/publier`), {})).data; toast(r.ignores?.length ? `${r.publies} acte(s) importé(s), ${r.ignores.length} en erreur` : `${r.publies} acte(s) importé(s)`, r.ignores?.length ? 'ko' : 'ok'); recharger(); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusyAction(null); }
+  };
+  const importerArchives = async () => {
+    setBusyAction('archives');
+    try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/conseils-archives-importer`), {})).data; toast(`${r.conseils} conseil(s) archivé(s), ${r.actes} acte(s)${r.erreurs?.length ? `, ${r.erreurs.length} erreur(s)` : ''}`, r.erreurs?.length ? 'ko' : 'ok'); recharger(); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusyAction(null); }
   };
   if (d.loading && !d.data) return <Loading progress={prog?.enCours ? prog : null} />;
   const lot = d.data.lot;
@@ -501,14 +541,15 @@ function Detail({ o, lotId, onRetour, onRechargeListe }: { o: number; lotId: num
     <div className="space-y-4">
       <button className="btn-secondary" onClick={onRetour}><ChevronLeft className="h-4 w-4" /> Tous les lots</button>
       <div className="card flex flex-wrap items-center gap-3 p-4">
-        <div className="min-w-0 flex-1"><div className="text-[15px] font-bold text-head">{lot.label}</div><div className="text-[12px] text-mute">{lot.mode === 'passes' ? 'Séances passées' : 'Séances passées + actes en préparation'} · source {lot.sourceKind} · créé le {dt(lot.createdAt, { dateStyle: 'medium' })}</div></div>
+        <div className="min-w-[240px] flex-1"><div className="text-[15px] font-bold text-head">{lot.label}</div><div className="text-[12px] text-mute">{lot.mode === 'passes' ? 'Séances passées' : 'Séances passées + actes en préparation'} · source {lot.sourceKind} · créé le {dt(lot.createdAt, { dateStyle: 'medium' })}</div></div>
         <Badge tone={(LOT[lot.statut] ?? LOT.brouillon).tone}>{(LOT[lot.statut] ?? LOT.brouillon).label}</Badge>
-        <span className="flex flex-wrap gap-2">
+        <span className="flex flex-wrap gap-2 md:ml-auto">
           <button className="btn-secondary" disabled={lot.statut === 'annule'} onClick={() => setCharger(true)}><Upload className="h-4 w-4" /> Charger</button>
           <button className="btn-secondary" disabled={enCours || prog?.enCours || !['charge', 'concordances', 'pret'].includes(lot.statut)} onClick={lancerAnalyse}><Play className="h-4 w-4" /> Analyser</button>
           <button className="btn-secondary" onClick={() => setMapping(true)}><Cog className="h-4 w-4" /> Mapping</button>
-          <button className="btn-primary" disabled={!['concordances', 'pret'].includes(lot.statut) || d.data.blocage.bloquantesNonResolues > 0} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/publier`), {}), 'Import traité')}><Check className="h-4 w-4" /> Importer tous les conseils</button>
-          <button className="btn-secondary" disabled={!['concordances', 'pret', 'publie'].includes(lot.statut)} onClick={importerActes} title="Importe tous les actes du sas (les séances sont créées au besoin)"><Check className="h-4 w-4" /> Importer tous les actes</button>
+          <button className="btn-primary" disabled={busyAction !== null || !['concordances', 'pret'].includes(lot.statut) || d.data.blocage.bloquantesNonResolues > 0} onClick={importerConseils}>{busyAction === 'conseils' ? <Spinner /> : <Check className="h-4 w-4" />} {busyAction === 'conseils' ? 'Import…' : 'Importer tous les conseils'}</button>
+          <button className="btn-secondary" disabled={busyAction !== null || !['concordances', 'pret', 'publie'].includes(lot.statut)} onClick={importerActes} title="Importe tous les actes du sas (les séances sont créées au besoin)">{busyAction === 'actes' ? <Spinner /> : <Check className="h-4 w-4" />} {busyAction === 'actes' ? 'Import…' : 'Importer tous les actes'}</button>
+          <button className="btn-secondary" disabled={busyAction !== null || !['concordances', 'pret', 'publie'].includes(lot.statut)} onClick={importerArchives} title="Importe tous les conseils ARCHIVÉS d'AIRS (actes et documents d'origine compris)">{busyAction === 'archives' ? <Spinner /> : <Check className="h-4 w-4" />} {busyAction === 'archives' ? 'Import…' : 'Importer les conseils archivés'}</button>
           {(d.data.compteurs.publies > 0 || lot.statut !== 'annule') && <button className="btn-secondary text-ko" onClick={() => window.confirm('Annuler ce lot et retirer ses imports ?') && agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/annuler`), {}), 'Lot annulé')}><Ban className="h-4 w-4" /> Annuler</button>}
           <button className="btn-secondary text-ko" onClick={() => setSupprimer(true)}><Trash2 className="h-4 w-4" /> Supprimer</button>
         </span>
@@ -519,6 +560,8 @@ function Detail({ o, lotId, onRetour, onRechargeListe }: { o: number; lotId: num
       <Progression p={prog ?? (enCours ? { enCours: true, phase: 'analyse', fait: 0, total: 0 } : null)} />
 
       <TablesSource o={o} onChanged={recharger} />
+
+      <FichiersAirs o={o} />
 
       <div className="grid gap-3 md:grid-cols-4">
         {[['Séances', d.data.compteurs.seances], ['Actes', d.data.compteurs.actes], ['Prêts à importer', d.data.compteurs.prets], ['Importés', d.data.compteurs.publies]].map(([l, v]) => (

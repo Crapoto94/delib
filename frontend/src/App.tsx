@@ -3,9 +3,9 @@ import { useAuth } from './auth';
 import { Loading } from './ui';
 import Layout from './Layout';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import MonEspace from './pages/MonEspace';
 import Recherche from './pages/Recherche';
-import Dossiers from './pages/Dossiers';
+import TousLesActes from './pages/TousLesActes';
 import Dossier from './pages/Dossier';
 import Admin from './pages/Admin';
 import Seances from './pages/Seances';
@@ -40,11 +40,13 @@ export default function App() {
       {DevSeances && <Route path="/dev/seances" element={<Suspense fallback={null}><DevSeances /></Suspense>} />}
       {DevDesign && <Route path="/dev/design" element={<Suspense fallback={null}><DevDesign /></Suspense>} />}
       <Route element={me ? <Layout /> : <Navigate to="/connexion" replace />}>
-        <Route index element={<Dashboard />} />
+        <Route index element={<MonEspace />} />
         <Route path="recherche" element={<Recherche />} />
-        <Route path="dossiers" element={<Dossiers />} />
+        <Route path="dossiers" element={<Navigate to="/" replace />} />
         <Route path="bibliotheque" element={<Bibliotheque />} />
-        <Route path="mes-actes/:id?" element={<MesActes />} />
+        <Route path="tous-les-actes" element={<TousLesActes />} />
+        <Route path="mes-actes" element={<Navigate to="/" replace />} />
+        <Route path="mes-actes/:id" element={<MesActes />} />
         <Route path="dossiers/:id" element={<Dossier />} />
         <Route path="seances/*" element={<Seances />} />
         <Route path="commissions" element={<Commissions />} />
