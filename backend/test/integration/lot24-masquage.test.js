@@ -77,9 +77,19 @@ describe('séance visée sur tous les tableaux', () => {
     const liste = (await as(t.dupont).get(`${base()}/actes?scope=mine`)).body.items.find((x) => x.id === a);
     expect(liste.seanceVisee).toMatchObject({ id: seance.id, dateSeance: expect.anything(), instance: expect.any(String) });
     expect((await as(t.dupont).get(A(a))).body.seanceVisee).toMatchObject({ id: seance.id, instance: expect.any(String) });   // et la fiche du dossier
+    expect(liste.seanceVisee.inscrit).toBe(false);                                                   // visée, pas encore à l'ordre du jour → italique
     const b = (await as(t.dupont).post(`${base()}/actes`, { typeId: typeDelib.id, titre: 'Sans séance' })).body.id;
     expect((await as(t.dupont).get(`${base()}/actes?scope=mine`)).body.items.find((x) => x.id === b).seanceVisee).toBeNull();
     const todo = (await as(t.petit).get(`${base()}/circuit/a-traiter`)).body.items.find((x) => x.acte.id === a);
     expect(todo.acte.seanceVisee).toMatchObject({ id: seance.id });
+  });
+
+  it('SEA-18 : inscrit à l’ordre du jour → « inscrit » (gras) ; retiré de l’ordre du jour → de nouveau « visée » seulement (italique)', async () => {
+    const it = await env.db.get("INSERT INTO seance_items (organisme_id, seance_id, position, kind, acte_id, created_by) VALUES ($1,$2,1,'deliberation',$3,'test') RETURNING id", [ville.id, seance.id, a]);
+    const inscrit = async () => (await as(t.dupont).get(`${base()}/actes?scope=mine`)).body.items.find((x) => x.id === a).seanceVisee.inscrit;
+    expect(await inscrit()).toBe(true);
+    expect((await as(t.dupont).get(A(a))).body.seanceVisee.inscrit).toBe(true);
+    await env.db.run("UPDATE seance_items SET statut = 'retire' WHERE id = $1", [it.id]);
+    expect(await inscrit()).toBe(false);
   });
 });

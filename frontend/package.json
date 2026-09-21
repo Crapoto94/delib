@@ -1,7 +1,7 @@
 {
   "name": "vibedelib-frontend",
   "private": true,
-  "version": "0.38.0",
+  "version": "0.38.1",
   "type": "module",
   "scripts": {
     "predev": "node scripts/copy-pdfjs-assets.mjs",

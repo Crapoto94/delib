@@ -24,14 +24,21 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
     toActe,
 
     /**
-     * Ajoute à chaque acte de la liste sa séance visée (« seanceVisee » : { id, dateSeance, instance }, ou null) — celle qu'il vise, à défaut celle où il est inscrit.
-     * Une seule requête pour toute la liste : à appeler sur tout ce qui s'affiche en tableau (dossiers, à traiter, équipe, validés).
+     * Ajoute à chaque acte de la liste sa séance visée (« seanceVisee » : { id, dateSeance, instance, inscrit }, ou null) — celle qu'il vise, à défaut celle où il est inscrit.
+     * « inscrit » : l'acte est à l'ordre du jour de cette séance (point à traiter, non retiré), et pas seulement visé (SEA-18).
+     * Deux requêtes pour toute la liste : à appeler sur tout ce qui s'affiche en tableau (dossiers, à traiter, équipe, validés).
      */
     async attachSeance(list) {
       const ids = [...new Set(list.map((a) => a?.seanceViseeId ?? a?.seanceId).filter(Boolean))];
       const rows = ids.length ? await db.all('SELECT s.id, s.date_seance, i.nom AS instance FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = ANY($1::int[])', [ids]) : [];
+      const actes = [...new Set(list.map((a) => a?.id).filter(Boolean))];
+      const odj = ids.length && actes.length ? await db.all("SELECT DISTINCT seance_id, acte_id FROM seance_items WHERE statut = 'a_traiter' AND seance_id = ANY($1::int[]) AND acte_id = ANY($2::int[])", [ids, actes]) : [];
+      const inscrits = new Set(odj.map((r) => `${r.seance_id}:${r.acte_id}`));
       const by = new Map(rows.map((r) => [r.id, { id: r.id, dateSeance: r.date_seance, instance: r.instance }]));
-      for (const a of list) if (a) a.seanceVisee = by.get(a.seanceViseeId ?? a.seanceId) ?? null;
+      for (const a of list) {
+        const s = a ? by.get(a.seanceViseeId ?? a.seanceId) : null;
+        if (a) a.seanceVisee = s ? { ...s, inscrit: inscrits.has(`${s.id}:${a.id}`) } : null;
+      }
       return list;
     },
 

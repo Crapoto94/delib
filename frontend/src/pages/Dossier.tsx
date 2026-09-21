@@ -113,7 +113,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
       <ErrorBox msg={err} />
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Direction porteuse"><div className="input bg-soft">{acte.direction?.label}{acte.service ? ` · ${acte.service.label}` : ''}</div></Field>
-        <Field label="Séance visée" hint="Proposée par le rédacteur ; modifiable par la hiérarchie.">
+        <Field label="Séance visée" hint={acte.seanceVisee ? (acte.seanceVisee.inscrit ? "Inscrit à l'ordre du jour de cette séance." : "Séance visée — pas encore inscrit à l'ordre du jour.") : 'Proposée par le rédacteur ; modifiable par la hiérarchie.'}>
           <Select className="input" disabled={dis && !acte.droits?.modifierSeance} value={f.seanceViseeId ?? ''} onChange={(e) => setF({ ...f, seanceViseeId: e.target.value })}>
             <option value="">— à définir —</option>{[...(seances.data ?? []), ...(acte.seanceVisee && !(seances.data ?? []).some((s) => s.id === acte.seanceVisee.id) ? [acte.seanceVisee] : [])].map((s) => <option key={s.id} value={s.id}>{s.instance} — {d(s.dateSeance)}</option>)}
           </Select>

@@ -11,9 +11,15 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.38.0';
+export const VERSION = '0.38.1';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.38.1', type: 'patch', titre: 'Séance visée : inscrit ou pas encore',
+    items: [
+      "La séance visée s'affiche en gras quand le dossier est inscrit à l'ordre du jour de cette séance, et en italique (« pas encore inscrit ») quand elle n'est que visée : tableau de bord, liste des dossiers et fiche du dossier.",
+    ],
+  },
   {
     version: '0.38.0', type: 'minor', titre: 'Séances : nouvelle liste, relance des services, lien Outlook ; se souvenir de moi',
     items: [

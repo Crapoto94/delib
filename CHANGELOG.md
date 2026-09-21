@@ -9,6 +9,10 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.38.1 — Séance visée : inscrit ou pas encore
+
+- La **séance visée** s'affiche désormais en **gras** quand l'acte est **inscrit à l'ordre du jour** de la séance, et en *italique* (« pas encore inscrit ») quand elle n'est que visée — tableau de bord, liste des dossiers, fiche du dossier (SEA-18).
+
 ## 0.38.0 — Séances : nouvelle liste, relance des services, lien Outlook ; se souvenir de moi
 - Liste des séances refondue d'après la maquette : une carte par séance (compte à rebours, délibérations inscrites, étape du workflow, jalons), onglets à compteurs, année, instances, filtre, vue détaillée ou compacte.
 - « Relancer les services » : relance, direction par direction, les détenteurs des dossiers non terminés d'une séance (garde-fou de 24 h).
