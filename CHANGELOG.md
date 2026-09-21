@@ -20,6 +20,7 @@
 - **Séances** : distinction **clôturées / non clôturées** (filtre d'état et pastille). Les séances **reprises d'AIRS** sont marquées **« tenue » et jamais closes** (AIRS ne transmet pas la clôture), avec correction d'un verrouillage antérieur.
 - **Création d'un dossier** : la **direction porteuse** reste **déduite de la fiche RH**, et un **champ libre** « service / bureau ou chargé de mission » permet de préciser le service porteur.
 - **Import AIRS** : **origine** (archivé ou courant) et **actes des conseils non archivés** conservés ; les **séances reprises ne sont plus closes**.
+- **Organisation** (Paramétrages › Organisation) : l'organigramme du **Hub DSI** peut être **complété** localement, une direction ou un service peut être **renommé**, ou **masqué** pour ne plus apparaître dans les listes de l'application (**une direction masquée emporte ses services**) ; une entité masquée reste réaffichable, et une surcharge peut être retirée. Table `organisation_entites` (migration `0060`).
 - **Manifeste** : journal des versions (what's new) consultable depuis le pied de page.
 
 ## 0.42.0 — Mes actes, « Tous les actes », bibliothèque enrichie et import AIRS des conseils récents

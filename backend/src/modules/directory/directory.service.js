@@ -24,13 +24,23 @@ function createDirectoryService({ db, adapter, ad = null, config, log }) {
     }
   }
 
-  /** Fusionne l'organigramme du Hub avec les entités locales (organisation_entites) : ajout ou correction de libellé. */
+  /**
+   * Fusionne l'organigramme du Hub avec les entités locales (organisation_entites) : ajout, correction de libellé et
+   * **masquage** (une entité `actif = false` n'apparaît plus — une direction masquée emporte tous ses services).
+   */
   async function mergeLocales(list) {
     let locaux;
-    try { locaux = await db.all('SELECT type, code, label, parent_code FROM organisation_entites WHERE actif ORDER BY ordre, label'); } catch { return list; }
+    try { locaux = await db.all('SELECT type, code, label, parent_code, actif FROM organisation_entites ORDER BY ordre, label'); } catch { return list; }
     if (!locaux.length) return list;
     const out = list.map((d) => ({ ...d, services: [...(d.services || [])] }));
+    const dirLoc = new Map(); const svcLoc = new Map();
+    for (const e of locaux) { if (e.type === 'direction') dirLoc.set(e.code, e); else svcLoc.set(`${e.parent_code}|${e.code}`, e); }
+    // 1) masquage : on retire les directions masquées (et donc leurs services) puis les services masqués.
+    for (let i = out.length - 1; i >= 0; i--) { const e = dirLoc.get(out[i].code); if (e && !e.actif) out.splice(i, 1); }
+    for (const d of out) d.services = d.services.filter((s) => { const e = svcLoc.get(`${d.code}|${s.code}`); return !e || e.actif; });
+    // 2) surcharges actives : correction de libellé, ou ajout d'une entité locale.
     for (const e of locaux) {
+      if (!e.actif) continue;
       if (e.type === 'direction') {
         const ex = out.find((d) => d.code === e.code);
         if (ex) ex.label = e.label; else out.push({ code: e.code, label: e.label, services: [] });

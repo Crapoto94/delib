@@ -9,6 +9,15 @@ const { addBusinessDays, parisParts, parisToDate } = require('../../shared/time'
 
 const SEANCE_TYPES = ['ordinaire', 'extraordinaire', 'budgetaire', 'autre'];
 const STATUTS = ['planifiee', 'convoquee', 'tenue', 'close', 'annulee'];
+/** Rétroplanning par défaut : chaque étape est à `jours` jours OUVRÉS de la suivante (la dernière = le conseil). */
+const RETRO_DEFAUT = [
+  { code: 'soumissions', label: 'Clôture des soumissions', jours: 7 },
+  { code: 'modifications', label: 'Clôture des modifications', jours: 3 },
+  { code: 'dga', label: 'Vérification DGA', jours: 3 },
+  { code: 'dgs', label: 'Vérification DGS', jours: 3 },
+  { code: 'commissions', label: 'Commissions', jours: 7 },
+  { code: 'conseil', label: 'Conseil municipal', jours: 0 },
+];
 const NEXT = { planifiee: ['convoquee', 'annulee', 'tenue'], convoquee: ['planifiee', 'tenue', 'annulee'], tenue: ['close'], close: [], annulee: ['planifiee'] };
 const VISEABLE = ['planifiee', 'convoquee'];
 
@@ -65,21 +74,66 @@ function createSeances({ db, audit, actes, acl, settings, bus, late, meeting, lo
     },
 
     // ------------------------------------------------------------------------------------------ séances
-    /** Dates clés proposées d'après la date de séance et les décalages paramétrés (jours ouvrés, sauf convocation : jours francs). */
+    /** Rétroplanning de l'organisme (configuré, sinon les étapes par défaut). */
+    async retroplanning(organismeId) {
+      const cfg = await settings.resolve(organismeId);
+      return { etapes: svc.retroConfig(cfg) || RETRO_DEFAUT, defaut: !svc.retroConfig(cfg) };
+    },
+
+    /** Rétroplanning configuré (liste d'étapes) s'il existe, sinon null. */
+    retroConfig(cfg) {
+      const v = cfg['seances.retroplanning']?.value;
+      const etapes = Array.isArray(v) ? v : v?.etapes;
+      return Array.isArray(etapes) && etapes.length ? etapes : null;
+    },
+
+    /**
+     * Dates clés proposées d'après la date de séance.
+     *  - Si un rétroplanning est configuré (`seances.retroplanning`) : chaque étape est à J-x JOURS OUVRÉS de la suivante,
+     *    la dernière étant le jour du conseil. Les codes `soumissions`/`redaction`, `dgs`, `commissions`/`mad`, `convocation`
+     *    alimentent les champs fixes de la séance ; les autres deviennent des jalons complémentaires.
+     *  - Sinon : les décalages historiques (`seances.decalage.*`).
+     */
     async proposeDates(organismeId, dateSeance, typeActeId) {
       const cfg = await settings.resolve(organismeId, { typeActeId });
-      const get = (k, d) => Number(cfg[k]?.value ?? d);
       const holidays = await holidaysOf(organismeId);
       const p = parisParts(new Date(dateSeance));
       const day = new Date(Date.UTC(p.y, p.m - 1, p.d));
       const eod = (dt) => parisToDate(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate(), 23, 59);
+      const etapes = svc.retroConfig(cfg);
+      if (etapes) {
+        const jalons = [];
+        let d = day;
+        for (let i = etapes.length - 1; i >= 0; i--) {
+          const e = etapes[i];
+          if (i < etapes.length - 1) d = addBusinessDays(d, -Math.max(0, Number(e.jours) || 0), holidays);
+          jalons[i] = { code: e.code, label: e.label, jours: Number(e.jours) || 0, date: eod(d) };
+        }
+        const byCode = (codes) => jalons.find((j) => codes.includes(j.code))?.date ?? null;
+        return {
+          jalons,
+          dateLimiteRedaction: byCode(['soumissions', 'redaction', 'depot']),
+          dateLimiteDgs: byCode(['dgs', 'verification_dgs']),
+          dateLimiteMadCommissions: byCode(['commissions', 'mad', 'mad_commissions']),
+          dateEnvoiConvocation: byCode(['convocation']),
+        };
+      }
+      const get = (k, d) => Number(cfg[k]?.value ?? d);
       const conv = new Date(day.getTime() - (get('seances.decalage.convocation', 5) + 1) * 86400000); // « jours francs » : veille comprise
-      return {
+      const out = {
         dateLimiteRedaction: eod(addBusinessDays(day, -get('seances.decalage.redaction', 30), holidays)),
         dateLimiteDgs: eod(addBusinessDays(day, -get('seances.decalage.dgs', 20), holidays)),
         dateLimiteMadCommissions: eod(addBusinessDays(day, -get('seances.decalage.mad', 12), holidays)),
         dateEnvoiConvocation: eod(conv),
       };
+      out.jalons = [
+        { code: 'redaction', label: 'Clôture des soumissions (rédaction)', date: out.dateLimiteRedaction },
+        { code: 'dgs', label: 'Vérification DGS', date: out.dateLimiteDgs },
+        { code: 'mad_commissions', label: 'Commissions', date: out.dateLimiteMadCommissions },
+        { code: 'convocation', label: 'Envoi de la convocation', date: out.dateEnvoiConvocation },
+        { code: 'seance', label: 'Conseil municipal', date: eod(day) },
+      ];
+      return out;
     },
 
     async create(ctx, organismeId, b) {

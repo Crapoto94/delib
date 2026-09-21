@@ -39,8 +39,11 @@ module.exports = ({ makeRouter, seances, deadlines }) => {
 
   r.get('/seances', { summary: 'Séances (avec le nombre d\'actes en attente d\'affectation)', tags: T, org: true, params: P, query: ListQ },
     async (req, res) => res.json(await seances.list(req.org.id, req.valid.query)));
+  r.get('/seances/retroplanning', { summary: "Rétroplanning (étapes et décalages) — étapes par défaut si non configuré", tags: T, org: true, params: P,
+    description: "Chaque étape est à J-x jours ouvrés de la suivante ; la dernière est le jour du conseil. Réglable via le paramètre `seances.retroplanning` (objet `{ etapes: [{ code, label, jours }] }`)." },
+  async (req, res) => res.json(await seances.retroplanning(req.org.id)));
   r.get('/seances/dates-proposees', { summary: 'Dates clés proposées pour une date de séance', tags: T, org: true, roles: ADMIN, params: P, query: ProposeQ,
-    description: 'Décalages paramétrables (`seances.decalage.redaction` = 30 jours ouvrés, `.dgs` = 20, `.mad` = 12, `.convocation` = 5 jours francs).' },
+    description: 'Rétroplanning configuré (`seances.retroplanning`) ou, à défaut, décalages historiques (`seances.decalage.*`). Renvoie les jalons datés.' },
   async (req, res) => res.json(await seances.proposeDates(req.org.id, req.valid.query.dateSeance)));
   r.get('/seances/hors-delai', { summary: 'Liste « hors délai » du SCC : actes bloqués par la date limite', tags: T, org: true, roles: ADMIN, params: P },
     async (req, res) => res.json(await seances.horsDelai(req.org.id)));

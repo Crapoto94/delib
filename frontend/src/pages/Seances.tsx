@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
 import Odj from './Odj';
 import Convocation from './Convocation';
@@ -21,11 +21,20 @@ function NewSeance({ onClose, onDone }: { onClose: () => void; onDone: () => voi
   const [type, setType] = useState('ordinaire');
   const [err, setErr] = useState<string | null>(null);
   const prop = useLoad(async () => (date ? (await api.get(orgPath(o, '/seances/dates-proposees'), { params: { dateSeance: new Date(date).toISOString() } })).data : null), [date]);
+  const [jalons, setJalons] = useState<any[]>([]);
+  useEffect(() => { setJalons((prop.data?.jalons ?? []).map((j: any) => ({ ...j }))); }, [prop.data]);
   const choisi = (inst.data ?? []).find((i) => String(i.id) === String(instanceId)) ?? inst.data?.[0];
   const estConseil = choisi?.kind === 'conseil';
+  const toLocal = (iso: string) => { const x = new Date(iso); const p = (n: number) => String(n).padStart(2, '0'); return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}`; };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    try { await api.post(orgPath(o, '/seances'), { instanceId: Number(instanceId || inst.data?.[0]?.id), dateSeance: new Date(date).toISOString(), lieu: lieu || undefined, type: estConseil ? type : undefined }); onDone(); onClose(); } catch (x) { setErr(errMsg(x)); }
+    const byCode = (codes: string[]) => jalons.find((j) => codes.includes(j.code))?.date || undefined;
+    const map: [string, string[]][] = [['dateLimiteRedaction', ['soumissions', 'redaction', 'depot']], ['dateLimiteDgs', ['dgs', 'verification_dgs']], ['dateLimiteMadCommissions', ['commissions', 'mad', 'mad_commissions']], ['dateEnvoiConvocation', ['convocation']]];
+    const body: any = { instanceId: Number(instanceId || inst.data?.[0]?.id), dateSeance: new Date(date).toISOString(), lieu: lieu || undefined, type: estConseil ? type : undefined };
+    for (const [k, codes] of map) { const v = byCode(codes); if (v) body[k] = v; }
+    const mapped = new Set([...map.flatMap(([, c]) => c), 'seance']);
+    body.jalonsExtra = jalons.filter((j) => !mapped.has(j.code) && j.date).map((j) => ({ code: j.code, label: j.label, date: j.date }));
+    try { await api.post(orgPath(o, '/seances'), body); onDone(); onClose(); } catch (x) { setErr(errMsg(x)); }
   };
   return (
     <Modal title="Nouvelle séance" onClose={onClose}>
@@ -34,7 +43,12 @@ function NewSeance({ onClose, onDone }: { onClose: () => void; onDone: () => voi
         {estConseil && <Field label="Type de conseil" hint="Par défaut : conseil ordinaire."><Select className="input" value={type} onChange={(e) => setType(e.target.value)}><option value="ordinaire">Conseil ordinaire</option><option value="extraordinaire">Conseil extraordinaire</option></Select></Field>}
         <Field label="Date et heure"><input className="input" type="datetime-local" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Lieu"><input className="input" value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Salle du conseil, Hôtel de ville" /></Field>
-        {prop.data && <div className="rounded bg-soft p-3 text-[12px]"><b>Dates clés proposées</b><ul className="mt-1"><li>Date limite de rédaction : {d(prop.data.dateLimiteRedaction)}</li><li>Validation DGS : {d(prop.data.dateLimiteDgs)}</li><li>Mise à disposition des commissions : {d(prop.data.dateLimiteMadCommissions)}</li><li>Envoi de la convocation : {d(prop.data.dateEnvoiConvocation)}</li></ul></div>}
+        {jalons.length > 0 && <div className="rounded bg-soft p-3 text-[12px]"><b>Rétroplanning proposé</b> <span className="text-mute">— modifiable ; les dates sont calculées d'après le rétroplanning des paramètres.</span>
+          <ul className="mt-2 space-y-1">{jalons.map((j, i) => (
+            <li key={j.code} className="flex flex-wrap items-center gap-2"><span className="w-52 shrink-0">{j.label}</span>
+              <input className="input !w-auto !py-0.5" type="datetime-local" value={j.date ? toLocal(j.date) : ''} onChange={(e) => setJalons((x) => x.map((y, k) => (k === i ? { ...y, date: e.target.value ? new Date(e.target.value).toISOString() : null } : y)))} />
+              {j.jours ? <span className="text-mute">J-{j.jours}</span> : null}</li>))}
+          </ul></div>}
         <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary">Créer</button></div>
       </form>
     </Modal>

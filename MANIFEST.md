@@ -2015,5 +2015,10 @@ Gabarits Word et documents produits, éditeur enrichi, bibliothèque multi-docum
 ### Création d'un dossier
 - La **direction porteuse** reste **déduite de la fiche RH** ; un **champ libre** « **service / bureau ou chargé de mission** » permet de préciser le service porteur (`serviceLabel`), repris à l'affichage (DIRECTION / Service).
 
+### Organisation (organigramme local)
+- Écran **Paramétrages › Organisation** : l'organigramme du **Hub DSI** (directions et services) peut être **complété** (ajouter une direction/service absent), **renommé** (corriger un libellé) ou **masqué** (**ne plus l'afficher**). Une **direction masquée emporte ses services**.
+- Une entité masquée **reste visible dans l'écran d'administration** (marquée « Masquée ») pour être **réaffichée** ; possibilité de **retirer une surcharge** pour revenir à l'organigramme du Hub.
+- Le masquage s'applique aux **listes de l'application** (choix de direction/service, filtres, actes) via la fusion `dir.directions()`. Table `organisation_entites` (migration `0060`).
+
 ### Pied de page
-- Le **numéro de version** du pied de page est **cliquable** : il ouvre le **« Nouveautés de VibeDélib »** (what's new), **journal des versions paginé** — une version par page, navigation « Plus récent / Plus ancien ». (`frontend/src/Nouveautes.tsx`, `nouveautes.ts`.)
+- Le **numéro de version** du pied de page est **cliquable** : il ouvre le **« Nouveautés de VibeDélib »** (what's new), **journal des versions paginé** — une version par page, navigation « Plus récent / Plus ancien ». (`frontend/src/NouveautesModal.tsx`, `nouveautes.ts`.)

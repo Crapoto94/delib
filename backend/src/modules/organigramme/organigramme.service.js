@@ -16,28 +16,32 @@ function createOrganigramme({ db, dir, audit }) {
       const hubDir = new Map(hub.map((d) => [d.code, d]));
       const localDir = new Map(); const localSvc = new Map();
       for (const e of locaux) { if (e.type === 'direction') localDir.set(e.code, e); else localSvc.set(`${e.parent_code}|${e.code}`, e); }
-      const items = hub.map((d) => ({
-        code: d.code, id: localDir.get(d.code)?.id ?? null, label: localDir.get(d.code)?.label || d.label,
-        source: localDir.has(d.code) ? 'mixte' : 'hub',
-        services: (d.services || []).map((s) => {
-          const e = localSvc.get(`${d.code}|${s.code}`);
-          return { code: s.code, id: e?.id ?? null, label: e?.label || s.label, source: e ? 'mixte' : 'hub' };
-        }),
-      }));
+      const items = hub.map((d) => {
+        const ld = localDir.get(d.code);
+        return {
+          code: d.code, id: ld?.id ?? null, label: ld?.label || d.label, actif: ld ? ld.actif : true,
+          source: ld ? 'mixte' : 'hub',
+          services: (d.services || []).map((s) => {
+            const e = localSvc.get(`${d.code}|${s.code}`);
+            return { code: s.code, id: e?.id ?? null, label: e?.label || s.label, actif: e ? e.actif : true, source: e ? 'mixte' : 'hub' };
+          }),
+        };
+      });
       // directions purement locales
       for (const e of locaux.filter((x) => x.type === 'direction' && !hubDir.has(x.code))) {
         items.push({
-          code: e.code, id: e.id, label: e.label, source: 'local',
-          services: locaux.filter((s) => s.type === 'service' && s.parent_code === e.code).map((s) => ({ code: s.code, id: s.id, label: s.label, source: 'local' })),
+          code: e.code, id: e.id, label: e.label, actif: e.actif, source: 'local',
+          services: locaux.filter((s) => s.type === 'service' && s.parent_code === e.code).map((s) => ({ code: s.code, id: s.id, label: s.label, actif: s.actif, source: 'local' })),
         });
       }
       // services locaux rattachés à une direction du Hub
       for (const s of locaux.filter((x) => x.type === 'service' && hubDir.has(x.parent_code))) {
         const d = items.find((x) => x.code === s.parent_code);
-        if (d && !d.services.some((y) => y.code === s.code)) d.services.push({ code: s.code, id: s.id, label: s.label, source: 'local' });
+        if (d && !d.services.some((y) => y.code === s.code)) d.services.push({ code: s.code, id: s.id, label: s.label, actif: s.actif, source: 'local' });
       }
       items.sort((a, b) => String(a.label).localeCompare(String(b.label), 'fr'));
-      return { items, resume: { directions: items.length, services: items.reduce((n, d) => n + d.services.length, 0), locales: locaux.length } };
+      const masquees = items.filter((d) => !d.actif).length + items.reduce((n, d) => n + d.services.filter((s) => !s.actif).length, 0);
+      return { items, resume: { directions: items.length, services: items.reduce((n, d) => n + d.services.length, 0), locales: locaux.length, masquees } };
     },
 
     /** Met à jour l'organigramme depuis le Hub DSI (vide le cache) et renvoie la liste fusionnée. */
@@ -49,18 +53,25 @@ function createOrganigramme({ db, dir, audit }) {
       return svc.list(ctx, org);
     },
 
-    /** Ajoute (ou corrige) une direction/service local. */
-    async ajouter(ctx, organismeId, { type, code, label, parentCode, ordre }) {
+    /**
+     * Ajoute, **renomme** ou **masque** une direction/service (surcharge locale, `actif`). Le libellé peut être omis
+     * pour masquer une entité du Hub qui a déjà une surcharge (on garde le libellé existant).
+     */
+    async ajouter(ctx, organismeId, { type, code, label, parentCode, ordre, actif }) {
       const org = requireOrg(organismeId);
       if (!['direction', 'service'].includes(type)) throw E.badRequest('Type attendu : direction ou service');
-      const c = String(code || '').trim().toUpperCase().slice(0, 40); const l = String(label || '').trim().slice(0, 200);
-      if (!c || !l) throw E.badRequest('Code et libellé obligatoires');
+      const c = String(code || '').trim().toUpperCase().slice(0, 40);
+      if (!c) throw E.badRequest('Code obligatoire');
+      const exist = await db.get('SELECT label FROM organisation_entites WHERE organisme_id = $1 AND type = $2 AND code = $3', [org, type, c]);
+      const l = String(label ?? exist?.label ?? '').trim().slice(0, 200);
+      if (!l) throw E.badRequest('Libellé obligatoire');
       if (type === 'service' && !String(parentCode || '').trim()) throw E.badRequest('Un service doit être rattaché à une direction');
+      const on = actif === undefined ? true : !!actif;
       const r = await db.get(
-        `INSERT INTO organisation_entites (organisme_id, type, code, label, parent_code, ordre, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (organisme_id, type, code) DO UPDATE SET label = EXCLUDED.label, parent_code = EXCLUDED.parent_code, ordre = EXCLUDED.ordre, actif = true, updated_at = now() RETURNING *`,
-        [org, type, c, l, type === 'service' ? String(parentCode).trim().toUpperCase() : null, Number(ordre) || 0, ctx.username]);
-      await audit.log(ctx, { organismeId: org, action: 'organisation.entite', entity: 'organisation_entites', entityId: r.id, after: { type, code: c, label: l } });
+        `INSERT INTO organisation_entites (organisme_id, type, code, label, parent_code, ordre, actif, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (organisme_id, type, code) DO UPDATE SET label = EXCLUDED.label, parent_code = EXCLUDED.parent_code, ordre = EXCLUDED.ordre, actif = EXCLUDED.actif, updated_at = now() RETURNING *`,
+        [org, type, c, l, type === 'service' ? String(parentCode).trim().toUpperCase() : null, Number(ordre) || 0, on, ctx.username]);
+      await audit.log(ctx, { organismeId: org, action: 'organisation.entite', entity: 'organisation_entites', entityId: r.id, after: { type, code: c, label: l, actif: on } });
       return svc.list(ctx, org);
     },
 

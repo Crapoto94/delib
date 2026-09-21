@@ -25,6 +25,7 @@ export const VERSIONS: Version[] = [
       "Séances : distinction clôturées / non clôturées (filtre d'état et pastille). Les séances reprises d'AIRS sont marquées « tenue » et jamais closes, avec correction d'un verrouillage antérieur.",
       "Création d'un dossier : la direction porteuse reste déduite de votre fiche RH, et un champ libre « service / bureau ou chargé de mission » permet de préciser le service porteur.",
       "Import AIRS : l'origine (archivé ou courant) et les actes des conseils non archivés sont conservés ; les séances reprises ne sont plus marquées closes.",
+      "Organisation (Paramétrages › Organisation) : l'organigramme du Hub DSI peut être complété localement, une direction ou un service peut être renommé, ou masqué pour ne plus apparaître dans les listes de l'application (une direction masquée emporte ses services).",
     ],
   },
   {
