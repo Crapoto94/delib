@@ -5,7 +5,8 @@ import Convocation from './Convocation';
 import SuiviSeance from './SuiviSeance';
 import { DeleteSeanceModal, EditSeanceModal } from './SeanceActions';
 import { TeamsLink } from '../Reunions';
-import { CalendarDays, Plus, Pencil, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarPlus, Check, FileText, LayoutList, Plus, Rows3, Search, ShieldCheck, Timer } from 'lucide-react';
+import { CarteSeance, LienCalendrier, RelanceServices } from './SeancesParts';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { d, daysUntil, dt } from '../format';
@@ -64,44 +65,82 @@ function HorsDelai() {
   );
 }
 
+/** Liste des séances (SEA-15, D108, maquette Stitch « seances ») : bandeau de synthèse, onglets à compteur, année, puces d'instance, filtre, vue détaillée ou compacte, une carte par séance. */
 function SeancesList() {
   const { org, isScc } = useAuth(); const o = org!.id;
-  const [editing, setEditing] = useState<any>(null); const [deleting, setDeleting] = useState<any>(null);
-  const [tab, setTab] = useState<'avenir' | 'passees' | 'hors'>('avenir'); const [creating, setCreating] = useState(false); const [kind, setKind] = useState<'' | 'conseil' | 'commission'>('');
+  const [editing, setEditing] = useState<any>(null); const [deleting, setDeleting] = useState<any>(null); const [relance, setRelance] = useState<any>(null); const [calendrier, setCalendrier] = useState(false);
+  const [tab, setTab] = useState<'avenir' | 'passees' | 'hors'>('avenir'); const [creating, setCreating] = useState(false);
+  const [instanceId, setInstanceId] = useState<number | ''>(''); const [annee, setAnnee] = useState<number | ''>(''); const [q, setQ] = useState('');
+  const [vue, setVue] = useState<'detaillee' | 'compacte'>(() => { try { return localStorage.getItem('vd.seances.vue') === 'compacte' ? 'compacte' : 'detaillee'; } catch { return 'detaillee'; } });
+  const changerVue = (v: 'detaillee' | 'compacte') => { setVue(v); try { localStorage.setItem('vd.seances.vue', v); } catch { /* préférence non conservée */ } };
+  const instances = useLoad(async () => (await api.get(orgPath(o, '/instances'))).data.items as any[], [o]);
+  const compteurs = useLoad(async () => {
+    const now = new Date().toISOString();
+    const [av, pa, ho] = await Promise.all([api.get(orgPath(o, '/seances'), { params: { from: now, limit: 1 } }), api.get(orgPath(o, '/seances'), { params: { to: now, limit: 1 } }),
+      isScc ? api.get(orgPath(o, '/seances/hors-delai')).catch(() => ({ data: { items: [] } })) : Promise.resolve({ data: { items: [] } })]);
+    return { avenir: av.data.total as number, passees: pa.data.total as number, hors: (ho.data.items as any[]).length };
+  }, [o, isScc]);
   const list = useLoad(async () => {
     const now = new Date().toISOString();
-    const items = (await api.get(orgPath(o, '/seances'), { params: { ...(tab === 'passees' ? { to: now } : { from: now }), limit: 200, kind: kind || undefined } })).data.items as any[];
-    return tab === 'passees' ? items : [...items].sort((a, b) => +new Date(a.dateSeance) - +new Date(b.dateSeance)); // les prochaines d'abord ; les passées, la plus récente d'abord
-  }, [o, tab, kind]);
+    const p: any = { ...(tab === 'passees' ? { to: now } : { from: now }), limit: 200, instanceId: instanceId || undefined };
+    const items = (await api.get(orgPath(o, '/seances'), { params: p })).data.items as any[];
+    return tab === 'passees' ? items : [...items].sort((x, y) => +new Date(x.dateSeance) - +new Date(y.dateSeance)); // les prochaines d'abord ; les passées, la plus récente d'abord
+  }, [o, tab, instanceId]);
+  const filtrees = (list.data ?? []).filter((x) => (!annee || new Date(x.dateSeance).getFullYear() === annee)
+    && (!q.trim() || `${x.instance} ${x.lieu ?? ''} ${dt(x.dateSeance, { dateStyle: 'full' })}`.toLowerCase().includes(q.trim().toLowerCase())));
+  const ids = tab === 'avenir' && isScc ? filtrees.filter((x) => x.kind !== 'commission').map((x) => x.id).slice(0, 40) : [];
+  const synth = useLoad(async () => (ids.length ? (await api.get(orgPath(o, '/seances-synthese'), { params: { ids: ids.join(',') } })).data : null), [o, ids.join(',')]);
+  const parId = new Map<number, any>((synth.data?.items ?? []).map((x: any) => [x.seanceId, x]));
+  const b = synth.data?.bandeau;
+  const annees = Array.from(new Set((list.data ?? []).map((x) => new Date(x.dateSeance).getFullYear()))).sort();
+  const reload = () => { list.reload(); compteurs.reload(); synth.reload(); };
   return (
     <div>
-      <PageTitle title="Séances & Ordre du jour" sub="Calendrier des instances, dates clés et actes en attente." actions={isScc && <button className="btn-primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nouvelle séance</button>} />
-      <div className="mb-4 flex w-fit rounded bg-surface p-1 shadow-card" role="tablist">{([['avenir', 'À venir'], ['passees', 'Séances passées'], ...(isScc ? [['hors', 'Hors délai & dérogations']] : [])] as [string, string][]).map(([k, l]) => (
-        <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k as any)} className={`rounded px-3 py-2 text-[13px] font-semibold ${tab === k ? 'bg-primary text-white' : ''}`}>{l}</button>))}</div>
-      {tab !== 'hors' && <div className="mb-4 flex gap-2" role="group" aria-label="Nature de l'instance">{([['', 'Toutes'], ['conseil', 'Conseil municipal'], ['commission', 'Commissions']] as const).map(([k, l]) => <button key={k} onClick={() => setKind(k)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${kind === k ? 'border-primary bg-primary text-white' : 'border-line bg-surface'}`}>{l}</button>)}</div>}
-      {tab === 'hors' ? <HorsDelai /> : list.loading ? <Loading /> : !list.data?.length ? <div className="card"><Empty>{tab === 'passees' ? 'Aucune séance passée.' : 'Aucune séance à venir.'}</Empty></div> : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{list.data.map((s) => {
-          const j = daysUntil(s.dateSeance); const lim = daysUntil(s.dateLimiteRedaction);
-          return (
-            <Link key={s.id} to={`/seances/${s.id}`} className="card block p-5 hover:shadow-lift" aria-label={`Ordre du jour du ${d(s.dateSeance)}`}>
-              <div className="flex items-start justify-between"><div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-action" /><h3>{s.instance}</h3></div>
-                <div className="flex items-center gap-1"><Badge tone={s.statut === 'planifiee' ? 'blue' : 'gray'}>{s.statut}</Badge>
-                  {isScc && <><button type="button" className="rounded p-1 text-mute hover:bg-soft hover:text-action" title="Modifier la séance" aria-label="Modifier la séance" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditing(s); }}><Pencil className="h-4 w-4" /></button>
-                    <button type="button" className="rounded p-1 text-mute hover:bg-ko-bg hover:text-ko" title="Supprimer la séance" aria-label="Supprimer la séance" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleting(s); }}><Trash2 className="h-4 w-4" /></button></>}</div></div>
-              <div className="mt-2 text-[18px] font-bold">{dt(s.dateSeance, { dateStyle: 'full', timeStyle: 'short' })}</div>
-              <div className="text-mute">{s.lieu || 'Lieu à définir'}{j !== null && j >= 0 ? ` · dans ${j} jour(s)` : ''}</div>
-              {s.teams && <div className="mt-2" onClick={(e) => e.stopPropagation()}><TeamsLink teams={s.teams} /></div>}
-              {s.kind === 'commission' ? <p className="mt-3 text-[12px] text-mute">Réunion de commission — <b>{s.actesEnAttente ?? 0}</b> projet(s) visé(s) · ordre du jour : projets présentés</p> : (
-              <dl className="mt-3 space-y-1 text-[12px]">
-                <div className="flex justify-between"><dt>Date limite de rédaction</dt><dd><Badge tone={lim !== null && lim < 0 ? 'ko' : lim !== null && lim < 7 ? 'warn' : 'ok'}>{d(s.dateLimiteRedaction)}</Badge></dd></div>
-                <div className="flex justify-between"><dt>Actes en attente d'affectation</dt><dd className="font-bold">{s.actesEnAttente ?? 0}</dd></div>
-                <div className="flex justify-between"><dt>Ordre du jour</dt><dd>{s.odjStatut.replace('_', ' ')}</dd></div>
-              </dl>)}
-            </Link>);
-        })}</div>)}
-      {creating && <NewSeance onClose={() => setCreating(false)} onDone={list.reload} />}
-      {editing && <EditSeanceModal seance={editing} onClose={() => setEditing(null)} onDone={list.reload} />}
-      {deleting && <DeleteSeanceModal seance={deleting} onClose={() => setDeleting(null)} onDone={list.reload} />}
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-[12px] text-mute"><span className="rounded bg-soft px-2 py-0.5 font-bold uppercase tracking-wider text-head">{org!.nom}</span><span>· Mandat municipal</span></div>
+      <PageTitle title="Séances & Ordre du jour" sub="Calendrier des assemblées délibérantes, rétroplanning réglementaire CGCT et état d’instruction temps réel des projets de délibérations."
+        actions={<><button className="btn-secondary" onClick={() => setCalendrier(true)}><CalendarPlus className="h-4 w-4" /> Lien calendrier Outlook</button>{isScc && <button className="btn-primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Programmer une nouvelle séance</button>}</>} />
+
+      {isScc && (
+        <div className="card mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-3 text-[13px]" aria-label="Synthèse">
+          <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-action" /><b>{compteurs.data?.avenir ?? '…'}</b> séance(s) à venir</span>
+          <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-action" /><b>{b?.actesEnInstruction ?? '…'}</b> acte(s) en instruction</span>
+          {b?.prochaineCloture && <span className={`flex items-center gap-2 font-semibold ${b.prochaineCloture.jours <= 3 ? 'text-ko' : b.prochaineCloture.jours <= 7 ? 'text-warn' : 'text-ink'}`}><Timer className="h-4 w-4" /> Clôture des dépôts dans J-{b.prochaineCloture.jours} <span className="font-normal text-mute">({b.prochaineCloture.instance})</span></span>}
+          {b && <Link to="/controle-legalite" className={`ml-auto flex items-center gap-2 font-semibold ${b.transmissionsSansAr || b.transmissionsAEnvoyer ? 'text-warn' : 'text-ok'}`}><ShieldCheck className="h-4 w-4" />
+            {b.transmissionsAEnvoyer ? `${b.transmissionsAEnvoyer} transmission(s) à envoyer` : b.transmissionsSansAr ? `${b.transmissionsSansAr} transmission(s) sans AR` : 'Contrôle de légalité à jour'}</Link>}
+        </div>)}
+
+      <div className="card mb-4 space-y-3 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-fit max-w-full overflow-x-auto rounded-lg bg-soft p-1" role="tablist">{([['avenir', 'Séances à venir', compteurs.data?.avenir], ['passees', 'Séances passées', compteurs.data?.passees], ...(isScc ? [['hors', 'Hors délai & dérogations', compteurs.data?.hors]] : [])] as [string, string, number | undefined][]).map(([k, l, n]) => (
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k as any)} className={`flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-[13px] font-semibold ${tab === k ? 'bg-primary text-white shadow-lift' : 'text-slate-700 hover:bg-surface'}`}>{l}{n !== undefined && <span className={`rounded-full px-1.5 text-[11px] ${tab === k ? 'bg-white/25' : k === 'hors' && n > 0 ? 'bg-ko-bg text-ko' : 'bg-line'}`}>{n}</span>}</button>))}</div>
+          {tab !== 'hors' && <div className="ml-auto flex items-center gap-2">
+            <div className="flex rounded-lg bg-soft p-1" role="group" aria-label="Année">
+              <button type="button" aria-pressed={annee === ''} onClick={() => setAnnee('')} className={`rounded-md px-2.5 py-1 text-[12px] font-semibold ${annee === '' ? 'bg-primary text-white' : ''}`}>Toutes</button>
+              {annees.map((a) => <button key={a} type="button" aria-pressed={annee === a} onClick={() => setAnnee(a)} className={`rounded-md px-2.5 py-1 text-[12px] font-semibold ${annee === a ? 'bg-primary text-white' : ''}`}>{a}</button>)}</div>
+            <div className="flex rounded-lg bg-soft p-1" role="group" aria-label="Affichage">
+              <button type="button" aria-pressed={vue === 'detaillee'} title="Vue détaillée" aria-label="Vue détaillée" onClick={() => changerVue('detaillee')} className={`rounded-md p-1.5 ${vue === 'detaillee' ? 'bg-primary text-white' : 'text-mute'}`}><LayoutList className="h-4 w-4" /></button>
+              <button type="button" aria-pressed={vue === 'compacte'} title="Vue compacte" aria-label="Vue compacte" onClick={() => changerVue('compacte')} className={`rounded-md p-1.5 ${vue === 'compacte' ? 'bg-primary text-white' : 'text-mute'}`}><Rows3 className="h-4 w-4" /></button></div>
+          </div>}
+        </div>
+        {tab !== 'hors' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Instance">
+              <button type="button" aria-pressed={instanceId === ''} onClick={() => setInstanceId('')} className={`flex items-center gap-1 rounded-full border px-3 py-1 text-[12px] font-semibold ${instanceId === '' ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-slate-700 hover:bg-soft'}`}>{instanceId === '' && <Check className="h-3 w-3" />} Toutes les instances</button>
+              {(instances.data ?? []).map((i) => <button key={i.id} type="button" aria-pressed={instanceId === i.id} onClick={() => setInstanceId(i.id)} className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${instanceId === i.id ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-slate-700 hover:bg-soft'}`}>{i.nom}</button>)}</div>
+            <div className="ml-auto flex min-w-[220px] items-center rounded-lg bg-soft px-3"><Search className="h-4 w-4 text-mute" /><input className="w-full bg-transparent px-2 py-2 text-[13px] outline-none" aria-label="Filtrer les séances" placeholder="Filtrer par instance, lieu, date…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          </div>)}
+      </div>
+
+      {tab === 'hors' ? <HorsDelai /> : list.loading && !list.data ? <Loading /> : !filtrees.length ? <div className="card"><Empty>{q || annee || instanceId ? 'Aucune séance ne correspond au filtre.' : tab === 'passees' ? 'Aucune séance passée.' : 'Aucune séance à venir.'}</Empty></div> : (
+        <div className="space-y-4">{filtrees.map((x) => (
+          <CarteSeance key={x.id} s={x} synth={parId.get(x.id)} isScc={isScc} compacte={vue === 'compacte' || tab === 'passees'} onEdit={() => setEditing(x)} onDelete={() => setDeleting(x)} onRelancer={() => setRelance(x)} />))}</div>)}
+
+      <p className="mt-6 border-t border-line pt-3 text-[12px] text-mute"><b>Rappel L2121-12 CGCT</b> : délai de convocation obligatoire de 5 jours francs avec note de synthèse explicative.</p>
+      {creating && <NewSeance onClose={() => setCreating(false)} onDone={reload} />}
+      {editing && <EditSeanceModal seance={editing} onClose={() => setEditing(null)} onDone={reload} />}
+      {deleting && <DeleteSeanceModal seance={deleting} onClose={() => setDeleting(null)} onDone={reload} />}
+      {relance && <RelanceServices seance={relance} onClose={() => setRelance(null)} onDone={reload} />}
+      {calendrier && <LienCalendrier onClose={() => setCalendrier(false)} />}
     </div>
   );
 }

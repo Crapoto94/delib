@@ -37,6 +37,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
 
   /** Définition d'une étape : graphe, ou étape ponctuelle ajoutée à cet acte seul (CIR-68). */
   const defOf = (graph, a, key) => G.stepOf(graph, key) || (a.adhoc_steps || []).find((s) => s.key === key) || null;
+  /** Étape dont on n'affiche pas les noms, seulement l'étape de validation (paramétrable dans le circuit : `masquerNoms`) ; par défaut, les étapes tenues par un groupe (financier, juridique, SCC…). */
+  const masqueNoms = (def) => (def?.masquerNoms !== undefined ? !!def.masquerNoms : def?.resolver?.kind === 'groupe');
   const baseKeyOf = (a, key) => (a.adhoc_steps || []).find((s) => s.key === key)?.afterKey || key;
 
   /** Titulaires d'une étape (CIR-20). Le rédacteur ne valide jamais sa propre étape (CIR-24). */
@@ -411,14 +413,14 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       if (!a.circuit_version_id) {
         const c = await svc.selectCircuit(a.organisme_id, a.type_id, a.direction_code);
         const path = c ? await buildPath({ ...a, circuit_version_id: c.active_version_id }, c.graph) : [];
-        return { acteId: a.id, statut: a.statut, submitted: false, circuit: c ? { definitionId: c.id, nom: c.nom, versionId: c.active_version_id } : null, path: path.map((p) => ({ ...p, state: 'pending' })), actions: { submit: IS_DRAFTER(ctx, a) || acl.isAdmin(ctx, a.organisme_id), validate: false, refuse: false }, refuseTargets: [], events: [] };
+        return { acteId: a.id, statut: a.statut, submitted: false, circuit: c ? { definitionId: c.id, nom: c.nom, versionId: c.active_version_id } : null, path: path.map((p) => ({ ...p, ...(!acl.isAdmin(ctx, a.organisme_id) && masqueNoms(G.stepOf(c.graph, p.key)) ? { holders: [], masque: true } : {}), state: 'pending' })), actions: { submit: IS_DRAFTER(ctx, a) || acl.isAdmin(ctx, a.organisme_id), validate: false, refuse: false }, refuseTargets: [], events: [] };
       }
       const graph = await graphOf(a.circuit_version_id);
       const inst = await db.get("SELECT * FROM step_instances WHERE acte_id = $1 AND status = 'current'", [a.id]);
       const stored = a.path && a.path.length ? a.path : await fullPath(db, a, graph);
       const trail = a.trail || []; const curIdx = trail.indexOf(a.current_step_key);
       const instances = await db.all('SELECT * FROM step_instances WHERE acte_id = $1 ORDER BY id', [a.id]);
-      const path = stored.map((p) => {
+      let path = stored.map((p) => {
         const mine = instances.filter((i) => i.step_key === p.key);
         const last = mine[mine.length - 1];
         let state = 'pending';
@@ -428,7 +430,10 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         if (p.skipped && state === 'pending') state = 'skipped';
         return { ...p, state, instance: last ? { status: last.status, arrivedAt: last.arrived_at, actedAt: last.acted_at, actedBy: last.acted_by, onBehalfOf: last.on_behalf_of, decision: last.decision, dueAt: last.due_at, approvals: last.approvals } : null };
       });
-      const events = (await db.all('SELECT * FROM step_events WHERE acte_id = $1 ORDER BY id', [a.id])).map((e) => ({ id: Number(e.id), at: e.at, actor: e.actor, onBehalfOf: e.on_behalf_of, action: e.action, from: e.from_step, to: e.to_step, comment: e.comment, meta: e.meta }));
+      const masques = acl.isAdmin(ctx, a.organisme_id) ? new Set() : new Set(path.filter((p) => masqueNoms(defOf(graph, a, p.key))).map((p) => p.key));
+      path = path.map((p) => (masques.has(p.key) ? { ...p, holders: [], masque: true, instance: p.instance ? { ...p.instance, actedBy: null, onBehalfOf: null } : p.instance } : p));
+      const events = (await db.all('SELECT * FROM step_events WHERE acte_id = $1 ORDER BY id', [a.id])).map((e) => ({ id: Number(e.id), at: e.at, actor: e.actor, onBehalfOf: e.on_behalf_of, action: e.action, from: e.from_step, to: e.to_step, comment: e.comment, meta: e.meta }))
+        .map((e) => (masques.has(e.from) || masques.has(e.to) ? { ...e, actor: masques.has(e.from) ? null : e.actor, onBehalfOf: null, masque: true, meta: e.meta ? { ...e.meta, holders: undefined } : e.meta } : e));
       let canValidate = false; let canRefuse = false; let onBehalfOf = null;
       if (inst && IN_CIRCUIT.includes(a.statut) && a.current_step_key !== graph.start) {
         const v = await actorOf(ctx, a, inst, 'validate'); const r = await actorOf(ctx, a, inst, 'refuse');
@@ -468,6 +473,7 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       }
       const returned = await db.all("SELECT a.* FROM actes a WHERE a.organisme_id = $1 AND a.statut = 'modification_demandee' AND (a.redacteur = $2 OR a.co_redacteurs ? $2)", [org, ctx.username]);
       for (const r of returned) if (!items.some((i) => i.acte.id === r.id)) items.push({ acte: actes.toActe(r), step: { key: r.current_step_key, label: 'À modifier', returned: true } });
+      await actes.attachSeance(items.map((i) => i.acte));
       return items;
     },
 
@@ -478,7 +484,12 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     async tracking(ctx, organismeId) {
       const org = organismeId;
       const step = (r) => (r.cur_key ? { key: r.cur_key, label: r.cur_label, holders: r.cur_holders, dueAt: r.cur_due, late: !!r.cur_due && new Date(r.cur_due) < new Date() } : null);
-      const shape = (r, extra = {}) => ({ acte: actes.toActe(r), step: step(r), ...extra });
+      // étape en cours ; les noms des détenteurs sont retirés pour les étapes réglées « sans noms » (juridique, financier, SCC par défaut)
+      const shape = async (r, extra = {}) => {
+        const st = step(r);
+        if (st && r.circuit_version_id) { const g = await graphOf(r.circuit_version_id); if (masqueNoms(defOf(g, r, st.key))) { st.holders = []; st.masque = true; } }
+        return { acte: actes.toActe(r), step: st, ...extra };
+      };
       const validated = (await db.all(
         `SELECT DISTINCT ON (a.id) a.*, i.step_key AS cur_key, i.label AS cur_label, i.holders AS cur_holders, i.due_at AS cur_due, my.acted_at AS my_at, my.label AS my_label
          FROM actes a JOIN step_instances my ON my.acte_id = a.id AND (my.acted_by = $2 OR my.on_behalf_of = $2) AND my.decision IN ('validation', 'auto')
@@ -486,7 +497,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
          WHERE a.organisme_id = $1 AND a.current_step_key IS NOT NULL AND a.statut IN ('en_circuit', 'modification_demandee', 'en_attente_scc')
            AND NOT (COALESCE(i.holders, '[]'::jsonb) ? $2)
          ORDER BY a.id, my.acted_at DESC`, [org, ctx.username]))
-        .sort((x, y) => new Date(y.my_at) - new Date(x.my_at)).map((r) => shape(r, { validatedAt: r.my_at, validatedStep: r.my_label }));
+        .sort((x, y) => new Date(y.my_at) - new Date(x.my_at));
+      const validatedShaped = await Promise.all(validated.map((r) => shape(r, { validatedAt: r.my_at, validatedStep: r.my_label })));
 
       const h = await titulaires.hierarchyScope(ctx.username, org);
       const isDgs = (await titulaires.resolve(org, 'dgs', {})).some((t) => t.username === ctx.username || t.suppleant === ctx.username);
@@ -502,9 +514,11 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
            WHERE a.organisme_id = $1 AND a.redacteur <> $2 AND (${or.join(' OR ')})
              AND ((a.statut IN ('brouillon', 'modification_demandee', 'en_circuit') ) OR (a.statut = 'en_attente_scc' AND a.current_step_key IS NOT NULL))
              AND NOT (COALESCE(i.holders, '[]'::jsonb) ? $2)
-           ORDER BY a.updated_at DESC LIMIT 200`, p)).map((r) => shape(r, { phase: r.statut === 'brouillon' ? 'redaction' : r.statut === 'modification_demandee' ? 'correction' : 'validation' }));
+           ORDER BY a.updated_at DESC LIMIT 200`, p));
+        team = await Promise.all(team.map((r) => shape(r, { phase: r.statut === 'brouillon' ? 'redaction' : r.statut === 'modification_demandee' ? 'correction' : 'validation' })));
       }
-      return { equipe: team, valides: validated };
+      await actes.attachSeance([...team, ...validatedShaped].map((t) => t.acte));
+      return { equipe: team, valides: validatedShaped };
     },
 
     async lateActes(ctx, organismeId) {

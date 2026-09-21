@@ -28,7 +28,7 @@ module.exports = ({ makeRouter, eluAuth, espace, annotations, sms }) => {
   r.get('/oublis', { summary: 'Journal des oublis de mot de passe (demandes, codes envoyés / refusés / expirés, comptes inconnus, mobiles manquants, échecs d’envoi, connexions par SMS) avec compteurs des dernières 24 h', tags: T, org: true, roles: ADMIN, params: P, query: OublisQ,
     description: 'Aucun code n’y figure.' }, async (req, res) => res.json(await eluAuth.oublis(req.org.id, req.valid.query)));
   r.put('/sms', { summary: 'Configure la passerelle SMS (simulation ou passerelle HTTP) ; le jeton est chiffré et jamais renvoyé', tags: T, org: true, roles: ['org_admin'], params: P,
-    body: z.object({ mode: z.enum(['simulation', 'http']).optional(), url: z.string().trim().max(300).refine((v) => v === '' || /^https?:\/\/.+/i.test(v), 'URL http(s) attendue').optional(), expediteur: z.string().trim().max(11).optional(),
+    body: z.object({ mode: z.enum(['simulation', 'apm', 'http']).optional().describe('simulation : aucun SMS ; apm : API de la Ville (clé APM déjà configurée) ; http : passerelle propre'), url: z.string().trim().max(300).refine((v) => v === '' || /^https?:\/\/.+/i.test(v), 'URL http(s) attendue').optional(), expediteur: z.string().trim().max(11).optional(),
       modele: z.string().max(1000).optional().describe('Corps JSON avec {to}, {message}, {expediteur}'), jeton: z.string().max(500).optional().describe('Vide : conservé') }) },
   async (req, res) => res.json({ config: await sms.enregistrer(req.ctx, req.org.id, req.valid.body) }));
   r.get('/sms', { summary: 'Passerelle SMS : configuration (sans le jeton) et derniers messages (le texte n’est lisible qu’en simulation)', tags: T, org: true, roles: ['org_admin'], params: P },

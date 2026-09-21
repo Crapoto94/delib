@@ -39,6 +39,9 @@ const { createOdj } = require('./modules/seances/odj.service');
 const { createCahier } = require('./modules/seances/cahier.service');
 const { createParcours } = require('./modules/seances/parcours.service');
 const { createBibliotheque } = require('./modules/actes/bibliotheque.service');
+const { createRelance } = require('./modules/seances/relance.service');
+const { createSynthese } = require('./modules/seances/synthese.service');
+const { createCalendrier } = require('./modules/seances/calendrier.service');
 const { createKpis } = require('./modules/seances/kpis.service');
 const { createTenue } = require('./modules/seances/tenue.service');
 const { createPv } = require('./modules/seances/pv.service');
@@ -111,6 +114,8 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const cahier = createCahier({ db, audit, render, odj, storage, log, bus });
   const kpis = createKpis({ db, odj, seances });
   const parcours = createParcours({ db, seances });
+  const synthese = createSynthese({ db, kpis, parcours });
+  const calendrier = createCalendrier({ db, audit, access, config });
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
   const pv = createPv({ db, audit, render, odj, tenue, actes });
   const bibliotheque = createBibliotheque({ db, audit, render, pv, textes });
@@ -128,6 +133,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
+  const relance = createRelance({ db, audit, kpis, notifications, settings });
   // GED : simulateur persistant par défaut, Alfresco (REST v1) choisi par organisme ; adaptateurs injectables pour les tests
   const ged = createGed({ db, audit, config, log, adapters: gedAdapters || { simulateur: createGedSimulateur({ db }), alfresco: createAlfresco({ tls: config.tls }) }, render, tenue, pv, tlt, storage, cahier });
   storage.attach({ cible: (org) => ged.cibleStockage(org), ad: (org) => ged.adapteurLecture(org), dossier: (org, cible) => ged.dossierStockage(org, cible) }); // Alfresco comme stockage (GED-09)
@@ -161,7 +167,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche-alertes', (orgId) => alertes.verifier(orgId)); // alertes de recherche (REC-29) : au plus une vérification par heure et par alerte
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
+  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts };
 }
 
 module.exports = { buildContainer };

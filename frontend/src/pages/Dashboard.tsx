@@ -5,6 +5,7 @@ import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Loading, PageTitle, useLoad } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
+import { SeanceVisee } from '../SeanceVisee';
 
 export default function Dashboard() {
   const { me, org } = useAuth();
@@ -24,11 +25,12 @@ export default function Dashboard() {
       <section aria-labelledby="atraiter" className="card">
         <div className="flex items-center gap-2 border-b border-line px-5 py-3"><ClipboardCheck className="h-5 w-5 text-action" /><h3 id="atraiter">À traiter</h3>{todo.data && <Badge tone="blue">{todo.data.length}</Badge>}</div>
         {todo.loading ? <Loading /> : todo.error ? <div className="p-4"><ErrorBox msg={todo.error} /></div> : !todo.data?.length ? <Empty>Rien en attente de votre validation. 🎉</Empty> : (
-          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Étape</th><th>Échéance</th></tr></thead><tbody>
+          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Séance visée</th><th>Étape</th><th>Échéance</th></tr></thead><tbody>
             {todo.data.map((t) => (
               <tr key={t.acte.id} className="hover:bg-soft">
                 <td className="w-20 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
                 <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link><div className="text-[12px] text-mute">{t.acte.direction?.label}</div></td>
+                <td><SeanceVisee acte={t.acte} /></td>
                 <td>{t.step.returned ? <Badge tone="warn">À corriger</Badge> : t.step.label}{t.step.onBehalfOf && <div className="text-[11px] text-mute">pour {t.step.onBehalfOf}</div>}</td>
                 <td>{t.step.late ? <Badge tone="ko">En retard · {dt(t.step.dueAt, { dateStyle: 'short' })}</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })}</td>
               </tr>
@@ -42,12 +44,13 @@ export default function Dashboard() {
         <section aria-labelledby="equipe" className="card">
           <div className="flex items-center gap-2 border-b border-line px-5 py-3"><Users className="h-5 w-5 text-action" /><h3 id="equipe">Dossiers de mon équipe</h3><Badge tone="blue">{suivi.data!.equipe.length}</Badge>
             <span className="ml-2 text-[12px] text-mute">Ce que vos collaborateurs rédigent ou font valider.</span></div>
-          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Rédacteur</th><th>Où en est-il ?</th><th>Échéance</th></tr></thead><tbody>
+          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Rédacteur</th><th>Séance visée</th><th>Où en est-il ?</th><th>Échéance</th></tr></thead><tbody>
             {suivi.data!.equipe.slice(0, 25).map((t) => (
               <tr key={t.acte.id} className="hover:bg-soft">
                 <td className="w-20 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
                 <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link></td>
                 <td><AgentName u={t.acte.redacteur} /></td>
+                <td><SeanceVisee acte={t.acte} /></td>
                 <td>{t.phase === 'redaction' ? <Badge>En rédaction</Badge> : t.phase === 'correction' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{t.step?.label ?? 'En validation'}</Badge>}{t.step?.holders?.length ? <div className="text-[11px] text-mute">chez <AgentNames list={t.step.holders} /></div> : null}</td>
                 <td>{t.step?.dueAt ? (t.step.late ? <Badge tone="ko">En retard · {dt(t.step.dueAt, { dateStyle: 'short' })}</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>
               </tr>))}
@@ -57,11 +60,12 @@ export default function Dashboard() {
       {(suivi.data?.valides.length ?? 0) > 0 && (
         <section aria-labelledby="valides" className="card">
           <div className="flex items-center gap-2 border-b border-line px-5 py-3"><Route className="h-5 w-5 text-ok" /><h3 id="valides">Dossiers que j'ai validés, en cours de circuit</h3><Badge tone="ok">{suivi.data!.valides.length}</Badge></div>
-          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Ma validation</th><th>Maintenant</th><th>Échéance</th></tr></thead><tbody>
+          <table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Séance visée</th><th>Ma validation</th><th>Maintenant</th><th>Échéance</th></tr></thead><tbody>
             {suivi.data!.valides.slice(0, 25).map((t) => (
               <tr key={t.acte.id} className="hover:bg-soft">
                 <td className="w-20 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
                 <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link><div className="text-[12px] text-mute">{t.acte.direction?.label}</div></td>
+                <td><SeanceVisee acte={t.acte} /></td>
                 <td>{t.validatedStep}<div className="text-[11px] text-mute">{dt(t.validatedAt, { dateStyle: 'short' })}</div></td>
                 <td>{t.step ? <><Badge tone="blue">{t.step.label}</Badge>{t.step.holders?.length ? <div className="text-[11px] text-mute">chez <AgentNames list={t.step.holders} /></div> : null}</> : '—'}</td>
                 <td>{t.step?.dueAt ? (t.step.late ? <Badge tone="ko">En retard</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>

@@ -198,3 +198,30 @@ describe('passerelle SMS', () => {
     expect(n('01 23 45 67 89')).toBeNull(); expect(n('12345')).toBeNull(); expect(n('')).toBeNull();
   });
 });
+
+describe('passerelle SMS : API de la Ville (APM)', () => {
+  const ctxAdmin = { username: 'boot', isPlatformAdmin: true };
+  it('mode « apm » : POST /api/v1/sms/send avec la clé APM déjà configurée, numéro au format national, texte jamais conservé', async () => {
+    const appels = []; const cfg = { ...env.config, apm: { url: 'https://api.ivry.test', key: 'cle-apm-de-test' } };
+    const s = createSms({ db: env.db, config: cfg, settings: env.c.settings, http: { post: async (u, c, o) => { appels.push({ u, c, o }); return { status: 200, data: { status: 'success' } }; } } });
+    expect((await s.config(ville.id)).apmDisponible).toBe(true);
+    await s.enregistrer(ctxAdmin, ville.id, { mode: 'apm' });
+    expect((await s.config(ville.id)).mode).toBe('apm');
+    await s.envoyer({ organismeId: ville.id, mobile: '+33612345678', message: 'Code 123456' });
+    expect(appels[0]).toMatchObject({ u: 'https://api.ivry.test/api/v1/sms/send', c: { mobile: '0612345678', message: 'Code 123456' } });
+    expect(appels[0].o.headers['X-API-KEY']).toBe('cle-apm-de-test');
+    const j = await env.db.get('SELECT * FROM sms_journal ORDER BY id DESC LIMIT 1');
+    expect(j).toMatchObject({ mode: 'apm', statut: 'envoye', message: '(masqué)' });
+    // refus de l'APM : erreur claire, journal « echec »
+    const ko = createSms({ db: env.db, config: cfg, settings: env.c.settings, http: { post: async () => ({ status: 403, data: { message: 'permission sms_send manquante' } }) } });
+    await expect(ko.envoyer({ organismeId: ville.id, mobile: '0612345678', message: 'x' })).rejects.toMatchObject({ status: 502 });
+    expect((await env.db.get('SELECT statut, erreur FROM sms_journal ORDER BY id DESC LIMIT 1'))).toMatchObject({ statut: 'echec', erreur: expect.stringMatching(/403.*sms_send/) });
+    await s.enregistrer(ctxAdmin, ville.id, { mode: 'simulation' });
+  });
+
+  it('refusée si l’APM n’est pas configurée sur le serveur', async () => {
+    const sans = createSms({ db: env.db, config: { ...env.config, apm: { url: '', key: '' } }, settings: env.c.settings });
+    expect((await sans.config(ville.id)).apmDisponible).toBe(false);
+    await expect(sans.enregistrer(ctxAdmin, ville.id, { mode: 'apm' })).rejects.toMatchObject({ status: 409 });
+  });
+});

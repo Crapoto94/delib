@@ -3,6 +3,7 @@ const { z } = require('zod');
 const Credentials = z.object({
   username: z.string().trim().min(1).max(128).describe('Identifiant AD (insensible à la casse)'),
   password: z.string().min(1).max(256),
+  souvenir: z.boolean().optional().describe("« Se souvenir de moi » : session persistante de 6 mois au plus, jusqu'à la déconnexion"),
 });
 
 /** Routes d'authentification. Le mot de passe n'est jamais journalisé ni stocké. */

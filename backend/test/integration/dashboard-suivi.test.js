@@ -48,6 +48,14 @@ describe('suivi du tableau de bord', () => {
     expect(c.acte.redacteur).toBe('dupont');
   });
 
+  it('affiche la séance visée de chaque dossier de l’équipe (ou rien quand il n’en vise pas)', async () => {
+    expect((await suivi(t.leroy)).equipe.find((x) => x.acte.id === draft.id).acte.seanceVisee).toBeNull();
+    const inst = await env.db.get('SELECT id, nom FROM instances LIMIT 1');
+    const se = await env.db.get("INSERT INTO seances (organisme_id, instance_id, date_seance, created_by) VALUES ((SELECT organisme_id FROM actes WHERE id = $1), $2, now() + interval '30 days', 'test') RETURNING id", [draft.id, inst.id]);
+    await env.db.run('UPDATE actes SET seance_visee_id = $2 WHERE id = $1', [draft.id, se.id]);
+    expect((await suivi(t.leroy)).equipe.find((x) => x.acte.id === draft.id).acte.seanceVisee).toMatchObject({ id: se.id, instance: inst.nom, dateSeance: expect.anything() });
+  });
+
   it('le chef de service voit aussi son service ; un agent ordinaire ne voit pas d\'équipe', async () => {
     expect((await suivi(t.durand)).equipe.some((x) => x.acte.id === draft.id)).toBe(true);
     expect((await suivi(t.dupont)).equipe).toEqual([]);

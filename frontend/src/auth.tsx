@@ -11,7 +11,7 @@ export type Me = {
 type Ctx = {
   me: Me | null; loading: boolean; org: Organisme | null; setOrg: (id: number) => void; isAdmin: boolean; isScc: boolean;
   startActAs: (username: string) => Promise<void>; stopActAs: () => void;
-  login: (u: string, p: string, local?: boolean) => Promise<void>; logout: () => Promise<void>; reload: () => Promise<void>;
+  login: (u: string, p: string, local?: boolean, souvenir?: boolean) => Promise<void>; logout: () => Promise<void>; reload: () => Promise<void>;
 };
 const AuthCtx = createContext<Ctx>(null as any);
 export const useAuth = () => useContext(AuthCtx);
@@ -34,8 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOrg: (id) => { setOrgId(id); setOrgIdState(id); },
     isAdmin: !!me?.isPlatformAdmin || roles.includes('org_admin'),
     isScc: !!me?.isPlatformAdmin || roles.includes('org_admin') || roles.includes('scc'),
-    login: async (username, password, local) => {
-      const r = await api.post(local ? '/auth/login-local' : '/auth/login', { username, password });
+    login: async (username, password, local, souvenir) => {
+      const r = await api.post(local ? '/auth/login-local' : '/auth/login', { username, password, souvenir: !!souvenir });
       setToken(r.data.token); setLoading(true); await reload();
     },
     startActAs: async (username) => { await api.post('/auth/act-as', { username }); setActAs(username.toLowerCase()); window.location.href = '/'; },

@@ -43,7 +43,7 @@ function createKpis({ db, odj, seances }) {
         const retardRedaction = (etat === 'brouillon' || etat === 'a_corriger') && !!dateRedaction && new Date(dateRedaction).getTime() < now;
         const retardDgs = etat !== 'pret' && !!dateDgs && new Date(dateDgs).getTime() < now;
         return {
-          acteId: r.id, numeroSuivi: r.numero_suivi, numero: numeros.get(r.id) ?? null, titre: r.titre, statut: r.statut, etat, direction: r.direction_label || r.direction_code, directionCode: r.direction_code,
+          acteId: r.id, numeroSuivi: r.numero_suivi, numero: numeros.get(r.id) ?? null, redacteur: r.redacteur, titre: r.titre, statut: r.statut, etat, direction: r.direction_label || r.direction_code, directionCode: r.direction_code,
           etape: r.etape || null, holders: r.holders || [], echeance, dansOdj: dansOdj.has(r.id) || r.statut === 'inscrit_odj',
           enRetard: retardEtape || retardRedaction || retardDgs,
           motifRetard: retardEtape ? 'étape en retard' : retardRedaction ? 'date limite de rédaction dépassée' : retardDgs ? 'date limite DGS dépassée' : null,

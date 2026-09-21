@@ -9,7 +9,7 @@ import { OrgLogo, useBranding, useFavicon } from '../Brand';
 export default function Login() {
   const { me, login } = useAuth();
   const nav = useNavigate();
-  // « Se souvenir de moi » : seul l'identifiant est conservé dans ce navigateur, jamais le mot de passe
+  // « Se souvenir de moi » : l'identifiant est conservé dans ce navigateur (jamais le mot de passe) et la session dure jusqu'à 6 mois, ou jusqu'à la déconnexion
   const memo = (() => { try { return localStorage.getItem('vd.login') || ''; } catch { return ''; } })();
   const [souvenir, setSouvenir] = useState(!!memo);
   const [u, setU] = useState(memo); const [p, setP] = useState(''); const [local, setLocal] = useState(false);
@@ -18,7 +18,7 @@ export default function Login() {
   if (me) return <Navigate to="/" replace />;
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr(null);
-    try { await login(u, p, local); try { if (souvenir) localStorage.setItem('vd.login', u.trim()); else localStorage.removeItem('vd.login'); } catch { /* stockage indisponible */ } nav('/'); } catch (x: any) { setErr(x?.response?.status === 401 ? 'Identifiant ou mot de passe incorrect.' : errMsg(x)); } finally { setBusy(false); }
+    try { await login(u, p, local, souvenir); try { if (souvenir) localStorage.setItem('vd.login', u.trim()); else localStorage.removeItem('vd.login'); } catch { /* stockage indisponible */ } nav('/'); } catch (x: any) { setErr(x?.response?.status === 401 ? 'Identifiant ou mot de passe incorrect.' : errMsg(x)); } finally { setBusy(false); }
   };
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-nav-from to-nav-to p-4">
@@ -33,7 +33,7 @@ export default function Login() {
           <input className="input" autoFocus={!memo} autoComplete="username" value={u} onChange={(e) => setU(e.target.value)} required /></label>
         <label className="block"><span className="label">Mot de passe</span>
           <input className="input" type="password" autoFocus={!!memo} autoComplete="current-password" value={p} onChange={(e) => setP(e.target.value)} required /></label>
-        <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={souvenir} onChange={(e) => setSouvenir(e.target.checked)} /> Se souvenir de mon identifiant <span className="text-mute">(pas le mot de passe)</span></label>
+        <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={souvenir} onChange={(e) => setSouvenir(e.target.checked)} /> Se souvenir de moi <span className="text-mute">(reste connecté jusqu’à 6 mois, ou jusqu’à la déconnexion ; jamais le mot de passe)</span></label>
         <button className="btn-primary w-full" disabled={busy}>{busy && <Spinner />} Se connecter</button>
         <button type="button" className="w-full text-center text-[12px] text-mute underline" onClick={() => setLocal(!local)}>{local ? 'Retour à la connexion par annuaire' : 'Compte de secours local'}</button>
       </form>

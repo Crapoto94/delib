@@ -11,9 +11,20 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.37.0';
+export const VERSION = '0.38.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.38.0', type: 'minor', titre: 'Séances : nouvelle liste, relance des services, lien Outlook ; se souvenir de moi',
+    items: [
+      "Liste des séances refondue d'après la maquette : une carte par séance (compte à rebours, délibérations inscrites, étape du workflow, jalons), onglets à compteurs, année, instances, filtre, vue détaillée ou compacte.",
+      "« Relancer les services » : relance, direction par direction, les détenteurs des dossiers non terminés d'une séance (garde-fou de 24 h).",
+      "« Lien calendrier Outlook » : un abonnement dynamique personnel et secret (séances, lieux, annulations, jalons pour le SCC), sans export de fichier.",
+      "« Se souvenir de moi » : session persistante de 6 mois au plus, jusqu'à la déconnexion.",
+      "Dossiers de mon équipe : la séance visée est affichée.",
+      "Mot de passe oublié des élus : les SMS peuvent partir par l'API de la Ville (APM), en plus d'une passerelle propre.",
+    ],
+  },
   {
     version: '0.37.0', type: 'minor', titre: 'Alertes de recherche par e-mail',
     items: [

@@ -36,6 +36,7 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(24, 'JWT_SECRET doit faire au moins 24 caractères'),
   JWT_TTL: z.string().default('8h'),
   SESSION_MAX_HOURS: z.coerce.number().positive().default(24),
+  SESSION_SOUVENIR_DAYS: z.coerce.number().int().min(1).max(183).default(182), // « Se souvenir de moi » : 6 mois au plus
   BOOTSTRAP_ADMINS: z.string().default(''),
   DEFAULT_ORGANISME_NAME: z.string().default('Ville'),
   LOCAL_ADMIN_ENABLED: flag('true'),
@@ -95,7 +96,7 @@ function buildConfig(env = process.env) {
     apm: Object.freeze({ url: e.APM_API_URL.replace(/\/+$/, ''), key: e.APM_API_KEY }),
     hub: Object.freeze({ url: e.HUBDSI_API_URL.replace(/\/+$/, ''), key: e.HUBDSI_API_KEY }),
     tls: Object.freeze({ caFile: e.VILLE_CA_FILE || null, allowSelfSigned: e.VILLE_ALLOW_SELF_SIGNED_CERTS }),
-    jwt: Object.freeze({ secret: e.JWT_SECRET, ttlSeconds, sessionMaxSeconds: Math.round(e.SESSION_MAX_HOURS * 3600) }),
+    jwt: Object.freeze({ secret: e.JWT_SECRET, ttlSeconds, sessionMaxSeconds: Math.round(e.SESSION_MAX_HOURS * 3600), souvenirSeconds: e.SESSION_SOUVENIR_DAYS * 86400 }),
     bootstrapAdmins: csv(e.BOOTSTRAP_ADMINS),
     defaultOrganismeName: e.DEFAULT_ORGANISME_NAME,
     localAdmin: Object.freeze({

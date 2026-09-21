@@ -174,3 +174,36 @@ describe('administrateurs et compte de secours', () => {
     } finally { await e2.close(); }
   });
 });
+
+describe('« Se souvenir de moi » : session persistante de 6 mois au plus (D109)', () => {
+  const claims = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString());
+  const jours = (t) => Math.round((claims(t).exp - claims(t).iat) / 86400);
+
+  it('sans la case, la durée reste courte ; avec la case, le jeton vaut 6 mois et la session est persistante', async () => {
+    const court = await login('dupont', 'pw-dupont');
+    expect(court.body.souvenir).toBe(false); expect(jours(court.body.token)).toBe(0);
+    const long = await env.http().post('/api/v1/auth/login').send({ username: 'dupont', password: 'pw-dupont', souvenir: true });
+    expect(long.status).toBe(200); expect(long.body.souvenir).toBe(true);
+    expect(jours(long.body.token)).toBe(182);                                                        // 6 mois au plus (SESSION_SOUVENIR_DAYS)
+    expect(new Date(long.body.expiresAt).getTime() - Date.now()).toBeGreaterThan(180 * 86400000);
+    expect((await env.http().get('/api/v1/me').set(bearer(long.body.token))).status).toBe(200);
+    const s = await env.db.get('SELECT persistante FROM sessions WHERE jti = $1', [long.body.jti]);
+    expect(s.persistante).toBe(true);
+    const a = await env.db.get("SELECT after FROM audit_log WHERE action = 'auth.login' AND entity_id = $1", [long.body.jti]);
+    expect(a.after).toMatchObject({ souvenir: true });
+  });
+
+  it('la déconnexion met fin à la session persistante ; le renouvellement la garde persistante, sans dépasser 6 mois', async () => {
+    const r = await env.http().post('/api/v1/auth/login').send({ username: 'martin', password: 'pw-martin', souvenir: true });
+    const t = r.body.token;
+    const ren = await env.http().post('/api/v1/auth/refresh').set(bearer(t));
+    expect(ren.status).toBe(200); expect(ren.body.souvenir).toBe(true); expect(jours(ren.body.token)).toBe(182);
+    expect((await env.http().get('/api/v1/me').set(bearer(t))).status).toBe(401);                    // l'ancien est révoqué
+    expect((await env.http().post('/api/v1/auth/logout').set(bearer(ren.body.token))).status).toBe(204);
+    expect((await env.http().get('/api/v1/me').set(bearer(ren.body.token))).status).toBe(401);       // « ou à la déco »
+    // au-delà de 6 mois depuis la connexion initiale : il faut se reconnecter
+    const r2 = await env.http().post('/api/v1/auth/login').send({ username: 'leroy', password: 'pw-leroy', souvenir: true });
+    await env.db.run("UPDATE sessions SET started_at = now() - interval '183 days' WHERE jti = $1", [r2.body.jti]);
+    expect((await env.http().post('/api/v1/auth/refresh').set(bearer(r2.body.token))).status).toBe(401);
+  });
+});

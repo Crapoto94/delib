@@ -20,6 +20,7 @@ import Bibliotheque from './pages/Bibliotheque';
 import MesActes from './pages/MesActes';
 import { lazy, Suspense } from 'react';
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./elus/dev/DevAnnot')) : null;
+const DevSeances = import.meta.env.DEV ? lazy(() => import('./dev/DevSeances')) : null;
 const DevDesign = import.meta.env.DEV ? lazy(() => import('./dev/DevDesign')) : null;
 import ConvocationPublique from './pages/ConvocationPublique';
 
@@ -32,6 +33,7 @@ export default function App() {
       <Route path="/c/:token" element={<ConvocationPublique />} />
       {import.meta.env.DEV && <Route path="/dev/editeur" element={<DevEditor />} />}
       {DevAnnot && <Route path="/dev/annot" element={<Suspense fallback={null}><DevAnnot /></Suspense>} />}
+      {DevSeances && <Route path="/dev/seances" element={<Suspense fallback={null}><DevSeances /></Suspense>} />}
       {DevDesign && <Route path="/dev/design" element={<Suspense fallback={null}><DevDesign /></Suspense>} />}
       <Route element={me ? <Layout /> : <Navigate to="/connexion" replace />}>
         <Route index element={<Dashboard />} />

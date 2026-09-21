@@ -38,6 +38,7 @@ const MODULES = [
   require('../modules/seances/cahier.routes'),
   require('../modules/seances/kpis.routes'),
   require('../modules/seances/parcours.routes'),
+  require('../modules/seances/agenda.routes'),
   require('../modules/actes/bibliotheque.routes'),
   require('../modules/seances/tenue.routes'),
   require('../modules/seances/pv.routes'),

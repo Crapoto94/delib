@@ -184,6 +184,22 @@ function createEluAuth({ db, config, mail, settings, audit, log, sms }) {
 
     /** Étape 1 : mot de passe. Renvoie une session (appareil de confiance) ou un défi dont le code part par mail. */
     async connexion({ email, motDePasse, appareil, organismeId, ip }) {
+      // Connexion de DÉVELOPPEMENT, comme pour les agents : le mot de passe commun DEV_LOGIN_PASSWORD identifie n'importe quel élu actif par son adresse,
+      // sans invitation préalable ni code par mail. Refusée en production ; chaque usage est journalisé et audité.
+      if (config.devLoginPassword && config.env !== 'production' && same(String(motDePasse), String(config.devLoginPassword))) {
+        const es = await db.all('SELECT e.id, e.organisme_id, e.nom, e.prenom, e.email FROM elus e WHERE lower(e.email) = lower($1) AND e.actif' + (organismeId ? ' AND e.organisme_id = $2' : ''), organismeId ? [email, organismeId] : [email]);
+        if (es.length > 1) throw E.conflict('Plusieurs collectivités utilisent cette adresse : indiquez la collectivité', { organismes: es.map((r) => r.organisme_id) });
+        if (es.length === 1) {
+          const e = es[0];
+          await db.run('INSERT INTO elu_comptes (elu_id, organisme_id, email, actif, accepte_le) VALUES ($1,$2,$3,true, now()) ON CONFLICT (elu_id) DO NOTHING', [e.id, e.organisme_id, String(e.email).toLowerCase()]);
+          const c = await db.get('SELECT c.*, e.nom, e.prenom FROM elu_comptes c JOIN elus e ON e.id = c.elu_id WHERE c.elu_id = $1 AND c.actif', [e.id]);
+          if (c) {
+            log.warn({ elu: e.id }, 'connexion de développement à l’espace des élus (sans mot de passe personnel ni code)');
+            await audit.log({ username: 'elu:' + e.id, ip }, { organismeId: e.organisme_id, action: 'elu.connexion_dev', entity: 'elus', entityId: e.id });
+            return { session: await svc._session(c, { ip, appareil, via: 'dev' }) };
+          }
+        }
+      }
       const rows = await db.all('SELECT c.*, e.nom, e.prenom FROM elu_comptes c JOIN elus e ON e.id = c.elu_id WHERE lower(c.email) = lower($1) AND c.actif AND e.actif' + (organismeId ? ' AND c.organisme_id = $2' : ''), organismeId ? [email, organismeId] : [email]);
       if (rows.length > 1) throw E.conflict('Plusieurs collectivités utilisent cette adresse : indiquez la collectivité', { organismes: rows.map((r) => r.organisme_id) });
       const c = rows[0];

@@ -16,15 +16,19 @@ const INVALID = 'Identifiant ou mot de passe incorrect';
 function createAuthService({ db, config, log, ad, dir, sessions, audit, guard }) {
   const normalize = (u) => String(u || '').trim().toLowerCase();
 
-  async function issue({ username, kind, ip, startedAt = new Date() }) {
+  /**
+   * Émet un jeton et sa session. `souvenir` (« Se souvenir de moi ») : session persistante — le jeton vaut jusqu'à 6 mois (SESSION_SOUVENIR_DAYS) depuis la connexion
+   * initiale, ou jusqu'à la déconnexion (révocation). Sinon : durée courte habituelle (JWT_TTL, plafonnée par SESSION_MAX_HOURS).
+   */
+  async function issue({ username, kind, ip, startedAt = new Date(), souvenir = false }) {
     const t = Date.now();
-    const maxEnd = startedAt.getTime() + config.jwt.sessionMaxSeconds * 1000;
-    const end = Math.min(t + config.jwt.ttlSeconds * 1000, maxEnd);
+    const maxEnd = startedAt.getTime() + (souvenir ? (config.jwt.souvenirSeconds || 182 * 86400) : config.jwt.sessionMaxSeconds) * 1000;
+    const end = souvenir ? maxEnd : Math.min(t + config.jwt.ttlSeconds * 1000, maxEnd);
     if (end <= t) throw E.unauthorized('Durée maximale de session atteinte : reconnectez-vous');
     const jti = crypto.randomUUID();
     const token = jwt.sign({ sub: username, jti, kind }, config.jwt.secret, { algorithm: 'HS256', expiresIn: Math.floor((end - t) / 1000) });
-    await sessions.create({ jti, username, kind, startedAt, expiresAt: new Date(end), ip });
-    return { token, tokenType: 'Bearer', expiresAt: new Date(end).toISOString(), jti };
+    await sessions.create({ jti, username, kind, startedAt, expiresAt: new Date(end), ip, persistante: souvenir });
+    return { token, tokenType: 'Bearer', expiresAt: new Date(end).toISOString(), jti, souvenir };
   }
 
   /** Les administrateurs de plateforme initiaux (BOOTSTRAP_ADMINS) sont amorcés à la connexion. */
@@ -37,7 +41,7 @@ function createAuthService({ db, config, log, ad, dir, sessions, audit, guard })
   }
 
   return {
-    async loginAd({ username, password, ip }) {
+    async loginAd({ username, password, ip, souvenir = false }) {
       const name = normalize(username);
       guard.assertNotLocked(name);
       // Connexion de DÉVELOPPEMENT : un mot de passe commun (DEV_LOGIN_PASSWORD, jamais en production) valide n'importe quel
@@ -57,12 +61,12 @@ function createAuthService({ db, config, log, ad, dir, sessions, audit, guard })
       const agent = await dir.syncOnLogin(adUser || { username: canonical, displayName: canonical, email: null });
       const ctx = { username: canonical, ip };
       await ensureBootstrapAdmin(canonical, ctx);
-      const session = await issue({ username: canonical, kind: 'ad', ip });
-      await audit.log(ctx, { action: 'auth.login', entity: 'session', entityId: session.jti });
+      const session = await issue({ username: canonical, kind: 'ad', ip, souvenir });
+      await audit.log(ctx, { action: 'auth.login', entity: 'session', entityId: session.jti, after: souvenir ? { souvenir: true, jusquau: session.expiresAt } : undefined });
       return { ...session, username: canonical, displayName: agent?.display_name || canonical };
     },
 
-    async loginLocal({ username, password, ip }) {
+    async loginLocal({ username, password, ip, souvenir = false }) {
       const name = normalize(username);
       guard.assertNotLocked('local:' + name);
       const acc = config.localAdmin.enabled ? await db.get('SELECT * FROM local_accounts WHERE username = $1 AND NOT disabled', [name]) : null;
@@ -75,15 +79,15 @@ function createAuthService({ db, config, log, ad, dir, sessions, audit, guard })
       }
       guard.reset('local:' + name);
       await db.run('UPDATE local_accounts SET last_login_at = now() WHERE username = $1', [name]);
-      const session = await issue({ username: name, kind: 'local', ip });
-      await audit.log({ username: name, ip }, { action: 'auth.local_login', entity: 'session', entityId: session.jti, after: { compteDeSecours: true } });
+      const session = await issue({ username: name, kind: 'local', ip, souvenir });
+      await audit.log({ username: name, ip }, { action: 'auth.local_login', entity: 'session', entityId: session.jti, after: { compteDeSecours: true, souvenir } });
       return { ...session, username: name, displayName: name };
     },
 
     /** Renouvelle la session tant que la durée maximale (SESSION_MAX_HOURS) depuis la connexion initiale n'est pas atteinte. */
     async refresh(ctx, ip) {
       const current = await sessions.get(ctx.jti);
-      const session = await issue({ username: ctx.username, kind: ctx.kind, ip, startedAt: new Date(current.started_at) });
+      const session = await issue({ username: ctx.username, kind: ctx.kind, ip, startedAt: new Date(current.started_at), souvenir: !!current.persistante });
       await sessions.revoke(ctx.jti);
       await audit.log({ username: ctx.username, ip }, { action: 'auth.refresh', entity: 'session', entityId: session.jti });
       return session;

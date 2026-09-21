@@ -6,7 +6,7 @@ import AgentPicker from '../AgentPicker';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from '../ui';
 import { Select } from '../Select';
 
-type Step = { key: string; label: string; resolver: { kind: string; fonction?: string; code?: string; username?: string }; mode?: string; quorum?: number; canEdit?: boolean; optional?: boolean; nonDelegable?: boolean; slaDays?: number; refusTo?: string; onEnter?: any; onDone?: any };
+type Step = { key: string; label: string; resolver: { kind: string; fonction?: string; code?: string; username?: string }; mode?: string; quorum?: number; canEdit?: boolean; optional?: boolean; nonDelegable?: boolean; masquerNoms?: boolean; slaDays?: number; refusTo?: string; onEnter?: any; onDone?: any };
 type Transition = { from: string; to: string; when?: { field: string; op: string; value?: any }; otherwise?: boolean };
 type Graph = { start: string; steps: Step[]; transitions: Transition[] };
 
@@ -243,6 +243,7 @@ function Editor({ o, c, version, toast, onClose }: { o: number; c: any; version:
                   <div className="flex flex-wrap gap-4 text-[13px]">
                     <label className="flex items-center gap-2"><input type="checkbox" checked={!!cur.canEdit} onChange={(e) => upd(cur.key, { canEdit: e.target.checked || undefined })} /> Peut modifier le texte</label>
                     <label className="flex items-center gap-2"><input type="checkbox" checked={!!cur.optional} onChange={(e) => upd(cur.key, { optional: e.target.checked || undefined })} /> Étape optionnelle (ignorée sans titulaire)</label>
+                    <label className="flex items-center gap-2" title="Sur le tableau de bord et la frise du dossier, seule l’étape de validation est affichée, pas le nom des valideurs. Par défaut : activé pour les étapes tenues par un groupe (financier, juridique, SCC)."><input type="checkbox" checked={cur.masquerNoms ?? cur.resolver.kind === 'groupe'} onChange={(ev) => upd(cur.key, { masquerNoms: ev.target.checked })} /> Ne pas afficher les noms des valideurs (seulement l’étape)</label>
                     <label className="flex items-center gap-2"><input type="checkbox" checked={!!cur.nonDelegable} onChange={(e) => upd(cur.key, { nonDelegable: e.target.checked || undefined })} /> Non déléguable</label>
                   </div>
                 </>) : <p className="text-[12px] text-mute">L'étape initiale est celle du rédacteur : elle ne se paramètre pas davantage.</p>}

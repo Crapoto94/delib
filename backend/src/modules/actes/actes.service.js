@@ -23,6 +23,18 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
   const svc = {
     toActe,
 
+    /**
+     * Ajoute à chaque acte de la liste sa séance visée (« seanceVisee » : { id, dateSeance, instance }, ou null) — celle qu'il vise, à défaut celle où il est inscrit.
+     * Une seule requête pour toute la liste : à appeler sur tout ce qui s'affiche en tableau (dossiers, à traiter, équipe, validés).
+     */
+    async attachSeance(list) {
+      const ids = [...new Set(list.map((a) => a?.seanceViseeId ?? a?.seanceId).filter(Boolean))];
+      const rows = ids.length ? await db.all('SELECT s.id, s.date_seance, i.nom AS instance FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = ANY($1::int[])', [ids]) : [];
+      const by = new Map(rows.map((r) => [r.id, { id: r.id, dateSeance: r.date_seance, instance: r.instance }]));
+      for (const a of list) if (a) a.seanceVisee = by.get(a.seanceViseeId ?? a.seanceId) ?? null;
+      return list;
+    },
+
     async raw(organismeId, id) {
       const a = await db.get('SELECT * FROM actes WHERE id = $1 AND organisme_id = $2', [id, requireOrg(organismeId)]);
       if (!a) throw E.notFound('Acte introuvable');
@@ -120,7 +132,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const where = w.join(' AND ');
       const total = (await db.get(`SELECT count(*)::int AS n FROM actes a WHERE ${where}`, p)).n;
       const rows = await db.all(`SELECT a.* FROM actes a WHERE ${where} ORDER BY a.updated_at DESC, a.id DESC LIMIT ${add(f.limit || 50)} OFFSET ${add(f.offset || 0)}`, p);
-      return { total, limit: f.limit || 50, offset: f.offset || 0, items: rows.map(toActe) };
+      return { total, limit: f.limit || 50, offset: f.offset || 0, items: await svc.attachSeance(rows.map(toActe)) };
     },
 
     async update(ctx, organismeId, id, patch) {

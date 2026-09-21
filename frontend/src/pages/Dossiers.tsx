@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
+import { SeanceVisee } from '../SeanceVisee';
 import { dt, STATUTS } from '../format';
 import { Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, StatutBadge, useLoad } from '../ui';
 import { AgentName } from '../AgentName';
@@ -73,12 +74,12 @@ export default function Dossiers() {
       </div>
       <div className="card overflow-x-auto">
         {list.loading ? <Loading /> : list.error ? <div className="p-4"><ErrorBox msg={list.error} /></div> : !list.data?.items.length ? <Empty>Aucun dossier ne correspond.</Empty> : (
-          <table className="w-full"><thead><tr><th>N°</th><th>Titre</th><th>Direction</th><th>Rédacteur</th><th>Statut</th><th>Modifié</th></tr></thead><tbody>
+          <table className="w-full"><thead><tr><th>N°</th><th>Titre</th><th>Direction</th><th>Rédacteur</th><th>Séance visée</th><th>Statut</th><th>Modifié</th></tr></thead><tbody>
             {list.data.items.map((a: any) => (
               <tr key={a.id} className="hover:bg-soft">
                 <td className="font-mono text-[12px]">#{a.numeroSuivi}</td>
                 <td><Link to={`/dossiers/${a.id}`} className="font-semibold text-head hover:underline">{a.titre}</Link></td>
-                <td className="text-mute">{a.direction?.label}</td><td><AgentName u={a.redacteur} /></td><td><StatutBadge statut={a.statut} /></td><td className="text-mute">{dt(a.updatedAt, { dateStyle: 'short' })}</td>
+                <td className="text-mute">{a.direction?.label}</td><td><AgentName u={a.redacteur} /></td><td><SeanceVisee acte={a} /></td><td><StatutBadge statut={a.statut} /></td><td className="text-mute">{dt(a.updatedAt, { dateStyle: 'short' })}</td>
               </tr>))}
           </tbody></table>
         )}

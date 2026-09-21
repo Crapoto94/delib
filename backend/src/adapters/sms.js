@@ -32,7 +32,7 @@ function createSms({ db, config, settings, log, tls, http: injected }) {
 
     async config(organismeId) {
       const c = await settings.resolve(organismeId);
-      return { mode: val(c, 'sms.mode', 'simulation'), url: String(val(c, 'sms.url', '')), expediteur: String(val(c, 'sms.expediteur', 'VibeDelib')), modele: String(val(c, 'sms.modele', '')), jetonDefini: !!val(c, 'sms.jeton', '') };
+      return { mode: val(c, 'sms.mode', 'simulation'), apmDisponible: !!config?.apm?.key, url: String(val(c, 'sms.url', '')), expediteur: String(val(c, 'sms.expediteur', 'VibeDelib')), modele: String(val(c, 'sms.modele', '')), jetonDefini: !!val(c, 'sms.jeton', '') };
     },
 
     /** Envoie (ou simule) un SMS. Ne renvoie jamais le jeton ; lève une erreur 502 si la passerelle échoue. */
@@ -41,6 +41,19 @@ function createSms({ db, config, settings, log, tls, http: injected }) {
       if (!n) throw E.badRequest('Numéro de mobile invalide');
       const c = await settings.resolve(organismeId);
       const mode = val(c, 'sms.mode', 'simulation');
+      if (mode === 'apm') { // API de la Ville (APM, POST /api/v1/sms/send, permission sms_send) : la clé APM déjà configurée sert, rien à saisir
+        if (!config?.apm?.key || !config?.apm?.url) throw E.conflict("L'API de la Ville (APM) n'est pas configurée sur ce serveur (APM_API_URL, APM_API_KEY)");
+        const national = n.startsWith('+33') ? `0${n.slice(3)}` : n; // l'APM attend « 0601020304 »
+        const http = injected || createHttpClient({ baseURL: config.apm.url, headers: { 'X-API-KEY': config.apm.key, 'Content-Type': 'application/json' }, tls, timeoutMs: 15000 });
+        let statut = 'envoye'; let erreur = null;
+        try {
+          const r = await http.post(injected ? `${config.apm.url}/api/v1/sms/send` : '/api/v1/sms/send', { mobile: national, message }, injected ? { headers: { 'X-API-KEY': config.apm.key } } : undefined);
+          if (r.status >= 300 || (r.data && r.data.status && r.data.status !== 'success')) { statut = 'echec'; erreur = `HTTP ${r.status}${r.data?.message ? ` — ${String(r.data.message).slice(0, 120)}` : ''}`; }
+        } catch (e) { statut = 'echec'; erreur = e.code || e.message; }
+        await db.run("INSERT INTO sms_journal (organisme_id, mobile_masque, message, mode, statut, erreur) VALUES ($1,$2,'(masqué)','apm',$3,$4)", [organismeId, masquer(n), statut, erreur]);
+        if (statut === 'echec') throw E.upstream(`API de la Ville (SMS) : ${erreur}`);
+        return { simule: false };
+      }
       if (mode !== 'http') {
         await db.run("INSERT INTO sms_journal (organisme_id, mobile_masque, mobile, message, mode, statut) VALUES ($1,$2,$3,$4,'simulation','simule')", [organismeId, masquer(n), n, message]);
         log?.info?.({ mobile: masquer(n) }, 'SMS simulé (aucun envoi réel)');
@@ -68,6 +81,7 @@ function createSms({ db, config, settings, log, tls, http: injected }) {
     /** Enregistre la configuration de la passerelle (le jeton est chiffré ; vide = conservé). */
     async enregistrer(ctx, organismeId, b) {
       const put = (key, v) => settings.put(ctx, { scope: 'organisme', organismeId, key, val: v });
+      if (b.mode === 'apm' && !(config?.apm?.key && config?.apm?.url)) throw E.conflict("L'API de la Ville (APM) n'est pas configurée sur ce serveur");
       if (b.mode === 'http' && !/^https?:\/\/.+/i.test(String(b.url ?? (await settings.resolve(organismeId))['sms.url']?.value ?? ''))) throw E.badRequest('Adresse de la passerelle (http ou https) obligatoire en mode passerelle');
       if (b.mode !== undefined) await put('sms.mode', b.mode);
       if (b.url !== undefined) await put('sms.url', b.url);

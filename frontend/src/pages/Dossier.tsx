@@ -461,7 +461,7 @@ export default function Dossier() {
           <ActesProches acte={a} />
           {c?.events?.length > 0 && (
             <div className="card p-5"><h3 className="mb-2">Historique</h3><ul className="space-y-2 text-[12px]">{c.events.slice().reverse().slice(0, 12).map((e: any) => (
-              <li key={e.id}><b><AgentName u={e.actor} /></b>{e.onBehalfOf && <> (pour <AgentName u={e.onBehalfOf} />)</>} · {e.action}{e.to ? ` → ${e.to}` : ''}<div className="text-mute">{dt(e.at)}</div></li>))}</ul></div>)}
+              <li key={e.id}><b>{e.actor ? <AgentName u={e.actor} /> : 'Étape de validation'}</b>{e.onBehalfOf && <> (pour <AgentName u={e.onBehalfOf} />)</>} · {e.action}{e.to ? ` → ${e.to}` : ''}<div className="text-mute">{dt(e.at)}</div></li>))}</ul></div>)}
         </aside>
       </div>
       {copying && <CopieModal acte={a} onClose={() => setCopying(false)} toast={toast} />}

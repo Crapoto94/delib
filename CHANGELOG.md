@@ -9,6 +9,14 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.38.0 — Séances : nouvelle liste, relance des services, lien Outlook ; se souvenir de moi
+- Liste des séances refondue d'après la maquette : une carte par séance (compte à rebours, délibérations inscrites, étape du workflow, jalons), onglets à compteurs, année, instances, filtre, vue détaillée ou compacte.
+- « Relancer les services » : relance, direction par direction, les détenteurs des dossiers non terminés d'une séance (garde-fou de 24 h).
+- « Lien calendrier Outlook » : un abonnement dynamique personnel et secret (séances, lieux, annulations, jalons pour le SCC), sans export de fichier.
+- « Se souvenir de moi » : session persistante de 6 mois au plus, jusqu'à la déconnexion.
+- Dossiers de mon équipe : la séance visée est affichée.
+- Mot de passe oublié des élus : les SMS peuvent partir par l'API de la Ville (APM), en plus d'une passerelle propre.
+
 ## 0.37.0 — Alertes de recherche par e-mail
 - Alertes de recherche par e-mail (facultatif) : l'enveloppe à côté de la cloche d'une recherche enregistrée envoie aussi le message par mail.
 
