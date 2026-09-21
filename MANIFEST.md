@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.40 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.42 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1491,6 +1491,61 @@ Règle : **rien de propre à un organisme dans le code**. Une installation hébe
 - **PAR-11** — **Export / import de la configuration** d'un organisme en JSON (`vibedelib.configuration/1`) : **paramètres** de l'organisme, vocabulaire et couleurs, **référentiels propres et surcharges**, **champs personnalisés**, **circuits** (dernière version), **instances**. **Jamais** de secret (mots de passe chiffrés, clés), de personne (titulaires, élus, comptes) ni d'acte. L'import se fait en **deux temps** : **aperçu** (ce qui serait créé, modifié, ignoré, avec avertissements) puis **application** ; il est **idempotent** (rejouable), **ne supprime jamais** rien, n'écrase jamais un circuit existant (les circuits importés arrivent en **brouillon** à publier après vérification) et est **audité**.
 - **PAR-12** — **Modèle « commune neutre »** (PAR-02) : fichier de configuration importable (types de séance, vocabulaire générique, champs et circuit court à 3 étapes) pour mettre en service **un autre organisme** (CCAS, autre commune) : créer la collectivité, importer le modèle, saisir à la main les membres (élus ou **non élus**), publier le circuit.
 
+---
+
+## 25 bis. Import de l'historique AIRS DELIB (sas et concordances) — réponse à Q22, décision D111
+
+La reprise de l'historique d'**AIRS DELIB** (ancien logiciel de gestion des actes, Digitech, à remplacer) alimente VibeDélib **sans jamais écrire directement** dans les tables métier : les données arrivent d'abord dans un **sas**, sont **rapprochées** des paramétrages existants (concordances), puis **publiées** après validation par l'administrateur ou le SCC. Tant que la **base Oracle d'AIRS**, son **MCD** et la **liste des tables de concordance** ne sont pas connus, le sas et le mapping sont **génériques** : ajouter une table source ou un axe de concordance est de la **configuration**, jamais du code. Le rapprochement **commence par les concordances**, parce que l'outil est déjà paramétré (élus, directions, services, agents, commissions, instances, référentiels).
+
+### 25 bis.1 Processus en quatre temps
+
+```
+HUB DSI (Oracle AIRS → PostgreSQL)          VibeDélib
+┌───────────────────────────┐        ┌────────────────────────────────────────────────┐
+│ tables AIRS                │  1     │ SAS    airs_imports / airs_raw_rows            │
+│  ou export JSON du HUB     │ ─────► │        lignes brutes JSONB, non visibles       │
+└───────────────────────────┘        │            │                                   │
+                                      │      2 ANALYSE  inventaire, valeurs à concorder │
+                                      │            ▼                                   │
+                                      │      3 CONCORDANCES  airs_concordances          │
+                                      │        auto / proposée / manuelle / ignorée     │
+                                      │            ▼                                   │
+                                      │      4 PUBLICATION  actes historiques           │
+                                      │        séances, actes, textes, annexes, votes   │
+                                      └────────────────────────────────────────────────┘
+```
+
+- **IMP-01 — Sas isolé.** Les données AIRS sont stockées dans des tables **`airs_*`** (sas), **jamais** dans les tables métier. Rien n'est visible des utilisateurs, de la recherche ni des tableaux de bord avant la **publication**. Chaque reprise est un **lot** (`airs_imports`) horodaté et journalisé.
+- **IMP-02 — MCD inconnu = sas générique.** Tant que le modèle d'AIRS n'est pas connu, le sas conserve chaque ligne **telle quelle en `JSONB`** (`airs_raw_rows` : lot, table source, clé source, contenu, empreinte) et une **définition de mapping déclarative** (`airs_source_tables`, JSON) décrit, table par table, la clé, les colonnes utiles et leur destination. Brancher une nouvelle table AIRS = **configuration**, sans redéploiement.
+- **IMP-03 — Source.** Le **HUB DSI** (`c:\dev\dsihub`) importe les tables Oracle d'AIRS dans PostgreSQL ; VibeDélib lit **en lecture seule** (a) les tables `airs_*` du même schéma, ou (b) un **export JSON** déposé par le HUB. **Aucune connexion directe à Oracle.** La source retenue est **à cadrer avec le HUB** (Q-AIRS1).
+- **IMP-04 — Périmètre.** Par défaut, seuls les **actes des séances passées** sont repris. Une option, **désactivée par défaut**, étend la reprise aux **actes en préparation** (séances à venir, dossiers non votés), avec un état distinct et **sans** inscription automatique à un ordre du jour.
+- **IMP-05 — Import brut.** Le lot charge les lignes du sas, calcule une **empreinte** par ligne (détection des doublons et des modifications depuis un import précédent) et produit un **inventaire** : nombre de lignes par table, période couverte, séances et actes détectés, anomalies (clés absentes, références orphelines).
+- **IMP-06 — Analyse.** L'analyse recense, **par axe**, les **valeurs AIRS rencontrées** avec leur occurrence (nombre d'actes concernés) et prépare les propositions de concordance. Elle ne modifie aucune donnée métier.
+- **IMP-07 — Axes de concordance (liste ouverte).** Un axe = une correspondance **valeur AIRS → entité VibeDélib**. Axes prévus a minima : organisme, instance / type de séance, **direction**, **service**, **agent** (rédacteur, rapporteur, signataire), **élu** (rapporteur, rapporteur complémentaire), **commission**, **type d'acte**, **nature**, **rubrique**, **matière**, type d'annexe, **séance**, statut / résultat de vote. La liste n'est **pas figée** : elle s'enrichit à la découverte du MCD d'AIRS.
+- **IMP-08 — Table de concordance.** `airs_concordances` lie une **valeur source** (`table`, `colonne`, `code`, `libellé`) à une **cible** (type d'entité + identifiant ou code) pour un organisme. Une ligne porte : `etat` (*automatique*, *proposée*, *manuelle*, *ignorée*), **degré de confiance**, auteur et date de décision. Une cible peut être **nulle** (valeur AIRS volontairement non reprise → *ignorée*).
+- **IMP-09 — Proposition automatique.** Le rapprochement propose : (1) **code identique** dans le référentiel cible, (2) **libellé normalisé** identique (sans accents ni casse), (3) **similarité** (trigrammes) au-dessus d'un seuil paramétrable, (4) correspondances déjà validées lors d'un lot précédent. La proposition est **toujours confirmée par un humain** ; rien n'est publié sur une proposition seule.
+- **IMP-10 — On commence par les concordances.** La **publication est bloquée** tant que subsistent des concordances **bloquantes** non résolues (axes indispensables : organisme, séance, acte, direction, service). Les autres axes produisent un **avertissement** sans blocage. L'écran affiche la **progression de résolution par axe**.
+- **IMP-11 — Paramétrages existants = cibles.** Les concordances se raccrochent aux référentiels, directions, services, élus, commissions, instances et types d'actes **déjà paramétrés** dans VibeDélib : l'import **ne crée pas** de référentiel métier. Au plus peut-il proposer une **valeur complémentaire** explicite, marquée « créée par import », désactivable — jamais une surcharge silencieuse.
+- **IMP-12 — Agents : contrôle AD.** Les agents cités par AIRS peuvent **ne jamais s'être connectés** à VibeDélib. Leur identité est cherchée par **identifiant** puis par **nom/prénom** dans l'**AD** (APM) puis dans l'**annuaire RH** (Hub DSI) ; le statut est affiché (*connu*, *jamais connecté*, *absent de l'AD*, *ambigu*). Un agent **n'est jamais créé** par l'import : à défaut, l'acte conserve un **rédacteur/rapporteur historique** (nom en texte), sans compte ni droits.
+- **IMP-13 — Élus, directions, services.** Le rapprochement des élus s'appuie sur les **membres** de l'organisme, et celui des directions et services sur l'**organisation RH** (Hub DSI) ; une valeur AIRS sans cible certaine reste **à valider** (concordance *proposée*) et l'acte concerné est **signalé**.
+- **IMP-14 — Items du sas.** Chaque **acte** détecté est matérialisé comme **item** (`airs_import_items`) avec ses champs résolus (séance, numéro, date, objet, type, nature, rubrique, matière, direction, service, rédacteur, rapporteur, résultat) et ses **contrôles** (champs obligatoires présents, concordances résolues, doublon de numéro, texte non vide). Un item est `en attente`, `prêt`, `publié` ou `ignoré`.
+- **IMP-15 — Publication.** Un item **prêt** est publié en **acte historique adopté** (bibliothèque, archives) : création de la **séance** si nécessaire, de l'**acte** et de ses **textes** (exposé, visas/considérants, dispositif) et du **résultat de vote**, rattachement des **PDF** repris (stockage local ou GED), **sans notification** ni passage de circuit. La publication est **idempotente** (clé source : un même acte n'est jamais créé deux fois) et peut se faire **item par item** ou **par lot**.
+- **IMP-16 — Réversibilité.** Un lot peut être **annulé** avant publication (sas purgé logiquement) et une publication peut être **retirée** : les actes du lot sont marqués « import AIRS DELIB annulé / retraité », **masqués de la recherche** et de la bibliothèque, jamais supprimés physiquement ; les concordances et l'historique sont conservés.
+- **IMP-17 — Traçabilité.** Tout est audité : chargement du lot, analyse, résolution de concordance (avant/après), publication (entité créée, clé source), annulation. Le **journal d'audit** (SEC-04) s'applique ; l'écran montre l'**historique du lot**.
+- **IMP-18 — Droits.** Import brut, concordances et publication sont réservés à l'**administrateur d'organisme** et au **SCC** (*Paramétrages › Import AIRS DELIB*) ; les actes publiés deviennent consultables selon les règles habituelles (bibliothèque et recherche).
+- **IMP-19 — Recette sans source réelle.** Tant que le HUB n'a pas branché la source, un **jeu d'essai** (fichier JSON) permet de dérouler tout le processus de bout en bout en recette, y compris les concordances, le blocage de publication et l'annulation.
+- **IMP-20 — Reprise des PDF et annexes.** Les documents associés dans AIRS (délibération, extrait, pièces jointes) sont conservés et rattachés à l'acte publié, **sans régénération** ni remise en page ; ils restent affichables dans la visionneuse (D58) et indexés (REC-10).
+
+### 25 bis.2 Reste à cadrer avec le HUB DSI (Q-AIRS)
+
+| # | Question | Proposition par défaut |
+|---|---|---|
+| Q-AIRS1 | **Source** : schéma `airs_*` partagé, base liée, export JSON, dépôt de fichiers ? | **export JSON + tables `airs_*`** acceptés ; **pas d'accès Oracle direct** |
+| Q-AIRS2 | **Liste des tables** AIRS et **MCD** (rapports, délibérations, séances, commissions, élus, agents, rubriques, matières, natures, annexes, votes, historique) | mapping déclaratif prêt, **à renseigner** dès réception |
+| Q-AIRS3 | **Identifiants stables** des entités AIRS (clé de rapprochement entre lots) | clé composite `table + id_source` |
+| Q-AIRS4 | **Volume** : nombre d'actes, de séances, taille des PDF | import **par séance** ou **par lot d'années**, paginé |
+| Q-AIRS5 | Les **actes en préparation** d'AIRS entrent-ils en brouillon VibeDélib ? | option **désactivée** par défaut (IMP-04) |
+| Q-AIRS6 | **Matières / natures / rubriques** AIRS : correspondance exacte avec les référentiels VibeDélib ou table de correspondance fournie ? | rapprochement automatique + validation humaine |
 
 ---
 
@@ -1521,7 +1576,7 @@ erDiagram
 
 Tables principales (préfixe `ivrydelib.`) : `actes`, `deliberations`, `tracked_texts`, `text_versions`, `text_authors`, `text_drafts`, `annexes`, `files`, `comments`, `step_instances`, `step_events`, `audit_log`, `circuit_definitions`, `circuit_steps`, `circuit_transitions`, `groups`, `group_members`, `redaction_grants`, `delegations`, `commissions`, `commission_members`, `commission_seances`, `acte_commission_avis`, `instances`, `seances`, `seance_items`, `seance_item_history`, `seance_derogations`, `cahier_profiles`, `cahier_builds`, `elu_profiles`, `agent_ref`, `direction_dga`, `direction_elus`, `ref_types_acte`, `ref_natures`, `ref_matieres`, `ref_rubriques`, `ref_annexe_types`, `custom_field_defs`, `custom_field_perms`, `notification_rules`, `notification_queue`, `notification_log`, `notifications`, `notification_prefs`, `mail_templates`, `holidays`, `seance_jalons`, `titulaires`, `render_templates`, `render_template_versions`, `parametres`.
 
-Tables ajoutées : **organisation** `organismes`, `organisme_directions`, `organisme_settings`, `user_org_roles`, `org_referentiel_overrides` ; **membres** `personnes`, `membres`, `groupes_politiques`, `groupe_membres` ; **élus** `elu_accounts`, `annotations`, `annotation_shares`, `document_consultations` ; **convocation** `convocations`, `convocation_envois`, `convocation_reponses`, `mises_a_disposition` ; **séance** `presences`, `procurations`, `votes`, `vote_details`, `amendements`, `proces_verbaux`, `registre_entries` ; **S²LOW** `s2low_configs`, `s2low_lots`, `s2low_transactions`, `s2low_events`, `s2low_prefecture_docs`, `classification_versions`, `classification_items` ; **IA et recherche** `ai_features`, `ai_runs`, `ai_suggestions`, `ai_check_rules`, `visa_library`, `ai_eval_cases`, `search_documents`, `saved_searches`.
+Tables ajoutées : **organisation** `organismes`, `organisme_directions`, `organisme_settings`, `user_org_roles`, `org_referentiel_overrides` ; **membres** `personnes`, `membres`, `groupes_politiques`, `groupe_membres` ; **élus** `elu_accounts`, `annotations`, `annotation_shares`, `document_consultations` ; **convocation** `convocations`, `convocation_envois`, `convocation_reponses`, `mises_a_disposition` ; **séance** `presences`, `procurations`, `votes`, `vote_details`, `amendements`, `proces_verbaux`, `registre_entries` ; **S²LOW** `s2low_configs`, `s2low_lots`, `s2low_transactions`, `s2low_events`, `s2low_prefecture_docs`, `classification_versions`, `classification_items` ; **IA et recherche** `ai_features`, `ai_runs`, `ai_suggestions`, `ai_check_rules`, `visa_library`, `ai_eval_cases`, `search_documents`, `saved_searches` ; **import AIRS DELIB** `airs_imports`, `airs_source_tables`, `airs_raw_rows`, `airs_concordances`, `airs_import_items`, `airs_import_events`.
 
 Principes : **chaque table métier porte `organisme_id`** (MOR-02), `TIMESTAMPTZ`, `created_at/updated_at`, champs personnalisés en `JSONB`, index sur (`statut`, `direction`, `seance_id`, `redacteur`), recherche plein texte GIN, **jamais de `DELETE` physique** sur actes, textes, événements.
 
@@ -1567,6 +1622,11 @@ POST   /seances/:id/convocations ; GET …/convocations/:n/preuve ; POST /convoc
 POST   /seances/:id/presences|procurations|points/:id/vote|close ; GET /seances/:id/pv|registre
 POST   /teletransmissions/lots ; POST …/lots/:id/simulate|prepare|confirm ; GET /teletransmissions/:id/statut
 POST   /actes/:id/ai/check ; GET /ai/runs/:id ; POST /ai/suggestions/:id/accept|reject
+GET/POST /admin/import-airs/lots ; GET /admin/import-airs/lots/:id ; POST …/analyser|publier|annuler
+GET/PUT  /admin/import-airs/mapping ; POST /admin/import-airs/lots/:id/charger        (définition des tables AIRS)
+GET      /admin/import-airs/lots/:id/concordances?axe= ; POST …/concordances/auto|decider
+GET      /admin/import-airs/lots/:id/actes ; POST …/actes/:itemId/publier|ignorer
+POST     /admin/import-airs/agents/verifier  (contrôle AD / annuaire RH, sans création)
 GET    /status                              (hors /v1 selon le guide)
 ```
 
@@ -1596,7 +1656,7 @@ Le **backend est développé en premier** ; le **frontend démarre quand les maq
 | **7b Connexion réelle à S²LOW** | branchement du **P12** et de l'instance de test puis de production dès l'accès obtenu, tests de contrat, suivi réel, courriers de la préfecture | acte transmis sur l'instance de test, AR reçu |
 | **7c Signature électronique** *(reportée)* | `SignaturePort` vers le parapheur, statuts « À signer / Signé », fichier de signature S²LOW | activable par organisme et par type de pièce |
 | **8 Aval** | publication (acte tamponné), recueil des actes, archivage (SAE), statistiques | hors périmètre actuel |
-| **Migration** | reprise de l'historique AirsDelib (Q22) | recherche d'anciens actes |
+| **Import AIRS DELIB** | sas (`airs_*`), tables de concordance, écran de validation admin/SCC, publication des actes des séances passées (option actes en préparation), annulation (section 25 bis, D111) | actes historiques visibles dans la bibliothèque et la recherche, concordances tracées |
 
 ---
 
@@ -1726,7 +1786,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | Q51 | **Actes liés** entre organismes (convention Ville–CCAS) : besoin réel ? |
 | Q53 | **Vote** : boîtiers de vote existants à intégrer ? **PV** : compte rendu succinct ou intégral, enregistrement audio autorisé ? |
 
-**À cadrer plus tard** : Q21 (sens de « type de pièces complémentaires »), Q22 (périmètre AirsDelib complet et **migration de l'historique**), Q24 (React 18 ou 19), Q25 (nom commercial de l'application ; le schéma est `ivrydelib`), Q40 (niveau et format de signature, à la reprise de la signature), Q52 (DMZ : domaine, port, pare-feu).
+**À cadrer plus tard** : Q21 (sens de « type de pièces complémentaires »), Q22 (périmètre AirsDelib complet ; **migration de l'historique** traitée par **D111**, section 25 bis, source à cadrer avec le HUB : Q-AIRS1 à 6), Q24 (React 18 ou 19), Q25 (nom commercial de l'application ; le schéma est `ivrydelib`), Q40 (niveau et format de signature, à la reprise de la signature), Q52 (DMZ : domaine, port, pare-feu).
 | **D39** | **Éditeur de textes en modale plein écran, WYSIWYG** : exposé des motifs, « Vu et considérant » et « Délibéré » s'ouvrent dans une modale complète (pas dans un petit cadre) ; dans le dispositif, **« Article N » est saisi automatiquement et mis en gras**, **Entrée** crée l'article suivant, **Maj + Entrée** fait un simple retour à la ligne. | 11, 12, 23 |
 | **D40** | **Copie de délibération assistée par IA** : on copie une délibération existante (ex. l'an passé) ; l'IA **propose** les modifications à faire pour l'adapter au nouveau contexte ; l'agent accepte ou refuse **chacune** (D21). | 7, 21 |
 | **D41** | **Administration des utilisateurs et des rôles** : écran (et API) pour rechercher un agent, lui attribuer ou retirer les rôles de plateforme et d'organisme, voir ses accès et son activité. | 4, 25 |
@@ -1786,6 +1846,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D108** | **Liste des séances refondue** (Stitch), **relance des services** par séance, **lien calendrier Outlook dynamique** (sans export) | SEA-15, 16, 17 |
 | **D109** | **« Se souvenir de moi »** : session persistante de 6 mois au plus, jusqu'à la déconnexion ; **séance visée** dans « Dossiers de mon équipe » ; **SMS par l'API de la Ville (APM)** ; **connexion de développement des élus** | SEC-17, ELU-86, ELU-87 |
 | **D110** | **Séance visée : deux états visibles** dans tous les tableaux et la fiche — en **gras** quand l'acte est **inscrit à l'ordre du jour** de cette séance, en *italique* quand elle n'est que **visée** (pas encore inscrit) | SEA-18 |
+| **D111** | **Import de l'historique AIRS DELIB par sas et concordances** : les données AIRS (HUB DSI depuis Oracle, jamais d'accès direct) arrivent dans un **sas `airs_*`** (JSONB, mapping déclaratif tant que le MCD n'est pas connu), sont rapprochées des **paramétrages existants** (concordances multiples, propositions confirmées par un humain, contrôle **AD** des agents jamais connectés) puis **publiées** en actes historiques après validation **admin/SCC** ; actes des **séances passées** (option **actes en préparation**), publication **idempotente** et **réversible**, tout **audité** *(IMP-01 à 20)* | 25 bis |
 | **D97** | **API externe et clés d'accès** : lecture seule, clés hachées à affichage unique, portées distinguant actes exécutoires / adoptés / en cours, IP autorisées, limite de débit, synchronisation incrémentale *(EXT-01 à EXT-06)* | 24 bis |
 | **D96** | **Sauvegarde vers un dossier réseau** : export logique cohérent en NDJSON, fichiers incrémentaux, destination UNC avec identifiants chiffrés, planification nocturne, rétention, journal, restauration outillée *(SAV-01 à SAV-07)* | 29.1 |
 | **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |
@@ -1803,7 +1864,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 
 ## 33. Hypothèses posées
 
-`[H1]` SCC = Service Conseil et Contentieux *(confirmé par AirsDelib)*. `[H3]` Les codes de matière transmis à S²LOW sont ceux de la **classification importée** de la préfecture. `[H4]` Le suivi des modifications commence à l'envoi au circuit. `[H5]` Seul le détenteur de l'étape édite. `[H6]` Le responsable de service accorde les droits de rédaction sur son service seulement. `[H7]` **Plusieurs organismes dans une installation**, annuaire d'agents commun ; un organisme d'une autre collectivité avec annuaire distinct est hors périmètre. `[H8]` Les références juridiques (CGCT, ACTES) sont **à valider** avec le service juridique ; elles sont citées de mémoire. `[H9]` La **dérogation** est accordée par le SCC ou le DGS (Q34). `[H10]` Le numéro d'une délibération se fige à l'arrêt de l'ordre du jour et n'est jamais réutilisé. `[H11]` L'égalité d'information des élus interdit tout accès anticipé d'un sous-ensemble, sauf paramétrage explicite. `[H12]` Le mode de télétransmission par défaut est **B** (préparation puis confirmation par un opérateur sur S²LOW). `[H13]` Le règlement européen sur l'IA et le RGPD sont à faire valider par le DPO. `[H14]` Le **P12** fourni identifie la collectivité auprès de S²LOW (authentification mutuelle). `[H15]` Sans signature activée, l'acte est transmis en PDF non signé (fichier de signature facultatif dans l'API). `[H16]` Le rattachement d'un agent du CCAS à son organisme se déduit de sa **direction** dans l'organisation du Hub DSI. `[H17]` Les propositions par défaut de la section 32 valent réponse tant qu'aucune décision contraire n'est prise.
+`[H1]` SCC = Service Conseil et Contentieux *(confirmé par AirsDelib)*. `[H3]` Les codes de matière transmis à S²LOW sont ceux de la **classification importée** de la préfecture. `[H4]` Le suivi des modifications commence à l'envoi au circuit. `[H5]` Seul le détenteur de l'étape édite. `[H6]` Le responsable de service accorde les droits de rédaction sur son service seulement. `[H7]` **Plusieurs organismes dans une installation**, annuaire d'agents commun ; un organisme d'une autre collectivité avec annuaire distinct est hors périmètre. `[H8]` Les références juridiques (CGCT, ACTES) sont **à valider** avec le service juridique ; elles sont citées de mémoire. `[H9]` La **dérogation** est accordée par le SCC ou le DGS (Q34). `[H10]` Le numéro d'une délibération se fige à l'arrêt de l'ordre du jour et n'est jamais réutilisé. `[H11]` L'égalité d'information des élus interdit tout accès anticipé d'un sous-ensemble, sauf paramétrage explicite. `[H12]` Le mode de télétransmission par défaut est **B** (préparation puis confirmation par un opérateur sur S²LOW). `[H13]` Le règlement européen sur l'IA et le RGPD sont à faire valider par le DPO. `[H14]` Le **P12** fourni identifie la collectivité auprès de S²LOW (authentification mutuelle). `[H15]` Sans signature activée, l'acte est transmis en PDF non signé (fichier de signature facultatif dans l'API). `[H16]` Le rattachement d'un agent du CCAS à son organisme se déduit de sa **direction** dans l'organisation du Hub DSI. `[H17]` Les propositions par défaut de la section 32 valent réponse tant qu'aucune décision contraire n'est prise. `[H18]` L'historique **AIRS DELIB** est repris dans un **sas**, rapproché par **concordances** puis publié après validation admin/SCC (D111) ; la source est fournie par le **HUB DSI**, sans accès direct à Oracle.
 
 ---
 
@@ -1818,6 +1879,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.42** | 2026-09-21 | **D111** : import de l'historique **AIRS DELIB** par **sas** et **concordances** (IMP-01 à IMP-20) — processus en quatre temps, sas `airs_*` générique (MCD inconnu), axes de concordance ouverts, contrôle AD des agents, publication idempotente et réversible, questions HUB (Q-AIRS1 à 6) |
 | **1.41** | 2026-09-21 | **D110** : séance visée en gras (inscrit à l'ordre du jour) ou en italique (pas encore) — SEA-18 |
 | **1.40** | 2026-09-21 | **D109** : « Se souvenir de moi » (SEC-17) ; séance visée dans les dossiers de l'équipe |
 | **1.39** | 2026-09-21 | **D108** : liste des séances refondue (SEA-15), relance des services (SEA-16), lien calendrier Outlook (SEA-17) |

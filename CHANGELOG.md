@@ -9,6 +9,14 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.39.0 — Import AIRS DELIB : sas, concordances et publication
+
+- Nouvel écran **Paramétrages › Import AIRS DELIB** (administrateur d'organisme et SCC) : reprise de l'historique de l'ancien logiciel en trois temps — **sas** (données brutes JSONB, invisibles de l'outil), **concordances** (rapprochement avec les élus, directions, services, agents, commissions, instances et référentiels déjà paramétrés, avec proposition automatique et validation humaine), puis **publication** des actes des séances passées.
+- Un **lot de reprise** se crée, se charge (export JSON du HUB DSI ou **jeu d'essai**), s'analyse et se valide ; la publication reste **bloquée** tant que les concordances obligatoires (direction, service) ne sont pas tranchées ou ignorées.
+- **Contrôle AD / RH** des agents cités par AIRS qui ne se sont jamais connectés (connu, jamais connecté, absent, ambigu) : **aucun compte n'est créé**.
+- Le **mapping des tables AIRS** est déclaratif (MCD inconnu) : il se renseigne en configuration dès réception, sans redéploiement.
+- **Publication idempotente et réversible** : séance, acte, textes et résultat de vote créés une seule fois ; un lot peut être retiré ou annulé, jamais supprimé physiquement. Tout est audité (lot, concordance, publication).
+
 ## 0.38.1 — Séance visée : inscrit ou pas encore
 
 - La **séance visée** s'affiche désormais en **gras** quand l'acte est **inscrit à l'ordre du jour** de la séance, et en *italique* (« pas encore inscrit ») quand elle n'est que visée — tableau de bord, liste des dossiers, fiche du dossier (SEA-18).

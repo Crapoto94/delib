@@ -11,9 +11,19 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.38.1';
+export const VERSION = '0.39.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.39.0', type: 'minor', titre: 'Import AIRS DELIB : sas, concordances et publication',
+    items: [
+      "Nouvel écran Paramétrages › Import AIRS DELIB : reprise de l'historique de l'ancien logiciel en trois temps — sas (données brutes, invisibles), concordances (rapprochement avec vos élus, directions, services, agents et référentiels déjà paramétrés), puis publication des actes des séances passées.",
+      "Un lot de reprise se charge depuis un export JSON du HUB DSI (ou un jeu d'essai), s'analyse, puis se valide : la publication reste bloquée tant que les concordances obligatoires (direction, service) ne sont pas tranchées.",
+      "Contrôle AD des agents cités par AIRS qui ne se sont jamais connectés (connu, jamais connecté, absent, ambigu) — aucun compte n'est créé.",
+      "Le mapping des tables AIRS est déclaratif : dès que le MCD d'AIRS sera connu, il se renseigne en configuration, sans redéploiement.",
+      "Publication idempotente et réversible : chaque acte repris est créé une seule fois (séance, textes, résultat de vote), et un lot peut être annulé.",
+    ],
+  },
   {
     version: '0.38.1', type: 'patch', titre: 'Séance visée : inscrit ou pas encore',
     items: [
