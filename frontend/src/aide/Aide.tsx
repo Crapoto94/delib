@@ -33,7 +33,7 @@ export function AideMenu() {
           <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-mute">Aides disponibles pour votre profil</div>
           <NavLink role="menuitem" to="/aide/ia" onClick={() => setOpen(false)} className="flex items-start gap-3 rounded px-3 py-2 hover:bg-soft">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-head" />
-            <span><span className="block text-[13px] font-semibold text-ink">Aide IA (manifeste)</span><span className="block text-[12px] text-mute">Posez une question : réponse fondée sur le manifeste.</span></span>
+            <span><span className="block text-[13px] font-semibold text-ink">Evelyne Del-IA</span><span className="block text-[12px] text-mute">Posez une question : réponse fondée sur le manifeste.</span></span>
           </NavLink>
           {dispo.map((a) => (
             <NavLink key={a.code} role="menuitem" to={`/aide/${a.code}`} onClick={() => setOpen(false)} className="flex items-start gap-3 rounded px-3 py-2 hover:bg-soft">
@@ -74,7 +74,7 @@ function Hub() {
       <PageTitle title="Centre d'aide" sub="Comment utiliser VibeDélib, expliqué simplement. Les aides affichées dépendent de votre profil." />
       <Link to="/aide/ia" className="card group mb-4 flex items-start gap-4 p-5 transition-shadow hover:shadow-lift">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-action/10 text-action"><Sparkles className="h-5 w-5" /></span>
-        <span className="flex-1"><span className="block font-semibold text-ink">Aide IA — interroger le manifeste</span><span className="mt-1 block text-[13px] leading-relaxed text-mute">Posez une question en langage courant : la réponse s'appuie uniquement sur le manifeste de l'application.</span></span>
+        <span className="flex-1"><span className="block font-semibold text-ink">Evelyne Del-IA — poser une question</span><span className="mt-1 block text-[13px] leading-relaxed text-mute">Posez une question en langage courant : la réponse s'appuie sur le manifeste de l'application, et vous pouvez la noter.</span></span>
         <ArrowRight className="h-4 w-4 shrink-0 text-action" />
       </Link>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

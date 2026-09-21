@@ -81,17 +81,18 @@ describe('import AIRS DELIB depuis Oracle (source directe, lecture seule)', () =
     const ex = (await api(env, admin).get(`${base(ville)}/lots/${lot.id}/concordances/${dir.id}/exemples`)).body;
     expect(ex.exemples[0].titre).toContain('subvention');
 
-    // une séance du sas se publie explicitement, comme un acte (le conseil est créé)
+    // une séance du sas se publie explicitement et importe ses actes
     const seanceItem = d.items.find((x) => x.kind === 'seance');
     expect(seanceItem.statut).toBe('pret');
     const pub = (await api(env, admin).post(`${base(ville)}/lots/${lot.id}/actes/${seanceItem.id}/publier`, {})).body;
     expect(pub.item.seanceId).toBeTruthy();
+    expect(pub.actes).toBe(1);
 
     for (const x of c.filter((y) => y.bloquant && !['manuelle', 'ignoree'].includes(y.etat))) {
       await api(env, admin).post(`${base(ville)}/lots/${lot.id}/concordances/${x.id}`, { cibleType: x.axe === 'direction' ? 'directions' : 'services', cibleCode: x.axe === 'direction' ? 'A1' : 'A1a', cibleLibelle: x.sourceCode });
     }
     const r = (await api(env, admin).post(`${base(ville)}/lots/${lot.id}/publier`, {})).body;
-    expect(r.publies).toBe(1);
+    expect(r.publies).toBe(0); // l'acte a déjà été importé avec sa séance
     const actes = await env.db.all("SELECT statut, seance_id FROM actes WHERE organisme_id = $1 AND custom ? 'airs'", [ville.id]);
     expect(actes.length).toBe(1);
     expect(actes[0].statut).toBe('archive');

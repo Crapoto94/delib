@@ -1,10 +1,11 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, ChevronDown, Circle, CircleDot, GripVertical, GraduationCap, Info, ListChecks, MessageCircleQuestion, Minus, PartyPopper, Sparkles, Star, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Circle, CircleDot, GripVertical, GraduationCap, Info, ListChecks, MessageCircleQuestion, Minus, PartyPopper, Sparkles, X } from 'lucide-react';
 import { api, errMsg, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { Badge, Spinner } from './ui';
 import { useIa } from './useIa';
 import { chargerExtraits } from './aideIa';
+import { NotationReponse } from './Notation';
 
 /** Nom de l'avatar d'aide. Modifiable ici : il apparaît partout (bulle, panneau). */
 export const AVATAR_NOM = 'Evelyne Del-IA';
@@ -337,7 +338,7 @@ export default function DossierAssiste({ acte, editable, onReload, onApercu, toa
                   {reponse && (
                     <div className="rounded border border-line bg-soft p-2 text-[13px] leading-relaxed text-slate-700">
                       <p className="whitespace-pre-wrap">{reponse.texte}</p>
-                      {reponse.id !== null && <NotationDelIa journalId={reponse.id} toast={toast} />}
+                      {reponse.id !== null && <NotationReponse journalId={reponse.id} />}
                     </div>
                   )}
                 </div>
@@ -352,39 +353,6 @@ export default function DossierAssiste({ acte, editable, onReload, onApercu, toa
         </div>
       )}
     </>
-  );
-}
-
-/** Notation d'une réponse de Del-IA : « Ma réponse vous a-t-elle convenu ? » (1 à 4 étoiles + commentaire). */
-function NotationDelIa({ journalId, toast }: { journalId: number; toast: (m: string, k?: 'ok' | 'ko') => void }) {
-  const { org } = useAuth(); const o = org!.id;
-  const [note, setNote] = useState(0); const [commentaire, setCommentaire] = useState('');
-  const [busy, setBusy] = useState(false); const [fait, setFait] = useState(false);
-  if (fait) return <p className="mt-2 text-[12px] font-semibold text-ok-text">Merci, votre avis a été enregistré.</p>;
-  const LIBELLE: Record<number, string> = { 1: 'Pas du tout', 2: 'Peu', 3: 'Bien', 4: 'Très bien' };
-  const envoyer = async () => {
-    if (!note) return; setBusy(true);
-    try { await api.post(orgPath(o, `/ia/delia/${journalId}/note`), { note, commentaire: commentaire.trim() || null }); setFait(true); toast('Merci pour votre retour'); }
-    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
-  };
-  return (
-    <div className="mt-2 border-t border-line pt-2">
-      <p className="text-[12px] font-semibold">Ma réponse vous a-t-elle convenu ?</p>
-      <div className="mt-1 flex items-center gap-1" role="radiogroup" aria-label="Note de la réponse">
-        {[1, 2, 3, 4].map((n) => (
-          <button key={n} type="button" role="radio" aria-checked={note === n} aria-label={`${n} étoile${n > 1 ? 's' : ''}`} onClick={() => setNote(n)}>
-            <Star className={`h-5 w-5 ${n <= note ? 'fill-warn text-warn' : 'text-mute'}`} />
-          </button>
-        ))}
-        <span className="ml-1 text-[11px] text-mute">{note ? LIBELLE[note] : '1 à 4 étoiles'}</span>
-      </div>
-      {note > 0 && (
-        <div className="mt-2 space-y-2">
-          <textarea className="input !text-[12px]" rows={2} placeholder="Commentaire (facultatif)…" value={commentaire} onChange={(e) => setCommentaire(e.target.value)} />
-          <button type="button" className="btn-primary !py-1 !text-[12px]" disabled={busy} onClick={envoyer}>{busy && <Spinner />} Envoyer mon avis</button>
-        </div>
-      )}
-    </div>
   );
 }
 

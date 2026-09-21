@@ -5,6 +5,7 @@ const as = (tok) => ({
   get: (u) => env.http().get(u).set(bearer(tok)),
   post: (u, b) => env.http().post(u).set(bearer(tok)).send(b),
   put: (u, b) => env.http().put(u).set(bearer(tok)).send(b),
+  del: (u) => env.http().delete(u).set(bearer(tok)),
 });
 const base = () => `/api/v1/organismes/${ville.id}`;
 const A = (id) => `${base()}/actes/${id}`;
@@ -152,6 +153,15 @@ describe('bibliothèque des actes de la collectivité (REC-30) : consulter sans 
     expect((await as(t.leroy).get(`${base()}/bibliotheque/actes/${A1}`)).status).toBe(404);
     expect((await as(t.leroy).get(`${base()}/bibliotheque?q=Subvention`)).body.items.map((i) => i.acteId)).not.toContain(A1);
     await env.db.run("UPDATE actes SET confidentialite = 'normale' WHERE id = $1", [A1]);
+  });
+
+  it('administrateur ou SCC : retirer une délibération de la bibliothèque (l’acte est conservé)', async () => {
+    expect((await as(t.leroy).del(`${base()}/bibliotheque/actes/${A1}`)).status).toBe(403); // ni admin ni SCC
+    expect((await as(t.martin).del(`${base()}/bibliotheque/actes/${A1}`)).body).toMatchObject({ retire: true });
+    expect((await as(t.leroy).get(`${base()}/bibliotheque?q=Subvention`)).body.items.map((i) => i.acteId)).not.toContain(A1);
+    expect((await as(t.leroy).get(`${base()}/bibliotheque/actes/${A1}`)).status).toBe(404);
+    expect((await as(t.martin).post(`${base()}/bibliotheque/actes/${A1}/reintegrer`)).body).toMatchObject({ retire: false });
+    expect((await as(t.leroy).get(`${base()}/bibliotheque?q=Subvention`)).body.items.map((i) => i.acteId)).toContain(A1);
   });
 });
 

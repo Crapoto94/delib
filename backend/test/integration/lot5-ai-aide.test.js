@@ -22,6 +22,7 @@ describe("aide IA fondée sur le manifeste", () => {
     env.ai.state.handler = (req) => { vu = req; return 'Cliquez sur « Envoyer pour validation ». (Manifeste › Le circuit)'; };
     const r = await as(dupont).post(`${base()}/ia/manifeste`, { question: 'Comment envoyer un dossier au circuit ?', extraits: [{ titre: 'Manifeste › Le circuit', texte: 'Le dossier part au circuit via le bouton Envoyer pour validation.' }] });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.id).toBeGreaterThan(0); // la question est journalisée (notation possible)
     expect(r.body.reponse).toMatch(/Envoyer pour validation/);
     expect(vu.system).toMatch(/manifeste/i);
     expect(vu.system).toMatch(/UNIQUEMENT/);

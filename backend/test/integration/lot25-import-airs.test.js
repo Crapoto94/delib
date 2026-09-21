@@ -45,26 +45,20 @@ describe('import AIRS DELIB : sas, concordances, publication (D111, IMP-01 à IM
 
     const d = (await as(admin).post(`${base()}/lots/${lotId}/analyser`, {})).body;
     expect(d.compteurs).toMatchObject({ seances: 2, actes: 2, publies: 0 });
-    expect(d.items.filter((x) => x.kind === 'acte').every((x) => x.statut === 'en_attente')).toBe(true);
-    // concordances proposées : direction et service (bloquants) restent à décider
+    expect(d.items.filter((x) => x.kind === 'acte').every((x) => x.statut === 'pret')).toBe(true);
+    // concordances proposées (direction/service ne bloquent plus l'import : enregistrés tels quels sinon)
     const c = d.concordances.items;
     expect(trouve(c, 'direction', 'DIRECTION DES FINANCES').etat).toBe('proposee');
     expect(trouve(c, 'type_acte', 'deliberation').cibleCode).toBe('deliberation');
     expect(trouve(c, 'rubrique', 'SPORTS').cibleLibelle).toBe('SPORTS');
     expect(trouve(c, 'nature', 'Delibérations').cibleCode).toBe('delib');
-    expect(d.blocage.bloquantesNonResolues).toBeGreaterThan(0);
+    expect(d.blocage.bloquantesNonResolues).toBe(0);
   });
 
-  it('la publication est bloquée tant que les concordances bloquantes ne sont pas résolues', async () => {
-    const r = await as(admin).post(`${base()}/lots/${lotId}/publier`, {});
-    expect(r.status).toBe(200); expect(r.body.publies).toBe(0);
-    expect(r.body.ignores.every((x) => x.missing?.some((m) => /Concordance/.test(m.label)))).toBe(true);
-  });
-
-  it('les concordances se décident ; les items deviennent prêts', async () => {
+  it('les concordances de direction/service se décident ; les items restent prêts', async () => {
     const c = (await as(admin).get(`${base()}/lots/${lotId}/concordances`)).body.items;
     const cible = { 'DIRECTION DES FINANCES': 'A1', 'DIRECTION CCAS': 'J', BUDGET: 'A1a', 'AIDE SOCIALE': 'Ja' };
-    for (const x of c.filter((y) => y.bloquant && !['manuelle', 'ignoree'].includes(y.etat))) {
+    for (const x of c.filter((y) => ['direction', 'service'].includes(y.axe) && !['manuelle', 'ignoree'].includes(y.etat))) {
       const r = (await as(admin).post(`${base()}/lots/${lotId}/concordances/${x.id}`, { cibleType: x.axe === 'direction' ? 'directions' : 'services', cibleCode: cible[x.sourceCode], cibleLibelle: x.sourceCode })).body;
       expect(r.etat).toBe('manuelle');
     }

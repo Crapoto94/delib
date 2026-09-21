@@ -25,7 +25,7 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
     JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
     JOIN instances i ON i.id = s.instance_id
     JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite' AND sp.resultat LIKE 'adopte%'
-    WHERE a.organisme_id = $1 AND a.id = $2 AND a.confidentialite = 'normale' AND a.statut NOT IN ('abandonne', 'retire')
+    WHERE a.organisme_id = $1 AND a.id = $2 AND a.confidentialite = 'normale' AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu')
     ORDER BY s.date_seance DESC LIMIT 1`, [org, acteId]);
 
   const svc = {
@@ -34,7 +34,7 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
     // ---------------------------------------------------------------------------------------------------------- 1. bibliothèque
     async chercher(ctx, organismeId, { q = '', annee, matiereId, natureId, rubriqueId, instanceId, rapporteurId, directionCode, du, au, limit = 20, offset = 0 } = {}) {
       const org = requireOrg(organismeId); const p = [org]; const add = (v) => { p.push(v); return `$${p.length}`; };
-      const w = ['a.organisme_id = $1', "a.confidentialite = 'normale'", "a.statut NOT IN ('abandonne', 'retire')", "sp.resultat LIKE 'adopte%'"];
+      const w = ['a.organisme_id = $1', "a.confidentialite = 'normale'", "a.statut NOT IN ('abandonne', 'retire')", "NOT (a.custom ? 'biblio_exclu')", "sp.resultat LIKE 'adopte%'"];
       let rang = '0::float4';
       const an = analyser(q, { poids: 'ABC' }); // titre, objet, matière, dispositif, exposé, visas : jamais les annexes
       if (an.numero) { if (an.numero.suivi !== null) w.push(`a.numero_suivi = ${add(an.numero.suivi)}`); else w.push(`upper(it.numero) = ${add(an.numero.ref.toUpperCase())}`); }
@@ -71,12 +71,51 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
       const pick = (kind) => rows.find((t) => t.kind === kind && (kind === 'expose' ? true : t.deliberation_id === a.deliberation_id))?.markdown || '';
       const annexes = await db.all(`SELECT an.id, an.titre, f.original_name, f.mime, f.size FROM annexes an JOIN files f ON f.id = an.file_id WHERE an.acte_id = $1 AND an.publiable ORDER BY an.ordre, an.id`, [a.id]);
       const matiere = a.matiere_id ? (await db.get('SELECT libelle FROM ref_items WHERE id = $1', [a.matiere_id]))?.libelle : null;
+      // Fiche complète (toutes les informations de la base sur la délibération), structurée par groupes.
+      const full = await db.get('SELECT * FROM actes WHERE id = $1', [a.id]);
+      const ids = [full.type_id, full.nature_id, full.rubrique_id, full.matiere_id].filter(Boolean);
+      const refs = ids.length ? await db.all('SELECT id, libelle FROM ref_items WHERE id = ANY($1::int[])', [ids]) : [];
+      const lib = (id) => (id ? refs.find((r) => r.id === id)?.libelle ?? null : null);
+      const rapporteur = full.rapporteur_id ? await db.get('SELECT prenom, nom FROM elus WHERE id = $1', [full.rapporteur_id]) : null;
+      const aire = full.custom?.airs ?? {};
+      const inf = (groupe, label, valeur) => ({ groupe, label, valeur: valeur === undefined ? null : valeur });
+      const informations = [
+        inf('Identification', 'Numéro de délibération', a.numero),
+        inf('Identification', 'Numéro de suivi (interne)', full.numero_suivi),
+        inf('Identification', "N° de suivi d'origine (AIRS)", aire.numSuivi),
+        inf('Identification', 'N° chrono du rapport (AIRS)', aire.numChrono),
+        inf('Identification', "Type d'acte", lib(full.type_id)),
+        inf('Identification', 'Titre', full.titre),
+        inf('Identification', 'Résultat', RESULTATS[a.resultat] || a.resultat),
+        inf('Séance', 'Date', a.date_seance),
+        inf('Séance', 'Instance', a.instance),
+        inf('Séance', 'Point / n°', a.numero_item ?? null),
+        inf('Classement', 'Nature', lib(full.nature_id)),
+        inf('Classement', 'Matière', lib(full.matiere_id)),
+        inf('Classement', 'Rubrique', lib(full.rubrique_id)),
+        inf('Classement', 'Direction', full.direction_label),
+        inf('Classement', 'Code direction', full.direction_code),
+        inf('Classement', 'Service', full.service_label),
+        inf('Classement', 'Code service', full.service_code),
+        inf('Classement', 'Commission (AIRS)', aire.commission),
+        inf('Classement', 'Confidentialité', full.confidentialite),
+        inf('Classement', 'Incidence financière', full.incidence_financiere === null ? null : (full.incidence_financiere ? 'Oui' : 'Non')),
+        inf('Classement', 'Montant', full.montant === null ? null : Number(full.montant)),
+        inf('Classement', 'Urgent', full.urgence ? 'Oui' : null),
+        inf('Classement', 'Date limite', full.date_limite),
+        inf('Acteurs', 'Rédacteur', full.redacteur),
+        inf('Acteurs', 'Nom du rédacteur (AIRS)', aire.redacteurNom),
+        inf('Acteurs', 'Rapporteur', rapporteur ? `${rapporteur.prenom ?? ''} ${rapporteur.nom ?? ''}`.trim() : null),
+        inf("Import AIRS", 'Clé source', aire.sourceKey),
+        inf("Import AIRS", 'Statut interne', full.statut),
+      ];
       await audit.log(ctx, { organismeId: org, action: 'bibliotheque.consultation', entity: 'actes', entityId: a.id });
       return {
         acteId: a.id, numeroSuivi: a.numero_suivi, titre: a.titre, numero: a.numero, matiere, direction: a.direction_label, montant: a.montant === null ? null : Number(a.montant),
         seance: { id: a.seance_id, dateSeance: a.date_seance, instance: a.instance }, resultat: a.resultat, resultatLabel: RESULTATS[a.resultat] || null,
         expose: pick('expose'), visas: pick('visas'), dispositif: pick('dispositif'), annexes: annexes.map((x) => ({ id: x.id, titre: x.titre || x.original_name, nom: x.original_name, mime: x.mime, taille: Number(x.size) })),
         documents: [{ cible: 'expose', label: 'Exposé des motifs' }, { cible: 'deliberation', label: 'Délibération' }, { cible: 'extrait', label: 'Extrait du registre' }],
+        informations,
       };
     },
 
@@ -90,6 +129,26 @@ function createBibliotheque({ db, audit, render, pv, textes }) {
       if (cible === 'expose') { const r = await render.renderActe(s, org, a.id, { cible: 'expose', mode: 'propre' }); return { buffer: r.buffer, name: `expose-des-motifs-${a.numero || a.numero_suivi}.pdf` }; }
       if (cible === 'deliberation') { const r = await render.renderActe(s, org, a.id, { cible: 'deliberation', deliberationId: a.deliberation_id, mode: 'propre' }); return { buffer: r.buffer, name: `deliberation-${a.numero || a.numero_suivi}.pdf` }; }
       throw E.badRequest('Document inconnu : expose, deliberation ou extrait');
+    },
+
+    /** Retire une délibération de la bibliothèque (administrateur ou SCC) : elle n'y est plus consultable, l'acte reste conservé. */
+    async retirer(ctx, organismeId, acteId) {
+      const org = requireOrg(organismeId);
+      const a = await db.get('SELECT id, custom FROM actes WHERE id = $1 AND organisme_id = $2', [acteId, org]);
+      if (!a) throw E.notFound('Acte introuvable');
+      await db.run(`UPDATE actes SET custom = custom || jsonb_build_object('biblio_exclu', true, 'biblio_exclu_par', $3::text) WHERE id = $1 AND organisme_id = $2`, [acteId, org, ctx.username]);
+      await audit.log(ctx, { organismeId: org, action: 'bibliotheque.retrait', entity: 'actes', entityId: acteId, before: { biblioExclu: !!a.custom?.biblio_exclu } });
+      return { retire: true };
+    },
+
+    /** Réintègre une délibération retirée de la bibliothèque (administrateur ou SCC). */
+    async reintegrer(ctx, organismeId, acteId) {
+      const org = requireOrg(organismeId);
+      const a = await db.get('SELECT id FROM actes WHERE id = $1 AND organisme_id = $2', [acteId, org]);
+      if (!a) throw E.notFound('Acte introuvable');
+      await db.run(`UPDATE actes SET custom = custom - 'biblio_exclu' - 'biblio_exclu_par' WHERE id = $1 AND organisme_id = $2`, [acteId, org]);
+      await audit.log(ctx, { organismeId: org, action: 'bibliotheque.reintegration', entity: 'actes', entityId: acteId });
+      return { retire: false };
     },
 
     // ---------------------------------------------------------------------------------------------------- 2. le trajet de mes actes

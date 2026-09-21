@@ -85,8 +85,15 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts, visa
       let r;
       try { r = await ai.query({ system, prompt, maxTokens: 1200, temperature: 0.1, model: modele || undefined }); }
       catch (e) { if (e?.status) throw e; throw E.upstream(`L'IA n'a pas pu répondre : ${e?.message || 'erreur inconnue'}`); }
-      await audit.log(ctx, { organismeId, action: 'ia.aide_manifeste', entity: 'ia', after: { question: question.slice(0, 200), extraits: morceaux.length, modele: r.model ?? modele ?? null } });
-      return { reponse: r.text, modele: r.model ?? null };
+      let id = null;
+      try {
+        const row = await db.get(
+          'INSERT INTO aide_ia_journal (organisme_id, username, question, reponse, contexte, modele) VALUES ($1,$2,$3,$4,$5::jsonb,$6) RETURNING id',
+          [organismeId, ctx.username, question.slice(0, 2000), r.text.slice(0, 20000), JSON.stringify({ source: 'centre-aide', extraits: morceaux.length }), r.model ?? modele ?? null]);
+        id = Number(row.id);
+        await audit.log(ctx, { organismeId, action: 'ia.aide_manifeste', entity: 'aide_ia_journal', entityId: id, after: { question: question.slice(0, 200), extraits: morceaux.length } });
+      } catch (e) { log?.warn?.({ err: e.message }, 'aide IA : journalisation impossible'); }
+      return { id, reponse: r.text, modele: r.model ?? null };
     },
 
     /**

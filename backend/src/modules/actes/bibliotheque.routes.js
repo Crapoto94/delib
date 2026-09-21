@@ -22,6 +22,10 @@ module.exports = ({ makeRouter, bibliotheque }) => {
     async (req, res) => res.json(await bibliotheque.consulter(req.ctx, req.org.id, req.valid.params.id)));
   r.get('/bibliotheque/actes/:id/pdf', { summary: "PDF d'une délibération de la bibliothèque : exposé des motifs, délibération ou extrait du registre", tags: T, org: true, params: PA, query: Pdf, responses: { 200: 'PDF' } },
     async (req, res) => { const f = await bibliotheque.pdf(req.ctx, req.org.id, req.valid.params.id, req.valid.query.cible); res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', `inline; filename="${f.name}"`); res.send(f.buffer); });
+  r.delete('/bibliotheque/actes/:id', { summary: 'Retire une délibération de la bibliothèque (administrateur ou SCC) : elle n\'y est plus consultable, l\'acte reste conservé', tags: T, org: true, roles: ['org_admin', 'scc'], params: PA },
+    async (req, res) => res.json(await bibliotheque.retirer(req.ctx, req.org.id, req.valid.params.id)));
+  r.post('/bibliotheque/actes/:id/reintegrer', { summary: 'Réintègre une délibération retirée de la bibliothèque', tags: T, org: true, roles: ['org_admin', 'scc'], params: PA },
+    async (req, res) => res.json(await bibliotheque.reintegrer(req.ctx, req.org.id, req.valid.params.id)));
 
   r.get('/mes-actes', { summary: "Le trajet de mes actes : les dossiers pour lesquels j'ai eu un rôle à un moment (rédacteur, valideur, remplaçant, commentateur…), tous statuts", tags: T, org: true, params: P, query: Mes },
     async (req, res) => res.json(await bibliotheque.mesActes(req.ctx, req.org.id, req.valid.query)));

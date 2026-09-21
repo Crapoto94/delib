@@ -63,6 +63,10 @@ module.exports = ({ makeRouter, actes }) => {
     async (req, res) => res.json(await actes.abandon(req.ctx, req.org.id, req.valid.params.id, req.valid.body.motif)));
   r.post('/:id/reactivate', { summary: 'Réactive un acte abandonné', tags: ['actes'], org: true, params: IdP },
     async (req, res) => res.json(await actes.reactivate(req.ctx, req.org.id, req.valid.params.id)));
+  r.post('/:id/rappeler', { summary: "Rappelle un acte en circuit (motif obligatoire) : casse le circuit, nouvel état « rappele »", tags: ['actes'], org: true, params: IdP, body: Abandon },
+    async (req, res) => res.json(await actes.rappeler(req.ctx, req.org.id, req.valid.params.id, req.valid.body.motif)));
+  r.delete('/:id', { summary: 'Supprime un acte HORS circuit (un acte en circuit doit être rappelé)', tags: ['actes'], org: true, params: IdP },
+    async (req, res) => res.json(await actes.supprimer(req.ctx, req.org.id, req.valid.params.id)));
   r.post('/:id/duplicate', { summary: 'Duplique un acte (nouveau brouillon)', tags: ['actes'], org: true, params: IdP, responses: { 201: 'Créé' } },
     async (req, res) => res.status(201).json(await actes.duplicate(req.ctx, req.org.id, req.valid.params.id)));
 

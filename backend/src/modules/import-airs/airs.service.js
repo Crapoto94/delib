@@ -6,26 +6,31 @@
  * mapping déclaratif (`airs_source_tables`) : brancher une table AIRS est de la configuration, jamais du code.
  */
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileP = promisify(execFile);
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
 
 const ETATS = ['a_faire', 'proposee', 'automatique', 'manuelle', 'ignoree'];
 const REF_KINDS = { type_acte: 'type_acte', nature: 'nature', rubrique: 'rubrique', matiere: 'matiere' };
-const BLOQUANTS = ['direction', 'service'];
+const BLOQUANTS = []; // direction/service ne bloquent plus l'import : enregistrés tels quels s'ils ne sont pas rapprochés (reprise historique)
 // Types de conseil (séance) proposés à la concordance : le « type » d'une séance n'est jamais un type d'acte.
 const TYPES_SEANCE = ['ordinaire', 'extraordinaire', 'budgetaire', 'autre'];
 const LIBELLES_SEANCE = { ordinaire: 'Ordinaire', extraordinaire: 'Extraordinaire', budgetaire: 'Budgétaire', autre: 'Autre' };
 // champ canonique -> axe de concordance
 const CHAMP_AXE = { type: 'type_acte', nature: 'nature', rubrique: 'rubrique', matiere: 'matiere', direction: 'direction', service: 'service', redacteur: 'agent', rapporteur: 'elu', rapporteur_compl: 'elu', instance: 'instance', commission: 'commission' };
 const AXES = ['organisme', 'instance', 'type_seance', 'direction', 'service', 'agent', 'elu', 'commission', 'type_acte', 'nature', 'rubrique', 'matiere'];
-const CANON = ['numero', 'titre', 'objet', 'type', 'type_seance', 'nature', 'rubrique', 'matiere', 'direction', 'service', 'redacteur', 'redacteur_nom', 'rapporteur', 'rapporteur_compl', 'resultat', 'date', 'expose', 'considere', 'visas', 'dispositif', 'seance', 'instance', 'lieu', 'commission', 'incidence_financiere', 'montant'];
+const CANON = ['numero', 'num_suivi', 'num_chrono', 'origine', 'titre', 'objet', 'type', 'type_seance', 'nature', 'rubrique', 'matiere', 'direction', 'service', 'redacteur', 'redacteur_nom', 'rapporteur', 'rapporteur_compl', 'resultat', 'date', 'expose', 'considere', 'visas', 'dispositif', 'seance', 'instance', 'lieu', 'commission', 'incidence_financiere', 'montant'];
 
 // Catalogue de départ aligné sur le MCD d'AIRS Delib (voir `airs_mcd.md`) : `seances` et `actes` reçoivent
 // les lignes extraites de la base Oracle ; `rapports` reste disponible pour un export JSON du HUB DSI.
 const DEFAULT_MAPPING = [
   { table_name: 'seances', libelle: 'Séances AIRS', entite_cible: 'seance', cle_colonne: 'id', ordre: 1, colonnes: [{ source: 'id', cible: 'id_source' }, { source: 'instance', cible: 'instance' }, { source: 'type_seance', cible: 'type_seance' }, { source: 'date', cible: 'date' }, { source: 'lieu', cible: 'lieu' }, { source: 'titre', cible: 'titre' }, { source: 'numero', cible: 'numero' }] },
   { table_name: 'rapports', libelle: 'Rapports / dossiers AIRS', entite_cible: 'acte', cle_colonne: 'id', ordre: 2, colonnes: [{ source: 'id', cible: 'numero' }, { source: 'objet', cible: 'titre' }, { source: 'seance', cible: 'seance' }, { source: 'type', cible: 'type' }, { source: 'nature', cible: 'nature' }, { source: 'rubrique', cible: 'rubrique' }, { source: 'matiere', cible: 'matiere' }, { source: 'direction', cible: 'direction' }, { source: 'service', cible: 'service' }, { source: 'redacteur', cible: 'redacteur' }, { source: 'rapporteur', cible: 'rapporteur' }, { source: 'resultat', cible: 'resultat' }, { source: 'expose', cible: 'expose' }, { source: 'considere', cible: 'considere' }, { source: 'dispositif', cible: 'dispositif' }] },
-  { table_name: 'actes', libelle: 'Actes AIRS (séances passées)', entite_cible: 'acte', cle_colonne: 'id', ordre: 3, colonnes: [{ source: 'titre', cible: 'titre' }, { source: 'numero', cible: 'numero' }, { source: 'type', cible: 'type' }, { source: 'nature', cible: 'nature' }, { source: 'matiere', cible: 'matiere' }, { source: 'rubrique', cible: 'rubrique' }, { source: 'direction', cible: 'direction' }, { source: 'service', cible: 'service' }, { source: 'redacteur', cible: 'redacteur' }, { source: 'redacteur_nom', cible: 'redacteur_nom' }, { source: 'rapporteur', cible: 'rapporteur' }, { source: 'resultat', cible: 'resultat' }, { source: 'date', cible: 'date' }, { source: 'seance', cible: 'seance' }, { source: 'commission', cible: 'commission' }, { source: 'instance', cible: 'instance' }, { source: 'incidence_financiere', cible: 'incidence_financiere' }, { source: 'montant', cible: 'montant' }] },
+  { table_name: 'actes', libelle: 'Actes AIRS (séances passées)', entite_cible: 'acte', cle_colonne: 'id', ordre: 3, colonnes: [{ source: 'titre', cible: 'titre' }, { source: 'numero', cible: 'numero' }, { source: 'num_suivi', cible: 'num_suivi' }, { source: 'num_chrono', cible: 'num_chrono' }, { source: 'type', cible: 'type' }, { source: 'nature', cible: 'nature' }, { source: 'matiere', cible: 'matiere' }, { source: 'rubrique', cible: 'rubrique' }, { source: 'direction', cible: 'direction' }, { source: 'service', cible: 'service' }, { source: 'redacteur', cible: 'redacteur' }, { source: 'redacteur_nom', cible: 'redacteur_nom' }, { source: 'rapporteur', cible: 'rapporteur' }, { source: 'resultat', cible: 'resultat' }, { source: 'date', cible: 'date' }, { source: 'seance', cible: 'seance' }, { source: 'commission', cible: 'commission' }, { source: 'instance', cible: 'instance' }, { source: 'incidence_financiere', cible: 'incidence_financiere' }, { source: 'montant', cible: 'montant' }] },
 ];
 
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
@@ -33,6 +38,8 @@ const str = (v) => (v === null || v === undefined ? '' : String(v));
 const slug = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '').slice(0, 60);
 /** Retire une civilité en tête (« Monsieur », « Madame », « M. »…) : l'annuaire n'en porte pas. */
 const sansCivilite = (s) => str(s).replace(/^(monsieur|madame|mademoiselle|mme|mlle|mr|m)\b[.\s-]*/i, '').trim();
+/** Code d'une direction/service AIRS : la partie après le dernier « - » (« Service X - BB2 » → « BB2 »). */
+const codeDepuis = (v) => { const s = str(v).trim(); const parts = s.split(/\s[-–—]\s/); return parts.length > 1 ? parts.pop().trim() : null; };
 const sha = (v) => crypto.createHash('sha256').update(JSON.stringify(v ?? null)).digest('hex');
 
 /**
@@ -543,6 +550,27 @@ function createAirs({ db, audit, dir, source, ad }) {
     return { crees };
   }
 
+  /** Crée en une fois les directions/services non rapprochés comme entités HISTORIQUES (anciennes organisations). */
+  async function creerDsNonRappropries(ctx, org, importId) {
+    const o = requireOrg(org); await lotDe(o, importId);
+    const rows = await db.all(`SELECT * FROM airs_concordances WHERE import_id = $1 AND axe IN ('direction', 'service') AND etat = 'a_faire'`, [importId]);
+    let crees = 0;
+    for (const r of rows) {
+      const type = r.axe === 'direction' ? 'direction' : 'service';
+      const brut = str(r.source_code).trim();
+      const parts = brut.split(/\s[-–—]\s/);
+      const code = parts.length > 1 ? parts.pop().trim() : null;
+      const libelle = parts.join(' - ').trim() || brut;
+      const h = await creerHistorique(ctx, o, { type, code, libelle });
+      const cibleCode = h.code || `hist:${h.id}`;
+      await db.run(`UPDATE airs_concordances SET etat = 'manuelle', cible_type = $2, cible_id = $3, cible_code = $4, cible_libelle = $5, decide_par = $6, decide_at = now() WHERE id = $1`,
+        [r.id, type === 'direction' ? 'directions_historiques' : 'services_historiques', h.id, cibleCode, h.libelle, ctx.username]);
+      crees++;
+    }
+    await event(o, importId, ctx.username, 'ds.crees', { nombre: crees });
+    return { crees };
+  }
+
   /** Marque les valeurs de commission restantes comme « hors commission » (commission absente de l'application). */
   async function horsCommission(ctx, org, importId) {
     const o = requireOrg(org); await lotDe(o, importId);
@@ -704,9 +732,14 @@ function createAirs({ db, audit, dir, source, ad }) {
 
   const mapResultat = (r) => { const v = norm(r); if (!v) return null; if (v.includes('REJET')) return 'rejete'; if (v.includes('UNANIM')) return 'adopte_unanimite'; if (v.includes('ADOPT')) return 'adopte_majorite'; return null; };
 
-  async function publierSeance(ctx, o, importId, item) {
+  async function publierSeance(ctx, o, importId, item, { implicite = false } = {}) {
     const link = await db.get(`SELECT entity_id FROM airs_links WHERE organisme_id = $1 AND kind = 'seance' AND source_key = $2`, [o, item.source_key]);
-    if (link) { await db.run(`UPDATE airs_import_items SET seance_id = $2, statut = 'publie', pubie_at = now(), pubie_par = $3 WHERE id = $1`, [item.id, link.entity_id, ctx.username]); return link.entity_id; }
+    if (link) {
+      // Import implicite (via un acte) : la séance est créée, mais le conseil n'est PAS marqué « importé ».
+      if (implicite) await db.run(`UPDATE airs_import_items SET seance_id = $2 WHERE id = $1`, [item.id, link.entity_id]);
+      else await db.run(`UPDATE airs_import_items SET seance_id = $2, statut = 'publie', pubie_at = now(), pubie_par = $3 WHERE id = $1`, [item.id, link.entity_id, ctx.username]);
+      return link.entity_id;
+    }
     const { resolved } = await resoudre(o, importId, item);
     const instanceId = resolved.instanceId ?? (await db.get('SELECT id FROM instances WHERE organisme_id = $1 ORDER BY id LIMIT 1', [o]))?.id;
     if (!instanceId) throw E.incomplete('Aucune instance de séance : paramétrez une instance avant de publier', { missing: [{ code: 'instance', label: 'Instance de séance' }] });
@@ -717,7 +750,8 @@ function createAirs({ db, audit, dir, source, ad }) {
     [o, instanceId, resolved.typeSeance ?? 'ordinaire', date, item.payload.lieu ?? null, passe ? 'close' : 'planifiee', passe ? 'tenue' : 'en_preparation', passe ? date : null, ctx.username]);
     if (passe) await db.run(`INSERT INTO seance_tenue (seance_id, organisme_id, statut, close_at, close_par, ouverte_par) VALUES ($1,$2,'close',$3,$4,$4) ON CONFLICT (seance_id) DO NOTHING`, [seance.id, o, date, ctx.username]);
     await db.run(`INSERT INTO airs_links (organisme_id, kind, source_key, entity_id, import_id) VALUES ($1,'seance',$2,$3,$4) ON CONFLICT (organisme_id, kind, source_key) DO UPDATE SET entity_id = EXCLUDED.entity_id`, [o, item.source_key, seance.id, importId]);
-    await db.run(`UPDATE airs_import_items SET seance_id = $2, statut = 'publie', pubie_at = now(), pubie_par = $3 WHERE id = $1`, [item.id, seance.id, ctx.username]);
+    if (implicite) await db.run(`UPDATE airs_import_items SET seance_id = $2 WHERE id = $1`, [item.id, seance.id]);
+    else await db.run(`UPDATE airs_import_items SET seance_id = $2, statut = 'publie', pubie_at = now(), pubie_par = $3 WHERE id = $1`, [item.id, seance.id, ctx.username]);
     return seance.id;
   }
 
@@ -730,24 +764,26 @@ function createAirs({ db, audit, dir, source, ad }) {
     const p = item.payload;
     const typeId = resolved.typeId ?? (await db.get(`SELECT id FROM ref_items WHERE kind = 'type_acte' AND code = 'deliberation' AND (organisme_id IS NULL OR organisme_id = $1) ORDER BY organisme_id NULLS LAST LIMIT 1`, [o]))?.id;
     if (!typeId) throw E.incomplete('Type d’acte introuvable', { missing: [{ code: 'type_acte', label: 'Type d’acte' }] });
-    const seanceId = seanceItem ? await publierSeance(ctx, o, importId, await db.get('SELECT * FROM airs_import_items WHERE id = $1', [seanceItem.id])) : null;
+    const seanceId = seanceItem ? await publierSeance(ctx, o, importId, await db.get('SELECT * FROM airs_import_items WHERE id = $1', [seanceItem.id]), { implicite: true }) : null;
     const titre = str(p.titre ?? p.objet).trim();
     const statut = lot.mode === 'passes' ? 'archive' : 'brouillon';
-    const custom = { airs: { importId, sourceKey: item.source_key, numero: p.numero ?? null, resultat: p.resultat ?? null, direction: p.direction ?? null, service: p.service ?? null, commission: p.commission ?? null, redacteurNom: resolved.redacteurNom ?? null } };
+    const numeroBrut = str(p.numero).trim();
+    const numeroPoint = numeroBrut && numeroBrut !== '0' ? numeroBrut : null; // AIRS met « 0 » partout : pas de n° de point (évite le doublon)
+    const custom = { airs: { importId, sourceKey: item.source_key, numero: p.numero ?? null, numSuivi: p.num_suivi ?? null, numChrono: p.num_chrono ?? null, resultat: p.resultat ?? null, direction: p.direction ?? null, service: p.service ?? null, commission: p.commission ?? null, redacteurNom: resolved.redacteurNom ?? null } };
     const acte = await db.tx(async (q) => {
       const numeroSuivi = await prochainNumeroSuivi(q, o);
       const a = await q.get(`INSERT INTO actes (organisme_id, numero_suivi, type_id, titre, statut, redacteur, direction_code, direction_label, service_code, service_label,
           nature_id, matiere_id, rubrique_id, incidence_financiere, montant, rapporteur_id, rapporteur_compl_id, seance_id, custom, participants)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,'[]'::jsonb) RETURNING *`,
-      [o, numeroSuivi, typeId, titre || `Acte importé ${item.source_key}`, statut, resolved.redacteur || resolved.redacteurNom || 'import.airs', resolved.directionCode || 'AIRS',
-        resolved.directionLabel || str(p.direction) || null, resolved.serviceCode || null, resolved.serviceLabel || str(p.service) || null, resolved.natureId, resolved.matiereId, resolved.rubriqueId,
+      [o, numeroSuivi, typeId, titre || `Acte importé ${item.source_key}`, statut, resolved.redacteur || resolved.redacteurNom || 'import.airs', resolved.directionCode || codeDepuis(p.direction) || 'AIRS',
+        resolved.directionLabel || str(p.direction) || null, resolved.serviceCode || codeDepuis(p.service) || null, resolved.serviceLabel || str(p.service) || null, resolved.natureId, resolved.matiereId, resolved.rubriqueId,
         p.incidence_financiere ?? null, p.montant ?? null, resolved.rapporteurId, resolved.rapporteurComplId, seanceId, JSON.stringify(custom)]);
       const delib = await q.get(`INSERT INTO deliberations (acte_id, ordre, titre) VALUES ($1,1,$2) RETURNING id`, [a.id, titre || 'Délibération']);
       const texts = [['expose', null, str(p.expose)], ['visas', delib.id, str(p.visas ?? p.considere)], ['dispositif', delib.id, str(p.dispositif)]];
       for (const [kind, delibId, markdown] of texts) if (markdown) await q.run(`INSERT INTO tracked_texts (organisme_id, acte_id, deliberation_id, kind, markdown, updated_by) VALUES ($1,$2,$3,$4,$5,$6)`, [o, a.id, delibId, kind, markdown, ctx.username]);
       if (seanceId) {
         const item2 = await q.get(`INSERT INTO seance_items (organisme_id, seance_id, position, kind, acte_id, deliberation_id, titre, numero, statut, created_by)
-          SELECT $1,$2, COALESCE(MAX(position),0)+1, 'deliberation', $3,$4,$5,$6, $7, $8 FROM seance_items WHERE seance_id = $2 RETURNING *`, [o, seanceId, a.id, delib.id, titre, str(p.numero) || null, statut === 'archive' ? 'a_traiter' : 'a_traiter', ctx.username]);
+          SELECT $1,$2, COALESCE(MAX(position),0)+1, 'deliberation', $3,$4,$5,$6, $7, $8 FROM seance_items WHERE seance_id = $2 RETURNING *`, [o, seanceId, a.id, delib.id, titre, numeroPoint, statut === 'archive' ? 'a_traiter' : 'a_traiter', ctx.username]);
         const res = mapResultat(p.resultat);
         await q.run(`INSERT INTO seance_points (item_id, seance_id, etat, resultat, close_at, close_par) VALUES ($1,$2,$3,$4,$5,$6)`,
           [item2.id, seanceId, statut === 'archive' ? 'traite' : 'a_traiter', statut === 'archive' ? (res || 'adopte_majorite') : null, statut === 'archive' ? new Date().toISOString() : null, statut === 'archive' ? ctx.username : null]);
@@ -808,13 +844,54 @@ function createAirs({ db, audit, dir, source, ad }) {
     return { retires: items.filter((x) => x.acte_id).length };
   }
 
+  /** Annule l'import d'un élément (conseil — et ses actes — ou acte seul) et le remet « à importer ». */
+  async function dePublierItem(ctx, org, importId, itemId) {
+    const o = requireOrg(org); await lotDe(o, importId);
+    const item = await db.get(`SELECT * FROM airs_import_items WHERE id = $1 AND import_id = $2`, [itemId, importId]);
+    if (!item) throw E.notFound('Item introuvable');
+    if (item.statut !== 'publie' && !item.seance_id && !item.acte_id) return { annule: false };
+    const cibles = item.kind === 'seance'
+      ? await db.all(`SELECT * FROM airs_import_items WHERE import_id = $1 AND kind = 'acte' AND payload->>'seance' = $2`, [importId, item.source_key])
+      : [item];
+    let actes = 0;
+    for (const a of cibles) {
+      if (!a.acte_id) continue;
+      await db.run(`UPDATE actes SET statut = 'abandonne', custom = custom || '{"airs_annule": true}'::jsonb WHERE id = $1 AND organisme_id = $2`, [a.acte_id, o]);
+      if (a.seance_id) await db.run(`UPDATE seance_items SET statut = 'retire', retire_motif = 'Import AIRS DELIB annulé' WHERE acte_id = $1`, [a.acte_id]);
+      await db.run(`DELETE FROM airs_links WHERE organisme_id = $1 AND kind = 'acte' AND source_key = $2`, [o, a.source_key]);
+      await db.run(`UPDATE airs_import_items SET statut = 'en_attente', acte_id = NULL, pubie_at = NULL, pubie_par = NULL WHERE id = $1`, [a.id]);
+      actes++;
+    }
+    if (item.kind === 'seance') {
+      const link = await db.get(`SELECT entity_id FROM airs_links WHERE organisme_id = $1 AND kind = 'seance' AND source_key = $2`, [o, item.source_key]);
+      if (link) {
+        await db.run(`DELETE FROM seances WHERE id = $1 AND organisme_id = $2`, [link.entity_id, o]);
+        await db.run(`DELETE FROM airs_links WHERE organisme_id = $1 AND kind = 'seance' AND source_key = $2`, [o, item.source_key]);
+      }
+      await db.run(`UPDATE airs_import_items SET statut = 'en_attente', seance_id = NULL, pubie_at = NULL, pubie_par = NULL WHERE id = $1`, [item.id]);
+    }
+    await majStatutLot(o, importId);
+    await event(o, importId, ctx.username, 'import.annule', { kind: item.kind, sourceKey: item.source_key, actes });
+    return { annule: true, actes };
+  }
+
+  /** Importe TOUS les actes du sas (séances créées au besoin), et renvoie le détail des échecs. */
+  async function importerTousLesActes(ctx, org, importId) {
+    const o = requireOrg(org); await lotDe(o, importId);
+    const result = { publies: 0, ignores: [] };
+    const actes = await db.all(`SELECT * FROM airs_import_items WHERE import_id = $1 AND kind = 'acte' AND statut != 'publie' ORDER BY id`, [importId]);
+    for (const a of actes) { try { await publierActe(ctx, o, importId, a); result.publies++; } catch (e) { result.ignores.push({ sourceKey: a.source_key, motif: e.message, missing: e.details?.missing || null }); } }
+    await majStatutLot(o, importId);
+    return result;
+  }
+
   async function majStatutLot(org, importId) {
     const r = await db.get(`SELECT count(*) FILTER (WHERE statut = 'publie')::int AS p, count(*) FILTER (WHERE statut != 'publie' AND statut != 'ignore')::int AS reste FROM airs_import_items WHERE import_id = $1`, [importId]);
     const statut = r.p > 0 && r.reste === 0 ? 'publie' : 'concordances';
     await db.run(`UPDATE airs_imports SET statut = $2 WHERE id = $1 AND statut != 'annule'`, [importId, statut]);
   }
 
-  // ---------------------------------------------------------------------------------------------------------- agents
+  // --------------------------------------------------------------------------------------------------------- agents
   /** Contrôle AD / RH d'agents jamais connectés (IMP-12) : jamais de création, seulement un diagnostic. */
   async function verifierAgents(ctx, org, valeurs) {
     const o = requireOrg(org); const out = [];
@@ -854,8 +931,8 @@ function createAirs({ db, audit, dir, source, ad }) {
     AXES, ETATS, BLOQUANTS, REF_KINDS, CHAMP_AXE, DEFAULT_MAPPING, TYPES_SEANCE,
     getMapping, setMapping, tablesSource, apercuTable, validerTable,
     creerLot, lister, charger, chargerDemo, chargerOracle, etatSource, annuler, supprimerLot,
-    analyser, proposer, concordances, exemplesConcordance, decider, validerTout, creerConcordanceHistorique, creerAgentsNonRappropries, creerElusNonRappropries, horsCommission, cibles,
-    items, detail, progression, resoudre, publierItem, publierTout, ignorerItem, dePublier, verifierAgents,
+    analyser, proposer, concordances, exemplesConcordance, decider, validerTout, creerConcordanceHistorique, creerAgentsNonRappropries, creerElusNonRappropries, creerDsNonRappropries, horsCommission, cibles,
+    items, detail, progression, resoudre, publierItem, publierTout, importerTousLesActes, ignorerItem, dePublier, dePublierItem, verifierAgents,
     _canonise: canonise, _demo: demo,
   });
   return svc;

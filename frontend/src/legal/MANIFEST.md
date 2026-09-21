@@ -1920,3 +1920,31 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **1.4** | 2026-09-19 | décisions **D50 à D55** : identité et logo de l'organisme (aussi logo de l'application et des PDF), réunions de commission avec projets présentés et Teams, IA en arrière plan avec file d'attente paramétrable, séances passées et dossiers visant une séance, `docker compose` complet ; **copie de délibération assistée par IA**, éditeur en modale et polices Interstate réalisés |
 | **1.3** | 2026-09-19 | décisions **D47 à D49** : « Afficher en tant que » (administrateur, SCC), autocomplétion des agents partout (`@nom`), tableau de bord avec l'équipe (N-x) et les actes validés en cours de circuit ; **ODJ et numérotation**, utilisateurs et rôles, gabarits PDF (police Interstate, choix du gabarit) réalisés |
 | **1.2** | 2026-09-19 | **lots 1 à 4a réalisés** (actes, textes suivis, PDF, circuit, délégations, notifications et relances, élus, commissions, séances, dérogations) ; **premier frontend** d'après Stitch ; décisions **D39 à D46** : éditeur en modale WYSIWYG (articles automatiques), copie de délibération assistée par IA, administration des utilisateurs et des rôles, connexion de développement, jeu de démonstration, commissions réelles (sièges, thématiques), fiche RH sans e-mail AD, erreur 423 de date limite |
+
+---
+
+## 34 bis — Journal des évolutions (session 2026-09-21)
+
+Reprise de données AIRS DELIB, recherche et consultation de la bibliothèque, cycle de vie des actes.
+
+### Import AIRS DELIB
+- **Type de conseil** (`type_seance`) : « Ordinaire / Extra-ordinaire » rattaché à la séance, jamais au type d'acte ; table source `actes` ajoutée aux organismes existants ; migration de reclassement des lots déjà analysés.
+- **Directions / services** : rapprochement par **code** (direction : chiffre retiré — BF1 → BF ; service : code complet — BF1), directions générales (organigramme RH + DGA définies dans l'app) incluses, liste complète et triée par code.
+- **Agents** : recherche AD par identifiant (`ad.getUser`) puis par nom, civilité retirée, dérivation du nom depuis « InitialeNom » (NHoudart → Houdart) ; agents partis **conservés** (nom gardé, sans compte) ; bouton « Créer les agents non rapprochés » ; seconde passe qui re-propose les agents ignorés automatiquement.
+- **Élus** : civilité retirée (« Monsieur / Madame… ») ; bouton « Créer les élus non rapprochés ».
+- **Directions/services historiques** (anciennes organisations, sans code) : table `entites_historiques` ; bouton « Créer les non rapprochés ».
+- **Commissions** : « Hors commission (hors application) » + bouton « Tout hors commission ».
+- **Nature** : code AIRS numérique = **ordre** de la nature VibeDélib.
+- **Directions/services non bloquants** à l'import ; extraction des **numéros** (`RAP_NUM_SUIVI`, `RAP_NUM_CHRONO`) et **repli rapporteur** (texte) ; le n° de point « 0 » n'est plus écrit (corrige le blocage `seance_items_numero_uq` qui n'importait qu'un acte par conseil).
+- **Faux « actes isolés »** supprimés : les `DOC_DEL_DELIB` sans rapport sont des doublons « courants » d'actes archivés (sans date ni séance) ; l'archive porte le rattachement.
+- Progression (compteur + barre), insertion par lots, index en mémoire (détail de lot rapide) ; boutons « Importer tous les conseils », « Importer tous les actes », « Annuler l'import » ; « Valider toutes les assignations automatiques » ; blocs validés repliés.
+
+### Bibliothèque
+- **Recherche avancée** : rapporteur, direction, période de séance, thématique, nature, rubrique, instance ; colonne Rapporteur ; pagination.
+- **Consultation** : fiche complète et structurée (Identification, Séance, Classement, Acteurs, Import AIRS) en plus de l'exposé, des visas, du dispositif et des annexes.
+- **Retrait de la bibliothèque** (administrateur/SCC) : `DELETE /bibliotheque/actes/:id` (l'acte est conservé), et réintégration.
+
+### Actes — suppression / rappel
+- **Suppression d'un acte hors circuit** : `DELETE /actes/:id` (avec modale de confirmation), refusée si une étape est en cours.
+- **Rappel d'un acte en circuit** : `POST /actes/:id/rappeler` avec **motif obligatoire** — casse le circuit (étape courante marquée « returned ») et **informe les intervenants** (règle de notification `acte.rappele`).
+- **Nouvel état `rappele`** (migration `0056_acte_rappel.sql`) avec `rappel_motif` et `rappel_at`.

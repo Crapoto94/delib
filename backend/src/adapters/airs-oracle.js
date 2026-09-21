@@ -33,7 +33,9 @@ SELECT * FROM (
     AND (:annee IS NULL OR EXTRACT(YEAR FROM a.SEA_DT_DEBUT) = :annee)
 ) ORDER BY "date"`;
 
-// Actes : délibérations courantes (rapport lié), délibérations isolées, délibérations archivées.
+// Actes : délibérations courantes (rapport lié) et délibérations archivées.
+// Les DOC_DEL_DELIB sans PROJET_DELIB (≈258) sont des doublons « courants » d'actes archivés, sans date ni
+// référence de séance : l'archive porte le rattachement, on ne les reprend donc pas (sinon faux « actes isolés »).
 const ACTES_SQL = `
 SELECT * FROM (
   SELECT 'act:' || dl.DEL_ID AS "id",
@@ -42,9 +44,10 @@ SELECT * FROM (
          TO_CHAR(d.DDE_DT_VOTE, 'YYYY-MM-DD"T"HH24:MI:SS') AS "date",
          r.RAP_DIRECTION AS "direction", r.RAP_SERVICE AS "service", r.RAP_RUB AS "rubrique",
          u.USR_LOGIN AS "redacteur", r.RAP_INSTRUCTEUR AS "redacteur_nom",
-         e.ELD_PRENOM || ' ' || e.ELD_NOM AS "rapporteur",
+         COALESCE(e.ELD_PRENOM || ' ' || e.ELD_NOM, r.RAP_RAPPORTEUR) AS "rapporteur",
          c.COM_LABEL AS "commission", s.SEA_ASSEMBLEE AS "instance",
          f.CODENATURE AS "nature", f.CODEMATIERE AS "matiere",
+         r.RAP_NUM_SUIVI AS "num_suivi", r.RAP_NUM_CHRONO AS "num_chrono",
          d.DDE_NUMERO AS "numero", r.RAP_INCIDENCE AS "incidence_financiere", r.RAP_MONTANT AS "montant",
          'deliberation' AS "type", 'courant' AS "origine"
   FROM DELIBUSER.PROJET_DELIB dl
@@ -58,14 +61,6 @@ SELECT * FROM (
   LEFT JOIN DELIBUSER.FAST_RAPPORT_CLASSIF f ON f.RAP_ID = p.RAP_ID
   WHERE (:annee IS NULL OR EXTRACT(YEAR FROM d.DDE_DT_VOTE) = :annee)
   UNION ALL
-  SELECT 'act:' || d.DOC_ID, NULL, d.DDE_TITRE, d.DDE_RESULTAT,
-         TO_CHAR(d.DDE_DT_VOTE, 'YYYY-MM-DD"T"HH24:MI:SS'),
-         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-         d.DDE_NUMERO, NULL, NULL, 'deliberation', 'isole'
-  FROM AIRSUSER.DOC_DEL_DELIB d
-  WHERE d.DOC_ID NOT IN (SELECT DEL_ID FROM DELIBUSER.PROJET_DELIB)
-    AND (:annee IS NULL OR EXTRACT(YEAR FROM d.DDE_DT_VOTE) = :annee)
-  UNION ALL
   SELECT 'act:' || a.DOC_ID,
          CASE WHEN a.ARC_SEANCE_REF IS NOT NULL THEN 'sea:' || REGEXP_SUBSTR(a.ARC_SEANCE_REF, '[0-9]+') END,
          COALESCE(a.DDE_TITRE, a.RAP_TITRE), a.DDE_RESULTAT,
@@ -73,14 +68,14 @@ SELECT * FROM (
          a.RAP_DIRECTION, a.RAP_SERVICE, a.RAP_RUB,
          a.RAP_UTILISATEUR, a.RAP_INSTRUCTEUR, a.RAP_RAPPORTEUR,
          NULL, a.SEA_ASSEMBLEE, NULL, NULL,
-         a.DDE_NUMERO, NULL, a.RAP_MONTANT, 'deliberation', 'archive'
+         a.RAP_NUM_SUIVI, a.RAP_NUM_CHRONO, a.DDE_NUMERO, NULL, a.RAP_MONTANT, 'deliberation', 'archive'
   FROM AIRSUSER.DOC_DEL_ARCHIVE a
   WHERE a.ARC_TYPE = 'Delib'
     AND (:annee IS NULL OR EXTRACT(YEAR FROM a.DDE_DT_VOTE) = :annee)
 ) ORDER BY "date"`;
 
 const CHAMPS_SEANCE = ['id', 'titre', 'instance', 'type_seance', 'date', 'heure', 'lieu', 'numero', 'president', 'origine'];
-const CHAMPS_ACTE = ['id', 'seance', 'titre', 'numero', 'type', 'nature', 'matiere', 'rubrique', 'direction', 'service',
+const CHAMPS_ACTE = ['id', 'seance', 'titre', 'numero', 'num_suivi', 'num_chrono', 'type', 'nature', 'matiere', 'rubrique', 'direction', 'service',
   'redacteur', 'redacteur_nom', 'rapporteur', 'resultat', 'date', 'commission', 'instance', 'incidence_financiere', 'montant', 'origine'];
 
 /** Oracle renvoie les alias en MAJUSCULES : on normalise en minuscules pour les champs canoniques. */

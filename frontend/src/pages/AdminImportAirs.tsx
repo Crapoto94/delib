@@ -282,6 +282,10 @@ function Concordances({ o, lotId, conc, onDone }: { o: number; lotId: number; co
     try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/elus/creer`), {})).data; toast(`${r.crees} élu(s) non rapproché(s) créé(s)`); onDone(); }
     catch (e) { toast(errMsg(e), 'ko'); }
   };
+  const creerDs = async () => {
+    try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/directions-services/creer`), {})).data; toast(`${r.crees} direction(s)/service(s) historique(s) créé(s)`); onDone(); }
+    catch (e) { toast(errMsg(e), 'ko'); }
+  };
   const horsCommission = async () => {
     try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/commissions/hors`), {})).data; toast(`${r.horsCommission} valeur(s) marquée(s) hors commission`); onDone(); }
     catch (e) { toast(errMsg(e), 'ko'); }
@@ -312,6 +316,7 @@ function Concordances({ o, lotId, conc, onDone }: { o: number; lotId: number; co
               <span className="flex items-center gap-2 text-[12px] text-mute">
                 {rowCount(rows)}
                 {axe === 'commission' && rows.some((c: any) => c.etat !== 'manuelle' && c.etat !== 'ignoree') && <button className="btn-secondary !px-2 !py-1 text-[12px]" title="Marquer les valeurs restantes comme absentes de l'application" onClick={horsCommission}><Ban className="h-3.5 w-3.5" /> Tout hors commission</button>}
+                {(axe === 'direction' || axe === 'service') && rows.some((c: any) => c.etat === 'a_faire') && <button className="btn-secondary !px-2 !py-1 text-[12px]" title="Créer ces directions/services comme entités historiques (anciennes organisations)" onClick={creerDs}><Plus className="h-3.5 w-3.5" /> Créer les non rapprochés</button>}
                 {axe === 'elu' && rows.some((c: any) => !c.cibleCode && c.cibleId == null && c.etat !== 'manuelle') && <button className="btn-secondary !px-2 !py-1 text-[12px]" title="Créer ces rapporteurs dans le référentiel des élus" onClick={creerElus}><Plus className="h-3.5 w-3.5" /> Créer les élus non rapprochés</button>}
                 {axe === 'agent' && rows.some((c: any) => !c.cibleCode && c.cibleId == null && c.etat !== 'manuelle') && <button className="btn-secondary !px-2 !py-1 text-[12px]" title="Créer ces agents dans le référentiel local (nom conservé, aucun compte)" onClick={creerAgents}><Plus className="h-3.5 w-3.5" /> Créer les agents non rapprochés</button>}
                 {rows.some((c: any) => ['proposee', 'automatique'].includes(c.etat) && (c.cibleCode || c.cibleId != null)) && <button className="btn-secondary !px-2 !py-1 text-[12px]" onClick={() => validerTout(axe)}><Check className="h-3.5 w-3.5" /> Valider toutes les assignations automatiques</button>}
@@ -394,6 +399,7 @@ function Conseils({ o, lotId, detail, onDone }: { o: number; lotId: number; deta
     } catch (e) { toast(errMsg(e), 'ko'); }
   };
   const ignorer = async (s: any) => { try { await api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${s.id}/ignorer`), {}); toast('Conseil ignoré'); onDone(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const annulerImport = async (id: number) => { try { await api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${id}/depublier`), {}); toast('Import annulé — le conseil redevient à importer'); onDone(); } catch (e) { toast(errMsg(e), 'ko'); } };
   if (!seances.length) return <Empty>Aucun conseil dans le sas. Vérifiez que la table source « seances » est validée, puis rechargez le lot.</Empty>;
   return (
     <div className="card overflow-x-auto">
@@ -401,16 +407,17 @@ function Conseils({ o, lotId, detail, onDone }: { o: number; lotId: number; deta
         <div className="border-b border-line bg-warn-bg px-4 py-2 text-[13px] text-warn">La table source « actes » n'est pas validée : les actes ne sont pas chargés. Validez-la dans « Tables source », rechargez le lot puis relancez l'analyse.</div>
       )}
       <table className="w-full"><thead><tr><th>Conseil</th><th>Instance</th><th>Type de conseil</th><th>Actes</th><th>État</th><th /></tr></thead><tbody>{seances.map((s) => {
-        const mes = actesDe(s); const prets = mes.filter((a) => a.statut === 'publie' || !a.problemes?.length).length;
+        const mes = actesDe(s); const importes = mes.filter((a) => a.statut === 'publie').length; const prets = mes.filter((a) => a.statut === 'publie' || !a.problemes?.length).length;
         return (
           <tr key={s.id}>
-            <td><div className="font-semibold">{s.payload.titre ?? s.payload.numero ?? '(sans intitulé)'}</div><div className="text-[11px] text-mute">{s.sourceKey} · {s.payload.date ? dt(s.payload.date, { dateStyle: 'medium' }) : 'date ?'}</div></td>
+            <td><div className="font-semibold">{s.payload.titre ?? s.payload.numero ?? '(sans intitulé)'}</div><div className="text-[11px] text-mute">{s.sourceKey} · {s.payload.date ? dt(s.payload.date, { dateStyle: 'medium' }) : 'date ?'}</div>{s.payload.origine === 'archive' && <Badge tone="gray">conseil archivé AIRS</Badge>}</td>
             <td className="text-[12px]">{s.payload.instance ?? '—'}</td>
             <td className="text-[12px]">{s.payload.type_seance ?? s.payload.type ?? '—'}</td>
-            <td className="text-[12px]">{mes.length} acte(s){mes.length > 0 && <span className="text-mute"> · {prets}/{mes.length} prêt(s)</span>}</td>
-            <td>{s.statut === 'publie' ? <Badge tone="ok">Importé</Badge> : s.statut === 'ignore' ? <Badge tone="gray">Ignoré</Badge> : s.problemes?.length ? <span className="text-[12px] text-ko">{s.problemes.map((p: any) => p.label).join(' · ')}</span> : <Badge tone="blue">Prêt</Badge>}</td>
+            <td className="text-[12px]">{mes.length} acte(s){mes.length > 0 && <span className="text-mute"> · {importes > 0 ? `${importes}/${mes.length} importé(s)` : `${prets}/${mes.length} prêt(s)`}</span>}</td>
+            <td>{s.statut === 'publie' ? <Badge tone="ok">Importé</Badge> : s.statut === 'ignore' ? <Badge tone="gray">Ignoré</Badge> : s.problemes?.length ? <span className="text-[12px] text-ko">{s.problemes.map((p: any) => p.label).join(' · ')}</span> : importes > 0 ? <Badge tone="warn">Partiel</Badge> : <Badge tone="blue">Prêt</Badge>}</td>
             <td className="whitespace-nowrap text-right">
               <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" onClick={() => setApercu(s)}><Eye className="h-3.5 w-3.5" /> Aperçu</button>
+              {(s.statut === 'publie' || importes > 0) && <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" title="Annuler l'import de ce conseil et de ses actes" onClick={() => annulerImport(s.id)}><Ban className="h-3.5 w-3.5" /> Annuler l'import</button>}
               {s.statut !== 'publie' && <button className="btn-primary mr-1 !px-2 !py-1 text-[12px]" disabled={!!s.problemes?.length} onClick={() => importer(s)}><Check className="h-3.5 w-3.5" /> Importer</button>}
               {s.statut !== 'publie' && <button className="rounded p-2 text-ko hover:bg-slate-100" title="Ignorer" aria-label="Ignorer" onClick={() => ignorer(s)}><XCircle className="h-4 w-4" /></button>}
             </td>
@@ -425,6 +432,7 @@ function Conseils({ o, lotId, detail, onDone }: { o: number; lotId: number; deta
 function ActesIsoles({ o, lotId, detail, onDone }: { o: number; lotId: number; detail: any; onDone: () => void }) {
   const { toast } = useToast();
   const [voir, setVoir] = useState<any>(null);
+  const [ouvert, setOuvert] = useState(false);
   const items = detail.items as any[];
   const seanceKeys = new Set(items.filter((x) => x.kind === 'seance').map((s) => s.sourceKey));
   const actes = items.filter((x) => x.kind === 'acte' && (!x.payload.seance || !seanceKeys.has(String(x.payload.seance))));
@@ -432,8 +440,12 @@ function ActesIsoles({ o, lotId, detail, onDone }: { o: number; lotId: number; d
   if (!actes.length) return null;
   return (
     <section className="space-y-3">
-      <h3>Actes isolés (sans conseil rattaché)</h3>
-      <div className="card overflow-x-auto">
+      <button type="button" className="flex flex-wrap items-center gap-2 text-left" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)}>
+        {ouvert ? <ChevronDown className="h-4 w-4 shrink-0 text-mute" /> : <ChevronRight className="h-4 w-4 shrink-0 text-mute" />}
+        <h3>Actes isolés (sans conseil rattaché)</h3>
+        <span className="text-[12px] text-mute">{actes.length} acte(s) — aucune référence de séance dans AIRS</span>
+      </button>
+      {ouvert && <div className="card overflow-x-auto">
         <table className="w-full"><thead><tr><th>Acte</th><th>Date</th><th>État</th><th /></tr></thead><tbody>{actes.map((x) => (
           <tr key={x.id}>
             <td><div className="font-semibold">{clamp(String(x.payload.titre ?? x.payload.objet ?? '(sans objet)'))}</div><div className="text-[11px] text-mute">{x.sourceKey} · {x.payload.numero ?? ''}</div></td>
@@ -441,12 +453,13 @@ function ActesIsoles({ o, lotId, detail, onDone }: { o: number; lotId: number; d
             <td>{x.statut === 'publie' ? <Badge tone="ok">Importé</Badge> : x.statut === 'ignore' ? <Badge tone="gray">Ignoré</Badge> : x.problemes?.length ? <span className="text-[12px] text-ko">{x.problemes.map((p: any) => p.label).join(' · ')}</span> : <Badge tone="blue">Prêt</Badge>}</td>
             <td className="whitespace-nowrap text-right">
               <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" onClick={() => setVoir(x)}><Eye className="h-3.5 w-3.5" /> Voir</button>
+              {x.statut === 'publie' && <button className="btn-secondary mr-1 !px-2 !py-1 text-[12px]" title="Annuler l'import de cet acte" onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${x.id}/depublier`), {}), 'Import annulé')}><Ban className="h-3.5 w-3.5" /> Annuler l'import</button>}
               {x.statut !== 'publie' && <button className="btn-primary mr-1 !px-2 !py-1 text-[12px]" disabled={!!x.problemes?.length} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${x.id}/publier`), {}), 'Acte importé')}><Check className="h-3.5 w-3.5" /> Importer</button>}
               {x.statut !== 'publie' && <button className="rounded p-2 text-ko hover:bg-slate-100" title="Ignorer" aria-label="Ignorer" onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/actes/${x.id}/ignorer`), {}), 'Acte ignoré')}><XCircle className="h-4 w-4" /></button>}
             </td>
           </tr>))}</tbody></table>
         {voir && <VoirActe acte={voir} onClose={() => setVoir(null)} />}
-      </div>
+      </div>}
     </section>
   );
 }
@@ -472,6 +485,10 @@ function Detail({ o, lotId, onRetour, onRechargeListe }: { o: number; lotId: num
     catch (e) { toast(errMsg(e), 'ko'); }
     finally { setEnCours(false); setProg(null); recharger(); }
   };
+  const importerActes = async () => {
+    try { const r = (await api.post(orgPath(o, `/import-airs/lots/${lotId}/actes-importer`), {})).data; toast(r.ignores?.length ? `${r.publies} acte(s) importé(s), ${r.ignores.length} en erreur` : `${r.publies} acte(s) importé(s)`, r.ignores?.length ? 'ko' : 'ok'); recharger(); }
+    catch (e) { toast(errMsg(e), 'ko'); }
+  };
   if (d.loading && !d.data) return <Loading progress={prog?.enCours ? prog : null} />;
   const lot = d.data.lot;
   const etapes = [
@@ -491,6 +508,7 @@ function Detail({ o, lotId, onRetour, onRechargeListe }: { o: number; lotId: num
           <button className="btn-secondary" disabled={enCours || prog?.enCours || !['charge', 'concordances', 'pret'].includes(lot.statut)} onClick={lancerAnalyse}><Play className="h-4 w-4" /> Analyser</button>
           <button className="btn-secondary" onClick={() => setMapping(true)}><Cog className="h-4 w-4" /> Mapping</button>
           <button className="btn-primary" disabled={!['concordances', 'pret'].includes(lot.statut) || d.data.blocage.bloquantesNonResolues > 0} onClick={() => agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/publier`), {}), 'Import traité')}><Check className="h-4 w-4" /> Importer tous les conseils</button>
+          <button className="btn-secondary" disabled={!['concordances', 'pret', 'publie'].includes(lot.statut)} onClick={importerActes} title="Importe tous les actes du sas (les séances sont créées au besoin)"><Check className="h-4 w-4" /> Importer tous les actes</button>
           {(d.data.compteurs.publies > 0 || lot.statut !== 'annule') && <button className="btn-secondary text-ko" onClick={() => window.confirm('Annuler ce lot et retirer ses imports ?') && agir(() => api.post(orgPath(o, `/import-airs/lots/${lotId}/annuler`), {}), 'Lot annulé')}><Ban className="h-4 w-4" /> Annuler</button>}
           <button className="btn-secondary text-ko" onClick={() => setSupprimer(true)}><Trash2 className="h-4 w-4" /> Supprimer</button>
         </span>

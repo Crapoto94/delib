@@ -4,9 +4,10 @@ import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { useIa } from '../useIa';
 import { chargerExtraits } from '../aideIa';
+import { NotationReponse } from '../Notation';
 import { Loading, PageTitle, Spinner } from '../ui';
 
-type Message = { role: 'user' | 'assistant'; texte: string; sources?: string[] };
+type Message = { role: 'user' | 'assistant'; texte: string; sources?: string[]; id?: number | null };
 
 /** Aide IA du centre d'aide : toute question est confrontée au manifeste, dont les extraits pertinents sont envoyés à l'IA. */
 export default function AideIa() {
@@ -25,7 +26,7 @@ export default function AideIa() {
     try {
       const extraits = await chargerExtraits(q);
       const r = (await api.post(orgPath(o, '/ia/manifeste'), { question: q, extraits })).data;
-      setFil((f) => [...f, { role: 'assistant', texte: r.reponse, sources: extraits.map((x) => x.titre) }]);
+      setFil((f) => [...f, { role: 'assistant', texte: r.reponse, sources: extraits.map((x) => x.titre), id: r.id ?? null }]);
     } catch (x) {
       setErr(errMsg(x));
       setFil((f) => [...f, { role: 'assistant', texte: "Je n'ai pas pu répondre (IA indisponible ou désactivée). Reformulez ou réessayez plus tard." }]);
@@ -37,9 +38,9 @@ export default function AideIa() {
 
   return (
     <div>
-      <PageTitle title="Aide IA" sub="Posez votre question : la réponse s'appuie uniquement sur le manifeste de l'application." />
+      <PageTitle title="Evelyne Del-IA" sub="Posez votre question : la réponse s'appuie sur le manifeste de l'application." />
       {!ia.loaded ? <Loading /> : !ia.aide ? (
-        <div className="card p-6 text-slate-700">L'<b>aide IA</b> est désactivée par l'administration de votre collectivité. Vous pouvez consulter les autres aides du centre d'aide.</div>
+        <div className="card p-6 text-slate-700"><b>Evelyne Del-IA</b> est désactivée par l'administration de votre collectivité. Vous pouvez consulter les autres aides du centre d'aide.</div>
       ) : (
         <div className="mx-auto max-w-3xl">
           <div className="card flex min-h-[50vh] flex-col p-4">
@@ -62,6 +63,7 @@ export default function AideIa() {
                         <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" /> Extraits du manifeste utilisés :</span>
                         <ul className="mt-1 list-disc pl-5">{m.sources.map((s, k) => <li key={k}>{s}</li>)}</ul>
                       </div>) : null}
+                    {typeof m.id === 'number' && <NotationReponse journalId={m.id} />}
                   </div>
                 </div>
               ))}

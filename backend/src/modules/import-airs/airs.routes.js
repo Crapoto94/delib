@@ -94,6 +94,9 @@ module.exports = ({ makeRouter, airs }) => {
   r.post('/:orgId/import-airs/lots/:id/elus/creer', { summary: 'Crée les élus (rapporteurs) non rapprochés dans le référentiel local', tags: T, org: true, roles: ROLES, params: LotP },
     async (req, res) => res.json(await airs.creerElusNonRappropries(req.ctx, req.org.id, req.valid.params.id)));
 
+  r.post('/:orgId/import-airs/lots/:id/directions-services/creer', { summary: 'Crée les directions/services non rapprochés comme entités historiques (anciennes organisations)', tags: T, org: true, roles: ROLES, params: LotP },
+    async (req, res) => res.json(await airs.creerDsNonRappropries(req.ctx, req.org.id, req.valid.params.id)));
+
   r.post('/:orgId/import-airs/lots/:id/commissions/hors', { summary: "Marque les valeurs de commission restantes comme « hors commission » (absente de l'application)", tags: T, org: true, roles: ROLES, params: LotP },
     async (req, res) => res.json(await airs.horsCommission(req.ctx, req.org.id, req.valid.params.id)));
 
@@ -111,11 +114,16 @@ module.exports = ({ makeRouter, airs }) => {
 
   r.post('/:orgId/import-airs/lots/:id/actes/:itemId/publier', { summary: 'Publie un acte ou une séance du sas en donnée historique', tags: T, org: true, roles: ROLES, params: ItemP },
     async (req, res) => res.json(await airs.publierItem(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId)));
+  r.post('/:orgId/import-airs/lots/:id/actes/:itemId/depublier', { summary: "Annule l'import d'un conseil (et ses actes) ou d'un acte : il redevient « à importer »", tags: T, org: true, roles: ROLES, params: ItemP },
+    async (req, res) => res.json(await airs.dePublierItem(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId)));
   r.post('/:orgId/import-airs/lots/:id/actes/:itemId/ignorer', { summary: "Ignore un item du sas", tags: T, org: true, roles: ROLES, params: ItemP },
     async (req, res) => res.json(await airs.ignorerItem(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId)));
 
   r.post('/:orgId/import-airs/lots/:id/publier', { summary: 'Publie tous les items prêts (rapport item par item)', tags: T, org: true, roles: ROLES, params: LotP },
     async (req, res) => res.json(await airs.publierTout(req.ctx, req.org.id, req.valid.params.id)));
+
+  r.post('/:orgId/import-airs/lots/:id/actes-importer', { summary: 'Importe TOUS les actes du sas (les séances sont créées au besoin)', tags: T, org: true, roles: ROLES, params: LotP },
+    async (req, res) => res.json(await airs.importerTousLesActes(req.ctx, req.org.id, req.valid.params.id)));
 
   r.post('/:orgId/import-airs/lots/:id/depublier', { summary: 'Retire les actes publiés de ce lot (jamais de suppression physique)', tags: T, org: true, roles: ROLES, params: LotP },
     async (req, res) => res.json(await airs.dePublier(req.ctx, req.org.id, req.valid.params.id)));

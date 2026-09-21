@@ -1,16 +1,17 @@
-import { FormEvent, useState } from 'react';
-import { BookOpen, FileText, Search, SlidersHorizontal } from 'lucide-react';
-import { api, openPdf, org as orgPath } from '../api';
+import { FormEvent, Fragment, useState } from 'react';
+import { BookOpen, FileText, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Pagination, PageTitle, useLoad, useToast } from '../ui';
 import { Select } from '../Select';
 
 /** Fiche de consultation d'une délibération adoptée : exposé des motifs, visas, dispositif, annexes, et les PDF (visionneuse). */
-function Fiche({ acteId, onClose }: { acteId: number; onClose: () => void }) {
-  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+function Fiche({ acteId, onClose, onDone }: { acteId: number; onClose: () => void; onDone: () => void }) {
+  const { org, isScc } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const d = useLoad(async () => (await api.get(orgPath(o, `/bibliotheque/actes/${acteId}`))).data, [acteId]);
   const pdf = async (cible: string, titre: string) => { const m = await openPdf(() => api.get(orgPath(o, `/bibliotheque/actes/${acteId}/pdf`), { params: { cible }, responseType: 'blob' }), titre); if (m) toast(m, 'ko'); };
+  const supprimer = async () => { if (!window.confirm('Retirer cette délibération de la bibliothèque ? L’acte est conservé, mais il n’y sera plus consultable.')) return; try { await api.delete(orgPath(o, `/bibliotheque/actes/${acteId}`)); toast('Délibération retirée de la bibliothèque'); onDone(); } catch (e) { toast(errMsg(e), 'ko'); } };
   const f = d.data;
   return (
     <Modal title={f ? `${f.numero ? `${f.numero} — ` : ''}${f.titre}` : 'Délibération'} onClose={onClose} wide>
@@ -20,10 +21,22 @@ function Fiche({ acteId, onClose }: { acteId: number; onClose: () => void }) {
             <Badge tone="ok">{f.resultatLabel}</Badge><span className="text-mute">Séance du {dt(f.seance.dateSeance, { dateStyle: 'long' })} · {f.seance.instance}{f.matiere ? ` · ${f.matiere}` : ''}{f.direction ? ` · ${f.direction}` : ''}</span>
           </div>
           <div className="flex flex-wrap gap-2">{f.documents.map((x: any) => <button key={x.cible} className="btn-secondary" onClick={() => pdf(x.cible, `${x.label} — ${f.titre}`)}><FileText className="h-4 w-4" /> {x.label}</button>)}</div>
+          {f.informations?.filter((x: any) => x.valeur !== null && x.valeur !== undefined && String(x.valeur).trim() !== '').length > 0 && (
+            <section>
+              <h3 className="mb-2">Informations</h3>
+              <div className="overflow-x-auto rounded border border-line"><table className="w-full text-[13px]"><tbody>
+                {f.informations.filter((x: any) => x.valeur !== null && x.valeur !== undefined && String(x.valeur).trim() !== '').map((x: any, i: number, arr: any[]) => (
+                  <Fragment key={i}>
+                    {(i === 0 || arr[i - 1].groupe !== x.groupe) && <tr><td colSpan={2} className="bg-soft px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-head">{x.groupe}</td></tr>}
+                    <tr><td className="w-56 px-3 py-1 font-semibold text-mute">{x.label}</td><td className="px-3 py-1">{x.label === 'Date' || x.label === 'Date limite' ? dt(x.valeur, { dateStyle: 'long' }) : String(x.valeur)}</td></tr>
+                  </Fragment>))}
+              </tbody></table></div>
+            </section>)}
           {[['Exposé des motifs', f.expose], ['Visas et considérants', f.visas], ['Dispositif', f.dispositif]].map(([t, md]) => md ? (
             <section key={t}><h3 className="mb-1">{t}</h3><div className="whitespace-pre-wrap rounded border border-line bg-soft/40 p-3 text-[13px] leading-6">{md}</div></section>) : null)}
           {f.annexes.length > 0 && <section><h3 className="mb-1">Annexes publiables</h3><ul className="list-disc pl-5 text-[13px]">{f.annexes.map((x: any) => <li key={x.id}>{x.titre}</li>)}</ul></section>}
           <p className="text-[12px] text-mute">Consultation seule. Pour suivre le parcours d’un dossier auquel vous avez participé, ouvrez <b>Mes actes</b>.</p>
+          {isScc && <div className="flex justify-end border-t border-line pt-3"><button className="btn-ko" onClick={supprimer}><Trash2 className="h-4 w-4" /> Supprimer de la bibliothèque</button></div>}
         </div>)}
       {node}
     </Modal>
@@ -88,7 +101,7 @@ export default function Bibliotheque() {
             <td className="text-[12px]">{dt(r.dateSeance, { dateStyle: 'medium' })}<div className="text-mute">{r.instance}</div></td><td><Badge tone="ok">{r.resultatLabel}</Badge></td>
             <td className="text-right"><button className="btn-secondary !py-1" onClick={() => setOuvert(r.acteId)}><BookOpen className="h-3.5 w-3.5" /> Consulter</button></td></tr>))}</tbody></table>
           <div className="border-t border-line px-3 py-2"><Pagination total={d.data.total} limit={LIMIT} page={page} onPage={setPage} itemLabel="délibération" /></div></div>)}
-      {ouvert && <Fiche acteId={ouvert} onClose={() => setOuvert(null)} />}
+      {ouvert && <Fiche acteId={ouvert} onClose={() => setOuvert(null)} onDone={() => { setOuvert(null); d.reload(); }} />}
     </div>
   );
 }

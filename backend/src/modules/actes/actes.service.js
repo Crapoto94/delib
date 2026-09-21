@@ -255,6 +255,37 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.reactivate', entity: 'actes', entityId: id });
       return toActe(r);
     },
+    /** Un acte est « dans le circuit » s'il a une étape courante. */
+    async _circuitActif(acteId) { return !!(await db.get("SELECT 1 AS x FROM step_instances WHERE acte_id = $1 AND status = 'current'", [acteId])); },
+
+    /** Supprime un acte HORS circuit (confirmation côté interface). Refusé si une étape est en cours. */
+    async supprimer(ctx, organismeId, id) {
+      const a = await svc.load(ctx, organismeId, id);
+      if (!(a.redacteur === ctx.username || acl.isAdmin(ctx, a.organisme_id))) throw E.forbidden('Vous ne pouvez pas supprimer cet acte');
+      if (await svc._circuitActif(a.id)) throw E.conflict("Cet acte est dans le circuit : utilisez « Rappeler » (avec motif), la suppression casserait le circuit");
+      if (['transmis', 'ar_recu', 'publie', 'executoire'].includes(a.statut)) throw E.conflict(`Un acte « ${a.statut} » ne peut pas être supprimé`);
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.delete', entity: 'actes', entityId: id, before: { titre: a.titre, statut: a.statut } });
+      try { await db.run('DELETE FROM actes WHERE id = $1 AND organisme_id = $2', [id, a.organisme_id]); }
+      catch (e) { if (e.code === '23503') throw E.conflict('Cet acte est référencé ailleurs : il ne peut pas être supprimé'); throw e; }
+      await bus.emit('acte.deleted', { organismeId: a.organisme_id, acteId: id, ctx });
+      return { supprime: id };
+    },
+
+    /** Rappelle un acte DANS le circuit : motif obligatoire, casse le circuit et prévient les intervenants. Nouvel état « rappele ». */
+    async rappeler(ctx, organismeId, id, motif) {
+      const a = await svc.load(ctx, organismeId, id);
+      if (!(a.redacteur === ctx.username || acl.isAdmin(ctx, a.organisme_id))) throw E.forbidden('Vous ne pouvez pas rappeler cet acte');
+      const m = String(motif || '').trim(); if (!m) throw E.badRequest('Un motif de rappel est obligatoire');
+      if (!(await svc._circuitActif(a.id))) throw E.conflict("Cet acte n'est pas dans le circuit : il peut être supprimé directement");
+      await db.tx(async (q) => {
+        await q.run("UPDATE step_instances SET status = 'returned', reason = $2, acted_by = $3, acted_at = now() WHERE acte_id = $1 AND status = 'current'", [a.id, m, ctx.username]);
+        await q.run("UPDATE actes SET statut = 'rappele', current_step_key = NULL, rappel_motif = $2, rappel_at = now() WHERE id = $1", [a.id, m]);
+      });
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.rappele', entity: 'actes', entityId: id, before: { statut: a.statut, etape: a.current_step_key }, after: { statut: 'rappele', motif: m } });
+      await bus.emit('acte.rappele', { organismeId: a.organisme_id, acteId: id, motif: m, ctx });
+      return toActe(await db.get('SELECT * FROM actes WHERE id = $1', [id]));
+    },
+
     async duplicate(ctx, organismeId, id) {
       const src = await svc.load(ctx, organismeId, id);
       const copy = await svc.create(ctx, src.organisme_id, {
