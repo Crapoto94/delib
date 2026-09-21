@@ -9,6 +9,7 @@ const { createSessions } = require('./modules/auth/sessions.repository');
 const { createLoginGuard } = require('./modules/auth/login-guard');
 const { createAuthService } = require('./modules/auth/auth.service');
 const { createDirectoryService } = require('./modules/directory/directory.service');
+const { createOrganigramme } = require('./modules/organigramme/organigramme.service');
 const { createOrganismes } = require('./modules/organismes/organismes.service');
 const { createSettings } = require('./modules/settings/settings.service');
 const { createOnboarding } = require('./modules/me/onboarding.service');
@@ -124,6 +125,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config, access, pv });
   acl.registerEditHook((ctx, a) => tlt.peutModifierTexte(ctx, a)); // le SCC modifie la délibération avant la transmission (TLT-32)
   const organisation = createOrganisation({ db, titulaires, dir });
+  const organigramme = createOrganigramme({ db, dir, audit });
   const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
   const aiPrompts = createPrompts({ settings, ai: aiAdapter, log });
@@ -170,7 +172,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche-alertes', (orgId) => alertes.verifier(orgId)); // alertes de recherche (REC-29) : au plus une vérification par heure et par alerte
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, convocations, users, ai, aiQueue, aiPrompts, airs };
+  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs };
 }
 
 module.exports = { buildContainer };

@@ -52,6 +52,7 @@ const MODULES = [
   require('../modules/sauvegarde/sauvegarde.routes'),
   require('../modules/externe/externe.routes'),
   require('../modules/titulaires/organisation.routes'),
+  require('../modules/organigramme/organigramme.routes'),
   require('../modules/convocations/convocations.routes'),
   require('../modules/users/users.routes'),
   require('../modules/ai/ai.routes'),

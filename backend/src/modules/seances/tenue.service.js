@@ -52,7 +52,7 @@ function createTenue({ db, audit, acl, access, seances, odj, bus }) {
     return items.map((it) => {
       const p = st.get(it.id);
       return {
-        id: it.id, position: it.position, kind: it.kind, numero: it.numero, titre: it.titre, statut: it.statut, acte: it.acte,
+        id: it.id, position: it.position, kind: it.kind, numero: it.numero, titre: it.titre, statut: it.statut, acte: it.acte, fichiers: it.fichiers || [],
         etat: p?.etat || 'a_traiter', scrutin: p?.scrutin || 'main_levee', resultat: p?.resultat || null,
         decompte: p && p.votants !== null ? { pour: p.pour, contre: p.contre, abstention: p.abstention, nppv: p.nppv, absents: p.absents, votants: p.votants } : null,
         notes: p?.notes || '', debutAt: p?.debut_at || null, closAt: p?.close_at || null,

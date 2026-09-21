@@ -23,6 +23,15 @@ const CATEGORIES: { cle: string; titre: string; sous: string; match: (r: string[
  */
 type Vue = 'rubriques' | 'conseil';
 
+const normLabel = (s: string) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+/** Direction porteuse + service : « DIRECTION / Service », le service étant omis quand il porte le nom de sa direction (D68). */
+function porteuse(a: any): string {
+  const dir = a.direction?.label || '';
+  const svc = a.service?.label || '';
+  if (!svc || normLabel(svc) === normLabel(dir)) return dir;
+  return dir ? `${dir} / ${svc}` : svc;
+}
+
 export default function MonEspace() {
   const { me, org } = useAuth(); const o = org!.id;
   const [sp, setSp] = useSearchParams();
@@ -42,7 +51,7 @@ export default function MonEspace() {
     return (
       <tr key={t.acte.id} className={vert ? 'bg-ok-bg' : t.enRetard ? 'bg-ko-bg' : 'hover:bg-soft'}>
         <td className="w-16 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
-        <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link>{inscrit && <span className="ml-2"><Badge tone="ok">Inscrit au conseil</Badge></span>}<div className="text-[12px] text-mute">{t.acte.direction?.label}</div></td>
+        <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link>{inscrit && <span className="ml-2"><Badge tone="ok">Inscrit au conseil</Badge></span>}<div className="text-[12px] text-mute">{porteuse(t.acte)}</div></td>
         {showEtape && <td className="text-[12px]">{t.step?.label ?? '—'}</td>}
         <td><SeanceVisee acte={t.acte} /></td>
         <td><StatutBadge statut={t.acte.statut} /></td>

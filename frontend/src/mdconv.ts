@@ -33,12 +33,18 @@ export function encodeImgSrc(src: string, a: { width?: number | null; rotation?:
   return parts.length ? `${src}#vd:${parts.join(',')}` : src;
 }
 
+/** Image en HTML : attributs `data-*` (lus par l'éditeur) ET styles en ligne (rendus par l'aperçu, hors éditeur). */
+export function imgHtml(src: string, alt: string, attrs: ImgAttrs): string {
+  const da = [attrs.width ? ` data-width="${attrs.width}"` : '', attrs.rotation ? ` data-rotation="${attrs.rotation}"` : '', attrs.align ? ` data-align="${attrs.align}"` : ''].join('');
+  const st = [attrs.width ? `width:${attrs.width}px` : '', attrs.rotation ? `transform:rotate(${attrs.rotation}deg)` : '', 'max-width:100%', 'height:auto'].filter(Boolean).join(';');
+  return `<img src="${src}" alt="${alt}"${da} style="${st}">`;
+}
+
 function inline(s: string): string {
   return esc(s)
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt: string, raw: string) => {
       const { src, attrs } = parseImgSrc(raw);
-      const da = [attrs.width ? ` data-width="${attrs.width}"` : '', attrs.rotation ? ` data-rotation="${attrs.rotation}"` : '', attrs.align ? ` data-align="${attrs.align}"` : ''].join('');
-      return `<img src="${src}" alt="${alt}"${da}>`;
+      return imgHtml(src, alt, attrs);
     })
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g, '$1<em>$2</em>');
@@ -63,8 +69,13 @@ export function mdToHtml(md: string): string {
       return `<table><tbody><tr>${head.map((c) => `<th><p>${inline(c)}</p></th>`).join('')}</tr>`
         + `${rows.map((r) => `<tr>${r.map((c) => `<td><p>${inline(c)}</p></td>`).join('')}</tr>`).join('')}</tbody></table>`;
     }
-    // Image(s) seule(s) : nœud « image » de bloc (pas dans un paragraphe).
-    if (lines.every((l) => /^\s*!\[[^\]]*\]\([^)]+\)\s*$/.test(l))) return lines.map((l) => inline(l.trim())).join('');
+    // Image(s) seule(s) : nœud « image » de bloc (pas dans un paragraphe) ; l'alignement est porté par le conteneur.
+    if (lines.every((l) => /^\s*!\[[^\]]*\]\([^)]+\)\s*$/.test(l))) return lines.map((l) => {
+      const raw = /^!\[[^\]]*\]\(([^)]+)\)$/.exec(l.trim());
+      const { attrs } = parseImgSrc(raw?.[1] || '');
+      const sty = attrs.align && attrs.align !== 'left' ? ` style="text-align:${attrs.align}"` : '';
+      return `<div${sty}>${inline(l.trim())}</div>`;
+    }).join('');
     if (lines.every((l) => /^\s*[-*]\s+/.test(l))) return `<ul>${lines.map((l) => `<li><p>${inline(l.replace(/^\s*[-*]\s+/, ''))}</p></li>`).join('')}</ul>`;
     if (lines.every((l) => /^\s*\d+[.)]\s+/.test(l))) return `<ol>${lines.map((l) => `<li><p>${inline(l.replace(/^\s*\d+[.)]\s+/, ''))}</p></li>`).join('')}</ol>`;
     return `<p${sty}>${lines.map(inline).join('<br>')}</p>`;

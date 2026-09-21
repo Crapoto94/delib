@@ -1879,6 +1879,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.44** | 2026-09-21 | **D113** : **gabarits Word (.docx) à variables** pour tous les documents (exposé, délibération, visas/délibéré, dossier complet) — fusion des zones, tableaux et images, conversion PDF (LibreOffice), dépôt/aperçu du modèle par gabarit ; **variable `{numero}`** (numéro du dossier au conseil, dans l'ordre de passage) ; **éditeur enrichi** (images insérables, redimensionnables, orientables, alignables, déplaçables ; tableaux ; alignement de paragraphes ; copier/coller conservé) ; **bibliothèque multi-documents** et délibérations non archivées régénérées au gabarit ; **« Mes actes »** (rubrique « plus à vous », vue par conseil, DIRECTION / Service, pastille « Inscrit au conseil » et fond vert) ; **séances clôturées / non clôturées** et séances reprises d'AIRS « tenue » non closes ; **champ libre service / chargé de mission** à la création ; **journal des versions (what's new)** au pied de page |
 | **1.43** | 2026-09-21 | **D112** : portefeuille « Mes actes » (action attendue, rédaction/validation de l'équipe, actes validés en circuit, inscrits au conseil) et vue « Tous les actes » (administrateur/SCC) avec rupture par étape du circuit ou par conseil pressenti ; bibliothèque (filtre d'état, origine AIRS en violet, compteur d'annexes dont non publiables, PDF d'import pour exposé/extrait) ; annexes Word + PDF associé ; import AIRS des conseils récents et origine des actes ; mots-clés et reprise d'un modèle ; rappel ciblé et réouverture d'ordre du jour ; numéros de suivi robustes |
 | **1.42** | 2026-09-21 | **D111** : import de l'historique **AIRS DELIB** par **sas** et **concordances** (IMP-01 à IMP-20) — processus en quatre temps, sas `airs_*` générique (MCD inconnu), axes de concordance ouverts, contrôle AD des agents, publication idempotente et réversible, questions HUB (Q-AIRS1 à 6) |
 | **1.41** | 2026-09-21 | **D110** : séance visée en gras (inscrit à l'ordre du jour) ou en italique (pas encore) — SEA-18 |
@@ -1974,3 +1975,45 @@ Reprise de données AIRS DELIB, recherche et consultation de la bibliothèque, c
 ### Circuit, ordre du jour et suppressions
 - **Réouverture d'un ordre du jour arrêté** : `POST /seances/:id/odj/reouverture` (motif obligatoire, SCC/administrateur), refusée dès que la séance est convoquée ou tenue ; numéros recalculés au prochain arrêt, historisée et auditée.
 - **Suppression d'un acte** : un acte **déjà passé au conseil** n'est supprimable que par un **administrateur ou le SCC** ; **numéros de suivi robustes** (plus de collision avec les numéros issus de l'import AIRS).
+
+---
+
+## 34 ter — Journal des évolutions (session 2026-09-21, suite)
+
+Gabarits Word et documents produits, éditeur enrichi, bibliothèque multi-documents, vues de suivi.
+
+### Gabarits Word (.docx) et documents produits (D113)
+- **Modèle Word à variables par gabarit** : tout gabarit (`expose`, `deliberation`, `dossier`, `sommaire`…) peut recevoir un **fichier .docx à variables** (`{titre}`, `{expose}`, `{visas}`, `{dispositif}`, `{date_seance}`… et **blocs conditionnels `{IF variable|texte}`**). À la génération, le modèle est **fusionné** puis **converti en PDF** (LibreOffice). Sans modèle, la **mise en page PDF** habituelle est conservée (PDF de fond + en-tête/pied). Paramétrages › **Gabarits** (ex-« Gabarits PDF ») : **déposer / télécharger / prévisualiser / retirer** le modèle, liste des variables disponibles. (`backend/src/modules/render/docx.service.js`, `render.service.js`, `render.routes.js`, migration `0059_gabarit_docx.sql`.)
+- **Le bon gabarit par document** : l'**exposé des motifs** au gabarit `expose` ; la **délibération** (visas + délibéré), les **visas et considérants** et le **délibéré** au gabarit `deliberation` ; si un modèle `dossier` est défini, il remplace l'assemblage ; sinon les parties sont assemblées (sommaire + annexes), chacune à son gabarit.
+- **Fusion « riche »** : les zones peuvent contenir des **tableaux Markdown** (→ vraie table Word) et des **images** (data-URL) ; le gras et les « Article N » sont préservés.
+- **Variable `{numero}`** (alias `{numero_point}`) : **numéro du dossier au conseil, dans l'ordre de passage** — numéro du point à l'ordre du jour, **figé à l'arrêt** et **provisoire** (recalculé selon le motif de la séance) avant. (`numeroAffiche` dans `backend/src/modules/seances/odj.service.js`, `varsFor` dans `render.service.js`.)
+- **Aperçus au gabarit** : le bouton **« Aperçu mis en page »** de l'éditeur et le bouton **« Prévisualiser »** de la fiche du dossier rendent le document au **modèle Word** du gabarit correspondant s'il est défini.
+
+### Éditeur (WYSIWYG)
+- **Images** : insertion par **fichier**, **copier/coller** ou **glisser-déposer** (data-URL) ; **redimensionnement par une poignée** de coin (proportionnel), **rotation**, **alignement** (gauche / centré / droite) et **déplacement** (glisser). Réglages conservés dans le Markdown (`#vd:w=…,rot=…,align=…`) et repris dans les documents Word (largeur `cx`, rotation `a:xfrm`, justification `w:jc`).
+- **Tableaux** : insertion d'un tableau, ajout de lignes/colonnes, suppression (format Markdown GFM, vraie table Word à la génération).
+- **Alignement de paragraphes** : gauche, **centré**, droite, **justifié** (comme un traitement de texte) ; conservé dans le Markdown (`{center}`, `{right}`, `{justify}`) et rendu en Word (`w:jc`).
+- **Copier/coller** : la mise en forme (gras, italique, listes, tableaux, images et réglages, alignements) est **conservée**, y compris au collage **depuis Word**.
+- Corps **JSON à 20 Mo** et Markdown **à 15 Mo** pour absorber les images en data-URL (`http/app.js`, `textes.routes.js`).
+
+### Bibliothèque et pièces jointes
+- **Visionneuse multi-documents** : le trombone ouvre directement les **pièces jointes** ; on **navigue d'une pièce à l'autre** (flèches, liste) sans refermer la visionneuse. L'aperçu du dossier sert le **dossier** (exposé + délibérations, **sans** annexes fusionnées), chaque annexe restant **navigable** ; le bouton « ouvrir dans un onglet » a été retiré.
+- **Délibérations non archivées** : un seul bouton **« Délibération »** régénère **visas et délibéré** au **gabarit `deliberation`** ; les archivées gardent l'**extrait du registre**. Boutons par document (**exposé**, **délibération**, **extrait**), **pièces jointes** et **fiche** complète.
+
+### Vues de suivi — « Mes actes » et « Tous les actes »
+- **« Mes actes »** : rubrique **« plus à vous »** — actes **encore en circuit chez un autre** (avec leur **étape** : validation juridique, DGS…) ou **validés en attente de séance** — en remplacement de la rubrique « inscrits au conseil ». **Deux vues** : **par rubrique** ou **par conseil pressenti**.
+- **Inscription au conseil** : **pastille « Inscrit au conseil »** ; **fond vert** quand le circuit est **validé ET** l'acte **inscrit**.
+- **DIRECTION / Service** affichés sous l'acte (le **service** est **omis** quand il porte le **nom de sa direction**, D68).
+- **Nom complet du rédacteur** (Prénom NOM) partout, y compris dans « Tous les actes ».
+
+### Séances
+- **Clôturées / non clôturées** : filtre d'**état de clôture** (Toutes / Non clôturées / Clôturées) et **pastille** « Clôturée » / « Non clôturée » sur chaque carte.
+
+### Import AIRS (séances)
+- Une séance reprise d'AIRS est créée **« tenue »** et **jamais close** (AIRS ne transmet pas la clôture ; une séance close est verrouillée) ; une éventuelle **clôture laissée par un import antérieur** est corrigée (séance close **sans aucune saisie de suivi**). (`airs.service.js`.)
+
+### Création d'un dossier
+- La **direction porteuse** reste **déduite de la fiche RH** ; un **champ libre** « **service / bureau ou chargé de mission** » permet de préciser le service porteur (`serviceLabel`), repris à l'affichage (DIRECTION / Service).
+
+### Pied de page
+- Le **numéro de version** du pied de page est **cliquable** : il ouvre le **« Nouveautés de VibeDélib »** (what's new), **journal des versions paginé** — une version par page, navigation « Plus récent / Plus ancien ». (`frontend/src/Nouveautes.tsx`, `nouveautes.ts`.)

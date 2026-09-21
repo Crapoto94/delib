@@ -7,6 +7,7 @@ import { Modal, useToast } from './ui';
 import { OrgLogo, useFavicon } from './Brand';
 import { AiChip } from './AiStatus';
 import Visite from './Visite';
+import Nouveautes from './NouveautesModal';
 import { AideMenu } from './aide/Aide';
 import { VERSION } from './nouveautes';
 import { PdfViewerHost } from './PdfViewer';
@@ -61,6 +62,7 @@ export default function Layout() {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
   const [tour, setTour] = useState(false);
+  const [nouveautes, setNouveautes] = useState(false);
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
@@ -133,6 +135,7 @@ export default function Layout() {
       <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8"><Outlet /></main>
       <PdfViewerHost />
       <Visite ouverte={tour} onFermer={() => setTour(false)} />
+      {nouveautes && <Nouveautes onClose={() => setNouveautes(false)} />}
       {asOpen && (
         <Modal title="Afficher en tant que…" onClose={() => setAsOpen(false)}>
           <p className="mb-3 text-mute">Choisissez un utilisateur : vous aurez <b>exactement ses droits</b> (ce qu'il voit, ce qu'il peut faire). Chaque action est journalisée à votre nom.</p>
@@ -142,7 +145,7 @@ export default function Layout() {
         </Modal>)}
       {toastNode}
       <footer className="fixed bottom-0 left-0 right-0 z-20 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 border-t border-line bg-surface px-6 py-2 text-[11px] text-mute">
-        <span>Ville d'Ivry-sur-Seine · VibeDélib — version {VERSION}</span>
+        <span>Ville d'Ivry-sur-Seine · VibeDélib — <button type="button" className="underline hover:text-ink" title="Voir les nouveautés de chaque version" onClick={() => setNouveautes(true)}>version {VERSION}</button></span>
         <span aria-hidden>·</span>
         <Link to="/cgu" className="underline hover:text-ink">Conditions d'utilisation</Link>
         <span aria-hidden>·</span>

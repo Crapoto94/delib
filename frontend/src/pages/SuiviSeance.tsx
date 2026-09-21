@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import FriseSeance from './FriseSeance';
-import { AlertTriangle, ArrowLeft, ArrowRight, Eye, FileText, Lock, LockOpen, Play, RotateCcw, Square, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Eye, FileText, Lock, LockOpen, Paperclip, Play, RotateCcw, Square, Users } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { AgentName } from '../AgentName';
@@ -81,6 +81,33 @@ function Notes({ resetKey, initial, onSave, placeholder }: { resetKey: string | 
 }
 
 /** Suivi de la séance en direct (D78) : tous ceux qui affichent la page voient en même temps le point en cours, les présences et les votes. */
+/** Pièces jointes d'un point du déroulé : une image s'affiche en miniature (clic = plein écran), les autres en pastille. */
+function Miniature({ url, titre }: { url: string; titre: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let u: string | null = null; let live = true;
+    api.get(url, { responseType: 'blob' }).then((r) => { if (!live) return; u = URL.createObjectURL(r.data); setSrc(u); }).catch(() => {});
+    return () => { live = false; if (u) URL.revokeObjectURL(u); };
+  }, [url]);
+  return (
+    <button type="button" title={titre} aria-label={`Ouvrir ${titre}`} onClick={() => src && window.open(src, '_blank')}
+      className="overflow-hidden rounded border border-line bg-soft hover:border-action">
+      {src ? <img src={src} alt={titre} className="h-24 w-auto object-cover" /> : <span className="flex h-24 w-24 items-center justify-center text-[11px] text-mute">…</span>}
+    </button>
+  );
+}
+
+function PiecesJointes({ o, seanceId, itemId, fichiers, open }: { o: number; seanceId: number; itemId: number; fichiers: any[]; open: (f: any) => void }) {
+  const base = (fid: number) => orgPath(o, `/seances/${seanceId}/odj/points/${itemId}/fichiers/${fid}`);
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-2" aria-label="Pièces jointes du point">
+      {fichiers.map((f) => (String(f.mime || '').startsWith('image/')
+        ? <Miniature key={f.id} url={base(f.id)} titre={f.titre} />
+        : <button key={f.id} type="button" className="inline-flex items-center gap-1 rounded-full bg-soft px-3 py-1 text-[12px] font-semibold hover:bg-slate-200" title={f.nom} onClick={() => open(f)}><Paperclip className="h-3.5 w-3.5" />{f.titre}</button>))}
+    </div>
+  );
+}
+
 export default function SuiviSeance() {
   const { id } = useParams(); const { org } = useAuth(); const o = org!.id; const sid = Number(id);
   const root = orgPath(o, `/seances/${sid}/tenue`); const { toast, node } = useToast();
@@ -124,6 +151,13 @@ export default function SuiviSeance() {
   const piece = async (path: string, titre: string) => {
     const m = await openPdf(() => api.get(orgPath(o, `/seances/${sid}${path}`), { responseType: 'blob' }), titre);
     if (m) toast(m, 'ko');
+  };
+  /** Pièce jointe d'un point : PDF dans la visionneuse, image en plein écran, autres fichiers téléchargés. */
+  const ouvrirPj = async (f: any) => {
+    if (!c) return;
+    const path = orgPath(o, `/seances/${sid}/odj/points/${c.id}/fichiers/${f.id}`);
+    if (f.mime === 'application/pdf') { const m = await openPdf(() => api.get(path, { responseType: 'blob' }), f.titre); if (m) toast(m, 'ko'); return; }
+    try { const r = await api.get(path, { responseType: 'blob' }); const u = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = u; a.download = f.nom; a.click(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
   const elus = useMemo(() => (s?.groupes ?? []).flatMap((g: any) => g.elus) as any[], [s]);
   const byId = useMemo(() => new Map(elus.map((e) => [e.id, e])), [elus]);
@@ -215,6 +249,8 @@ export default function SuiviSeance() {
                       {c.acte && <button className="btn-secondary" onClick={async () => { const m = await openPdf(() => api.post(orgPath(o, `/actes/${c.acte.id}/apercu`), { cible: 'dossier', mode: 'propre' }, { responseType: 'blob' }), `Dossier #${c.acte.numeroSuivi} — ${c.titre}`); if (m) toast(m, 'ko'); }}><Eye className="h-4 w-4" /> Voir le dossier</button>}
                     </div>
                   </div>
+
+                  {can && c.fichiers?.length > 0 && <PiecesJointes o={o} seanceId={sid} itemId={c.id} fichiers={c.fichiers} open={ouvrirPj} />}
 
                   <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                     {([['Pour', 'pour', 'text-ok'], ['Contre', 'contre', 'text-ko'], ['Abstention', 'abstention', 'text-warn'], ['NPPV', 'nppv', 'text-slate-600'], ['Absents', 'absents', 'text-mute']] as const).map(([l, k, cl]) => (

@@ -11,9 +11,22 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.42.0';
+export const VERSION = '0.43.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.43.0', type: 'minor', titre: 'Gabarits Word, éditeur enrichi (images, tableaux, alignement) et bibliothèque multi-documents',
+    items: [
+      "Gabarits Word (.docx) à variables : chaque document (exposé des motifs, délibération, visas et considérants, délibéré, dossier complet) est produit à partir du modèle Word défini pour son gabarit s'il existe, sinon de la mise en page PDF. La fusion remplit les zones (exposé, visas, dispositif, présences, transmission…), insère les tableaux et les images, puis convertit en PDF sur le serveur. On peut déposer, télécharger, prévisualiser et retirer le modèle de chaque gabarit (Paramétrages › Gabarits).",
+      "Variable {numero} : le numéro du dossier au conseil, dans l'ordre de passage (figé à l'arrêt de l'ordre du jour, provisoire avant), utilisable dans les modèles Word et les en-têtes PDF.",
+      "Éditeur : insertion d'images (fichier, copier/coller, glisser-déposer), redimensionnement à la poignée, rotation, alignement (gauche / centré / droite) et déplacement ; insertion de tableaux ; alignement des paragraphes (gauche, centré, droite, justifié) comme dans un traitement de texte ; le copier/coller conserve la mise en forme, y compris depuis Word.",
+      "Bibliothèque : visionneuse multi-documents — on navigue d'une pièce jointe à l'autre (flèches, liste) ; pour les délibérations des conseils non encore archivés, un bouton « Délibération » régénère visas et délibéré au bon gabarit ; boutons par document (exposé, délibération, extrait du registre, pièces jointes) et fiche complète.",
+      "« Mes actes » : nouvelle rubrique « plus à vous » (actes encore en circuit chez un autre avec leur étape, ou validés en attente de séance) ; vue par rubrique ou par conseil pressenti ; la direction porteuse et le service s'affichent sous l'acte ; pastille « Inscrit au conseil » et fond vert quand le circuit est validé ET l'acte inscrit.",
+      "Séances : distinction clôturées / non clôturées (filtre d'état et pastille). Les séances reprises d'AIRS sont marquées « tenue » et jamais closes, avec correction d'un verrouillage antérieur.",
+      "Création d'un dossier : la direction porteuse reste déduite de votre fiche RH, et un champ libre « service / bureau ou chargé de mission » permet de préciser le service porteur.",
+      "Import AIRS : l'origine (archivé ou courant) et les actes des conseils non archivés sont conservés ; les séances reprises ne sont plus marquées closes.",
+    ],
+  },
   {
     version: '0.42.0', type: 'minor', titre: 'Mes actes, « Tous les actes », bibliothèque enrichie et import AIRS des conseils récents',
     items: [

@@ -117,6 +117,17 @@ aside nav::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.
 .prose-doc p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: rgb(var(--c-s400)); float: left; height: 0; pointer-events: none; white-space: pre-line; }
 .prose-doc strong { font-weight: 700; }
 .prose-doc img { max-width: 100%; height: auto; }
+/* Tableaux : bordures (y compris les lignes verticales), en-tête grisé. */
+.prose-doc table { width: 100%; border-collapse: collapse; margin: 0 0 0.85em; table-layout: fixed; }
+.prose-doc th, .prose-doc td { border: 1px solid #cbd5e1; padding: 4px 8px; vertical-align: top; text-align: left; word-break: break-word; }
+.prose-doc th { background: #f1f5f9; font-weight: 700; }
+.prose-doc th p, .prose-doc td p { margin: 0; }
+/* Mêmes tableaux/images dans les aperçus de texte (hors éditeur). */
+.text-preview p { margin: 0 0 0.4em; }
+.text-preview img { max-width: 100%; height: auto; }
+.text-preview table { width: 100%; border-collapse: collapse; margin: 0 0 0.5em; table-layout: fixed; }
+.text-preview th, .text-preview td { border: 1px solid #cbd5e1; padding: 3px 6px; text-align: left; vertical-align: top; word-break: break-word; }
+.text-preview th { background: #f1f5f9; font-weight: 700; }
 /* Image de l'éditeur : poignées de redimensionnement et de rotation quand elle est sélectionnée */
 .vd-image { display: block; width: 100%; max-width: 100%; }
 .vd-image[data-align='center'] { text-align: center; }

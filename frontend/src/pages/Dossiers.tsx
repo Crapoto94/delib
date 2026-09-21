@@ -33,6 +33,7 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
   const nav = useNavigate();
   const types = useLoad(async () => (await api.get(orgPath(org!.id, '/referentiels/type_acte'))).data.items as any[], [org!.id]);
   const [typeId, setTypeId] = useState<number | ''>(''); const [titre, setTitre] = useState('');
+  const [serviceLibre, setServiceLibre] = useState('');
   const [mots, setMots] = useState(''); const [props, setProps] = useState<any[]>([]);
   const [assister, setAssister] = useState(assisterParDefaut);
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [busyModele, setBusyModele] = useState<number | null>(null);
@@ -46,14 +47,14 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
   const prendreModele = async (p: any) => {
     setBusyModele(p.acteId); setErr(null);
     try {
-      const body: any = { modeleId: p.acteId, ...(typeId ? { typeId } : {}), ...(titre.trim().length >= 3 ? { titre: titre.trim() } : {}), ...(cles.length ? { motsCles: cles } : {}) };
+      const body: any = { modeleId: p.acteId, ...(typeId ? { typeId } : {}), ...(titre.trim().length >= 3 ? { titre: titre.trim() } : {}), ...(serviceLibre.trim() ? { serviceLabel: serviceLibre.trim() } : {}), ...(cles.length ? { motsCles: cles } : {}) };
       const r = await api.post(orgPath(org!.id, '/actes/depuis-modele'), body); nav(`/dossiers/${r.data.id}`);
     } catch (x) { setErr(errMsg(x)); setBusyModele(null); }
   };
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr(null);
     const custom = { ...(assister ? { assiste: { actif: true } } : {}), ...(cles.length ? { motsCles: cles } : {}) };
-    try { const r = await api.post(orgPath(org!.id, '/actes'), { typeId, titre, ...(Object.keys(custom).length ? { custom } : {}) }); nav(`/dossiers/${r.data.id}`); } catch (x) { setErr(errMsg(x)); setBusy(false); }
+    try { const r = await api.post(orgPath(org!.id, '/actes'), { typeId, titre, ...(serviceLibre.trim() ? { serviceLabel: serviceLibre.trim() } : {}), ...(Object.keys(custom).length ? { custom } : {}) }); nav(`/dossiers/${r.data.id}`); } catch (x) { setErr(errMsg(x)); setBusy(false); }
   };
   const infos = (p: any) => [
     p.numero ? `N° délibération : ${p.numero}` : null,
@@ -97,6 +98,9 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
           </span>
         </label>
         <p className="text-[12px] text-mute">Direction porteuse : <b>{me?.agent?.direction?.label ?? 'à préciser'}</b> (déduite de votre fiche RH).</p>
+        <Field label="Service / bureau ou chargé de mission" hint="Facultatif. Précise le service porteur si la direction seule ne suffit pas. Ex. « chargé de mission subventions ».">
+          <input className="input" value={serviceLibre} onChange={(e) => setServiceLibre(e.target.value)} maxLength={120} placeholder="chargé de mission…" />
+        </Field>
         <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || !typeId}>{busy && <Spinner />} Créer le brouillon</button></div>
       </form>
     </Modal>

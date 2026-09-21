@@ -10,7 +10,8 @@ const normLabel = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, ''
 function createDirectoryService({ db, adapter, ad = null, config, log }) {
   let dirCache = { at: 0, list: null };
 
-  async function directions({ force = false } = {}) {
+  /** Organigramme du Hub seul (sans les surcharges locales), mis en cache. */
+  async function hubDirections({ force = false } = {}) {
     const fresh = dirCache.list && Date.now() - dirCache.at < config.directoryCacheMs;
     if (fresh && !force) return dirCache.list;
     try {
@@ -22,6 +23,28 @@ function createDirectoryService({ db, adapter, ad = null, config, log }) {
       throw e;
     }
   }
+
+  /** Fusionne l'organigramme du Hub avec les entités locales (organisation_entites) : ajout ou correction de libellé. */
+  async function mergeLocales(list) {
+    let locaux;
+    try { locaux = await db.all('SELECT type, code, label, parent_code FROM organisation_entites WHERE actif ORDER BY ordre, label'); } catch { return list; }
+    if (!locaux.length) return list;
+    const out = list.map((d) => ({ ...d, services: [...(d.services || [])] }));
+    for (const e of locaux) {
+      if (e.type === 'direction') {
+        const ex = out.find((d) => d.code === e.code);
+        if (ex) ex.label = e.label; else out.push({ code: e.code, label: e.label, services: [] });
+      } else {
+        const d = out.find((x) => x.code === e.parent_code); if (!d) continue;
+        const ex = d.services.find((s) => s.code === e.code);
+        if (ex) ex.label = e.label; else d.services.push({ code: e.code, label: e.label });
+      }
+    }
+    return out;
+  }
+
+  /** Directions/services de l'organigramme, surcharges locales comprises. */
+  async function directions(opts = {}) { return mergeLocales(await hubDirections(opts)); }
 
   async function resolveDirection(label) {
     if (!label) return null;
@@ -137,6 +160,7 @@ function createDirectoryService({ db, adapter, ad = null, config, log }) {
 
   const svc = {
     directions,
+    hubDirections,
     organisationChart: () => adapter.getOrganisationChart(),
     async searchAgents(q) { const list = await adapter.searchAgents(q); return Promise.all(list.map(async (a) => ({ ...a, poste: await posteAffiche(a) }))); },
     posteAffiche,

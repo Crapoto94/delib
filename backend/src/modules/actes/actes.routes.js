@@ -14,7 +14,7 @@ const Fields = {
 const Create = z.object({
   typeId: Id, titre: z.string().trim().min(3).max(500),
   directionCode: z.string().trim().max(40).optional().describe('Direction porteuse (défaut : ma direction)'),
-  serviceCode: z.string().trim().max(40).optional(), commentaire: z.string().max(5000).optional(), ...Fields,
+  serviceCode: z.string().trim().max(40).optional(), serviceLabel: z.string().trim().max(120).optional().describe('Service porteur en texte libre (ex. chargé de mission)'), commentaire: z.string().max(5000).optional(), ...Fields,
 });
 const Update = z.object({
   titre: z.string().trim().min(3).max(500).optional(), typeId: Id.optional(), serviceCode: z.string().trim().max(40).optional(),
@@ -28,7 +28,7 @@ const ListQ = z.object({
 const Delib = z.object({ titre: z.string().trim().min(3).max(500) });
 const DelibUpd = z.object({ titre: z.string().trim().min(3).max(500).optional(), ordre: z.number().int().min(1).optional() });
 const Abandon = z.object({ motif: z.string().trim().min(3).max(1000) });
-const DepuisModele = z.object({ modeleId: Id, typeId: Id.optional(), titre: z.string().trim().min(3).max(500).optional(), motsCles: z.array(z.string().trim().min(1).max(60)).max(20).optional() });
+const DepuisModele = z.object({ modeleId: Id, typeId: Id.optional(), titre: z.string().trim().min(3).max(500).optional(), serviceLabel: z.string().trim().max(120).optional(), motsCles: z.array(z.string().trim().min(1).max(60)).max(20).optional() });
 const Assiste = z.object({
   actif: z.boolean().optional(), bienvenue: z.boolean().optional(),
   passees: z.array(z.string().trim().min(1).max(40)).max(50).optional(),

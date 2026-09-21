@@ -86,6 +86,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const perm = await redaction.canDraft(ctx, org, directionCode, serviceCode);
       if (!perm.ok) throw E.forbidden("Vous n'êtes pas autorisé à rédiger pour cette direction");
       const { directionLabel, serviceLabel } = await svc.labels(directionCode, serviceCode, ctx.agent);
+      const serviceLabelFinal = b.serviceLabel?.trim() || serviceLabel; // champ libre : précise le service porteur (ex. chargé de mission)
 
       const natureId = b.natureId ? (await refs.require('nature', b.natureId, org)).id
         : (type.meta?.natureCode ? (await refs.byCode('nature', type.meta.natureCode, org))?.id ?? null : null);
@@ -103,7 +104,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
              nature_id, matiere_id, rubrique_id, incidence_financiere, montant, rapporteur_id, rapporteur_compl_id, seance_visee_id,
              urgence, date_limite, confidentialite, commentaire_initial, custom)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22::jsonb) RETURNING *`,
-          [org, numero, type.id, b.titre, ctx.username, directionCode, directionLabel, serviceCode, serviceLabel, natureId, matiereId, rubriqueId,
+          [org, numero, type.id, b.titre, ctx.username, directionCode, directionLabel, serviceCode, serviceLabelFinal, natureId, matiereId, rubriqueId,
             b.incidenceFinanciere ?? null, b.montant ?? null, b.rapporteurId ?? null, b.rapporteurComplId ?? null, b.seanceViseeId ?? null,
             !!b.urgence, b.dateLimite ?? null, b.confidentialite || 'normale', b.commentaire ?? null, JSON.stringify(b.custom || {})]);
         const n = Math.max(1, type.meta?.minDeliberations ?? 1);
@@ -308,7 +309,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
      * délibérations et annexes. Les fichiers d'annexes sont partagés (contenu immuable) : aucune copie inutile.
      * La direction reste celle du rédacteur (on ne peut pas rédiger pour une autre direction) ; les mots-clés sont mémorisés.
      */
-    async creerDepuisModele(ctx, organismeId, { modeleId, typeId, titre, motsCles } = {}) {
+    async creerDepuisModele(ctx, organismeId, { modeleId, typeId, titre, serviceLabel, motsCles } = {}) {
       const org = requireOrg(organismeId);
       const modele = await svc.load(ctx, org, modeleId);
       const custom = { ...(modele.custom || {}) };
@@ -317,6 +318,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const titreNew = String(titre || '').trim() || modele.titre;
       const copy = await svc.create(ctx, org, {
         typeId: typeId ?? modele.type_id, titre: titreNew.slice(0, 500),
+        ...(serviceLabel?.trim() ? { serviceLabel: serviceLabel.trim() } : {}),
         natureId: modele.nature_id, matiereId: modele.matiere_id, rubriqueId: modele.rubrique_id,
         incidenceFinanciere: modele.incidence_financiere,
         montant: modele.montant === null || modele.montant === undefined ? undefined : Number(modele.montant),

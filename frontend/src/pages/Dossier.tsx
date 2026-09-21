@@ -199,7 +199,7 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
             <button key={t.id} onClick={() => setOpen(t.id)} className="block w-full rounded-lg border border-line bg-surface p-4 text-left hover:border-action hover:shadow-lift" aria-label={`Ouvrir ${KIND_LABEL[t.kind]}`}>
               <div className="mb-1 flex items-center gap-2"><h4 className="text-[15px] font-bold text-head">{KIND_LABEL[t.kind]}{d && dels.length > 1 ? ` — délibération ${d.ordre}` : ''}</h4>
                 {t.empty ? <Badge tone="warn">à rédiger</Badge> : <Badge tone="ok">v{t.version}</Badge>}{t.tracking && <Badge tone="blue">suivi actif</Badge>}<span className="ml-auto text-[12px] font-semibold text-action">{editable ? 'Modifier' : 'Ouvrir'} →</span></div>
-              {md ? <div className="line-clamp-4 text-[14px] leading-[22px] text-slate-700" dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} /> : <p className="text-mute">Cliquez pour rédiger ce texte.</p>}
+              {md ? <div className="text-preview line-clamp-4 text-[14px] leading-[22px] text-slate-700" dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} /> : <p className="text-mute">Cliquez pour rédiger ce texte.</p>}
             </button>);
         })}
       </div>
