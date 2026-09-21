@@ -85,7 +85,8 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
   const rubriques = useLoad(async () => (await api.get(orgPath(o, '/referentiels/rubrique'))).data.items as any[], [o]);
   const natures = useLoad(async () => (await api.get(orgPath(o, '/referentiels/nature'))).data.items as any[], [o]);
   const elus = useLoad(async () => (await api.get(orgPath(o, '/elus'))).data.items as any[], [o]);
-  const seances = useLoad(async () => (await api.get(orgPath(o, '/seances'), { params: { statut: 'planifiee' } })).data.items as any[], [o]);
+  // séances proposables : celles à venir (hors annulées) ; la séance déjà visée par le dossier reste toujours affichée, même tenue ou passée
+  const seances = useLoad(async () => ((await api.get(orgPath(o, '/seances'), { params: { from: new Date(Date.now() - 86400000).toISOString(), limit: 100 } })).data.items as any[]).filter((s) => s.statut !== 'annulee'), [o]);
   const [f, setF] = useState<any>({});
   const [cv, setCv] = useState<Record<string, any>>({}); // valeurs des champs personnalisés
   const [err, setErr] = useState<string | null>(null); const [saving, setSaving] = useState(false);
@@ -114,7 +115,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
         <Field label="Direction porteuse"><div className="input bg-soft">{acte.direction?.label}{acte.service ? ` · ${acte.service.label}` : ''}</div></Field>
         <Field label="Séance visée" hint="Proposée par le rédacteur ; modifiable par la hiérarchie.">
           <Select className="input" disabled={dis && !acte.droits?.modifierSeance} value={f.seanceViseeId ?? ''} onChange={(e) => setF({ ...f, seanceViseeId: e.target.value })}>
-            <option value="">— à définir —</option>{seances.data?.map((s) => <option key={s.id} value={s.id}>{s.instance} — {d(s.dateSeance)}</option>)}
+            <option value="">— à définir —</option>{[...(seances.data ?? []), ...(acte.seanceVisee && !(seances.data ?? []).some((s) => s.id === acte.seanceVisee.id) ? [acte.seanceVisee] : [])].map((s) => <option key={s.id} value={s.id}>{s.instance} — {d(s.dateSeance)}</option>)}
           </Select>
         </Field>
         <div className="md:col-span-2"><Field label="Titre explicite de l'acte *"><input className="input" disabled={dis} value={f.titre ?? ''} onChange={(e) => setF({ ...f, titre: e.target.value })} /></Field></div>

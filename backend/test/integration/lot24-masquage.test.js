@@ -76,6 +76,7 @@ describe('séance visée sur tous les tableaux', () => {
   it('la liste des dossiers et « à traiter » portent la séance visée (date et instance)', async () => {
     const liste = (await as(t.dupont).get(`${base()}/actes?scope=mine`)).body.items.find((x) => x.id === a);
     expect(liste.seanceVisee).toMatchObject({ id: seance.id, dateSeance: expect.anything(), instance: expect.any(String) });
+    expect((await as(t.dupont).get(A(a))).body.seanceVisee).toMatchObject({ id: seance.id, instance: expect.any(String) });   // et la fiche du dossier
     const b = (await as(t.dupont).post(`${base()}/actes`, { typeId: typeDelib.id, titre: 'Sans séance' })).body.id;
     expect((await as(t.dupont).get(`${base()}/actes?scope=mine`)).body.items.find((x) => x.id === b).seanceVisee).toBeNull();
     const todo = (await as(t.petit).get(`${base()}/circuit/a-traiter`)).body.items.find((x) => x.acte.id === a);

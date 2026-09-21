@@ -113,7 +113,8 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const [delibs, editable] = await Promise.all([svc.deliberations(a.id), acl.canEdit(ctx, a)]);
       const comp = await svc.completeness(a);
       const champs = late.champs ? await late.champs.pourActe(ctx, a) : [];
-      return { ...toActe(a), champs, deliberations: delibs, droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp, odj: late.odj ? await late.odj.positionsOf(a.id) : [] };
+      const acte = (await svc.attachSeance([toActe(a)]))[0]; // séance visée (date et instance) pour la fiche
+      return { ...acte, champs, deliberations: delibs, droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp, odj: late.odj ? await late.odj.positionsOf(a.id) : [] };
     },
 
     async list(ctx, organismeId, f = {}) {
