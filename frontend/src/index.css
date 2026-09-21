@@ -118,7 +118,9 @@ aside nav::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.
 .prose-doc strong { font-weight: 700; }
 .prose-doc img { max-width: 100%; height: auto; }
 /* Image de l'éditeur : poignées de redimensionnement et de rotation quand elle est sélectionnée */
-.vd-image { display: inline-block; max-width: 100%; }
+.vd-image { display: block; width: 100%; max-width: 100%; }
+.vd-image[data-align='center'] { text-align: center; }
+.vd-image[data-align='right'] { text-align: right; }
 .vd-image-frame { position: relative; display: inline-block; line-height: 0; }
 .vd-image-frame[data-selected='true'] { outline: 2px solid rgb(var(--c-action)); outline-offset: 2px; }
 .vd-grip { position: absolute; width: 11px; height: 11px; background: rgb(var(--c-surface)); border: 1.5px solid rgb(var(--c-action)); border-radius: 2px; z-index: 6; }

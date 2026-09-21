@@ -69,6 +69,20 @@ describe('fusion d’un modèle Word (.docx)', () => {
     expect(await z.file('word/document.xml').async('text')).toContain('<w:drawing>');
   });
 
+  it('applique taille, rotation et alignement d’une image (fragment #vd:)', async () => {
+    const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const out = await lire(await remplir(await creer(doc(para('{expose}'))), { '{expose}': `![logo](${PNG}#vd:w=200,rot=90,align=center)` }));
+    expect(out).toContain('rot="5400000"');
+    expect(out).toContain('<w:jc w:val="center"/>');
+    expect(out).toContain('cx="1905000"'); // 200 px × 9 525 EMU
+  });
+
+  it('aligne un paragraphe centré ou justifié (`{center}`, `{justify}`)', async () => {
+    const src = await creer(doc(para('{expose}')));
+    expect(await lire(await remplir(src, { '{expose}': '{center} Titre centré' }))).toContain('<w:jc w:val="center"/>');
+    expect(await lire(await remplir(src, { '{expose}': '{justify} Texte justifié' }))).toContain('<w:jc w:val="both"/>');
+  });
+
   it('met « Article N » en gras et en MAJUSCULES dans le dispositif', async () => {
     const src = await creer(doc(para('{dispositif}')));
     const out = await lire(await remplir(src, { '{dispositif}': markdownToRich('**Article 1** : une subvention est attribuée.') }));

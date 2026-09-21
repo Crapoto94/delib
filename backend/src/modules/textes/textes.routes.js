@@ -5,8 +5,9 @@ const P = z.object({ orgId: Id, id: Id });
 const PT = P.extend({ textId: Id });
 const PV = PT.extend({ n: Id });
 const ViewQ = z.object({ mode: z.enum(['suivi', 'propre', 'depuis']).default('suivi'), sinceAt: z.iso.datetime().optional() });
-const Commit = z.object({ markdown: z.string().max(400000), baseVersion: z.number().int().min(1), reason: z.string().max(200).optional() });
-const Draft = z.object({ markdown: z.string().max(400000) });
+// 15 Mo : un texte peut embarquer des images (data-URL) insérées ou collées depuis Word.
+const Commit = z.object({ markdown: z.string().max(15000000), baseVersion: z.number().int().min(1), reason: z.string().max(200).optional() });
+const Draft = z.object({ markdown: z.string().max(15000000) });
 const Cmp = z.object({ from: Id, to: Id });
 const Resolve = z.object({ decision: z.enum(['accept', 'reject']), cids: z.array(z.string().max(40)).max(500).optional(), all: z.boolean().optional() })
   .refine((d) => d.all || (d.cids && d.cids.length), { message: 'cids ou all requis' });

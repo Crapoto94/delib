@@ -117,8 +117,12 @@ function ImageNodeView(props: NodeViewProps) {
   };
 
   return (
-    <NodeViewWrapper as="span" className="vd-image" data-align={align || 'left'} style={{ textAlign: align || 'left' }} contentEditable={false}>
-      <span className="vd-image-frame" data-selected={selected ? 'true' : undefined}>
+    <NodeViewWrapper as="div" className="vd-image" data-align={align || 'left'} style={{ textAlign: align || 'left' }} contentEditable={false}>
+      <span className="vd-image-frame" data-selected={selected ? 'true' : undefined}
+        draggable={editable}
+        onPointerDown={(e) => { if (editable && e.button === 0) select(); }}
+        onDragStart={(e) => { if (!editable) return; select(); try { e.dataTransfer?.setData('text/plain', ''); if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'; } catch { /* ignore */ } }}
+        title={editable ? 'Glisser pour déplacer' : undefined}>
         <img ref={imgRef} src={src} alt={alt || ''} draggable={false} onClick={select}
           style={{ width: w ? `${w}px` : undefined, maxWidth: '100%', height: 'auto', transform: rot ? `rotate(${rot}deg)` : undefined }} />
         {editable && selected && <>

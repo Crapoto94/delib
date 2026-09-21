@@ -63,7 +63,8 @@ export function mdToHtml(md: string): string {
       return `<table><tbody><tr>${head.map((c) => `<th><p>${inline(c)}</p></th>`).join('')}</tr>`
         + `${rows.map((r) => `<tr>${r.map((c) => `<td><p>${inline(c)}</p></td>`).join('')}</tr>`).join('')}</tbody></table>`;
     }
-    if (lines.every((l) => /^\s*!\[[^\]]*\]\([^)]+\)\s*$/.test(l))) return `<p${sty}>${lines.map((l) => inline(l.trim())).join('</p><p>')}</p>`;
+    // Image(s) seule(s) : nœud « image » de bloc (pas dans un paragraphe).
+    if (lines.every((l) => /^\s*!\[[^\]]*\]\([^)]+\)\s*$/.test(l))) return lines.map((l) => inline(l.trim())).join('');
     if (lines.every((l) => /^\s*[-*]\s+/.test(l))) return `<ul>${lines.map((l) => `<li><p>${inline(l.replace(/^\s*[-*]\s+/, ''))}</p></li>`).join('')}</ul>`;
     if (lines.every((l) => /^\s*\d+[.)]\s+/.test(l))) return `<ol>${lines.map((l) => `<li><p>${inline(l.replace(/^\s*\d+[.)]\s+/, ''))}</p></li>`).join('')}</ol>`;
     return `<p${sty}>${lines.map(inline).join('<br>')}</p>`;
@@ -95,6 +96,7 @@ export function docToMd(doc: PMNode): string {
       const a = b.attrs?.textAlign;
       if (t.trim()) blocks.push(a && a !== 'left' ? `{${a}} ${t}` : t);
     }
+    else if (b.type === 'image') blocks.push(`![${b.attrs?.alt ?? ''}](${encodeImgSrc(b.attrs?.src ?? '', b.attrs)})`);
     else if (b.type === 'bulletList' || b.type === 'orderedList') {
       const items = (b.content ?? []).map((li, i) => `${b.type === 'bulletList' ? '-' : `${i + 1}.`} ${inlineMd(li.content?.[0]?.content)}`.trimEnd());
       blocks.push(items.join('\n'));

@@ -83,7 +83,8 @@ function createApp(c) {
     });
     next();
   });
-  app.use(express.json({ limit: '1mb' }));
+  // 20 Mo : les textes peuvent contenir des images (data-URL) collées dans l'éditeur.
+  app.use(express.json({ limit: '20mb' }));
 
   const mw = createAuthMiddleware({ config, sessions: c.sessions, access: c.access, organismes: c.organismes });
   mw.authenticateElu = c.eluAuth.authenticate;
