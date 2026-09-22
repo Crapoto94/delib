@@ -8,7 +8,8 @@ const { nextCounter } = require('../../shared/infra');
 
 const DRIVERS = ['incidenceFinanciere', 'montant', 'typeId'];
 const toActe = (r) => r && ({
-  id: r.id, organismeId: r.organisme_id, numeroSuivi: r.numero_suivi, typeId: r.type_id, titre: r.titre, statut: r.statut,
+  id: r.id, organismeId: r.organisme_id, numeroSuivi: r.numero_suivi, typeId: r.type_id, typeCode: r.type_code ?? null, typeLibelle: r.type_libelle ?? null,
+  titre: r.titre, statut: r.statut,
   redacteur: r.redacteur, coRedacteurs: r.co_redacteurs,
   direction: { code: r.direction_code, label: r.direction_label }, service: r.service_code || r.service_label ? { code: r.service_code, label: r.service_label } : null,
   natureId: r.nature_id, matiereId: r.matiere_id, rubriqueId: r.rubrique_id, incidenceFinanciere: r.incidence_financiere,
@@ -16,6 +17,7 @@ const toActe = (r) => r && ({
   seanceViseeId: r.seance_visee_id, seanceId: r.seance_id, urgence: r.urgence, dateLimite: r.date_limite, confidentialite: r.confidentialite,
   commentaireInitial: r.commentaire_initial, custom: r.custom, currentStepKey: r.current_step_key, participants: r.participants,
   submittedAt: r.submitted_at, abandonedAt: r.abandoned_at, abandonMotif: r.abandon_motif, createdAt: r.created_at, updatedAt: r.updated_at,
+  signeAt: r.signe_at ?? null, signePar: r.signe_par ?? null, parapheurEnvoiId: r.parapheur_envoi_id ?? null,
 });
 const toDelib = (r) => ({ id: r.id, acteId: r.acte_id, ordre: r.ordre, titre: r.titre });
 
@@ -43,7 +45,9 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
     },
 
     async raw(organismeId, id) {
-      const a = await db.get('SELECT * FROM actes WHERE id = $1 AND organisme_id = $2', [id, requireOrg(organismeId)]);
+      const a = await db.get(
+        `SELECT a.*, t.code AS type_code, t.libelle AS type_libelle FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id
+         WHERE a.id = $1 AND a.organisme_id = $2`, [id, requireOrg(organismeId)]);
       if (!a) throw E.notFound('Acte introuvable');
       return a;
     },
@@ -118,13 +122,49 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
 
     async deliberations(acteId) { return (await db.all('SELECT * FROM deliberations WHERE acte_id = $1 ORDER BY ordre, id', [acteId])).map(toDelib); },
 
+    // ---- liens « délibérations d'autorisation » (décisions prises par délégation) --------------------------------------
+    /** Délibérations liées à cet acte (qui l'autorisent). Renvoie titre, numéro et type de la cible. */
+    async liens(acteId) {
+      return db.all(
+        `SELECT l.id, l.cible_acte_id AS "cibleActeId", l.kind, l.created_at AS "createdAt",
+                a.titre, a.numero_suivi AS "numeroSuivi", a.statut, t.code AS "typeCode", t.libelle AS "typeLibelle"
+         FROM acte_liens l JOIN actes a ON a.id = l.cible_acte_id LEFT JOIN ref_items t ON t.id = a.type_id
+         WHERE l.acte_id = $1 ORDER BY l.created_at`, [acteId]);
+    },
+    /** États d'une délibération déjà passée (elle peut autoriser une décision). */
+    async ajouterLien(ctx, organismeId, acteId, cibleActeId) {
+      const a = await svc.load(ctx, organismeId, acteId, { edit: true });
+      if (a.id === Number(cibleActeId)) throw E.badRequest('Un acte ne peut pas s\'autoriser lui-même');
+      const cible = await svc.raw(organismeId, cibleActeId);
+      if (!(await acl.canView(ctx, cible))) throw E.notFound('Délibération introuvable');
+      if (cible.type_code !== 'deliberation') throw E.badRequest('Seule une délibération peut autoriser une décision');
+      const PASSEES = ['adopte', 'transmis', 'ar_recu', 'publie', 'executoire', 'archive', 'texte_definitif_pret', 'pret_a_transmettre'];
+      if (!PASSEES.includes(cible.statut)) throw E.badRequest('La délibération liée doit être adoptée (passée au conseil)');
+      try {
+        const l = await db.get('INSERT INTO acte_liens (organisme_id, acte_id, cible_acte_id, kind, created_by) VALUES ($1,$2,$3,\'autorisation\',$4) RETURNING id', [requireOrg(organismeId), a.id, cible.id, ctx.username]);
+        await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.lien.ajout', entity: 'acte_liens', entityId: l.id, after: { acteId: a.id, cibleActeId: cible.id } });
+        await bus.emit('acte.lien_changed', { organismeId: a.organisme_id, acteId: a.id, ctx });
+        return { id: l.id, items: await svc.liens(a.id) };
+      } catch (e) { if (e.code === '23505') throw E.conflict('Cette délibération est déjà liée'); throw e; }
+    },
+    async retirerLien(ctx, organismeId, acteId, lienId) {
+      const a = await svc.load(ctx, organismeId, acteId, { edit: true });
+      const r = await db.get('DELETE FROM acte_liens WHERE id = $1 AND acte_id = $2 RETURNING cible_acte_id', [lienId, a.id]);
+      if (!r) throw E.notFound('Lien introuvable');
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.lien.retrait', entity: 'acte_liens', entityId: lienId, before: { cibleActeId: r.cible_acte_id } });
+      await bus.emit('acte.lien_changed', { organismeId: a.organisme_id, acteId: a.id, ctx });
+      return { items: await svc.liens(a.id) };
+    },
+
     async get(ctx, organismeId, id) {
       const a = await svc.load(ctx, organismeId, id);
       const [delibs, editable] = await Promise.all([svc.deliberations(a.id), acl.canEdit(ctx, a)]);
       const comp = await svc.completeness(a);
       const champs = late.champs ? await late.champs.pourActe(ctx, a) : [];
+      const typeInfo = { code: a.type_code ?? null, libelle: a.type_libelle ?? null, meta: (await db.get('SELECT meta FROM ref_items WHERE id = $1', [a.type_id]))?.meta || {} };
       const acte = (await svc.attachSeance([toActe(a)]))[0]; // séance visée (date et instance) pour la fiche
-      return { ...acte, champs, deliberations: delibs, droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp, odj: late.odj ? await late.odj.positionsOf(a.id) : [] };
+      return { ...acte, typeInfo, champs, deliberations: delibs, liens: await svc.liens(a.id),
+        droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp, odj: late.odj ? await late.odj.positionsOf(a.id) : [] };
     },
 
     async list(ctx, organismeId, f = {}) {
@@ -142,7 +182,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       if (!f.includeAbandoned) w.push("a.statut <> 'abandonne'");
       const where = w.join(' AND ');
       const total = (await db.get(`SELECT count(*)::int AS n FROM actes a WHERE ${where}`, p)).n;
-      const rows = await db.all(`SELECT a.* FROM actes a WHERE ${where} ORDER BY a.updated_at DESC, a.id DESC LIMIT ${add(f.limit || 50)} OFFSET ${add(f.offset || 0)}`, p);
+      const rows = await db.all(`SELECT a.*, t.code AS type_code, t.libelle AS type_libelle FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id WHERE ${where} ORDER BY a.updated_at DESC, a.id DESC LIMIT ${add(f.limit || 50)} OFFSET ${add(f.offset || 0)}`, p);
       return { total, limit: f.limit || 50, offset: f.offset || 0, items: await svc.attachSeance(rows.map(toActe)) };
     },
 
@@ -347,9 +387,13 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       need(a.incidence_financiere !== null && a.incidence_financiere !== undefined, 'incidence_financiere', 'Incidence financière');
       need(!!a.rubrique_id, 'rubrique', 'Rubrique');
       need(!!a.nature_id, 'nature', 'Nature');
-      need(!!a.rapporteur_id, 'rapporteur', 'Élu rapporteur');
+      if (!type?.meta?.signature) need(!!a.rapporteur_id, 'rapporteur', 'Élu rapporteur'); // décision / arrêté : pas d'élu rapporteur
       const n = (await db.get('SELECT count(*)::int AS n FROM deliberations WHERE acte_id = $1', [a.id])).n;
       need(n >= Math.max(1, type?.meta?.minDeliberations ?? 1), 'deliberation', 'Au moins une délibération');
+      if (type?.meta?.autorisations) {
+        const nl = (await db.get('SELECT count(*)::int AS n FROM acte_liens WHERE acte_id = $1', [a.id])).n;
+        need(nl > 0, 'autorisation', 'Au moins une délibération d\'autorisation liée');
+      }
       if (late.texts) for (const m of await late.texts.missingTexts(a, type?.meta)) missing.push(m);
       if (late.champs) for (const m of await late.champs.manquants(a)) missing.push(m);
       return { complete: missing.length === 0, missing };

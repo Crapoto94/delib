@@ -15,10 +15,23 @@ const DEFAULTS = {
     { texte: 'EXPOSÉ DES MOTIFS', align: 'center', taille: 15, gras: true, encadre: true, apres: 10 },
     { texte: 'OBJET : {rubrique} — {titre}', align: 'left', taille: 11.5, gras: true, apres: 14 },
   ] },
+  // Délibération (et vœu) : acte discuté et voté en conseil → « extrait du registre ».
   deliberation: { ...BASE, entete: [
     { texte: '{organisme}', align: 'center', taille: 11, gras: true, apres: 4 },
     { texte: 'EXTRAIT DU REGISTRE DES DÉLIBÉRATIONS', align: 'center', taille: 14, gras: true, encadre: true, apres: 6 },
     { texte: 'SÉANCE DU {date_seance}', align: 'center', taille: 11, gras: true, apres: 10 },
+    { texte: 'OBJET : {rubrique} — {titre}', align: 'left', taille: 11.5, gras: true, apres: 14 },
+  ] },
+  // Décision (et arrêté) : acte signé par le maire, qui ne passe pas au conseil → en-tête d'acte signé,
+  // ni « extrait du registre » ni « séance du… ». Le dispositif (l'acte lui-même) reste en corps.
+  decision: { ...BASE, filigrane: '', entete: [
+    { texte: '{organisme}', align: 'center', taille: 11, gras: true, apres: 4 },
+    { texte: 'DÉCISION N° {numero_suivi}', align: 'center', taille: 14, gras: true, encadre: true, apres: 6 },
+    { texte: 'OBJET : {rubrique} — {titre}', align: 'left', taille: 11.5, gras: true, apres: 14 },
+  ] },
+  arrete: { ...BASE, filigrane: '', entete: [
+    { texte: '{organisme}', align: 'center', taille: 11, gras: true, apres: 4 },
+    { texte: 'ARRÊTÉ N° {numero_suivi}', align: 'center', taille: 14, gras: true, encadre: true, apres: 6 },
     { texte: 'OBJET : {rubrique} — {titre}', align: 'left', taille: 11.5, gras: true, apres: 14 },
   ] },
   dossier: { ...BASE },

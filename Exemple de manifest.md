@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.45 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.43 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -15,7 +15,7 @@ Sources analysées pour ce document :
 | `matieres.txt` | nomenclature des matières (193 lignes, 4 niveaux) |
 | `GUIDE_NOUVELLE_APP_VILLE.md` | stack, PostgreSQL, API APM, API Hub DSI, bonnes pratiques |
 | `C:\dev\appdsi` — module `transcriptmanager` | principe de suivi des modifications (à reprendre), palette d'auteurs, brouillons |
-| `C:\dev\appdsi` — modules `rh`, `ville`, `parapheur` | référentiel RH, élus, signature électronique — **branchée pour les décisions et arrêtés** (section 19.4, D114) |
+| `C:\dev\appdsi` — modules `rh`, `ville`, `parapheur` | référentiel RH, élus, signature électronique (phase ultérieure) |
 
 ---
 
@@ -145,7 +145,7 @@ Lu dans le tutoriel de formation (18 pages).
 | Élus | Hub DSI `GET /api/ville/elus` | champs : nom, prénom, email, téléphone, rôle, délégation ; **pas** de groupe politique ni de commission |
 | Envoi de mail | APM `POST /api/v1/mail/send` (`mail_send`) | le corps est enveloppé dans le gabarit institutionnel ; pied de page en paramètres `footer1..3`, `footerColor` |
 | SMS (urgences, option) | APM `POST /api/v1/sms/send` | |
-| Signature électronique | module `parapheur` d'appdsi (**DSIHUB**, défaut) ou **iParapheur** (prévu, non branché) — décisions et arrêtés uniquement pour le moment (D114) | signataires, OTP mail, certificats, QR de vérification |
+| Signature électronique (phase ultérieure) | module `parapheur` d'appdsi | signataires, OTP mail, certificats, QR de vérification |
 | IA interne | APM `POST /api/v1/ai/query`, `GET /api/v1/ai/models`, `query-async` + `query-progress` | clé `X-API-KEY` avec la permission IA (à demander) ; section 21 |
 | Télétransmission au contrôle de légalité | **S²LOW**, module ACTES (`SL-DOC-API.pdf` v5.1) | certificat client **P12** (+ login) ; **accès à obtenir** ; section 19.5 |
 | Vérification des textes en vigueur (option) | API Légifrance (PISTE, DILA) | IA-31 |
@@ -294,8 +294,7 @@ Paramétrage ──► Création d'un acte ──► Rédaction (exposé + déli
 
 ### 7.1 Types d'actes (paramétrable — `ref_types_acte`)
 
-Valeurs initiales : **Délibération**, **Vœu**, **Décision**, **Arrêté**. Chaque type porte : son **circuit par défaut**, ses **composants obligatoires** (exposé oui/non, nb de délibérations, annexes), ses **champs personnalisés** et son **gabarit de mise en page**. Un **Vœu suit le même circuit** qu'une délibération par défaut (D26) ; le circuit reste modifiable par type d'acte.
-Les types portent aussi une **pastille** de lecture (couleur) et une **aide** affichée à la création (« quel type choisir »). Les types **Décision** et **Arrêté** sont **signés par le maire** à la fin du circuit **au lieu d'être inscrits au conseil** (D114, section 19.4) ; une **Décision** doit en outre **lier la ou les délibérations adoptées qui l'autorisent** (délégation du conseil).
+Valeurs initiales : **Délibération**, **Vœu**. Chaque type porte : son **circuit par défaut**, ses **composants obligatoires** (exposé oui/non, nb de délibérations, annexes), ses **champs personnalisés** et son **gabarit de mise en page**. Un **Vœu suit le même circuit** qu'une délibération par défaut (D26) ; le circuit reste modifiable par type d'acte.
 
 ### 7.2 Champs de la fiche
 
@@ -353,7 +352,7 @@ Le fichier reprend la **nomenclature ministérielle des matières** utilisée po
 `Délibérations` · `Actes réglementaires` · `Actes individuels` · `Contrats, conventions et avenants` · `Documents budgétaires et financiers` · `Autres`
 
 - **REF-01** — Chaque nature porte un **code** issu de la **classification de la préfecture** (import S²LOW, TLT-04) et un statut actif/inactif ; éditable en administration, avec héritage et surcharge par organisme (MOR-10).
-- **REF-02** — Le type d'acte « Délibération » pré-sélectionne la nature « Délibérations » ; « Décision » → « Actes individuels » ; « Arrêté » → « Actes réglementaires » (D114).
+- **REF-02** — Le type d'acte « Délibération » pré-sélectionne la nature « Délibérations ».
 
 **Rubriques** (`rubriquess.png`, `rubrique 2.png`, `rubrique 3.png` — liste complète, 40 valeurs) :
 
@@ -531,8 +530,6 @@ Le circuit est une **donnée**, pas du code : `circuit_definitions → circuit_s
 
 `Brouillon` → `En circuit (étape X)` ⇄ `Modification demandée` → `Validé DGS` → `En attente SCC` → `Mis à disposition commission` → `Avis rendu` → `Inscrit à l'ODJ` → *(phases ultérieures)* `Adopté / Rejeté / Retiré / Ajourné` → `Signé` *(si la signature est activée)* → `Transmis` → `Publié` / `Exécutoire`.
 Statuts transverses : `Abandonné`, `Archivé`.
-
-Pour un **acte signé par le maire** (Décision, Arrêté) : la fin du circuit donne `À signer` → `Signé` (ou `Signature refusée`) **au lieu** de `En attente SCC` / `Inscrit à l'ODJ` (D114).
 
 ### 9.8 Validation par lot
 
@@ -1009,11 +1006,8 @@ Une page de **suivi de séance** est **synchronisée en direct** : tous ceux qui
 
 ### 19.4 Signature
 
-- **SIG-01** — **Réalisée pour les décisions et arrêtés (D114, ex-D19).** Un acte dont le **type** porte `signature: true` (Décision, Arrêté) **ne passe pas au conseil** : à la fin de son circuit, il passe à l'état **`À signer`** et part au **parapheur** pour la **signature du maire**. Le **circuit reste le même** que pour les délibérations ; il peut être spécialisé par type d'acte (D26). Port `SignaturePort` branché sur le **module `parapheur` d'appdsi (DSIHUB)** ; **iParapheur** est proposé au paramétrage mais **non branché**. Paramétrage par organisme (Paramétrages › **Parapheur (signature)**) : `fournisseur`, `actif`, `mode` (**dev** = tous les envois vers une **adresse d'essai unique** ; **prod** = au **signataire** paramétré), compte technique du Hub (**secret chiffré au repos**, jamais renvoyé), nom/e-mail/qualité du signataire. Sans Hub configuré, un **simulateur** prend le relais (retour signé/refusé simulable en dev). Tables `parapheur_config`, `parapheur_envois`, `parapheur_journal` (migration `0061`).
-- **SIG-02** — **Journal des échanges** : ce qui est **envoyé** au parapheur et ce qu'il **retourne** (demande, accusé, état, retour) est **journalisé** et consultable sur la **fiche du dossier** (bloc Signature) et dans l'**administration**. Le parapheur du Hub **n'a pas de webhook** : l'état est obtenu par **interrogation** (polling) ; un retour **signé** met l'acte à `Signé`, un **refus** à `Signature refusée`.
-- **SIG-03** — **Délibérations d'autorisation** : une **décision** est prise par le maire dans le cadre d'une **délégation du conseil** ; elle doit **lier une ou plusieurs délibérations adoptées** qui l'autorisent (bloc « Délibérations d'autorisation » sur la fiche, recherche dans la bibliothèque). La **complétude** l'exige avant l'envoi au circuit. Table `acte_liens` (migration `0061`).
-- **SIG-04** — **Qui peut envoyer en signature (autorisation).** Dans VibeDélib, seuls l'**administrateur** et le **SCC** peuvent envoyer, relancer, interroger ou annuler un envoi, et uniquement sur un acte **qu'ils peuvent voir**, de **type signé**, à l'état `À signer` ou `Signature refusée` (contrôle `actes.load` + rôles sur `POST /parapheur/actes/:id/…`). Chaque action est **auditée au nom de l'agent réel**. **Limite assumée** : le parapheur du Hub n'identifie que le **compte technique** de VibeDélib (jeton de session), pas l'agent ; l'autorisation est donc **portée par VibeDélib**, pas vérifiée par le parapheur (voir Q-PARA dans la section 32).
-- **SIG-05** — **Reste à faire** : signature du **PV** par le maire et le secrétaire de séance, signature du **texte adopté** (après vote) par le maire, niveau de signature (avancée / qualifiée) et format transmis à S²LOW (PAdES intégré ou PKCS#7 détaché) ; signature **papier + numérisation** possible.
+- **SIG-01** — **Non activée pour le moment** (D19). Le mécanisme est **prévu** : port `SignaturePort` défini, adaptateur vers le **parapheur d'appdsi** (signataires, délégations, certificats, QR de vérification) **non branché**. Paramètre `signature_requise` par organisme et par type de pièce (défaut : **non**). Quand elle est désactivée, les états « À signer / Signé » sont **sautés** et l'acte est transmis **sans signature** (le fichier de signature est facultatif dans l'API S²LOW).
+- **SIG-02** — À l'activation : signature du texte adopté par le Maire, du PV par le Maire et le secrétaire de séance ; niveau de signature (avancée / qualifiée) et format transmis à S²LOW (PAdES intégré ou PKCS#7 détaché) à décider à ce moment-là ; signature **papier + numérisation** possible.
 
 ### 19.5 Préparation et envoi au contrôle de légalité (S²LOW, module ACTES)
 
@@ -1425,7 +1419,7 @@ Pour rendre l'outil transposable, le cœur métier ne parle qu'à des **ports** 
 | `MailPort` / `SmsPort` | APM | SMTP direct |
 | `RenderPort` (mise en page) | fond PDF + gabarit HTML/CSS (Chromium + pdf-lib) | autre fond, autre gabarit |
 | `StoragePort` | volume / GED Ville | S3, NAS |
-| `SignaturePort` (**branché** pour décisions/arrêtés, D114) | module `parapheur` d'appdsi (**DSIHUB**, défaut) ; **iParapheur** prévu (non branché) ; simulateur si aucun Hub | autre parapheur |
+| `SignaturePort` *(mécanisme prévu, non branché)* | module `parapheur` d'appdsi (section 19.4) | autre parapheur |
 | `TeletransmissionPort` | **S²LOW** (API ACTES, section 19.5), un compte par organisme | autre tiers de télétransmission |
 | `AiPort` | APM IA interne (`/api/v1/ai/…`) | modèle local |
 | `SearchPort` | PostgreSQL plein texte (`french` + `unaccent` + `pg_trgm`) | OpenSearch |
@@ -1660,7 +1654,7 @@ Le **backend est développé en premier** ; le **frontend démarre quand les maq
 | **6 Séance et post-séance** | présences, procurations, quorum, votes, amendements, **mode séance** (point en cours), texte adopté, extrait, registre, procès-verbal (section 19) | séance saisie de bout en bout |
 | **7a Contrôle de légalité : préparation** | import de la classification, lot de télétransmission, numéro transmis personnalisable, contrôles préalables, **mode simulation**, export ZIP, **simulateur S²LOW**, cycle complet de suivi sur le simulateur (section 19.5) | paquet conforme généré ; cycle complet déroulé sur le simulateur |
 | **7b Connexion réelle à S²LOW** | branchement du **P12** et de l'instance de test puis de production dès l'accès obtenu, tests de contrat, suivi réel, courriers de la préfecture | acte transmis sur l'instance de test, AR reçu |
-| **7c Signature électronique** *(décisions et arrêtés réalisés, D114)* | `SignaturePort` vers le parapheur DSIHUB (défaut) / iParapheur (prévu), statuts « À signer / Signé », journal des échanges, liens de délégation | actes signés par le maire ; reste : signature du texte adopté et du PV, fichier de signature S²LOW |
+| **7c Signature électronique** *(reportée)* | `SignaturePort` vers le parapheur, statuts « À signer / Signé », fichier de signature S²LOW | activable par organisme et par type de pièce |
 | **8 Aval** | publication (acte tamponné), recueil des actes, archivage (SAE), statistiques | hors périmètre actuel |
 | **Import AIRS DELIB** | sas (`airs_*`), tables de concordance, écran de validation admin/SCC, publication des actes des séances passées (option actes en préparation), annulation (section 25 bis, D111) | actes historiques visibles dans la bibliothèque et la recherche, concordances tracées |
 
@@ -1853,7 +1847,6 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | **D109** | **« Se souvenir de moi »** : session persistante de 6 mois au plus, jusqu'à la déconnexion ; **séance visée** dans « Dossiers de mon équipe » ; **SMS par l'API de la Ville (APM)** ; **connexion de développement des élus** | SEC-17, ELU-86, ELU-87 |
 | **D110** | **Séance visée : deux états visibles** dans tous les tableaux et la fiche — en **gras** quand l'acte est **inscrit à l'ordre du jour** de cette séance, en *italique* quand elle n'est que **visée** (pas encore inscrit) | SEA-18 |
 | **D111** | **Import de l'historique AIRS DELIB par sas et concordances** : les données AIRS (HUB DSI depuis Oracle, jamais d'accès direct) arrivent dans un **sas `airs_*`** (JSONB, mapping déclaratif tant que le MCD n'est pas connu), sont rapprochées des **paramétrages existants** (concordances multiples, propositions confirmées par un humain, contrôle **AD** des agents jamais connectés) puis **publiées** en actes historiques après validation **admin/SCC** ; actes des **séances passées** (option **actes en préparation**), publication **idempotente** et **réversible**, tout **audité** *(IMP-01 à 20)* | 25 bis |
-| **D114** | **Décisions et arrêtés signés par le maire (parapheur)** : deux nouveaux **types d'acte** (Décision, Arrêté) ; à la fin du circuit, l'acte passe **`À signer`** et part au **parapheur** (module `parapheur` d'appdsi = **DSIHUB** par défaut ; **iParapheur** prévu, non branché) au lieu d'être inscrit au conseil ; **paramétrage par organisme** (fournisseur, actif, **mode dev** = adresse d'essai unique / **prod** = signataire, compte technique chiffré, signataire), **journal des échanges**, la **décision lie les délibérations d'autorisation** (délégation du conseil) ; **simulateur** sans Hub *(SIG-01 à SIG-04)* | 7.1, 19.4 |
 | **D97** | **API externe et clés d'accès** : lecture seule, clés hachées à affichage unique, portées distinguant actes exécutoires / adoptés / en cours, IP autorisées, limite de débit, synchronisation incrémentale *(EXT-01 à EXT-06)* | 24 bis |
 | **D96** | **Sauvegarde vers un dossier réseau** : export logique cohérent en NDJSON, fichiers incrémentaux, destination UNC avec identifiants chiffrés, planification nocturne, rétention, journal, restauration outillée *(SAV-01 à SAV-07)* | 29.1 |
 | **D95** | **Alfresco comme stockage des fichiers** : clés `alf:`, coexistence avec le local, cache, pas de repli silencieux, migration dans les deux sens *(GED-09, GED-10)* | 19.5 bis |

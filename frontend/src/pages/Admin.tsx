@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ArrowLeftRight, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileText, GitBranch, HardDrive, KeyRound, Landmark, ListPlus, Menu, Network, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Timer, Trash2, Upload, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileSignature, FileText, GitBranch, HardDrive, KeyRound, Landmark, ListPlus, Menu, Network, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Timer, Trash2, Upload, Users, type LucideIcon } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -8,6 +8,7 @@ import { Badge, MailSwitch, Empty, ErrorBox, Field, Loading, Modal, PageTitle, u
 import { Gabarits, Identite, Utilisateurs } from './AdminExtra';
 import AdminGed from './AdminGed';
 import AdminTdt from './AdminTdt';
+import AdminParapheur from './AdminParapheur';
 import AdminMembres from './AdminMembres';
 import AdminSauvegarde from './AdminSauvegarde';
 import AdminCles from './AdminCles';
@@ -171,6 +172,7 @@ export function menu(isAdmin: boolean, plateforme: boolean, scc = false): Groupe
       { k: 'elus', label: 'Élus', icon: Landmark }, { k: 'espace-elus', label: 'Espace élus', icon: Smartphone }] },
     { titre: 'Intégrations', entrees: [
       { k: 'tdt', label: 'Télétransmission (TDT)', icon: Send }, { k: 'ged', label: 'GED (Alfresco)', icon: HardDrive },
+      ...(isAdmin || scc ? [{ k: 'parapheur', label: 'Parapheur (signature)', icon: FileSignature }] : []),
       ...(isAdmin ? [{ k: 'cles', label: 'Clés API', icon: KeyRound }, { k: 'recherche', label: 'Recherche', icon: Search }] : [])] },
     ...(isAdmin ? [{ titre: 'Données et conformité', entrees: [{ k: 'rgpd', label: 'RGPD', icon: Scale }, { k: 'configuration', label: 'Export / import', icon: ArrowLeftRight }] }] : []),
     ...(isAdmin || scc ? [{ titre: 'Reprise de données', entrees: [{ k: 'import-airs', label: 'Import AIRS DELIB', icon: Upload }] }] : []),
@@ -224,7 +226,7 @@ export default function Admin() {
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="organisation" element={<AdminOrganisation />} /><Route path="retroplanning" element={<AdminRetroplanning />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
-        <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} />        <Route path="visas" element={<AdminVisas />} /><Route path="calendrier" element={<Calendrier />} /><Route path="import-airs" element={<AdminImportAirs />} />
+        <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="parapheur" element={<AdminParapheur />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} />        <Route path="visas" element={<AdminVisas />} /><Route path="calendrier" element={<Calendrier />} /><Route path="import-airs" element={<AdminImportAirs />} />
       </Routes>
         </div>
       </div>

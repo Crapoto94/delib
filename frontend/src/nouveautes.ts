@@ -11,9 +11,22 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.43.0';
+export const VERSION = '0.44.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.44.0', type: 'minor', titre: 'Décisions et arrêtés : signature du maire par parapheur',
+    items: [
+      "Nouveaux types d'acte « Décision » et « Arrêté », proposés dès la création. Une décision est prise par le maire dans le cadre d'une délégation du conseil ; un arrêté est un acte réglementaire ou individuel du maire. Ni l'un ni l'autre ne passe au conseil.",
+      "À la fin du circuit d'une décision ou d'un arrêté, le dossier passe à l'état « À signer » et part en signature du maire au lieu d'être inscrit à l'ordre du jour. Le circuit reste le même que pour les délibérations ; il peut être spécialisé par type d'acte dans Paramétrages › Circuits.",
+      "Une décision doit lier les délibérations adoptées qui l'autorisent : un bloc « Délibérations d'autorisation » sur la fiche permet de les rechercher (bibliothèque) et de les lier ; sans elles, le dossier ne peut pas être envoyé.",
+      "Nouveau menu Paramétrages › Parapheur (signature) : choix du parapheur — DSIHUB par défaut, iParapheur prévu (non disponible) —, état actif, mode dev (tous les envois vers une adresse d'essai unique) ou prod (au signataire paramétré), compte technique du Hub, signataire et bouton de test.",
+      "Tous les échanges avec le parapheur sont journalisés (ce qui est envoyé, ce qui est retourné) et consultables depuis la fiche du dossier comme depuis l'administration. Sans Hub configuré, un simulateur permet de dérouler la signature (retour signé ou refusé).",
+      "Pastilles de type d'acte dans les listes et sur la fiche : l'icône du type (délibération, décision, arrêté) s'affiche désormais seule, à côté du titre.",
+      "Parapheur : le mode de signature se choisit (P12 par défaut, signature manuscrite ou SMS avec le portable du signataire), le document remis au parapheur porte son vrai titre et les métadonnées de l'acte (rubrique, direction, rédacteur, séance…), la position de signature est transmise au parapheur (le document s'affiche et se lit dans la visionneuse), et l'administration peut « Envoyer un document de test » pour vérifier la chaîne de bout en bout. Un envoi en erreur propose « Renvoyer au parapheur ».",
+      "Une décision n'a ni séance à viser, ni élu rapporteur, ni exposé, ni visas : juste l'acte lui-même. Pour les actes signés (décision, arrêté), les articles du dispositif s'enchaînent sans retour à la ligne. Un administrateur ou le SCC peut envoyer une décision en signature du maire sans attendre la fin du circuit.",
+    ],
+  },
   {
     version: '0.43.0', type: 'minor', titre: 'Gabarits Word, éditeur enrichi (images, tableaux, alignement) et bibliothèque multi-documents',
     items: [
@@ -21,7 +34,7 @@ export const VERSIONS: Version[] = [
       "Variable {numero} : le numéro du dossier au conseil, dans l'ordre de passage (figé à l'arrêt de l'ordre du jour, provisoire avant), utilisable dans les modèles Word et les en-têtes PDF.",
       "Éditeur : insertion d'images (fichier, copier/coller, glisser-déposer), redimensionnement à la poignée, rotation, alignement (gauche / centré / droite) et déplacement ; insertion de tableaux ; alignement des paragraphes (gauche, centré, droite, justifié) comme dans un traitement de texte ; le copier/coller conserve la mise en forme, y compris depuis Word.",
       "Bibliothèque : visionneuse multi-documents — on navigue d'une pièce jointe à l'autre (flèches, liste) ; pour les délibérations des conseils non encore archivés, un bouton « Délibération » régénère visas et délibéré au bon gabarit ; boutons par document (exposé, délibération, extrait du registre, pièces jointes) et fiche complète.",
-      "« Mes actes » : nouvelle rubrique « plus à vous » (actes encore en circuit chez un autre avec leur étape, ou validés en attente de séance) ; vue par rubrique ou par conseil pressenti ; la direction porteuse et le service s'affichent sous l'acte ; pastille « Inscrit au conseil » et fond vert quand le circuit est validé ET l'acte inscrit.",
+      "« Mes actes » : nouvelle rubrique « Dans le circuit » (actes encore en circuit chez un autre avec leur étape, ou validés en attente de séance) ; vue par rubrique ou par conseil pressenti ; la direction porteuse et le service s'affichent sous l'acte ; pastille « Inscrit au conseil » et fond vert quand le circuit est validé ET l'acte inscrit.",
       "Séances : distinction clôturées / non clôturées (filtre d'état et pastille). Les séances reprises d'AIRS sont marquées « tenue » et jamais closes, avec correction d'un verrouillage antérieur.",
       "Création d'un dossier : la direction porteuse reste déduite de votre fiche RH, et un champ libre « service / bureau ou chargé de mission » permet de préciser le service porteur.",
       "Import AIRS : l'origine (archivé ou courant) et les actes des conseils non archivés sont conservés ; les séances reprises ne sont plus marquées closes.",

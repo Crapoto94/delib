@@ -56,11 +56,16 @@ function stripPrefix(line, n) {
   return out;
 }
 
+/** Un début d'article : « Article 1 », « ARTICLE PREMIER », « Art. 2 »… (majuscules, accents et ponctuation tolérés). */
+const DEBUT_ARTICLE = /^\s*article\s+[\wÀ-ÿ'’.-]+/i;
+
 /** Type de bloc d'une ligne + retrait du préfixe. */
 function classify(line) {
   const t = lineText(line);
   let m;
   if ((m = /^(#{1,3})\s+/.exec(t))) return { kind: 'heading', level: m[1].length, runs: stripPrefix(line, m[0].length) };
+  // « Article 1 : … » commence un nouvel article : il ne doit pas poursuivre le paragraphe précédent.
+  if (DEBUT_ARTICLE.test(t)) return { kind: 'article', runs: line };
   if ((m = /^(\s*)[-*]\s+/.exec(t))) return { kind: 'bullet', runs: stripPrefix(line, m[0].length), marker: '-' };
   if ((m = /^(\s*)(\d+)[.)]\s+/.exec(t))) return { kind: 'number', runs: stripPrefix(line, m[0].length), marker: `${m[2]}.` };
   return { kind: 'p', runs: line };
@@ -153,9 +158,10 @@ function layoutDocument({ content, cfg, vars, measure, logo }) {
       y -= item.after ?? 6;
       continue;
     }
-    // runs : chaque ligne logique = un bloc
+    // runs : chaque ligne logique = un bloc ; pour un acte signé (décision, arrêté), les articles
+    // s'enchaînent sans retour à la ligne (chaque « Article N » repart simplement à la ligne, justifié).
     const lines = splitLines(item.runs);
-    for (const ln of lines) {
+    for (const [i, ln] of lines.entries()) {
       if (!ln.length) { y -= lh * 0.6; continue; }
       const b = classify(ln);
       if (b.kind === 'heading') {
@@ -166,6 +172,11 @@ function layoutDocument({ content, cfg, vars, measure, logo }) {
         const indent = 14;
         flow(b.runs, { x0: left + indent, w0: width - indent, marker: b.marker });
         y -= 2;
+      } else if (b.kind === 'article') {
+        // « Article N : … » commence toujours une nouvelle ligne ; le texte suit en pleine largeur.
+        flow(b.runs, { justify: true, spacing: lh });
+        const suiteDArticle = i + 1 < lines.length && classify(lines[i + 1]).kind === 'article';
+        y -= suiteDArticle ? 2 : 3;
       } else {
         flow(b.runs); y -= 3;
       }
@@ -178,6 +189,7 @@ function layoutDocument({ content, cfg, vars, measure, logo }) {
 async function paintDocument({ layout, cfg, vars, bgFirst, bgNext, watermark, title, fontsDir, logo }) {
   const doc = await PDFDocument.create();
   doc.setTitle(title || 'Document'); doc.setProducer('VibeDélib'); doc.setCreator('VibeDélib');
+  if (title) doc.setSubject(title); // certains parapheurs reprennent le sujet dans leur liste
   const fonts = await embedFamily(doc, cfg.police?.famille, fontsDir);
   const bg = async (bytes) => (bytes ? (await doc.embedPdf(bytes, [0]))[0] : null);
   const first = await bg(bgFirst); const next = (await bg(bgNext)) || first;

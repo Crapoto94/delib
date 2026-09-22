@@ -22,14 +22,14 @@ afterAll(async () => { await env.close(); });
 const list = (t, org, kind, q = '') => as(t).get(`/api/v1/organismes/${org.id}/referentiels/${kind}${q}`);
 
 describe('jeux communs (seeds)', () => {
-  it('fournit 6 natures, 40 rubriques, 2 types d\'acte et les types d\'annexe', async () => {
+  it('fournit 6 natures, 40 rubriques, 4 types d\'acte et les types d\'annexe', async () => {
     const n = (await list(admin, ville, 'nature')).body.items;
     expect(n.map((x) => x.libelle)).toEqual(['Délibérations', 'Actes réglementaires', 'Actes individuels', 'Contrats, conventions et avenants', 'Documents budgétaires et financiers', 'Autres']);
     const r = (await list(admin, ville, 'rubrique')).body.items;
     expect(r).toHaveLength(40);
     expect(r[0].libelle).toBe('ACTION SOCIALE');
     expect(r.find((x) => x.libelle === 'VŒU')).toBeTruthy();
-    expect((await list(admin, ville, 'type_acte')).body.items.map((x) => x.libelle)).toEqual(['Délibération', 'Vœu']);
+    expect((await list(admin, ville, 'type_acte')).body.items.map((x) => x.libelle)).toEqual(['Délibération', 'Vœu', 'Décision', 'Arrêté']);
     expect((await list(admin, ville, 'annexe_type')).body.items.length).toBeGreaterThan(3);
   });
 

@@ -211,15 +211,15 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
       if (annee) w.push(`EXTRACT(year FROM a.created_at) = ${add(Number(annee))}`);
       if (statut) w.push(`a.statut = ${add(statut)}`);
       if (hors) w.push(`a.statut <> ${add(hors)}`);
-      const rows = await db.all(`SELECT a.id, a.numero_suivi, a.titre, a.statut, a.created_at, a.redacteur,
+      const rows = await db.all(`SELECT a.id, a.numero_suivi, a.titre, a.statut, a.created_at, a.redacteur, t.code AS type_code, t.libelle AS type_libelle,
           (SELECT s.date_seance FROM seance_items it JOIN seances s ON s.id = it.seance_id WHERE it.acte_id = a.id AND it.statut = 'a_traiter' ORDER BY s.date_seance DESC LIMIT 1) AS date_seance,
           (SELECT sp.resultat FROM seance_items it JOIN seance_points sp ON sp.item_id = it.id WHERE it.acte_id = a.id ORDER BY it.id DESC LIMIT 1) AS resultat
-        FROM actes a WHERE ${w.join(' AND ')} ORDER BY a.created_at DESC LIMIT 500`, p);
+        FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id WHERE ${w.join(' AND ')} ORDER BY a.created_at DESC LIMIT 500`, p);
       const out = [];
       for (const r of rows) {
         const roles = await svc.rolesSur(ctx, org, r.id);
         if (role && !roles.some((x) => x.code === role)) continue;
-        out.push({ acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, creeLe: r.created_at, dateSeance: r.date_seance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null, redacteur: r.redacteur, roles });
+        out.push({ acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, typeCode: r.type_code, typeLibelle: r.type_libelle, creeLe: r.created_at, dateSeance: r.date_seance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null, redacteur: r.redacteur, roles });
       }
       return { total: out.length, items: out.slice(Number(offset), Number(offset) + Number(limit)) };
     },

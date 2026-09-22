@@ -11,6 +11,9 @@ import BibliothequeVisas from './BibliothequeVisas';
 import { useIa } from './useIa';
 
 export const KIND_LABEL: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispositif: 'Délibéré' };
+/** Libellé d'un texte : une décision (ou un arrêté) n'a pas de délibéré — le dispositif est l'acte lui-même. */
+const textLabel = (acte: any, t: any) => (t?.kind === 'dispositif' && (acte?.typeCode === 'decision' || acte?.typeCode === 'arrete')
+  ? (acte.typeCode === 'decision' ? 'Décision' : 'Arrêté') : KIND_LABEL[t?.kind]);
 const PLACEHOLDER: Record<string, string> = {
   expose: "Résumez l'intérêt communal en quelques paragraphes simples, sans jargon juridique…",
   visas: 'Vu le code général des collectivités territoriales…\n\nConsidérant que…',
@@ -77,7 +80,7 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const modeleWord = !!gabarits.data?.find((g) => g.docType === docType)?.docx;
   const preview = async () => {
     await commit();
-    const titre = `${KIND_LABEL[t.kind]} — dossier #${acte.numeroSuivi}`;
+    const titre = `${textLabel(acte, t)} — dossier #${acte.numeroSuivi}`;
     const m = modeleWord
       ? await openPdf(() => api.get(orgPath(o, `/actes/${acte.id}/docx-pdf`), { params: { docType, deliberationId: t.deliberationId ?? undefined }, responseType: 'blob' }), titre)
       : await openPdf(() => api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' }), titre);
@@ -157,7 +160,7 @@ export default function TexteModal({ acte, texts, initialId, editable, onClose, 
   const dels = acte.deliberations || [];
   const label = (t: any) => {
     const d = dels.find((x: any) => x.id === t.deliberationId);
-    return `${KIND_LABEL[t.kind]}${d && dels.length > 1 ? ` — délib. ${d.ordre}` : ''}`;
+    return `${textLabel(acte, t)}${d && dels.length > 1 ? ` — délib. ${d.ordre}` : ''}`;
   };
   const cur = texts.find((t) => t.id === id) ?? texts[0];
   return (

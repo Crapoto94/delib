@@ -43,6 +43,7 @@ const MODULES = [
   require('../modules/seances/tenue.routes'),
   require('../modules/seances/pv.routes'),
   require('../modules/teletransmission/tlt.routes'),
+  require('../modules/parapheur/parapheur.routes'),
   require('../modules/espace-elus/elus.routes'),
   require('../modules/espace-elus/comptes.routes'),
   require('../modules/ged/ged.routes'),

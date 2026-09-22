@@ -382,10 +382,17 @@ function createRender({ db, audit, storage, actes, config }) {
      * Aperçu d'un acte : exposé, une délibération, ou dossier complet (exposé + délibérations + annexes, avec sommaire).
      * mode : 'propre' | 'suivi' ; brouillon : utilise mon brouillon non enregistré (PRE-02).
      */
-    async renderActe(ctx, organismeId, acteId, { cible = 'expose', deliberationId, mode = 'propre', brouillon = false, watermark: wmOverride, avecAnnexes = true }) {
+    async renderActe(ctx, organismeId, acteId, { cible = 'expose', deliberationId, mode = 'propre', brouillon = false, watermark: wmOverride, avecAnnexes = true, docType: docTypeForce }) {
       const acte = await actes.load(ctx, organismeId, acteId);
       const { pick, delibs } = await svc.textsFor(ctx, acte, cible, deliberationId);
       const watermark = wmOverride !== undefined ? wmOverride : (FINAL.includes(acte.statut) ? '' : undefined);
+      // Le gabarit de l'acte dépend de son TYPE : une décision (ou un arrêté) utilise son propre gabarit d'acte
+      // signé, pas celui de la délibération. `docTypeForce` permet de forcer un gabarit depuis l'aperçu.
+      const meta = (await db.get('SELECT code FROM ref_items WHERE id = $1', [acte.type_id]))?.code || null;
+      const acteType = docTypeForce === 'deliberation' ? 'deliberation'
+        : meta === 'decision' ? 'decision' : meta === 'arrete' ? 'arrete' : 'deliberation';
+      // Libellé du bloc de dispositif : propre au type signé (décision/arrêté) ou « le conseil DÉCIDE ».
+      const defautDispositif = acteType === 'deliberation' ? 'Après en avoir délibéré, le conseil DÉCIDE :' : 'DÉCIDE :';
 
       const runs = async (row) => {
         if (!row) return [{ text: '', type: 'text' }];
@@ -408,18 +415,18 @@ function createRender({ db, audit, storage, actes, config }) {
         return svc.build({ organismeId: acte.organisme_id, docType: 'expose', content, vars, watermark, title: `Exposé des motifs — ${acte.titre}` });
       };
       const delibPdf = async (d) => {
-        const dx = await docxPdf('deliberation', d.id); if (dx) return dx;
-        const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
+        const dx = await docxPdf(acteType, d.id); if (dx) return dx;
+        const tpl = await svc.getTemplate(acte.organisme_id, acteType);
         const vars = await svc.varsFor(acte, d);
-        const dispLabel = tpl.cfg.sections?.dispositif ?? 'Après en avoir délibéré, le conseil DÉCIDE :';
+        const dispLabel = tpl.cfg.sections?.dispositif ?? defautDispositif;
+        const montrerVisas = meta !== 'decision'; // une décision n'a ni visas ni considérants
         const content = [
           ...svc.headerItems(tpl.cfg),
-          { type: 'runs', runs: await runs(pick('visas', d.id)) },
-          { type: 'space', h: 6 },
+          ...(montrerVisas ? [{ type: 'runs', runs: await runs(pick('visas', d.id)) }, { type: 'space', h: 6 }] : []),
           ...(dispLabel ? [{ type: 'title', text: dispLabel, size: 11, bold: true, align: 'left', after: 4 }] : []),
           { type: 'runs', runs: await runs(pick('dispositif', d.id)) },
         ];
-        return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Délibération — ${d.titre}` });
+        return svc.build({ organismeId: acte.organisme_id, docType: acteType, content, vars, watermark, title: `${acteType === 'deliberation' ? 'Délibération' : acteType === 'decision' ? 'Décision' : 'Arrêté'} — ${d.titre}` });
       };
       const visasPdf = async (d) => {
         const dx = await docxPdf('deliberation', d.id); if (dx) return dx;
@@ -429,16 +436,16 @@ function createRender({ db, audit, storage, actes, config }) {
         return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Visas et considérants — ${d.titre}` });
       };
       const dispositifPdf = async (d) => {
-        const dx = await docxPdf('deliberation', d.id); if (dx) return dx;
-        const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
+        const dx = await docxPdf(acteType, d.id); if (dx) return dx;
+        const tpl = await svc.getTemplate(acte.organisme_id, acteType);
         const vars = await svc.varsFor(acte, d);
-        const dispLabel = tpl.cfg.sections?.dispositif ?? 'Après en avoir délibéré, le conseil DÉCIDE :';
+        const dispLabel = tpl.cfg.sections?.dispositif ?? defautDispositif;
         const content = [
           ...svc.headerItems(tpl.cfg),
           ...(dispLabel ? [{ type: 'title', text: dispLabel, size: 11, bold: true, align: 'left', after: 4 }] : []),
           { type: 'runs', runs: await runs(pick('dispositif', d.id)) },
         ];
-        return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Délibéré — ${d.titre}` });
+        return svc.build({ organismeId: acte.organisme_id, docType: acteType, content, vars, watermark, title: `Délibéré — ${d.titre}` });
       };
 
       if (cible === 'expose') return exposePdf();
@@ -511,6 +518,41 @@ function createRender({ db, audit, storage, actes, config }) {
         + 'Le conseil municipal, après en avoir délibéré, décide d\'attribuer une subvention de fonctionnement. '.repeat(14);
       const vars = { organisme: 'Nom de la collectivité', titre: 'Titre de l\'acte (exemple)', rubrique: 'RUBRIQUE', matiere: '7.5 Subventions', date_seance: '1ER JANVIER 2030', numero_suivi: 1, numero: '2030-01-001', direction: 'Direction', service: 'Service', redacteur: 'agent', nature: 'Délibérations', statut: 'brouillon', date_du_jour: new Date().toLocaleDateString('fr-FR') };
       return svc.build({ organismeId, docType, content: [...svc.headerItems(tpl.cfg), { type: 'runs', runs: [{ text: lorem, type: 'text' }] }], vars, title: 'Aperçu du gabarit' });
+    },
+
+    /** Le nom du fichier PDF d'un rendu, pour que le parapheur affiche le vrai titre du document (jamais « blob »). */
+    nomFichier(titre, suffixe = 'pdf') {
+      const base = String(titre || 'document')
+        .replace(/[\\/:*?"<>|\r\n\t]+/g, ' ')
+        .replace(/[^\x20-\x7E\u00C0-\u017F]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80) || 'document';
+      return `${base}.${suffixe}`;
+    },
+
+    /**
+     * Document d'essai pour le parapheur : une pièce courte « SANS VALEUR », au gabarit de la collectivité, pour
+     * vérifier qu'un envoi en signature arrive bien au bon endroit sans engager de circuit ni de vrai acte.
+     */
+    async documentEssai(organismeId, { titre = 'Document de test — parapheur', signataire = null } = {}) {
+      const tpl = await svc.getTemplate(organismeId, 'deliberation');
+      const texte = [
+        '**Ce document est un essai technique.** Il ne correspond à aucun acte : aucune délibération, décision ou arrêté.',
+        'Il sert à vérifier, depuis les paramétrages, que VibeDélib remet bien un document au parapheur et que le signataire le reçoit.',
+        'Si vous recevez ce document, l’envoi en signature est correctement configuré. Vous pouvez l’ignorer ou le refuser sans conséquence.',
+      ].join('\n\n');
+      const vars = {
+        organisme: '', titre, rubrique: 'PARAPHEUR', matiere: 'Test de connexion', numero_suivi: '—', numero: '—',
+        direction: '—', service: '', redacteur: 'VibeDélib', nature: '—', statut: 'test', date_du_jour: new Date().toLocaleDateString('fr-FR'),
+      };
+      const doc = await svc.build({
+        organismeId, docType: 'deliberation', vars, watermark: 'SANS VALEUR', title: titre,
+        content: [...svc.headerItems(tpl.cfg), { type: 'title', text: 'DOCUMENT DE TEST — SANS VALEUR', size: 14, align: 'center', bold: true, after: 10 },
+          { type: 'runs', runs: [{ text: texte, type: 'text' }] },
+          ...(signataire ? [{ type: 'space', h: 8 }, { type: 'title', text: `Destinataire de l’essai : ${signataire}`, size: 10, align: 'left', after: 4 }] : [])],
+      });
+      return { ...doc, name: svc.nomFichier(titre) };
     },
   };
   return svc;

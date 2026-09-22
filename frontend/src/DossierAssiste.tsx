@@ -52,23 +52,33 @@ function construire(acte: any, passees: string[]): Etat {
   const renvoi = acte.statut === 'modification_demandee';
   const envoye = !['brouillon', 'modification_demandee'].includes(acte.statut);
   const passe = (id: string) => passees.includes(id);
+  // Une décision (ou un arrêté) n'a ni séance ni élu rapporteur, et une décision n'a ni exposé ni visas :
+  // juste l'acte lui-même. Le guide ne montre pas les étapes sans objet.
+  const signe = !!acte.typeInfo?.meta?.signature;
+  const sansExpose = acte.typeInfo?.meta?.expose === 'none';
+  const sansVisas = acte.typeInfo?.meta?.visas === 'none';
+  const nom = acte.typeCode === 'decision' ? 'décision' : acte.typeCode === 'arrete' ? 'arrêté' : 'délibération';
 
   const etapes: Etape[] = [
     {
       id: 'fiche', titre: 'Remplir la fiche du dossier', court: 'Fiche', requise: true, faite: ficheDoneSafe(ficheFaite, envoye), cible: '#fiche',
-      astuce: "Commencez par la fiche : titre, domaine, rubrique, nature, élu rapporteur et incidence financière. C'est le portrait du dossier — tout le reste en découle. La séance visée (le conseil concerné) n'est qu'une proposition de votre part : c'est le SCC qui la validera et inscrira le dossier à l'ordre du jour. L'encadré « État de complétude », à droite, vous dit à tout moment ce qu'il reste à renseigner.",
+      astuce: signe
+        ? `Commencez par la fiche : titre, domaine, rubrique, nature et incidence financière. C'est le portrait du dossier — tout le reste en découle. Une ${nom} ne passe pas au conseil et n'a donc ni séance à viser ni élu rapporteur. L'encadré « État de complétude », à droite, vous dit à tout moment ce qu'il reste à renseigner.`
+        : "Commencez par la fiche : titre, domaine, rubrique, nature, élu rapporteur et incidence financière. C'est le portrait du dossier — tout le reste en découle. La séance visée (le conseil concerné) n'est qu'une proposition de votre part : c'est le SCC qui la validera et inscrira le dossier à l'ordre du jour. L'encadré « État de complétude », à droite, vous dit à tout moment ce qu'il reste à renseigner.",
     },
-    {
+    ...(sansExpose ? [] : [{
       id: 'expose', titre: "Rédiger l'exposé des motifs", court: 'Exposé', requise: true, faite: exposeFaite || envoye, cible: '#textes',
       astuce: "Écrivez le « pourquoi » en langage simple : le contexte, le problème, ce que la collectivité veut faire. Visez 3 à 6 phrases claires plutôt qu'une page dense. En panne d'inspiration ou de formulation ? L'assistant IA (panneau « Assistant », dans l'éditeur) peut vous relire : orthographe, style plus clair, et il sait aussi adapter le texte d'un dossier existant — il propose, vous validez chaque changement.",
-    },
-    {
+    }]),
+    ...(sansVisas ? [] : [{
       id: 'visas', titre: 'Rédiger les visas et considérants', court: 'Visas', requise: true, faite: visasFaite || envoye, cible: '#textes',
       astuce: "Les « Vu… » citent les textes qui fondent la décision (code, loi, délibération précédente) ; les « Considérant que… » donnent les raisons. Un visa par base juridique, dans l'ordre du plus général au plus précis.",
-    },
+    }]),
     {
       id: 'dispositif', titre: 'Écrire le dispositif (le délibéré)', court: 'Dispositif', requise: true, faite: dispositifFaite || envoye, cible: '#textes',
-      astuce: "C'est ce que le conseil décide vraiment, article par article : « Article 1 : … ». Écrivez des phrases courtes et actionnables (qui, quoi, combien, quand).",
+      astuce: signe
+        ? `C'est le cœur de l'acte : ce que le maire décide, article par article — « Article 1 : … ». Écrivez des phrases courtes et actionnables (qui, quoi, combien, quand).`
+        : "C'est ce que le conseil décide vraiment, article par article : « Article 1 : … ». Écrivez des phrases courtes et actionnables (qui, quoi, combien, quand).",
     },
     {
       id: 'annexes', titre: 'Joindre les annexes utiles', court: 'Annexes', requise: false, conseillee: true, faite: passe('annexes') || envoye, cible: '#annexes',

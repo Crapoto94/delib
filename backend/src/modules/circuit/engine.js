@@ -17,13 +17,14 @@ const { addBusinessDays } = require('../../shared/time');
 /** Statuts où l'acte parcourt le circuit ; « en_attente_scc » = étape SCC en cours (l'acte y reste une fois le circuit terminé). */
 const IN_CIRCUIT = ['en_circuit', 'modification_demandee', 'en_attente_scc'];
 // Actes qui ne sont pas encore passés au conseil (rédaction → prêts), pour la vue « Tous les actes ».
-const EN_COURS_ACTIFS = ['brouillon', 'modification_demandee', 'en_circuit', 'valide_dgs', 'en_attente_scc', 'mis_a_disposition', 'avis_rendu', 'inscrit_odj', 'texte_definitif_pret', 'pret_a_transmettre'];
-// Actes dont le circuit est terminé (plus d'étape courante) mais pas encore passés en séance, pour la rubrique « plus à moi ».
-const POST_CIRCUIT = ['valide_dgs', 'en_attente_scc', 'mis_a_disposition', 'avis_rendu', 'inscrit_odj', 'texte_definitif_pret', 'pret_a_transmettre'];
+const EN_COURS_ACTIFS = ['brouillon', 'modification_demandee', 'en_circuit', 'valide_dgs', 'en_attente_scc', 'mis_a_disposition', 'avis_rendu', 'inscrit_odj', 'texte_definitif_pret', 'pret_a_transmettre', 'a_signer', 'signe', 'signature_refusee'];
+// Actes dont le circuit est terminé (plus d'étape courante) mais pas encore passés en séance, pour la rubrique « dans le circuit ».
+const POST_CIRCUIT = ['valide_dgs', 'en_attente_scc', 'mis_a_disposition', 'avis_rendu', 'inscrit_odj', 'texte_definitif_pret', 'pret_a_transmettre', 'a_signer', 'signe', 'signature_refusee'];
 // Libellé d'étape pour les actes sortis du circuit (plus d'étape courante) : chacun a sa rupture.
 const ETAPE_HORS_CIRCUIT = {
   valide_dgs: 'Validé DGS', en_attente_scc: 'En attente SCC', mis_a_disposition: 'Mis à disposition', avis_rendu: 'Avis rendu',
   inscrit_odj: 'Inscrit au conseil', texte_definitif_pret: 'Texte définitif prêt', pret_a_transmettre: 'Prêt à transmettre',
+  a_signer: 'À signer', signe: 'Signé', signature_refusee: 'Signature refusée',
 };
 
 function createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late }) {
@@ -37,6 +38,7 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     return graphCache.get(versionId);
   };
   const typeCodeOf = async (typeId) => (await db.get('SELECT code FROM ref_items WHERE id = $1', [typeId]))?.code || null;
+  const typeMetaOf = async (typeId) => (await db.get('SELECT meta FROM ref_items WHERE id = $1', [typeId]))?.meta || {};
 
   const factsOf = async (a) => ({
     incidenceFinanciere: a.incidence_financiere, montant: a.montant === null || a.montant === undefined ? null : Number(a.montant),
@@ -164,7 +166,11 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       else key = G.nextKey(graph, baseKeyOf(a, cur), facts);
       if (!key) {
         let end = ['en_circuit', 'modification_demandee'].includes(statut) ? 'en_attente_scc' : statut;
-        if (end === 'en_attente_scc' && a.seance_id) end = 'inscrit_odj'; // déjà inscrit à l'ordre du jour avant la fin du circuit (D57)
+        if (end === 'en_attente_scc') {
+          // Acte signé par le maire (décision, arrêté) : au lieu d'aller au conseil, il part en signature du maire.
+          if ((await typeMetaOf(a.type_id))?.signature) end = 'a_signer';
+          else if (a.seance_id) end = 'inscrit_odj'; // déjà inscrit à l'ordre du jour avant la fin du circuit (D57)
+        }
         await q.run('UPDATE actes SET current_step_key = NULL, statut = $2, trail = $3::jsonb, resume_step = NULL, return_from = NULL WHERE id = $1', [a.id, end, JSON.stringify(trail)]);
         await event(q, a, ctx, 'complete', { from: cur });
         events.push(['circuit.completed', { organismeId: a.organisme_id, acteId: a.id }]);
@@ -465,8 +471,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       const org = organismeId;
       const delegants = (await delegations.activeForDelegue(org, ctx.username)).map((d) => d.delegant);
       const rows = await db.all(
-        `SELECT a.*, i.step_key, i.label AS step_label, i.holders AS holders, i.arrived_at, i.due_at, i.mode, i.id AS inst_id, i.approvals, i.sla_days
-         FROM step_instances i JOIN actes a ON a.id = i.acte_id
+        `SELECT a.*, i.step_key, i.label AS step_label, i.holders AS holders, i.arrived_at, i.due_at, i.mode, i.id AS inst_id, i.approvals, i.sla_days, t.code AS type_code, t.libelle AS type_libelle
+         FROM step_instances i JOIN actes a ON a.id = i.acte_id LEFT JOIN ref_items t ON t.id = a.type_id
          WHERE i.status = 'current' AND a.organisme_id = $1 AND a.statut IN ('en_circuit', 'modification_demandee', 'en_attente_scc') AND i.holders ?| $2::text[]
          ORDER BY i.due_at NULLS LAST, i.arrived_at`, [org, [ctx.username, ...delegants]]);
       const items = [];
@@ -500,9 +506,10 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         return { acte: actes.toActe(r), step: st, ...extra };
       };
       const validated = (await db.all(
-        `SELECT DISTINCT ON (a.id) a.*, i.step_key AS cur_key, i.label AS cur_label, i.holders AS cur_holders, i.due_at AS cur_due, my.acted_at AS my_at, my.label AS my_label
+        `SELECT DISTINCT ON (a.id) a.*, i.step_key AS cur_key, i.label AS cur_label, i.holders AS cur_holders, i.due_at AS cur_due, my.acted_at AS my_at, my.label AS my_label, t.code AS type_code, t.libelle AS type_libelle
          FROM actes a JOIN step_instances my ON my.acte_id = a.id AND (my.acted_by = $2 OR my.on_behalf_of = $2) AND my.decision IN ('validation', 'auto')
               LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+              LEFT JOIN ref_items t ON t.id = a.type_id
          WHERE a.organisme_id = $1 AND a.current_step_key IS NOT NULL AND a.statut IN ('en_circuit', 'modification_demandee', 'en_attente_scc')
            AND NOT (COALESCE(i.holders, '[]'::jsonb) ? $2)
          ORDER BY a.id, my.acted_at DESC`, [org, ctx.username]))
@@ -518,8 +525,9 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         if (h.directions.length) { p.push(h.directions); or.push(`a.direction_code = ANY($${p.length}::text[])`); }
         for (const [d, sv] of h.services) { p.push(d, sv); or.push(`(a.direction_code = $${p.length - 1} AND a.service_code = $${p.length})`); }
         team = (await db.all(
-          `SELECT a.*, i.step_key AS cur_key, i.label AS cur_label, i.holders AS cur_holders, i.due_at AS cur_due
+          `SELECT a.*, i.step_key AS cur_key, i.label AS cur_label, i.holders AS cur_holders, i.due_at AS cur_due, t.code AS type_code, t.libelle AS type_libelle
            FROM actes a LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+           LEFT JOIN ref_items t ON t.id = a.type_id
            WHERE a.organisme_id = $1 AND a.redacteur <> $2 AND (${or.join(' OR ')})
              AND ((a.statut IN ('brouillon', 'modification_demandee', 'en_circuit') ) OR (a.statut = 'en_attente_scc' AND a.current_step_key IS NOT NULL))
              AND NOT (COALESCE(i.holders, '[]'::jsonb) ? $2)
@@ -548,9 +556,16 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         map.set(acte.id, e);
       };
       for (const t of todos) put(t.acte, 'action', t.step);
+      // Mes propres brouillons en rédaction (non encore envoyés) : ils me concernent au premier chef, y compris
+      // une décision qui ne vise aucune séance (elle ne passera pas au conseil).
+      const mesBrouillons = await db.all(
+        `SELECT a.*, t.code AS type_code, t.libelle AS type_libelle FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id
+         WHERE a.organisme_id = $1 AND a.statut = 'brouillon' AND (a.redacteur = $2 OR a.co_redacteurs ? $2)`,
+        [org, ctx.username]);
+      for (const r of mesBrouillons) put(actes.toActe(r), 'mes_brouillons', { key: 'redaction', label: 'Rédaction' });
       for (const t of suivi.equipe) put(t.acte, t.phase ?? 'validation', t.step);
       for (const t of suivi.valides) put(t.acte, 'valide', t.step);
-      // « Plus à moi » : les actes que je suis qui ne sont plus à mon étape — encore en circuit chez un autre,
+      // « Plus à moi » (rubrique « Dans le circuit » de l'écran « Mes actes ») : les actes que je suis qui ne sont plus à mon étape — encore en circuit chez un autre,
       // ou circuit terminé/validé sans être encore passé en séance (périmètre : moi et mon équipe hiérarchique).
       const h = await titulaires.hierarchyScope(ctx.username, org);
       const isDgs = (await titulaires.resolve(org, 'dgs', {})).some((t) => t.username === ctx.username || t.suppleant === ctx.username);
@@ -560,8 +575,9 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       for (const [d, sv] of h.services) { p.push(d, sv); or.push(`(a.direction_code = $${p.length - 1} AND a.service_code = $${p.length})`); }
       p.push(IN_CIRCUIT, POST_CIRCUIT);
       const poursuite = await db.all(
-        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due
+        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due, t.code AS type_code, t.libelle AS type_libelle
          FROM actes a LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+         LEFT JOIN ref_items t ON t.id = a.type_id
          WHERE a.organisme_id = $1 AND (${or.join(' OR ')})
            AND ((a.statut = ANY($${p.length - 1}::text[]) AND a.current_step_key IS NOT NULL)
              OR (a.statut = ANY($${p.length}::text[]) AND a.current_step_key IS NULL))
@@ -586,8 +602,9 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     async enCours(ctx, organismeId) {
       const org = organismeId;
       const rows = await db.all(
-        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due
+        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due, t.code AS type_code, t.libelle AS type_libelle
          FROM actes a LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+         LEFT JOIN ref_items t ON t.id = a.type_id
          WHERE a.organisme_id = $1 AND a.statut = ANY($2::text[])
          ORDER BY a.updated_at DESC LIMIT 1000`, [org, EN_COURS_ACTIFS]);
       const items = rows.map((r) => {
@@ -603,7 +620,7 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
 
     async lateActes(ctx, organismeId) {
       const rows = await db.all(
-        `SELECT a.*, i.step_key, i.label AS step_label, i.holders, i.due_at FROM step_instances i JOIN actes a ON a.id = i.acte_id
+        `SELECT a.*, i.step_key, i.label AS step_label, i.holders, i.due_at, t.code AS type_code, t.libelle AS type_libelle FROM step_instances i JOIN actes a ON a.id = i.acte_id LEFT JOIN ref_items t ON t.id = a.type_id
          WHERE i.status = 'current' AND a.organisme_id = $1 AND i.due_at < now() ORDER BY i.due_at`, [organismeId]);
       const out = [];
       for (const r of rows) if (await acl.canView(ctx, r)) out.push({ acte: actes.toActe(r), step: { key: r.step_key, label: r.step_label, holders: r.holders, dueAt: r.due_at } });

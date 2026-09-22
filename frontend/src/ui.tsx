@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
-import { STATUTS } from './format';
+import { STATUTS, TYPE_ACTES } from './format';
 
 export const Spinner = () => <Loader2 className="h-4 w-4 animate-spin" aria-label="Chargement" />;
 export const Loading = ({ progress }: { progress?: { fait?: number; total?: number; phase?: string } | null } = {}) => {
@@ -61,6 +61,22 @@ const TONES: Record<string, string> = {
 };
 export const Badge = ({ tone = 'gray', children }: { tone?: keyof typeof TONES; children: ReactNode }) => <span className={`badge ${TONES[tone]}`}>{children}</span>;
 export const StatutBadge = ({ statut }: { statut: string }) => { const s = STATUTS[statut] ?? { label: statut, tone: 'gray' as const }; return <Badge tone={s.tone}>{s.label}</Badge>; };
+
+/** Pastille de type d'acte : l'icône du type, seule (infobulle = libellé), un peu à l'écart du titre. */
+const TYPE_ICONES: Record<string, string> = {
+  deliberation: '/types/delib.png',
+  voeu: '/types/delib.png',
+  decision: '/types/decision.png',
+  arrete: '/types/arrete.png',
+};
+export const TypeBadge = ({ acte, className = '' }: { acte?: any; pastille?: string; className?: string }) => {
+  const code = acte?.typeCode as string | undefined;
+  const info = code ? TYPE_ACTES[code] : undefined;
+  const label = acte?.typeLibelle || info?.label;
+  const src = code ? TYPE_ICONES[code] : undefined;
+  if (!label || !src) return null;
+  return <img src={src} alt="" aria-hidden="true" title={label} className={`ml-2 inline-block h-5 w-5 shrink-0 align-[-0.2em] ${className}`} />;
+};
 
 export function PageTitle({ title, sub, actions }: { title: string; sub?: ReactNode; actions?: ReactNode }) {
   return (

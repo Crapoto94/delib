@@ -55,13 +55,16 @@ export const redaction: Article = {
         <>
           <Procedure>
             <Etape n={1} titre="Ouvrez « Actes & Dossiers »">Menu « Actes & Dossiers », puis <BoutonUI>Nouveau dossier</BoutonUI> (aussi accessible depuis le tableau de bord).</Etape>
-            <Etape n={2} titre="Choisissez le type d’acte">Par exemple « Délibération » ou « Vœu ». Le type détermine le circuit à venir.</Etape>
+            <Etape n={2} titre="Choisissez le type d’acte">Délibération, décision ou arrêté. Le type détermine le circuit à venir et la fin du parcours (conseil ou signature du maire). La fenêtre de création explique chaque type ; une pastille le rappelle ensuite dans les listes.</Etape>
             <Etape n={3} titre="Donnez un titre clair">C'est le titre qui apparaîtra sur l'ordre du jour officiel. Écrivez-le comme vous voudriez le lire en séance.</Etape>
             <Etape n={4} titre="Surveillez les actes proches">Dès que vous tapez quelques lettres, l'application vous montre les actes similaires déjà rédigés : inspirez-vous-en plutôt que de repartir de zéro.</Etape>
             <Etape n={5} titre="Cliquez sur « Créer le brouillon »">Votre dossier est créé. Il reste <Terme>brouillon</Terme> : personne d'autre ne le traite tant que vous ne l'avez pas envoyé.</Etape>
           </Procedure>
           <Encadre type="info" titre="La direction porteuse est déduite de vous">
             Votre direction est automatiquement reprise de votre fiche RH. Si vous avez le droit de rédiger pour plusieurs directions, vous choisissez la <Terme>direction porteuse</Terme> à la création ; c'est elle qui détermine le circuit.
+          </Encadre>
+          <Encadre type="astuce" titre="Délibération, décision ou arrêté ?">
+            Une <b>délibération</b> (et un <b>vœu</b>) est discutée et votée en conseil municipal : elle est inscrite à l'ordre du jour. Une <b>décision</b> est prise par le maire dans le cadre d'une délégation du conseil : elle ne passe pas en conseil et part en <b>signature du maire</b> à la fin du circuit — pensez à <b>lier la ou les délibérations qui l'autorisent</b> sur la fiche. Un <b>arrêté</b> (réglementaire ou individuel) est lui aussi signé par le maire. Le parapheur utilisé se paramètre dans « Paramétrages › Parapheur (signature) ».
           </Encadre>
         </>
       ),

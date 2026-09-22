@@ -61,6 +61,9 @@ const { createAlfresco } = require('./adapters/alfresco');
 const { createEluAuth } = require('./modules/espace-elus/elu-auth.service');
 const { createEspaceElus } = require('./modules/espace-elus/espace.service');
 const { createTeletransmission } = require('./modules/teletransmission/tlt.service');
+const { createParapheur } = require('./modules/parapheur/parapheur.service');
+const { createDsihubParapheur } = require('./adapters/parapheur-dsihub');
+const { createParapheurSimulateur } = require('./adapters/parapheur-simulateur');
 const { createS2lowSimulateur } = require('./adapters/s2low-simulateur');
 const { createOrganisation } = require('./modules/titulaires/organisation.service');
 const { createConvocations } = require('./modules/convocations/convocations.service');
@@ -71,7 +74,7 @@ const { createAiQueue } = require('./modules/ai/queue');
 const { createVisas } = require('./modules/ai/visas.service');
 const { createAirs } = require('./modules/import-airs/airs.service');
 
-function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard, airsSource }) {
+function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard, airsSource, parapheurAdapters }) {
   assertAuthPort(ad);
   assertMailPort(mail);
   assertAiPort(aiAdapter);
@@ -135,6 +138,10 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const delegations = createDelegations({ db, audit, access, titulaires, dir, bus });
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
+  // parapheur : signature du maire pour les décisions et arrêtés (DSIHUB réel si configuré, sinon simulateur)
+  const parapheur = createParapheur({ db, audit, actes, render, bus, config, log,
+    adapters: parapheurAdapters || { dsihub: createDsihubParapheur({ tls: config.tls }), simulateur: createParapheurSimulateur() }, acl });
+  bus.on('circuit.completed', (p) => parapheur.demanderEnvoiAuto(p.organismeId, p.acteId)); // fin de circuit d'un acte signé → envoi en signature
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
   const relance = createRelance({ db, audit, kpis, notifications, settings });
   // GED : simulateur persistant par défaut, Alfresco (REST v1) choisi par organisme ; adaptateurs injectables pour les tests
@@ -172,7 +179,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche-alertes', (orgId) => alertes.verifier(orgId)); // alertes de recherche (REC-29) : au plus une vérification par heure et par alerte
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs };
+  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur };
 }
 
 module.exports = { buildContainer };

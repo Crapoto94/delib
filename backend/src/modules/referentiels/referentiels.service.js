@@ -136,7 +136,9 @@ function createReferentiels({ db, audit }) {
       const has = async (kind) => (await db.get('SELECT count(*)::int AS n FROM ref_items WHERE kind = $1 AND organisme_id IS NULL', [kind])).n > 0;
       if (!(await has('nature'))) for (const [i, [code, lib]] of NATURES.entries()) await ins('nature', code, lib, i + 1);
       if (!(await has('rubrique'))) for (const [i, lib] of RUBRIQUES.entries()) await ins('rubrique', 'r' + String(i + 1).padStart(2, '0'), lib, i + 1);
-      if (!(await has('type_acte'))) for (const [i, t] of TYPES_ACTE.entries()) await ins('type_acte', t.code, t.libelle, i + 1, t.meta);
+      // Toujours rejoué (idempotent) : les types ajoutés par une version ultérieure (décision, arrêté…) apparaissent
+      // sur les installations existantes sans écraser un libellé ou une surcharge locaux.
+      for (const [i, t] of TYPES_ACTE.entries()) await ins('type_acte', t.code, t.libelle, i + 1, t.meta);
       if (!(await has('annexe_type'))) for (const [i, [code, lib]] of ANNEXE_TYPES.entries()) await ins('annexe_type', code, lib, i + 1);
       if (!(await has('matiere'))) {
         const file = path.resolve(__dirname, '../../../seeds/matieres.txt');

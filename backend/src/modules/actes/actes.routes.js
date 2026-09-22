@@ -26,6 +26,8 @@ const ListQ = z.object({
   includeAbandoned: z.enum(['true', 'false']).default('false'), limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0),
 });
 const Delib = z.object({ titre: z.string().trim().min(3).max(500) });
+const LienP = IdP.extend({ lienId: Id });
+const Lien = z.object({ cibleActeId: Id.describe('Acte (délibération adoptée) qui autorise cette décision') });
 const DelibUpd = z.object({ titre: z.string().trim().min(3).max(500).optional(), ordre: z.number().int().min(1).optional() });
 const Abandon = z.object({ motif: z.string().trim().min(3).max(1000) });
 const DepuisModele = z.object({ modeleId: Id, typeId: Id.optional(), titre: z.string().trim().min(3).max(500).optional(), serviceLabel: z.string().trim().max(120).optional(), motsCles: z.array(z.string().trim().min(1).max(60)).max(20).optional() });
@@ -84,6 +86,14 @@ module.exports = ({ makeRouter, actes }) => {
     async (req, res) => res.json(await actes.updateDeliberation(req.ctx, req.org.id, req.valid.params.id, req.valid.params.delibId, req.valid.body)));
   r.delete('/:id/deliberations/:delibId', { summary: 'Supprime une délibération (le dossier en garde au moins une)', tags: ['actes'], org: true, params: DelibP, responses: { 204: 'Supprimé' } },
     async (req, res) => { await actes.deleteDeliberation(req.ctx, req.org.id, req.valid.params.id, req.valid.params.delibId); res.status(204).end(); });
+
+  r.get('/:id/liens', { summary: 'Délibérations liées (autorisent une décision)', tags: ['actes'], org: true, params: IdP },
+    async (req, res) => { await actes.load(req.ctx, req.org.id, req.valid.params.id); res.json({ items: await actes.liens(req.valid.params.id) }); });
+  r.post('/:id/liens', { summary: 'Lie une délibération adoptée qui autorise cette décision', tags: ['actes'], org: true, params: IdP, body: Lien, responses: { 201: 'Lié' },
+    description: 'La cible doit être une délibération déjà adoptée (passée au conseil). Utilisé pour les décisions prises par délégation du conseil.' },
+  async (req, res) => res.status(201).json(await actes.ajouterLien(req.ctx, req.org.id, req.valid.params.id, req.valid.body.cibleActeId)));
+  r.delete('/:id/liens/:lienId', { summary: 'Retire un lien d’autorisation', tags: ['actes'], org: true, params: LienP },
+    async (req, res) => res.json(await actes.retirerLien(req.ctx, req.org.id, req.valid.params.id, req.valid.params.lienId)));
 
   return [r];
 };

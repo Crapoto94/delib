@@ -9,7 +9,7 @@ import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { showDocs, type PdfDoc } from '../PdfViewer';
 import { useAuth } from '../auth';
 import { d, dt } from '../format';
-import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, useLoad, useToast } from '../ui';
+import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, TypeBadge, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
 import { useIa } from '../useIa';
 import { Select } from '../Select';
@@ -93,6 +93,8 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
   const [f, setF] = useState<any>({});
   const [cv, setCv] = useState<Record<string, any>>({}); // valeurs des champs personnalisés
   const [err, setErr] = useState<string | null>(null); const [saving, setSaving] = useState(false);
+  // Un acte signé par le maire (décision, arrêté) ne passe pas au conseil : ni séance à viser, ni élu rapporteur.
+  const signature = !!acte.typeInfo?.meta?.signature;
   useEffect(() => { setCv(Object.fromEntries((acte.champs || []).map((c: any) => [c.code, c.valeur]))); }, [acte.champs]);
   useEffect(() => { setF({ titre: acte.titre, matiereId: acte.matiereId ?? '', rubriqueId: acte.rubriqueId ?? '', natureId: acte.natureId ?? '', incidenceFinanciere: acte.incidenceFinanciere, montant: acte.montant ?? '', rapporteurId: acte.rapporteurId ?? '', seanceViseeId: acte.seanceViseeId ?? '', urgence: acte.urgence }); }, [acte]);
   const nv = (v: any) => (v === '' ? null : Number(v));
@@ -102,7 +104,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
     matiere: f.matiereId === '' || f.matiereId == null,
     rubrique: f.rubriqueId === '' || f.rubriqueId == null,
     nature: f.natureId === '' || f.natureId == null,
-    rapporteur: f.rapporteurId === '' || f.rapporteurId == null,
+    rapporteur: !signature && (f.rapporteurId === '' || f.rapporteurId == null),
     incidence: f.incidenceFinanciere == null,
   };
   const mq = (k: keyof typeof manque) => editable && manque[k];
@@ -112,7 +114,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
     try {
       await api.put(orgPath(o, `/actes/${acte.id}`), {
         titre: f.titre, matiereId: nv(f.matiereId), rubriqueId: nv(f.rubriqueId), natureId: nv(f.natureId), incidenceFinanciere: f.incidenceFinanciere,
-        montant: f.incidenceFinanciere && f.montant !== '' ? Number(f.montant) : null, rapporteurId: nv(f.rapporteurId), seanceViseeId: nv(f.seanceViseeId), urgence: !!f.urgence,
+        montant: f.incidenceFinanciere && f.montant !== '' ? Number(f.montant) : null, rapporteurId: signature ? null : nv(f.rapporteurId), seanceViseeId: signature ? null : nv(f.seanceViseeId), urgence: !!f.urgence,
         ...((acte.champs || []).length ? { custom: { ...(acte.custom || {}), ...Object.fromEntries((acte.champs || []).filter((c: any) => c.modifiable).map((c: any) => [c.code, cv[c.code] ?? ''])) } } : {}),
       });
       onSaved();
@@ -121,15 +123,16 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
   const dis = !editable;
   return (
     <section className="card p-5" aria-labelledby="fiche">
-      <h3 id="fiche" className="mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-action" /> Informations clés de la délibération</h3>
+      <h3 id="fiche" className="mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-action" /> Informations clés de l'acte</h3>
       <ErrorBox msg={err} />
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Direction porteuse"><div className="input bg-soft">{acte.direction?.label}{acte.service ? ` · ${acte.service.label}` : ''}</div></Field>
+        {!signature && (
         <Field label="Séance visée" hint={acte.seanceVisee ? (acte.seanceVisee.inscrit ? "Inscrit à l'ordre du jour de cette séance." : "Séance visée — pas encore inscrit à l'ordre du jour.") : 'Proposée par le rédacteur ; modifiable par la hiérarchie.'}>
           <Select className="input" disabled={dis && !acte.droits?.modifierSeance} value={f.seanceViseeId ?? ''} onChange={(e) => setF({ ...f, seanceViseeId: e.target.value })}>
             <option value="">— à définir —</option>{[...(seances.data ?? []), ...(acte.seanceVisee && !(seances.data ?? []).some((s) => s.id === acte.seanceVisee.id) ? [acte.seanceVisee] : [])].map((s) => <option key={s.id} value={s.id}>{s.instance} — {d(s.dateSeance)}</option>)}
           </Select>
-        </Field>
+        </Field>)}
         <div className="md:col-span-2"><Field label="Titre explicite de l'acte *" missing={mq('titre')}><input className="input" disabled={dis} value={f.titre ?? ''} onChange={(e) => setF({ ...f, titre: e.target.value })} /></Field></div>
         <Field label="Domaine d'intervention (matière) *" missing={mq('matiere')} hint="Nomenclature de la préfecture : parcourez l'arborescence, seules les matières précises (feuilles) sont sélectionnables.">
           <MatiereTree disabled={dis} value={f.matiereId} onChange={(id) => setF({ ...f, matiereId: id ?? '' })} /></Field>
@@ -137,8 +140,9 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
           <option value="">— choisir —</option>{rubriques.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
         <Field label="Nature *" missing={mq('nature')}><Select className="input" disabled={dis} value={f.natureId ?? ''} onChange={(e) => setF({ ...f, natureId: e.target.value })}>
           <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
+        {!signature && (
         <Field label="Élu rapporteur *" missing={mq('rapporteur')}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => setF({ ...f, rapporteurId: e.target.value })}>
-          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${m.role})` : ''}</option>)}</Select></Field>
+          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${m.role})` : ''}</option>)}</Select></Field>)}
         <div className={mq('incidence') ? 'rounded-md border-l-4 border-warn bg-warn-bg/50 px-3 py-2' : ''}>
           <span className="label">Impact budgétaire (dépense ou recette) ? *{mq('incidence') && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-warn align-middle" title="À renseigner" aria-label="À renseigner" />}</span>
           <div className="flex items-center gap-4 py-2">
@@ -185,9 +189,12 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
   if (texts.loading && !texts.data) return <Loading />;
   const dels = acte.deliberations || [];
   const list = texts.data ?? [];
+  // Une décision (ou un arrêté) n'a pas de délibéré : le dispositif est l'acte lui-même, on le nomme par son type.
+  const acteLabel = acte.typeCode === 'decision' ? 'Décision' : acte.typeCode === 'arrete' ? 'Arrêté' : null;
+  const kindLabel = (t: any) => (t.kind === 'dispositif' && acteLabel ? acteLabel : KIND_LABEL[t.kind]);
   return (
     <section className="card p-5" aria-labelledby="textes">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h3 id="textes">Textes de la délibération</h3>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h3 id="textes">{acteLabel ? "Texte de l'acte" : 'Textes de la délibération'}</h3>
         {list.length > 0 && <div className="flex items-center gap-2">
           <button className="btn-secondary" onClick={onApercu}><Eye className="h-4 w-4" /> Prévisualiser</button>
           <button className="btn-primary" onClick={() => setOpen(list[0].id)}><Pencil className="h-4 w-4" /> {editable ? "Ouvrir l'éditeur" : 'Ouvrir en plein écran'}</button></div>}</div>
@@ -196,8 +203,8 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
           const d = dels.find((x: any) => x.id === t.deliberationId);
           const md = previews.data?.[t.id] ?? '';
           return (
-            <button key={t.id} onClick={() => setOpen(t.id)} className="block w-full rounded-lg border border-line bg-surface p-4 text-left hover:border-action hover:shadow-lift" aria-label={`Ouvrir ${KIND_LABEL[t.kind]}`}>
-              <div className="mb-1 flex items-center gap-2"><h4 className="text-[15px] font-bold text-head">{KIND_LABEL[t.kind]}{d && dels.length > 1 ? ` — délibération ${d.ordre}` : ''}</h4>
+            <button key={t.id} onClick={() => setOpen(t.id)} className="block w-full rounded-lg border border-line bg-surface p-4 text-left hover:border-action hover:shadow-lift" aria-label={`Ouvrir ${kindLabel(t)}`}>
+              <div className="mb-1 flex items-center gap-2"><h4 className="text-[15px] font-bold text-head">{kindLabel(t)}{d && dels.length > 1 ? ` — délibération ${d.ordre}` : ''}</h4>
                 {t.empty ? <Badge tone="warn">à rédiger</Badge> : <Badge tone="ok">v{t.version}</Badge>}{t.tracking && <Badge tone="blue">suivi actif</Badge>}<span className="ml-auto text-[12px] font-semibold text-action">{editable ? 'Modifier' : 'Ouvrir'} →</span></div>
               {md ? <div className="text-preview line-clamp-4 text-[14px] leading-[22px] text-slate-700" dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} /> : <p className="text-mute">Cliquez pour rédiger ce texte.</p>}
             </button>);
@@ -278,6 +285,141 @@ function Discussion({ acte, toast }: { acte: any; toast: (m: string, k?: 'ok' | 
       </ul>
       <MentionTextarea rows={2} placeholder="Écrire une consigne ou mentionner un collègue en tapant @nom…" value={body} onChange={setBody} />
       <div className="mt-2 flex justify-end"><button className="btn-secondary" onClick={send}>Publier</button></div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ délibérations d'autorisation (décisions) */
+/** Une décision est prise par le maire dans le cadre d'une délégation : on lie la ou les délibérations qui l'autorisent. */
+function Autorisations({ acte, editable, onChanged, toast }: { acte: any; editable: boolean; onChanged: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
+  const { org } = useAuth(); const o = org!.id;
+  const liens: any[] = acte.liens || [];
+  const [q, setQ] = useState(''); const [props, setProps] = useState<any[]>([]); const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (q.trim().length < 3) { setProps([]); return; }
+    const t = setTimeout(() => { api.get(orgPath(o, '/bibliotheque'), { params: { q: q.trim(), limit: 20 } }).then((r) => setProps(r.data.items || [])).catch(() => setProps([])); }, 400);
+    return () => clearTimeout(t);
+  }, [q, o]);
+  const pris = new Set(liens.map((l) => l.cibleActeId));
+  const add = async (id: number) => {
+    setBusy(true);
+    try { await api.post(orgPath(o, `/actes/${acte.id}/liens`), { cibleActeId: id }); toast('Délibération liée'); setQ(''); setProps([]); onChanged(); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
+  const remove = async (l: any) => { try { await api.delete(orgPath(o, `/actes/${acte.id}/liens/${l.id}`)); onChanged(); } catch (e) { toast(errMsg(e), 'ko'); } };
+  return (
+    <section className="card p-5" aria-labelledby="autorisations">
+      <h3 id="autorisations" className="mb-2">Délibérations d'autorisation</h3>
+      <p className="mb-3 text-[13px] text-mute">Une décision est prise par le maire dans le cadre d'une délégation du conseil : liez la ou les délibérations adoptées qui l'autorisent. Sans elles, le dossier ne peut pas être envoyé au circuit.</p>
+      {!liens.length ? <p className="mb-3 rounded bg-warn-bg p-2 text-warn">Aucune délibération liée.</p> : (
+        <ul className="mb-3 space-y-2">{liens.map((l) => (
+          <li key={l.id} className="flex items-center justify-between gap-2 rounded border border-line p-2">
+            <span className="min-w-0"><Link className="font-semibold text-head hover:underline" to={`/dossiers/${l.cibleActeId}`}>{l.titre}</Link><span className="ml-2 text-[12px] text-mute">#{l.numeroSuivi}</span></span>
+            {editable && <button className="shrink-0 text-ko" aria-label="Retirer le lien" onClick={() => remove(l)}><Trash2 className="h-4 w-4" /></button>}
+          </li>))}</ul>)}
+      {editable && (
+        <div>
+          <Field label="Lier une délibération adoptée" hint="Tapez au moins 3 caractères (titre ou numéro) : la recherche porte sur la bibliothèque des délibérations adoptées.">
+            <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="rechercher une délibération…" />
+          </Field>
+          {props.length > 0 && (
+            <ul className="mt-2 max-h-64 space-y-1 overflow-auto">{props.filter((p) => !pris.has(p.acteId)).map((p) => (
+              <li key={p.acteId} className="flex items-center justify-between gap-2 rounded border border-line p-2 text-[13px]">
+                <span className="min-w-0"><b className="block truncate">{p.titre}</b><span className="text-[12px] text-mute">#{p.numeroSuivi}{p.dateSeance ? ` · ${d(p.dateSeance)}` : ''}</span></span>
+                <button className="btn-secondary shrink-0" disabled={busy} onClick={() => add(p.acteId)}>Lier</button>
+              </li>))}</ul>)}
+        </div>)}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------------------ signature du maire (parapheur) */
+const SENS: Record<string, string> = { sortant: 'Envoyé', entrant: 'Retourné' };
+/** Suivi de la signature d'une décision / d'un arrêté : envoi au parapheur, état, journal des échanges. */
+function Signature({ acte, toast, onChanged }: { acte: any; toast: (m: string, k?: 'ok' | 'ko') => void; onChanged?: () => void }) {
+  const { org, isAdmin, isScc } = useAuth(); const o = org!.id;
+  const etat = useLoad(async () => (await api.get(orgPath(o, `/parapheur/actes/${acte.id}`))).data, [o, acte.id, acte.statut]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const staff = isAdmin || isScc;
+  const go = async (cle: string, fn: () => Promise<any>, ok: string) => {
+    setBusy(cle);
+    try { await fn(); toast(ok); etat.reload(); onChanged?.(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); }
+  };
+  const e = etat.data?.envoi;
+  // L'acte est « en attente de signature » (fin de circuit) : seul cas où l'envoi est « normal ».
+  const enAttente = ['a_signer', 'signature_refusee'].includes(acte.statut) || !e || ['erreur', 'annule', 'refuse'].includes(e.statut);
+  // Le circuit n'est pas terminé : un administrateur / le SCC peut tout de même envoyer la décision en signature.
+  const circuitEnCours = !['a_signer', 'signe', 'signature_refusee'].includes(acte.statut);
+  // Un envoi existe mais s'est mal passé (erreur du parapheur) : le dossier peut être « renvoyé » tel quel.
+  const enErreur = !!e && e.statut === 'erreur';
+  const titreEnvoi = etat.data?.blocage || null;
+  const envoyer = async (forcer: boolean) => {
+    if (forcer && !confirm(`Envoyer « ${acte.titre} » en signature du maire ?\n\nLe circuit n'est pas terminé. Le dossier passera à l'état « À signer ».`)) return;
+    await go('envoi', () => api.post(orgPath(o, `/parapheur/actes/${acte.id}/envoi`), forcer ? { forcer: true } : {}), forcer ? 'Décision envoyée en signature (circuit non terminé)' : 'Document envoyé en signature');
+  };
+  // Le Hub n'a pas de webhook : tant qu'un envoi est en cours, on interroge le parapheur en arrière-plan
+  // pour refléter une signature ou un refus sans attendre un clic.
+  const enCours = !!e && ['envoye', 'a_signer'].includes(e.statut) && !etat.data?.simulateur;
+  const syncRef = useRef(false);
+  useEffect(() => {
+    if (!enCours) return;
+    let stop = false;
+    const tick = async () => {
+      if (syncRef.current || stop || document.hidden) return;
+      syncRef.current = true;
+      try { await api.post(orgPath(o, `/parapheur/actes/${acte.id}/synchroniser`)); if (!stop) { etat.reload(); onChanged?.(); } }
+      catch { /* Hub injoignable : on réessaiera */ }
+      finally { syncRef.current = false; }
+    };
+    const t = setTimeout(tick, 1500);
+    const iv = setInterval(tick, 30000);
+    return () => { stop = true; clearTimeout(t); clearInterval(iv); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enCours, acte.id, o]);
+  return (
+    <section className="card p-5" aria-labelledby="signature">
+      <h3 id="signature" className="mb-2 flex items-center gap-2">Signature du maire {e?.statut && <Badge tone={e.statut === 'signe' ? 'ok' : e.statut === 'refuse' ? 'ko' : 'warn'}>{e.statut === 'signe' ? 'Signé' : e.statut === 'refuse' ? 'Refusé' : e.statut === 'erreur' ? 'Erreur' : 'En attente'}</Badge>}</h3>
+      <p className="mb-3 text-[13px] text-mute">Cet acte n'est pas inscrit au conseil : à la fin du circuit, il est envoyé au parapheur pour la signature du maire.</p>
+      {etat.loading && !etat.data ? <Loading /> : !etat.data ? <ErrorBox msg={etat.error} /> : (
+        <>
+          {enErreur && <p className="mb-3 rounded bg-ko-bg p-2 text-[13px] text-ko">L'envoi précédent a échoué{e.motif ? ` : ${e.motif}` : ''}. Corrigez le paramétrage si besoin, puis <b>renvoyez</b> le document.</p>}
+          <dl className="mb-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px]">
+            <dt className="text-mute">Parapheur</dt><dd>{etat.data.config.fournisseurs.find((f: any) => f.code === etat.data.config.fournisseur)?.nom}{etat.data.simulateur && <span className="ml-2 text-[12px] text-warn">(simulation : aucun envoi réel)</span>}</dd>
+            <dt className="text-mute">Mode</dt><dd>{etat.data.config.mode === 'dev' ? `dev — envoi à ${etat.data.config.email_test}` : `prod — signataire ${etat.data.config.signataire_email}`}</dd>
+            <dt className="text-mute">Signature</dt><dd>{(etat.data.config.modes_signature?.find((x: any) => x.code === etat.data.config.signature_mode)?.nom) || 'Signature P12 (certificat)'}{e?.signataireEmail && etat.data.config.signature_mode === 'sms' && etat.data.config.signataire_telephone ? ` · ${etat.data.config.signataire_telephone}` : ''}</dd>
+            {e && <><dt className="text-mute">Signataire</dt><dd>{e.signataireNom} · {e.signataireEmail}</dd>
+              <dt className="text-mute">Demandé le</dt><dd>{dt(e.demandeAt)}</dd>
+              {e.signeAt && <><dt className="text-mute">Signé le</dt><dd>{dt(e.signeAt)}</dd></>}
+              {e.motif && <><dt className="text-mute">Motif</dt><dd>{e.motif}</dd></>}
+              {e.ref && <><dt className="text-mute">Référence</dt><dd className="font-mono text-[12px]">{e.ref}</dd></>}</>}
+          </dl>
+          {staff && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {enErreur && <button className="btn-primary" disabled={!!busy} title="Renvoyer le document au parapheur (l'envoi précédent a échoué)" onClick={() => envoyer(false)}><RotateCcw className="h-4 w-4" /> Renvoyer au parapheur</button>}
+              {enAttente && !enErreur && <button className={titreEnvoi ? 'btn-primary' : 'btn-warn'} disabled={!!busy} title={titreEnvoi || 'Envoyer ce document en signature du maire'} onClick={() => envoyer(false)}><Send className="h-4 w-4" /> {e ? 'Renvoyer en signature' : 'Envoyer en signature'}</button>}
+              {!enAttente && !e && staff && circuitEnCours && <button className="btn-warn" disabled={!!busy} title="Le circuit n'est pas terminé : vous pouvez tout de même envoyer la décision en signature (administrateur / SCC)." onClick={() => envoyer(true)}><Send className="h-4 w-4" /> Envoyer en signature (forcé)</button>}
+              {e && ['envoye', 'a_signer'].includes(e.statut) && <button className="btn-secondary" disabled={!!busy} onClick={() => go('sync', () => api.post(orgPath(o, `/parapheur/actes/${acte.id}/synchroniser`)), 'État interrogé')}>Interroger le parapheur</button>}
+              {e && ['envoye', 'a_signer'].includes(e.statut) && <button className="btn-secondary text-ko" disabled={!!busy} onClick={() => { const m = prompt('Motif de l\'annulation :'); if (m !== null) go('annul', () => api.post(orgPath(o, `/parapheur/actes/${acte.id}/annuler`), { motif: m }), 'Envoi annulé'); }}>Annuler l'envoi</button>}
+              {e && ['envoye', 'a_signer'].includes(e.statut) && <button className="btn-secondary" disabled={!!busy} title="Recréer un dossier de signature au parapheur (si l'envoi en cours est incomplet)" onClick={() => { if (confirm('Renvoyer un nouveau document au parapheur ?\n\nUn nouveau dossier de signature sera créé, à jour du document. L\'ancien envoi restera sans suite.')) envoyer(false); }}><RotateCcw className="h-4 w-4" /> Renvoyer au parapheur</button>}
+              {etat.data.simulateur && e && ['envoye', 'a_signer'].includes(e.statut) && <><button className="btn-ok" disabled={!!busy} onClick={() => go('simok', () => api.post(orgPath(o, `/parapheur/actes/${acte.id}/retour`), { statut: 'signe' }), 'Signature simulée')}>Simuler : signé</button>
+                <button className="btn-ko" disabled={!!busy} onClick={() => { const m = prompt('Motif du refus (optionnel) :') ?? undefined; go('simko', () => api.post(orgPath(o, `/parapheur/actes/${acte.id}/retour`), { statut: 'refuse', motif: m }), 'Refus simulé'); }}>Simuler : refusé</button></>}
+            </div>)}
+          {staff && !enAttente && !e && !titreEnvoi && (
+            <p className="mb-3 rounded bg-warn-bg p-2 text-[13px] text-warn">Le circuit n'est pas terminé : l'envoi en signature deviendra possible à la fin du circuit, ou tout de suite avec « Envoyer en signature (forcé) ».</p>)}
+          {etat.data.journal?.length > 0 && (
+            <details className="rounded border border-line">
+              <summary className="cursor-pointer p-2 text-[13px] font-semibold">Journal des échanges avec le parapheur ({etat.data.journal.length})</summary>
+              <ul className="space-y-2 p-2">{etat.data.journal.map((x: any) => (
+                <li key={x.id} className="rounded border border-line p-2 text-[12px]">
+                  <div className="flex flex-wrap items-center gap-2"><Badge tone={x.sens === 'sortant' ? 'blue' : 'gray'}>{SENS[x.sens] || x.sens}</Badge>
+                    {x.methode && <span className="font-mono">{x.methode}</span>}{x.httpStatus && <span className="text-mute">HTTP {x.httpStatus}</span>}<span className="ml-auto text-mute">{dt(x.at)}</span></div>
+                  {x.resume && <div className="mt-1">{x.resume}</div>}
+                  {x.erreur && <div className="mt-1 text-ko">{x.erreur}</div>}
+                  {x.corps && <pre className="mt-1 max-h-40 overflow-auto rounded bg-soft p-2 text-[11px]">{JSON.stringify(x.corps, null, 2)}</pre>}
+                  {x.reponse && <pre className="mt-1 max-h-40 overflow-auto rounded bg-soft p-2 text-[11px]">{JSON.stringify(x.reponse, null, 2)}</pre>}
+                </li>))}</ul>
+            </details>)}
+        </>)}
     </section>
   );
 }
@@ -530,9 +672,12 @@ export default function Dossier() {
       showDocs(docs, 0);
     } catch (e) { toast(errMsg(e), 'ko'); }
   };
-  const modeleDocx = !!gabarits.data?.find((t) => t.docType === 'deliberation')?.docx;
-  const telechargerDocx = async () => { try { const r = await api.get(orgPath(o, `/actes/${a.id}/docx`), { params: { docType: 'deliberation' }, responseType: 'blob' }); const url = URL.createObjectURL(r.data); const el = document.createElement('a'); el.href = url; el.download = `deliberation-${a.numeroSuivi}.docx`; el.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
-  const apercuModele = async () => { const m = await openPdf(() => api.get(orgPath(o, `/actes/${a.id}/docx-pdf`), { params: { docType: 'deliberation' }, responseType: 'blob' }), `Délibération (modèle Word) — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };
+  // Le gabarit du document dépend du type d'acte : une décision (ou un arrêté) a son propre gabarit.
+  const gabaritType = ['decision', 'arrete'].includes(a.typeCode) ? a.typeCode : 'deliberation';
+  const libelleType = a.typeCode === 'decision' ? 'Décision' : a.typeCode === 'arrete' ? 'Arrêté' : 'Délibération';
+  const modeleDocx = !!gabarits.data?.find((t) => t.docType === gabaritType)?.docx;
+  const telechargerDocx = async () => { try { const r = await api.get(orgPath(o, `/actes/${a.id}/docx`), { params: { docType: gabaritType }, responseType: 'blob' }); const url = URL.createObjectURL(r.data); const el = document.createElement('a'); el.href = url; el.download = `${gabaritType}-${a.numeroSuivi}.docx`; el.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const apercuModele = async () => { const m = await openPdf(() => api.get(orgPath(o, `/actes/${a.id}/docx-pdf`), { params: { docType: gabaritType }, responseType: 'blob' }), `${libelleType} (modèle Word) — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };
   const onEnvoye = (data: any) => {
     let premier = true;
     try { const k = `vibedelib.premier-envoi.${me?.username ?? 'x'}`; premier = !localStorage.getItem(k); localStorage.setItem(k, '1'); } catch { /* stockage indisponible : message générique */ }
@@ -542,19 +687,20 @@ export default function Dossier() {
     <div className="space-y-6">
       <div>
         <div className="mb-1 text-[12px] text-mute"><Link to="/" className="hover:underline">Mes actes</Link> › Dossier #{a.numeroSuivi}</div>
-        <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><StatutBadge statut={a.statut} />
+        <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><TypeBadge acte={a} /><StatutBadge statut={a.statut} />
           <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
           <button className="btn-secondary" onClick={apercuDossier}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button>
-          {modeleDocx && <button className="btn-secondary" onClick={telechargerDocx}><FileText className="h-4 w-4" /> Délibération Word</button>}
-          {modeleDocx && <button className="btn-secondary" onClick={apercuModele}><Eye className="h-4 w-4" /> Délibération (modèle)</button>}
+          {modeleDocx && <button className="btn-secondary" onClick={telechargerDocx}><FileText className="h-4 w-4" /> {libelleType} Word</button>}
+          {modeleDocx && <button className="btn-secondary" onClick={apercuModele}><Eye className="h-4 w-4" /> {libelleType} (modèle)</button>}
           {peutSupprimer && <button className="btn-secondary text-ko" onClick={supprimer}><Trash2 className="h-4 w-4" /> Supprimer</button>}</div>
       </div>
       {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
           <Fiche acte={a} editable={editable} onSaved={() => { reloadAll(); toast('Fiche enregistrée'); }} />
+          {a.typeInfo?.meta?.autorisations && <Autorisations acte={a} editable={editable} onChanged={() => { reloadAll(); toast('Délibérations d\'autorisation mises à jour'); }} toast={toast} />}
           <Textes acte={a} editable={editable || !!c?.actions?.validate} onChanged={acte.reload} onApercu={apercuDossier} toast={toast} />
-          <Annexes acte={a} editable={editable} toast={toast} />
+          {a.typeInfo?.meta?.signature && <Signature acte={a} toast={toast} onChanged={reloadAll} />}          <Annexes acte={a} editable={editable} toast={toast} />
           <Discussion acte={a} toast={toast} />
         </div>
         <aside className="space-y-4">

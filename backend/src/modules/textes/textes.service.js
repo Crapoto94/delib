@@ -83,17 +83,22 @@ function createTextes({ db, audit, actes, acl, bus }) {
     KINDS,
 
     async ensureForActe(acteId) {
-      const a = await db.get('SELECT id, organisme_id FROM actes WHERE id = $1', [acteId]);
+      const a = await db.get(
+        `SELECT a.id, a.organisme_id, t.meta FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id WHERE a.id = $1`, [acteId]);
       if (!a) return;
+      const meta = a.meta || {};
       const ins = (delibId, kind) => db.run(
         `INSERT INTO tracked_texts (organisme_id, acte_id, deliberation_id, kind) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [a.organisme_id, acteId, delibId, kind]);
-      await ins(null, 'expose');
-      for (const d of await db.all('SELECT id FROM deliberations WHERE acte_id = $1', [acteId])) { await ins(d.id, 'visas'); await ins(d.id, 'dispositif'); }
+      if (meta.expose !== 'none') await ins(null, 'expose');
+      for (const d of await db.all('SELECT id FROM deliberations WHERE acte_id = $1', [acteId])) { if (meta.visas !== 'none') await ins(d.id, 'visas'); await ins(d.id, 'dispositif'); }
     },
 
     async list(ctx, organismeId, acteId) {
       const acte = await actes.load(ctx, organismeId, acteId);
-      return (await db.all('SELECT * FROM tracked_texts WHERE acte_id = $1 ORDER BY deliberation_id NULLS FIRST, kind DESC', [acte.id])).map(summary);
+      const meta = (await db.get('SELECT meta FROM ref_items WHERE id = $1', [acte.type_id]))?.meta || {};
+      const rows = await db.all('SELECT * FROM tracked_texts WHERE acte_id = $1 ORDER BY deliberation_id NULLS FIRST, kind DESC', [acte.id]);
+      // Un type sans exposé ni visas (décision) n'affiche que la décision elle-même, même si des textes vides subsistent d'une version antérieure.
+      return rows.filter((t) => !(meta.expose === 'none' && t.kind === 'expose') && !(meta.visas === 'none' && t.kind === 'visas')).map(summary);
     },
 
     async view(ctx, organismeId, acteId, textId, { mode = 'suivi', sinceAt } = {}) {
@@ -237,6 +242,7 @@ function createTextes({ db, audit, actes, acl, bus }) {
       const delibs = await db.all('SELECT id, ordre FROM deliberations WHERE acte_id = $1 ORDER BY ordre', [acte.id]);
       for (const d of delibs) {
         for (const k of ['visas', 'dispositif']) {
+          if (k === 'visas' && typeMeta.visas === 'none') continue;
           const r = rows.find((x) => x.deliberation_id === d.id && x.kind === k);
           if (!r || !r.markdown.trim()) out.push({ code: `${k}:${d.id}`, label: `${KINDS[k]} (délibération ${d.ordre})` });
         }

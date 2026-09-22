@@ -735,8 +735,10 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
 
   // ------------------------------------------------------------------------------------------------------- publication
   async function prochainNumeroSuivi(q, org) {
-    await q.run(`INSERT INTO counters (organisme_id, key, value) VALUES ($1, 'airs.numero_suivi', COALESCE((SELECT MAX(numero_suivi) FROM actes WHERE organisme_id = $1), 0)) ON CONFLICT (organisme_id, key) DO NOTHING`, [org]);
-    return Number((await q.get(`UPDATE counters SET value = value + 1 WHERE organisme_id = $1 AND key = 'airs.numero_suivi' RETURNING value`, [org])).value);
+    // Le compteur ne doit jamais repasser sous le plus grand n° de suivi déjà attribué (actes créés hors import).
+    const max = (await q.get('SELECT COALESCE(MAX(numero_suivi), 0)::int AS m FROM actes WHERE organisme_id = $1', [org])).m;
+    await q.run(`INSERT INTO counters (organisme_id, key, value) VALUES ($1, 'airs.numero_suivi', $2) ON CONFLICT (organisme_id, key) DO NOTHING`, [org, max]);
+    return Number((await q.get(`UPDATE counters SET value = GREATEST(value + 1, $2 + 1) WHERE organisme_id = $1 AND key = 'airs.numero_suivi' RETURNING value`, [org, max])).value);
   }
 
   const mapResultat = (r) => { const v = norm(r); if (!v) return null; if (v.includes('REJET')) return 'rejete'; if (v.includes('UNANIM')) return 'adopte_unanimite'; if (v.includes('ADOPT')) return 'adopte_majorite'; return null; };
@@ -784,7 +786,7 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
     return seance.id;
   }
 
-  async function publierActe(ctx, o, importId, item) {
+  async function publierActe(ctx, o, importId, item, { documents = true } = {}) {
     const lot = await db.get('SELECT mode FROM airs_imports WHERE id = $1', [importId]);
     const { resolved, problemes, seanceItem } = await resoudre(o, importId, item);
     if (problemes.length) throw E.incomplete('Item incomplet : résolvez les blocages avant publication', { missing: problemes });
@@ -802,7 +804,17 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
     const dateSrc = p.date || seanceItem?.payload?.date || null;
     const dateNum = dateSrc ? new Date(dateSrc) : null; const dateCompact = dateNum && !Number.isNaN(dateNum.getTime()) ? `${dateNum.getFullYear()}${String(dateNum.getMonth() + 1).padStart(2, '0')}${String(dateNum.getDate()).padStart(2, '0')}` : null;
     const chrono = str(p.num_chrono).trim();
-    const numeroDelib = dateCompact && chrono ? `DEL${dateCompact}_${chrono}${str(p.sous_numero).trim()}` : (numeroBrut && numeroBrut !== '0' ? numeroBrut : null);
+    let numeroDelib = dateCompact && chrono && chrono !== '0' ? `DEL${dateCompact}_${chrono}${str(p.sous_numero).trim()}` : (numeroBrut && numeroBrut !== '0' ? numeroBrut : null);
+    // Un même n° de délibération (chrono) porte souvent plusieurs sous-points (A/, B/, C/…) : on rend le n° de point
+    // unique (suffixe) au lieu de perdre l'acte. Seul un vrai doublon (même titre) est écarté.
+    if (seanceId && numeroDelib) {
+      const ex = await db.get('SELECT titre FROM seance_items WHERE seance_id = $1 AND numero = $2 LIMIT 1', [seanceId, numeroDelib]);
+      if (ex) {
+        if ((ex.titre || '').trim().toLowerCase() === (titre || '').trim().toLowerCase()) throw E.conflict(`Doublon : le point n° ${numeroDelib} existe déjà dans cette séance`);
+        const n = (await db.get("SELECT count(*)::int AS n FROM seance_items WHERE seance_id = $1 AND (numero = $2 OR numero LIKE $2 || '-%')", [seanceId, numeroDelib])).n;
+        numeroDelib = `${numeroDelib}-${n + 1}`;
+      }
+    }
       const custom = { airs: { importId, sourceKey: item.source_key, origine: item.payload?.origine ?? null, numero: p.numero ?? null, numSuivi: p.num_suivi ?? null, numChrono: p.num_chrono ?? null, resultat: p.resultat ?? null, direction: p.direction ?? null, service: p.service ?? null, commission: p.commission ?? null, redacteurNom: resolved.redacteurNom ?? null } };
     const acte = await db.tx(async (q) => {
       const numeroSuivi = await prochainNumeroSuivi(q, o);
@@ -824,7 +836,7 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
       }
       return a;
     });
-    await attacherDocuments(ctx, o, item, acte.id);
+    if (documents) await attacherDocuments(ctx, o, item, acte.id);
     await db.run(`INSERT INTO airs_links (organisme_id, kind, source_key, entity_id, import_id) VALUES ($1,'acte',$2,$3,$4) ON CONFLICT (organisme_id, kind, source_key) DO UPDATE SET entity_id = EXCLUDED.entity_id`, [o, item.source_key, acte.id, importId]);
     await db.run(`UPDATE airs_import_items SET acte_id = $2, statut = 'publie', pubie_at = now(), pubie_par = $3 WHERE id = $1`, [item.id, acte.id, ctx.username]);
     await event(o, importId, ctx.username, 'acte.publie', { sourceKey: item.source_key, acteId: acte.id });
@@ -918,15 +930,32 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
   }
 
   /** Importe TOUS les actes du sas (séances créées au besoin), et renvoie le détail des échecs. */
-  async function importerTousLesActes(ctx, org, importId) {
+  async function importerTousLesActes(ctx, org, importId, { documents = true } = {}) {
     const o = requireOrg(org); await lotDe(o, importId);
     const result = { publies: 0, ignores: [] };
     const actes = await db.all(`SELECT * FROM airs_import_items WHERE import_id = $1 AND kind = 'acte' AND statut != 'publie' ORDER BY id`, [importId]);
-    await majProgression(importId, { enCours: true, phase: 'import', fait: 0, total: actes.length, libelle: 'Import de tous les actes' });
-    for (let i = 0; i < actes.length; i++) { try { await publierActe(ctx, o, importId, actes[i]); result.publies++; } catch (e) { result.ignores.push({ sourceKey: actes[i].source_key, motif: e.message, missing: e.details?.missing || null }); } if (i % 3 === 0 || i === actes.length - 1) await majProgression(importId, { enCours: true, phase: 'import', fait: i + 1, total: actes.length, libelle: 'Import de tous les actes' }); }
+    await majProgression(importId, { enCours: true, phase: 'import', fait: 0, total: actes.length, libelle: documents ? 'Import de tous les actes' : 'Import de tous les actes (documents en différé)' });
+    for (let i = 0; i < actes.length; i++) { try { await publierActe(ctx, o, importId, actes[i], { documents }); result.publies++; } catch (e) { const doublon = /Doublon/.test(e.message); if (doublon) await db.run("UPDATE airs_import_items SET statut = 'ignore' WHERE id = $1", [actes[i].id]).catch(() => {}); result.ignores.push({ sourceKey: actes[i].source_key, motif: e.message, doublon, missing: e.details?.missing || null }); } if (i % 3 === 0 || i === actes.length - 1) await majProgression(importId, { enCours: true, phase: 'import', fait: i + 1, total: actes.length, libelle: documents ? 'Import de tous les actes' : 'Import de tous les actes (documents en différé)' }); }
     await majProgression(importId, { enCours: false, phase: 'termine', fait: actes.length, total: actes.length, libelle: 'Import de tous les actes' });
     await majStatutLot(o, importId);
     return result;
+  }
+
+  /**
+   * Passe différée : rattache les documents d'origine (et leur PDF) aux actes importés qui n'en ont pas encore.
+   * Sert après une reprise « rapide » (actes d'abord) — la lecture des fichiers sur le partage AIRS est longue.
+   */
+  async function attacherDocumentsManquants(ctx, org, importId) {
+    const o = requireOrg(org); await lotDe(o, importId);
+    const items = await db.all(`SELECT i.* FROM airs_import_items i
+      WHERE i.import_id = $1 AND i.kind = 'acte' AND i.acte_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM annexes an WHERE an.acte_id = i.acte_id AND an.titre ILIKE '%document d''origine%')
+      ORDER BY i.id`, [importId]);
+    let n = 0;
+    await majProgression(importId, { enCours: true, phase: 'import', fait: 0, total: items.length, libelle: 'Rattachement des documents' });
+    for (let i = 0; i < items.length; i++) { try { await attacherDocuments(ctx, o, items[i], items[i].acte_id); n++; } catch { /* document absent : on continue */ } if (i % 3 === 0 || i === items.length - 1) await majProgression(importId, { enCours: true, phase: 'import', fait: i + 1, total: items.length, libelle: 'Rattachement des documents' }); }
+    await majProgression(importId, { enCours: false, phase: 'termine', fait: items.length, total: items.length, libelle: 'Rattachement des documents' });
+    return { actes: n, total: items.length };
   }
 
   /** Importe en masse tous les conseils ARCHIVÉS du sas (et leurs actes / documents d'origine). */
@@ -1092,7 +1121,7 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
     getMapping, setMapping, tablesSource, apercuTable, validerTable,
     creerLot, lister, charger, chargerDemo, chargerOracle, etatSource, annuler, supprimerLot,
     analyser, proposer, concordances, exemplesConcordance, decider, validerTout, creerConcordanceHistorique, creerAgentsNonRappropries, creerElusNonRappropries, creerDsNonRappropries, horsCommission, cibles,
-    items, detail, progression, resoudre, publierItem, publierTout, importerTousLesActes, importerConseilsArchives, ignorerItem, dePublier, dePublierItem, verifierAgents,
+    items, detail, progression, resoudre, publierItem, publierTout, importerTousLesActes, importerConseilsArchives, attacherDocumentsManquants, ignorerItem, dePublier, dePublierItem, verifierAgents,
     etatFichiers, testerFichiers, lireFichierAir,
     _canonise: canonise, _demo: demo,
   });

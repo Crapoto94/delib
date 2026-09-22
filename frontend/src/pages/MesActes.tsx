@@ -5,7 +5,7 @@ import { api, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { AgentName } from '../AgentName';
 import { dt } from '../format';
-import { Badge, Empty, ErrorBox, Loading, Pagination, PageTitle, StatutBadge, useLoad } from '../ui';
+import { Badge, Empty, ErrorBox, Loading, Pagination, PageTitle, StatutBadge, TypeBadge, useLoad } from '../ui';
 import { Select } from '../Select';
 
 const ROLES: [string, string][] = [['', 'Tous mes rôles'], ['redacteur', 'Rédacteur'], ['co_redacteur', 'Co-rédacteur'], ['valideur', 'Valideur'], ['remplacant', 'Remplaçant'], ['commentateur', 'Commentaire'], ['participant', 'Dans le circuit']];
@@ -33,8 +33,9 @@ export function ListeTrajets({ statut, hors }: { statut?: string; hors?: string 
       </div>
       {d.loading && !d.data ? <Loading /> : !d.data ? <ErrorBox msg={d.error} /> : !d.data.items.length ? <div className="card"><Empty>Aucun acte ne correspond.</Empty></div> : (
         <>
-          <div className="card overflow-x-auto"><table className="w-full"><thead><tr><th>Dossier</th><th>Mes rôles</th><th>Statut</th><th>Séance</th><th /></tr></thead><tbody>{d.data.items.map((a: any) => (
-            <tr key={a.acteId}><td><b>{a.titre}</b><div className="text-[12px] text-mute">n° {a.numeroSuivi} · créé le {dt(a.creeLe, { dateStyle: 'short' })}</div></td>
+          <div className="card overflow-x-auto"><table className="w-full"><thead><tr><th>Dossier</th><th>Rédacteur</th><th>Mes rôles</th><th>Statut</th><th>Séance</th><th /></tr></thead><tbody>{d.data.items.map((a: any) => (
+            <tr key={a.acteId}><td><b>{a.titre}</b> <TypeBadge acte={a} /><div className="text-[12px] text-mute">n° {a.numeroSuivi} · créé le {dt(a.creeLe, { dateStyle: 'short' })}</div></td>
+              <td className="text-[12px]"><AgentName u={a.redacteur} /></td>
               <td className="space-x-1">{a.roles.map((r: any) => <Badge key={r.code} tone="blue">{r.label}</Badge>)}</td>
               <td><StatutBadge statut={a.statut} />{a.resultatLabel && <div className="mt-1 text-[11px] text-mute">{a.resultatLabel}</div>}</td>
               <td className="text-[12px]">{a.dateSeance ? dt(a.dateSeance, { dateStyle: 'medium' }) : '—'}</td>
