@@ -115,6 +115,7 @@ describe('circuit d’une décision : signature à la place du conseil', () => {
     await env.db.run("UPDATE actes SET statut = 'adopte' WHERE id = $1", [delib.id]);
     const decision = await readyActe(typeDecision.id, 'Décision prise par délégation');
     await as(t.dupont).post(`${A(decision.id)}/liens`, { cibleActeId: delib.id });
+    await as(t.dupont).put(`${A(decision.id)}/signature-position`, { page: 1, x: 75, y: 85, w: 150, h: 60 });
     await as(t.dupont).post(`${A(decision.id)}/envoi`);
     await runCircuit(decision.id);
     const after = await as(t.dupont).get(A(decision.id));
@@ -132,6 +133,7 @@ describe('circuit d’une décision : signature à la place du conseil', () => {
     await env.db.run("UPDATE actes SET statut = 'adopte' WHERE id = $1", [delib.id]);
     const decision = await readyActe(typeDecision.id, 'Décision à signer n°2');
     await as(t.dupont).post(`${A(decision.id)}/liens`, { cibleActeId: delib.id });
+    await as(t.dupont).put(`${A(decision.id)}/signature-position`, { page: 1, x: 75, y: 85, w: 150, h: 60 });
     await as(t.dupont).post(`${A(decision.id)}/envoi`);
     await runCircuit(decision.id);
     const r = await as(t.martin).post(`${P(decision.id)}/retour`, { statut: 'signe' });
@@ -144,6 +146,7 @@ describe('circuit d’une décision : signature à la place du conseil', () => {
     await env.db.run("UPDATE actes SET statut = 'adopte' WHERE id = $1", [delib.id]);
     const decision = await readyActe(typeDecision.id, 'Décision refusée');
     await as(t.dupont).post(`${A(decision.id)}/liens`, { cibleActeId: delib.id });
+    await as(t.dupont).put(`${A(decision.id)}/signature-position`, { page: 1, x: 75, y: 85, w: 150, h: 60 });
     await as(t.dupont).post(`${A(decision.id)}/envoi`);
     await runCircuit(decision.id);
     await as(t.martin).post(`${P(decision.id)}/retour`, { statut: 'refuse', motif: 'Pièce manquante' });

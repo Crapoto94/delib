@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ArrowLeftRight, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileSignature, FileText, GitBranch, HardDrive, KeyRound, Landmark, ListPlus, Menu, Network, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Timer, Trash2, Upload, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileSignature, FileText, GitBranch, HardDrive, Inbox, KeyRound, Landmark, ListPlus, Menu, Network, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Timer, Trash2, Upload, Users, type LucideIcon } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -21,6 +21,7 @@ import AdminIa from './AdminIa';
 import AdminImportAirs from './AdminImportAirs';
 import AdminOrganisation from './AdminOrganisation';
 import AdminRetroplanning from './AdminRetroplanning';
+import AdminCollecteurs from './AdminCollecteurs';
 import AgentPicker, { AgentList } from '../AgentPicker';
 import Collectivites from './Collectivites';
 import Organisation from './Organisation';
@@ -40,6 +41,7 @@ function Titulaires() {
   const aut = useLoad(async () => (await api.get(orgPath(o, '/redaction/autorisations'))).data.items as any[], [o]);
   const cfg = useLoad(async () => (await api.get(orgPath(o, '/settings'))).data.settings as Record<string, { value: any }>, [o]);
   const riOn = cfg.data?.['circuit.resp_intermediaire']?.value === true;
+  const autOn = cfg.data?.['decision.autorisations_obligatoires']?.value === true;
   const [f, setF] = useState({ fonction: 'chef_service', username: '', directionCode: '', serviceCode: '' }); const [err, setErr] = useState<string | null>(null);
   const [a, setA] = useState({ username: '', directionCode: '', serviceCode: '' });
   const services = dirs.data?.find((x) => x.code === f.directionCode)?.services ?? [];
@@ -59,6 +61,10 @@ function Titulaires() {
       <section className="card p-5"><h3 className="mb-2">Responsable intermédiaire</h3>
         <label className="flex items-start gap-3"><input type="checkbox" className="mt-1" checked={riOn} disabled={cfg.loading} onChange={async (e) => { try { await api.put(orgPath(o, '/settings/circuit.resp_intermediaire'), { value: e.target.checked, scope: 'organisme' }); cfg.reload(); toast(e.target.checked ? 'Étape « Responsable intermédiaire » activée' : 'Étape « Responsable intermédiaire » désactivée'); } catch (x) { toast(errMsg(x), 'ko'); } }} />
           <span><b>Activer l’étape « Responsable intermédiaire » dans les circuits</b><br /><span className="text-[12px] text-mute">Facultative et décochée par défaut : tant qu’elle est décochée, l’étape est ignorée même si des titulaires sont saisis ci-dessous. Une fois activée, elle n’est déclenchée que si un titulaire est désigné pour le service.</span></span></label>
+      </section>
+      <section className="card p-5"><h3 className="mb-2">Décisions : délibérations d'autorisation</h3>
+        <label className="flex items-start gap-3"><input type="checkbox" className="mt-1" checked={autOn} disabled={cfg.loading} onChange={async (e) => { try { await api.put(orgPath(o, '/settings/decision.autorisations_obligatoires'), { value: e.target.checked, scope: 'organisme' }); cfg.reload(); toast(e.target.checked ? 'Une délibération d’autorisation est désormais exigée pour les décisions' : 'Délibérations d’autorisation facultatives'); } catch (x) { toast(errMsg(x), 'ko'); } }} />
+          <span><b>Exiger une délibération d'autorisation pour une décision</b><br /><span className="text-[12px] text-mute">Décoché par défaut. Les délibérations qui autorisent le maire à décider se lient à la rédaction d'une décision, <b>sans bloquer</b> l'envoi. Si vous cochez, l'envoi au circuit est bloqué tant qu'aucune délibération adoptée n'est liée.</span></span></label>
       </section>
       <details className="card p-5"><summary className="cursor-pointer text-[15px] font-bold">Saisie avancée des titulaires <span className="text-[12px] font-normal text-mute">— table complète, tous périmètres</span></summary><div className="mt-3"><h3 className="mb-3">Titulaires des fonctions de validation</h3>
         <form onSubmit={add} className="mb-4 grid gap-3 md:grid-cols-5 md:items-end"><ErrorBox msg={err} />
@@ -173,6 +179,7 @@ export function menu(isAdmin: boolean, plateforme: boolean, scc = false): Groupe
     { titre: 'Intégrations', entrees: [
       { k: 'tdt', label: 'Télétransmission (TDT)', icon: Send }, { k: 'ged', label: 'GED (Alfresco)', icon: HardDrive },
       ...(isAdmin || scc ? [{ k: 'parapheur', label: 'Parapheur (signature)', icon: FileSignature }] : []),
+      ...(isAdmin || scc ? [{ k: 'collecteurs', label: 'Collecteurs d’arrêtés', icon: Inbox }] : []),
       ...(isAdmin ? [{ k: 'cles', label: 'Clés API', icon: KeyRound }, { k: 'recherche', label: 'Recherche', icon: Search }] : [])] },
     ...(isAdmin ? [{ titre: 'Données et conformité', entrees: [{ k: 'rgpd', label: 'RGPD', icon: Scale }, { k: 'configuration', label: 'Export / import', icon: ArrowLeftRight }] }] : []),
     ...(isAdmin || scc ? [{ titre: 'Reprise de données', entrees: [{ k: 'import-airs', label: 'Import AIRS DELIB', icon: Upload }] }] : []),
@@ -226,7 +233,7 @@ export default function Admin() {
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="organisation" element={<AdminOrganisation />} /><Route path="retroplanning" element={<AdminRetroplanning />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
-        <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="parapheur" element={<AdminParapheur />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} />        <Route path="visas" element={<AdminVisas />} /><Route path="calendrier" element={<Calendrier />} /><Route path="import-airs" element={<AdminImportAirs />} />
+        <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="parapheur" element={<AdminParapheur />} /><Route path="collecteurs" element={<AdminCollecteurs />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} />        <Route path="visas" element={<AdminVisas />} /><Route path="calendrier" element={<Calendrier />} /><Route path="import-airs" element={<AdminImportAirs />} />
       </Routes>
         </div>
       </div>

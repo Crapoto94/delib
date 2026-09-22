@@ -59,6 +59,7 @@ const MODULES = [
   require('../modules/ai/ai.routes'),
   require('../modules/ai/visas.routes'),
   require('../modules/import-airs/airs.routes'),
+  require('../modules/collecteurs/collecteurs.routes'),
 ];
 
 function createApp(c) {

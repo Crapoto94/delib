@@ -89,7 +89,7 @@ export function Utilisateurs() {
 
 /* ------------------------------------------------------------------------------------------------------- gabarits */
 const DOCS: Record<string, string> = {
-  expose: 'Exposé des motifs', deliberation: 'Délibération', dossier: 'Dossier complet', garde: 'Page de garde', intercalaire: 'Intercalaire de point', sommaire: 'Sommaire', odj: 'Ordre du jour', convocation: 'Convocation', registre: 'Extrait du registre',
+  expose: 'Exposé des motifs', deliberation: 'Délibération', decision: 'Décision', arrete: 'Arrêté', dossier: 'Dossier complet', garde: 'Page de garde', intercalaire: 'Intercalaire de point', sommaire: 'Sommaire', odj: 'Ordre du jour', convocation: 'Convocation', registre: 'Extrait du registre',
 };
 export function Gabarits() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
@@ -105,6 +105,8 @@ export function Gabarits() {
   const downloadDocx = async () => { try { const r = await api.get(orgPath(o, `/gabarits/${sel}/docx`), { responseType: 'blob' }); const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = `modele-${sel}.docx`; a.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
   const apercuDocx = async () => { try { const r = await api.get(orgPath(o, `/gabarits/${sel}/docx/apercu`), { responseType: 'blob' }); const url = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = url; a.download = `apercu-${sel}.docx`; a.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
   const apercuPdf = async () => { setBusy(true); try { const m = await openPdf(() => api.get(orgPath(o, `/gabarits/${sel}/docx/apercu-pdf`), { responseType: 'blob' }), `Aperçu (données de test) — ${DOCS[sel] ?? sel}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); } finally { setBusy(false); } };
+  const etalonnagePdf = async () => { setBusy(true); try { const m = await openPdf(() => api.get(orgPath(o, `/gabarits/${sel}/etalonnage`), { responseType: 'blob' }), `Étalonnage — ${DOCS[sel] ?? sel}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); } finally { setBusy(false); } };
+  const apercuOdj = async () => { setBusy(true); try { const m = await openPdf(() => api.get(orgPath(o, '/gabarits/odj/apercu'), { responseType: 'blob' }), 'Aperçu — Ordre du jour (exemple)'); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); } finally { setBusy(false); } };
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
       <nav aria-label="Gabarits" className="card h-fit p-2">
@@ -116,6 +118,8 @@ export function Gabarits() {
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2>{DOCS[sel] ?? sel} {cur.docx ? <Badge tone="ok">modèle Word</Badge> : <Badge>aucun modèle</Badge>}</h2>
           <div className="flex gap-2">
+            <button className="btn-secondary" disabled={busy} onClick={etalonnagePdf}>Étalonnage (PDF)</button>
+            {sel === 'odj' && <button className="btn-secondary" disabled={busy} onClick={apercuOdj}>Aperçu à blanc (exemple)</button>}
             <button className="btn-secondary" disabled={!cur.docx} onClick={apercuDocx}><FileText className="h-4 w-4" /> Aperçu (.docx, données de test)</button>
             <button className="btn-secondary" disabled={!cur.docx || busy} onClick={apercuPdf}>{busy && <Spinner />} Aperçu (PDF)</button>
           </div></div>

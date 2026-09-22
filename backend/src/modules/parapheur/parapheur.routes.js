@@ -39,6 +39,12 @@ module.exports = ({ makeRouter, parapheur }) => {
   r.get('/actes/:id', { summary: 'État de la signature d’un acte : envoi courant, signataire, journal des échanges (envoyé / retourné)', tags: T, org: true, params: PA,
     description: 'Le journal montre ce qui a été envoyé au parapheur et ce qu’il a renvoyé (demande, accusé, état, retour). Accessible à qui peut voir l’acte.' },
   async (req, res) => res.json(await parapheur.etat(req.ctx, req.org.id, req.valid.params.id)));
+  r.get('/actes/:id/document-signe', { summary: 'Document signé (PDF) revenu du parapheur — ce qui fait foi après signature', tags: T, org: true, params: PA, responses: { 200: 'application/pdf' },
+    description: 'Après la signature du maire, une décision ne se réécrit plus : ce PDF signé est la version de référence. Accessible à qui peut voir l’acte.' },
+  async (req, res) => {
+    const out = await parapheur.documentSigne(req.ctx, req.org.id, req.valid.params.id);
+    res.set({ 'Content-Type': out.mime || 'application/pdf', 'Content-Disposition': `inline; filename="${encodeURIComponent(out.name)}"`, 'Cache-Control': 'private, no-store' }).send(out.buffer);
+  });
   r.post('/actes/:id/envoi', { summary: 'Envoie (ou renvoie) un acte en signature au parapheur', tags: T, org: true, roles: ROLES, params: PA, body: Envoi,
     description: 'Un acte « à signer » (décision, arrêté) part en signature du maire. Les administrateurs et le SCC peuvent passer `forcer: true` pour envoyer en signature même si le circuit n’est pas terminé.' },
     async (req, res) => res.json(await parapheur.demanderEnvoi(req.ctx, req.org.id, req.valid.params.id, { forcer: !!req.valid.body?.forcer })));
@@ -48,6 +54,9 @@ module.exports = ({ makeRouter, parapheur }) => {
     async (req, res) => res.json(await parapheur.simulerRetour(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
   r.post('/actes/:id/annuler', { summary: 'Annule l’envoi en cours (le dossier redevient « à signer »)', tags: T, org: true, roles: ROLES, params: PA, body: Annuler },
     async (req, res) => res.json(await parapheur.annuler(req.ctx, req.org.id, req.valid.params.id, req.valid.body.motif)));
+  r.post('/actes/:id/reouvrir', { summary: 'Rouvre une décision signée pour modification (perd son document signé, revient à l’étape précédente)', tags: T, org: true, roles: ROLES, params: PA, body: Annuler,
+    description: 'Réservé aux administrateurs et au SCC. Le document signé est retiré ; l’acte revient à la dernière étape du circuit pour correction, puis repart en signature après validation.' },
+  async (req, res) => res.json(await parapheur.reouvrir(req.ctx, req.org.id, req.valid.params.id, req.valid.body || {})));
 
   r.get('/journal', { summary: 'Journal des échanges avec le parapheur (ce qui est envoyé et retourné), filtrable par acte', tags: T, org: true, roles: ROLES, params: P, query: JournalQ },
     async (req, res) => res.json(await parapheur.journal(req.ctx, req.org.id, req.valid.query)));

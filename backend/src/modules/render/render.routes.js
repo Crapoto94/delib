@@ -47,6 +47,7 @@ const DOCX_VARS = [
   { nom: '{expose}', description: 'Exposé des motifs (texte)' },
   { nom: '{visas}', description: 'Visas et considérants (texte) — alias {considere}' },
   { nom: '{dispositif}', description: 'Délibéré (texte) — alias {delibere}' },
+  { nom: '{ordre_du_jour}', description: "Gabarit « Ordre du jour » uniquement : la liste des points, une section par commission (texte riche, une ligne par point)" },
   { nom: '{statut}', description: 'Statut du dossier' },
   { nom: '{membres_conseil}', description: 'Nombre de membres composant le Conseil (tenue de séance)' },
   { nom: '{conseillers_exercice}', description: 'Nombre de conseillers en exercice' },
@@ -119,6 +120,21 @@ module.exports = ({ makeRouter, render, config }) => {
 
   r.get('/gabarits/:docType/etalonnage', { summary: "PDF d'étalonnage du gabarit (texte d'exemple sur le fond)", tags: ['mise en page'], org: true, roles: ['org_admin'], params: P },
     async (req, res) => pdf(res, await render.sample(req.ctx, req.org.id, req.valid.params.docType), `etalonnage-${req.valid.params.docType}`));
+
+  r.get('/gabarits/odj/apercu', { summary: "Aperçu d'un ordre du jour à blanc (points fictifs, commissions de l'organisme)", tags: ['mise en page'], org: true, roles: ['org_admin'], params: z.object({ orgId: Id }), responses: { 200: 'application/pdf' },
+    description: "Compose un ordre du jour d'exemple avec le gabarit « odj » : bandeau de titres, rupture par commission (commissions réelles de l'organisme, ou à défaut deux exemples), pied de page. Aucune séance n'est requise." },
+    async (req, res) => pdf(res, await render.odjSample(req.org.id), 'apercu-odj'));
+
+  r.post('/actes/:id/document-source', {
+    summary: "Joint le document rédigé hors application (PDF ou Word) — il remplace la composition dans l’outil", tags: ['mise en page'], org: true, params: PA,
+    description: "multipart/form-data, champ « file » (.pdf ou .docx) et champ « trame » : « presente » (le document porte déjà la trame de la collectivité) ou « a_ajouter » (l’en-tête et le pied de page du gabarit sont posés dans les marges). Dans ce mode, les textes ne sont plus composés dans l’application : ils ne sont pas corrigeables en cours de circuit.",
+  }, upload.single('file'), async (req, res) => res.json(await render.setSource(req.ctx, req.org.id, req.valid.params.id, { trame: req.body?.trame === 'a_ajouter' ? 'a_ajouter' : 'presente' }, req.file)));
+
+  r.delete('/actes/:id/document-source', { summary: 'Retire le document joint (retour à la rédaction dans l’outil)', tags: ['mise en page'], org: true, params: PA },
+    async (req, res) => { await render.removeSource(req.ctx, req.org.id, req.valid.params.id); res.json({ ok: true }); });
+
+  r.get('/actes/:id/document-source', { summary: 'PDF de consultation du document joint', tags: ['mise en page'], org: true, params: PA, responses: { 200: 'application/pdf' } },
+    async (req, res) => pdf(res, await render.sourceFile(req.ctx, req.org.id, req.valid.params.id), `acte-${req.valid.params.id}-document`));
 
   r.get('/actes/:id/docx', {
     summary: "Document Word d'un acte, fusionné avec le modèle .docx du gabarit", tags: ['mise en page'], org: true, params: PA, query: DocxQ, responses: { 200: 'Fichier .docx' },

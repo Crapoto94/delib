@@ -80,4 +80,22 @@ describe('gabarit Word (.docx) : dépôt, variables et fusion', () => {
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ docx: false });
   });
+
+  it('un modèle Word d\'ordre du jour reçoit la liste des points via {ordre_du_jour}', async () => {
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', '<Types/>');
+    zip.file('word/document.xml', `<?xml version="1.0"?><w:document><w:body>
+      <w:p><w:r><w:t>ORDRE DU JOUR</w:t></w:r></w:p>
+      <w:p><w:r><w:t>{ordre_du_jour}</w:t></w:r></w:p>
+    </w:body></w:document>`);
+    const up = await env.http().post(`${base()}/gabarits/odj/docx`).set(bearer(t.boot)).attach('file', await zip.generateAsync({ type: 'nodebuffer' }), 'odj.docx');
+    expect(up.status, JSON.stringify(up.body)).toBe(200);
+    const r = await bin(t.boot, `${base()}/gabarits/odj/docx/apercu`);
+    expect(r.status).toBe(200);
+    const xml = await xmlDe(r.body);
+    expect(xml).not.toContain('{ordre_du_jour}');        // la variable est remplacée…
+    expect(xml).toContain('Dossier d&apos;exemple 1');     // …par les points fictifs,
+    expect(xml).toContain('LA VILLE QUI DÉBAT');          // avec la rupture par commission.
+    await as(t.boot).del(`${base()}/gabarits/odj/docx`);
+  });
 });

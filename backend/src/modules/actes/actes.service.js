@@ -18,10 +18,12 @@ const toActe = (r) => r && ({
   commentaireInitial: r.commentaire_initial, custom: r.custom, currentStepKey: r.current_step_key, participants: r.participants,
   submittedAt: r.submitted_at, abandonedAt: r.abandoned_at, abandonMotif: r.abandon_motif, createdAt: r.created_at, updatedAt: r.updated_at,
   signeAt: r.signe_at ?? null, signePar: r.signe_par ?? null, parapheurEnvoiId: r.parapheur_envoi_id ?? null,
+  documentSourceTrame: r.document_source_trame ?? null,
+  signaturePosition: r.signature_position ?? null,
 });
 const toDelib = (r) => ({ id: r.id, acteId: r.acte_id, ordre: r.ordre, titre: r.titre });
 
-function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
+function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings }) {
   const svc = {
     toActe,
 
@@ -163,7 +165,9 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const champs = late.champs ? await late.champs.pourActe(ctx, a) : [];
       const typeInfo = { code: a.type_code ?? null, libelle: a.type_libelle ?? null, meta: (await db.get('SELECT meta FROM ref_items WHERE id = $1', [a.type_id]))?.meta || {} };
       const acte = (await svc.attachSeance([toActe(a)]))[0]; // séance visée (date et instance) pour la fiche
+      const src = a.document_source_file_id ? await db.get('SELECT original_name, mime FROM files WHERE id = $1', [a.document_source_file_id]) : null;
       return { ...acte, typeInfo, champs, deliberations: delibs, liens: await svc.liens(a.id),
+        documentSource: src ? { nom: src.original_name, mime: src.mime, trame: a.document_source_trame || null } : null,
         droits: { modifier: editable, administrer: acl.isAdmin(ctx, a.organisme_id) }, completude: comp, odj: late.odj ? await late.odj.positionsOf(a.id) : [] };
     },
 
@@ -252,6 +256,26 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       const after = await db.get('UPDATE actes SET custom = $2::jsonb WHERE id = $1 RETURNING *', [id, JSON.stringify(custom)]);
       await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.assiste', entity: 'actes', entityId: id, after: { actif: next.actif, passees: next.passees } });
       return toActe(after);
+    },
+
+    /**
+     * Emplacement de la signature du maire, sur le document envoyé au parapheur (mécanisme du Hub DSI) :
+     * `page` (1 = première), centre `x`/`y` en pourcentage (gauche / haut), `w`/`h` en points. Défini avant l'envoi.
+     */
+    async setSignaturePosition(ctx, organismeId, acteId, pos) {
+      const a = await svc.load(ctx, organismeId, acteId);
+      const allowed = acl.isAdmin(ctx, a.organisme_id) || a.redacteur === ctx.username || (a.co_redacteurs || []).includes(ctx.username);
+      if (!allowed) throw E.forbidden("Vous ne pouvez pas définir l'emplacement de la signature");
+      const p = pos == null ? null : {
+        page: Math.max(1, Math.round(Number(pos.page) || 1)),
+        x: Math.min(100, Math.max(0, Number(pos.x))),
+        y: Math.min(100, Math.max(0, Number(pos.y))),
+        w: Math.min(400, Math.max(10, Number(pos.w) || 150)),
+        h: Math.min(400, Math.max(10, Number(pos.h) || 60)),
+      };
+      const r = await db.get('UPDATE actes SET signature_position = $2::jsonb WHERE id = $1 RETURNING *', [a.id, p ? JSON.stringify(p) : null]);
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.signature_position', entity: 'actes', entityId: a.id, after: p });
+      return { signaturePosition: r.signature_position };
     },
 
     // ---- délibérations d'un dossier (D5) ------------------------------------------------------------------------------
@@ -390,11 +414,13 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late }) {
       if (!type?.meta?.signature) need(!!a.rapporteur_id, 'rapporteur', 'Élu rapporteur'); // décision / arrêté : pas d'élu rapporteur
       const n = (await db.get('SELECT count(*)::int AS n FROM deliberations WHERE acte_id = $1', [a.id])).n;
       need(n >= Math.max(1, type?.meta?.minDeliberations ?? 1), 'deliberation', 'Au moins une délibération');
-      if (type?.meta?.autorisations) {
+      // Délibérations d'autorisation : facultatives par défaut ; l'administrateur peut les rendre obligatoires.
+      if (type?.meta?.autorisations && settings && (await settings.resolve(a.organisme_id))['decision.autorisations_obligatoires']?.value === true) {
         const nl = (await db.get('SELECT count(*)::int AS n FROM acte_liens WHERE acte_id = $1', [a.id])).n;
         need(nl > 0, 'autorisation', 'Au moins une délibération d\'autorisation liée');
       }
-      if (late.texts) for (const m of await late.texts.missingTexts(a, type?.meta)) missing.push(m);
+      // Acte rédigé hors application (document joint) : le texte n'est pas composé ici, on n'exige pas les zones.
+      if (late.texts && !a.document_source_file_id) for (const m of await late.texts.missingTexts(a, type?.meta)) missing.push(m);
       if (late.champs) for (const m of await late.champs.manquants(a)) missing.push(m);
       return { complete: missing.length === 0, missing };
     },

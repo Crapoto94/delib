@@ -60,9 +60,10 @@ function createDsihubParapheur({ tls, http: injected } = {}) {
           email: s.email, nom: s.nom, ...(s.qualite ? { title: s.qualite } : {}),
           signatureMode: s.mode || 'simple',
           ...(s.mode === 'sms' && s.telephone ? { smsPhone: String(s.telephone).replace(/\s/g, '') } : {}),
-          // Le Hub n'expose le document (et ne pose le cadre) que s'il reçoit une position de signature :
-          // on en fournit systématiquement une (bas de la dernière page), sinon « Aucune position définie ».
-          positions: (s.positions || docs.map((_d, i) => ({ documentIndex: i, page: 0, x: 75, y: 85, w: 150, h: 60 }))),
+          // Position définie dans VibeDélib (mécanisme du Hub DSI : page 1-based, centre en %, w/h en points).
+          // À défaut (document de test), on fournit une position par défaut en bas du document, sinon le Hub
+          // n'expose pas le document (« Aucune position définie »).
+          positions: (Array.isArray(s.positions) && s.positions.length) ? s.positions : docs.map((_d, i) => ({ documentIndex: i, page: 1, x: 75, y: 85, w: 150, h: 60 })),
         })),
       };
       form.append('payload', JSON.stringify(payload));
@@ -82,8 +83,28 @@ function createDsihubParapheur({ tls, http: injected } = {}) {
       const brut = r.data?.parapheur || r.data?.dossier || r.data || {};
       const st = String(brut.statut || brut.status || '').toLowerCase();
       const map = { termine: 'signe', signe: 'signe', refuse: 'refuse', annule: 'annule', en_cours: 'en_cours' };
-      return { statut: map[st] || 'en_cours', signeAt: brut.signeAt || brut.date_signature || null, motif: brut.motif || brut.reason || null, brut,
+      // Documents du dossier : le Hub indique, pour chacun, si une version signée existe (`has_signed`). Sert à
+      // récupérer le PDF signé une fois la signature apposée (`telechargerDocument`).
+      const documents = Array.isArray(brut.documents) ? brut.documents.map((d) => ({
+        id: d.id, nom: d.original_name || d.nom || null, signe: !!(d.has_signed || d.signed),
+      })) : [];
+      return { statut: map[st] || 'en_cours', signeAt: brut.signeAt || brut.date_signature || null, motif: brut.motif || brut.reason || null, documents, brut,
         _echange: { methode: 'GET', url: `/api/parapheur/${ref}`, httpStatus: r.status, reponse: brut } };
+    },
+
+    /** Récupère un document du dossier, dans sa version signée (`signed=1`) : GET /api/parapheur/:id/doc/:docId. */
+    async telechargerDocument(cfg, ref, docId) {
+      const client = clientOf(cfg); const token = await jeton(client, cfg);
+      const r = await client.get(`/api/parapheur/${encodeURIComponent(ref)}/doc/${encodeURIComponent(docId)}`, {
+        params: { signed: 1 }, headers: { Authorization: `Bearer ${token}` }, responseType: 'arraybuffer',
+      }).catch((e) => { throw failNet(e); });
+      if (r.status === 404) throw E.notFound('Le parapheur DSIHUB n’a pas de document signé pour ce dossier');
+      if (r.status >= 400) throw E.upstream(`Le parapheur DSIHUB n’a pas renvoyé le document signé (HTTP ${r.status})`);
+      const disposition = String(r.headers?.['content-disposition'] || '');
+      const m = /filename\*?=(?:UTF-8'')?["']?([^"';]+)/i.exec(disposition);
+      let nom = m ? decodeURIComponent(m[1].trim()) : null;
+      if (!nom) nom = `document-signe-${docId}.pdf`;
+      return { buffer: Buffer.from(r.data), name: nom, mime: 'application/pdf' };
     },
 
     async annuler(cfg, ref) {

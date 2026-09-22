@@ -321,6 +321,17 @@ describe('gabarits : marges, en-tête, fond de page', () => {
     expect(s.status).toBe(200);
     expect((await PDFDocument.load(s.body)).getPageCount()).toBeGreaterThanOrEqual(1);
     expect((await as(t.dupont).get(`${base()}/gabarits/deliberation/etalonnage`)).status).toBe(403);
+    // Aperçu d'ordre du jour à blanc (gabarit « odj ») : PDF composé de points fictifs, sans séance.
+    const odj = await env.http().get(`${base()}/gabarits/odj/apercu`).set(bearer(admin)).buffer(true).parse(binary);
+    expect(odj.status).toBe(200);
+    expect((await PDFDocument.load(odj.body)).getPageCount()).toBeGreaterThanOrEqual(1);
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(odj.body), useSystemFonts: true, verbosity: 0, isEvalSupported: false }).promise;
+    let txt = '';
+    for (let i = 1; i <= doc.numPages; i++) txt += `${(await (await doc.getPage(i)).getTextContent()).items.map((x) => x.str).join(' ')} `;
+    expect(txt.replace(/\s+/g, ' ')).toContain('ORDRE DU JOUR');
+    expect(txt.replace(/\s+/g, ' ')).toContain('Commission(s) concernée(s)');
+    expect((await as(t.dupont).get(`${base()}/gabarits/odj/apercu`)).status).toBe(403);
     const ccas = (await as(admin).post('/api/v1/organismes', { code: 'ccas', nom: 'CCAS', type: 'ccas' })).body;
     const own = (await as(admin).get(`/api/v1/organismes/${ccas.id}/gabarits`)).body.items.find((x) => x.docType === 'deliberation');
     expect(own).toMatchObject({ personnalise: false, version: 0 });

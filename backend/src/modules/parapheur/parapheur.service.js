@@ -17,7 +17,7 @@ const { requireOrg } = require('../../db/pool');
 
 const INDISPONIBLE = 'Le parapheur iParapheur n’est pas encore disponible : choisissez le parapheur DSIHUB.';
 
-function createParapheur({ db, audit, actes, render, bus, config, log, adapters, acl }) {
+function createParapheur({ db, audit, actes, render, storage, bus, config, log, adapters, acl, engine }) {
   const box = createSecretBox(config.jwt.secret, 'parapheur');
   const { chiffre, dechiffre } = box;
   const SYS = (org) => ({ username: 'parapheur', kind: 'system', isPlatformAdmin: true, organismes: [], orgIds: [org], roles: ['org_admin'], agent: null, displayName: 'Parapheur' });
@@ -209,8 +209,10 @@ function createParapheur({ db, audit, actes, render, bus, config, log, adapters,
      * Envoie (ou renvoie) un acte en signature. `auto` : déclenché par la fin du circuit (pas d'utilisateur).
      * `forcer` (réservé aux administrateurs et au SCC) : envoie un acte dont le circuit n'est pas terminé,
      * pour la signature du maire — la décision peut ainsi être signée sans attendre l'inscription au conseil.
+     * `signataire` (réservé aux collecteurs d'arrêtés) : signataire précis ({ nom, email, qualite, mode?, telephone? }),
+     * fusionné sur le signataire configuré — le mode de signature par défaut de la collectivité est conservé.
      */
-    async demanderEnvoi(ctx, organismeId, acteId, { auto = false, forcer = false } = {}) {
+    async demanderEnvoi(ctx, organismeId, acteId, { auto = false, forcer = false, signataire: signataireOpt = null } = {}) {
       const org = requireOrg(organismeId);
       const c = auto ? SYS(org) : ctx;
       const a = await actes.load(c, org, acteId); // contrôle de visibilité
@@ -227,14 +229,18 @@ function createParapheur({ db, audit, actes, render, bus, config, log, adapters,
       if (!cfg.actif) throw E.conflict('Le parapheur est désactivé pour cette collectivité (Paramétrages / Parapheur).');
       const ad = adapterOf(cfg);
       if (!ad) throw E.conflict(INDISPONIBLE);
-      const signataire = signataireOf(cfg);
+      const signataire = signataireOpt ? { ...signataireOf(cfg), ...signataireOpt } : signataireOf(cfg);
       verifierSignataire(cfg, signataire);
+      // L'emplacement de la signature est défini dans VibeDélib avant l'envoi (mécanisme du Hub DSI).
+      const pos = a.signature_position;
+      if (!pos) throw E.conflict("Définissez l'emplacement de la signature avant l'envoi au parapheur (bouton « Emplacement de la signature »).");
+      const positions = [{ documentIndex: 0, page: pos.page, x: pos.x, y: pos.y, w: pos.w, h: pos.h }];
 
       const doc = await render.renderActe(c, org, acteId, { cible: 'deliberation', mode: 'propre', avecAnnexes: true });
       const typeLabel = meta.code === 'decision' ? 'Décision' : meta.code === 'arrete' ? 'Arrêté' : 'Acte';
       const titre = `${typeLabel} n° ${a.numero_suivi} — ${a.titre}`;
       const nomDoc = render.nomFichier(titre); // nom du PDF affiché par le parapheur
-      const payload = { titre, signataire: signataire.email, mode: cfg.mode, fournisseur: cfg.fournisseur, signatureMode: signataire.mode, document: nomDoc };
+      const payload = { titre, signataire: signataire.email, mode: cfg.mode, fournisseur: cfg.fournisseur, signatureMode: signataire.mode, document: nomDoc, signature: pos };
 
       const envoi = await db.get(
         `INSERT INTO parapheur_envois (organisme_id, acte_id, fournisseur, mode, statut, signataire_nom, signataire_email, document_nom, payload)
@@ -243,7 +249,7 @@ function createParapheur({ db, audit, actes, render, bus, config, log, adapters,
       await j(org, envoi.id, acteId, 'sortant', { resume: `Demande de signature (${signataire.mode})`, corps: payload });
 
       try {
-        const r = await ad.creer(cfg, { titre, message: await messageActe(a), mode: 'sequentiel', signataires: [signataire], documents: [{ nom: nomDoc, buffer: doc.buffer, mime: 'application/pdf' }] });
+        const r = await ad.creer(cfg, { titre, message: await messageActe(a), mode: 'sequentiel', signataires: [{ ...signataire, positions }], documents: [{ nom: nomDoc, buffer: doc.buffer, mime: 'application/pdf' }] });
         const e = r._echange || {};
         await j(org, envoi.id, acteId, 'entrant', { methode: e.methode, url: e.url, httpStatus: e.httpStatus, resume: `Accusé d’enregistrement (${r.reference || r.id || 'sans référence'})`, reponse: e.reponse || r.brut });
         await db.run("UPDATE parapheur_envois SET statut = 'a_signer', ref_externe = $2, lien_externe = $3, reponse = $4::jsonb, updated_at = now() WHERE id = $1",
@@ -285,7 +291,44 @@ function createParapheur({ db, audit, actes, render, bus, config, log, adapters,
       const e = r._echange || {};
       await j(org, envoi.id, acteId, 'entrant', { methode: e.methode, url: e.url, httpStatus: e.httpStatus, resume: `État renvoyé par le parapheur : ${r.statut}`, reponse: e.reponse || r.brut });
       await svc._appliquerRetour(org, acteId, envoi.id, r);
+      if (r.statut === 'signe') { await svc._capturerDocumentSigne(org, acteId, envoi.id, cfg, ad, r); await bus.emit('acte.document_signe', { organismeId: org, acteId, envoiId: envoi.id }); }
       return { statut: r.statut, envoi: await dernierEnvoi(org, acteId) };
+    },
+
+    /**
+     * Récupère le PDF signé renvoyé par le parapheur et le conserve comme fichier rattaché à l'envoi. C'est ce document
+     * qui fait foi après signature : une décision signée ne se réécrit plus. Best effort (le Hub peut être indisponible).
+     */
+    async _capturerDocumentSigne(org, acteId, envoiId, cfg, ad, retour) {
+      try {
+        const envoi = await db.get('SELECT ref_externe, document_signe_file_id FROM parapheur_envois WHERE id = $1', [envoiId]);
+        if (!envoi || envoi.document_signe_file_id || !envoi.ref_externe || !ad?.telechargerDocument) return;
+        const docs = (retour?.documents || []).filter((d) => d.signe && d.id != null);
+        if (!docs.length) return;
+        const f = await ad.telechargerDocument(cfg, envoi.ref_externe, docs[0].id);
+        if (!f?.buffer?.length) return;
+        const put = await storage.put(f.buffer, { organismeId: org, ext: 'pdf' });
+        const file = await db.get(
+          `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,'parapheur') RETURNING id`,
+          [org, put.key, String(f.name || 'document-signe.pdf').slice(0, 200), f.mime || 'application/pdf', put.size, put.sha256]);
+        await db.run('UPDATE parapheur_envois SET document_signe_file_id = $2, updated_at = now() WHERE id = $1', [envoiId, file.id]);
+        await j(org, envoiId, acteId, 'entrant', { resume: `Document signé récupéré (${f.name || 'PDF'})`, httpStatus: 200 });
+      } catch (e) {
+        await j(org, envoiId, acteId, 'entrant', { resume: 'Document signé indisponible', erreur: e.message });
+        log?.warn({ e: e.message, acteId }, 'récupération du document signé impossible');
+      }
+    },
+
+    /** Retire le document signé conservé d'un envoi (décision rouverte : la signature est abandonnée). */
+    async _purgerDocumentSigne(org, acteId, envoiId, motif) {
+      const envoi = await db.get('SELECT document_signe_file_id FROM parapheur_envois WHERE id = $1', [envoiId]);
+      if (!envoi?.document_signe_file_id) return;
+      const f = await db.get('SELECT storage_key FROM files WHERE id = $1', [envoi.document_signe_file_id]);
+      await db.run("UPDATE parapheur_envois SET statut = 'annule', document_signe_file_id = NULL, motif = COALESCE($2, motif), updated_at = now() WHERE id = $1", [envoiId, motif || 'Réouvert pour modification']);
+      await db.run('DELETE FROM files WHERE id = $1', [envoi.document_signe_file_id]);
+      if (f?.storage_key) await storage.remove(f.storage_key).catch(() => {});
+      await j(org, envoiId, acteId, 'entrant', { resume: 'Document signé retiré : acte rouvert pour modification' });
     },
 
     /** Applique un retour du parapheur (interne) : met à jour l'envoi ET l'état de l'acte. */
@@ -316,6 +359,11 @@ function createParapheur({ db, audit, actes, render, bus, config, log, adapters,
       if (ad?.fournisseur === 'simulateur' && envoi.ref_externe) ad.retour(envoi.ref_externe, { statut, motif });
       await j(org, envoi.id, acteId, 'entrant', { resume: `Retour simulé : ${statut}${motif ? ` (${motif})` : ''}`, reponse: { statut, motif } });
       await svc._appliquerRetour(org, acteId, envoi.id, { statut, motif });
+      if (statut === 'signe') {
+        const st = ad && envoi.ref_externe ? await ad.statut(cfg, envoi.ref_externe).catch(() => null) : null;
+        await svc._capturerDocumentSigne(org, acteId, envoi.id, cfg, ad, st);
+        await bus.emit('acte.document_signe', { organismeId: org, acteId, envoiId: envoi.id });
+      }
       await audit.log(ctx, { organismeId: org, action: 'parapheur.simulation_retour', entity: 'actes', entityId: acteId, after: { statut, motif } });
       return svc.etat(ctx, org, acteId);
     },
@@ -334,6 +382,23 @@ function createParapheur({ db, audit, actes, render, bus, config, log, adapters,
       return svc.etat(ctx, org, acteId);
     },
 
+    /**
+     * Rouvre une décision / un arrêté signé pour modification : l'acte perd son document signé et revient à la
+     * dernière étape du circuit, où il peut être corrigé puis validé de nouveau pour repartir en signature.
+     * Réservé aux administrateurs et au SCC.
+     */
+    async reouvrir(ctx, organismeId, acteId, { motif } = {}) {
+      const org = requireOrg(organismeId);
+      const a = await actes.load(ctx, org, acteId);
+      if (!acl.isAdmin(ctx, org)) throw E.forbidden('Seuls l’administrateur et le SCC peuvent rouvrir une décision signée');
+      if (a.statut !== 'signe') throw E.conflict('Seule une décision signée peut être rouverte pour modification');
+      await engine.reopen(ctx, org, acteId, { motif });
+      const envoi = await dernierEnvoi(org, acteId);
+      if (envoi) await svc._purgerDocumentSigne(org, acteId, envoi.id, motif || 'Réouvert pour modification');
+      await audit.log(ctx, { organismeId: org, action: 'parapheur.reouverture', entity: 'actes', entityId: acteId, after: { motif } });
+      return svc.etat(ctx, org, acteId);
+    },
+
     // -------------------------------------------------------------------------------------------------- consultation
     async etat(ctx, organismeId, acteId) {
       const org = requireOrg(organismeId);
@@ -344,6 +409,7 @@ function createParapheur({ db, audit, actes, render, bus, config, log, adapters,
         cfgOf(org),
       ]);
       // Pourquoi l'envoi (normal) est impossible : sert à afficher le bouton « en surbrillance » et son explication.
+      const docSigne = envoi?.document_signe_file_id ? await db.get('SELECT original_name FROM files WHERE id = $1', [envoi.document_signe_file_id]) : null;
       const enAttente = ['a_signer', 'signature_refusee'].includes(a.statut);
       const dejaEnCours = envoi && ['envoye', 'a_signer'].includes(envoi.statut);
       const blocage = a.statut === 'signe' ? 'Cet acte est déjà signé.'
@@ -351,10 +417,33 @@ function createParapheur({ db, audit, actes, render, bus, config, log, adapters,
         : dejaEnCours ? null
         : !enAttente ? 'Le circuit n’est pas terminé : l’envoi en signature se fera à la fin du circuit.'
         : (!signataireOf(cfg).email) ? 'Renseignez le signataire (nom et e-mail) dans le paramétrage du parapheur.' : null;
-      return { envoi: envoi ? { id: envoi.id, statut: envoi.statut, fournisseur: envoi.fournisseur, mode: envoi.mode, ref: envoi.reponse?.reference || envoi.ref_externe, refId: envoi.ref_externe, lien: envoi.lien_externe, signataireNom: envoi.signataire_nom, signataireEmail: envoi.signataire_email, document: envoi.document_nom, demandeAt: envoi.demande_at, signeAt: envoi.signe_at, refuseAt: envoi.refuse_at, motif: envoi.motif } : null,
+      return {         envoi: envoi ? { id: envoi.id, statut: envoi.statut, fournisseur: envoi.fournisseur, mode: envoi.mode, ref: envoi.reponse?.reference || envoi.ref_externe, refId: envoi.ref_externe, lien: envoi.lien_externe, signataireNom: envoi.signataire_nom, signataireEmail: envoi.signataire_email, document: envoi.document_nom, demandeAt: envoi.demande_at, signeAt: envoi.signe_at, refuseAt: envoi.refuse_at, motif: envoi.motif,
+          documentSigne: envoi.document_signe_file_id ? { fileId: envoi.document_signe_file_id, nom: docSigne?.original_name || null } : null } : null,
+        signaturePosition: a.signature_position || null,
         blocage,
         journal: journal.map((r) => ({ id: Number(r.id), sens: r.sens, methode: r.methode, url: r.url, httpStatus: r.http_status, resume: r.resume, corps: r.corps, reponse: r.reponse, erreur: r.erreur, at: r.at })),
         config: view(cfg), simulateur: adapterOf(cfg)?.fournisseur === 'simulateur' };
+    },
+
+    /**
+     * Le document signé (PDF revenu du parapheur) d'un acte. Si l'acte est signé mais que le PDF n'a pas encore été
+     * récupéré (envoi antérieur, Hub momentanément indisponible), on tente une dernière récupération à la demande.
+     */
+    async documentSigne(ctx, organismeId, acteId) {
+      const org = requireOrg(organismeId);
+      await actes.load(ctx, org, acteId);
+      let envoi = await dernierEnvoi(org, acteId);
+      if (!envoi) throw E.notFound('Aucun envoi en signature pour ce dossier.');
+      if (!envoi.document_signe_file_id && envoi.statut === 'signe') {
+        const cfg = await cfgOf(org); const ad = adapterOf(cfg);
+        const st = ad && envoi.ref_externe ? await ad.statut(cfg, envoi.ref_externe).catch(() => null) : null;
+        await svc._capturerDocumentSigne(org, acteId, envoi.id, cfg, ad, st);
+        envoi = await dernierEnvoi(org, acteId);
+      }
+      if (!envoi.document_signe_file_id) throw E.notFound('Le document signé n’est pas encore disponible.');
+      const f = await db.get('SELECT storage_key, original_name, mime FROM files WHERE id = $1', [envoi.document_signe_file_id]);
+      if (!f) throw E.notFound('Le document signé est introuvable.');
+      return { buffer: await storage.get(f.storage_key), name: f.original_name || 'document-signe.pdf', mime: f.mime || 'application/pdf' };
     },
 
     async journal(ctx, organismeId, { acteId = null, limit = 100 } = {}) {

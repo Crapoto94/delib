@@ -18,14 +18,14 @@ const Piece = z.object({ titre: z.string().trim().max(200).optional(), motif: Mo
 const Point = z.object({ kind: z.enum(['libre', 'chapitre']).default('libre'), titre: z.string().trim().min(2).max(300), description: z.string().trim().max(5000).optional().describe('Dossier simple : description'), numerote: z.boolean().default(false), afterItemId: Id.optional(), motif: Motif.optional() });
 const PointPatch = z.object({ titre: z.string().trim().min(2).max(300).optional(), description: z.string().trim().max(5000).nullable().optional(), numerote: z.boolean().optional(), motif: Motif.optional() });
 const Ordre = z.object({ ids: z.array(Id).max(1000), motif: Motif.optional() });
-const TriQ = z.object({ critere: z.enum(['rubrique', 'rapporteur', 'numero', 'alpha']) });
+const TriQ = z.object({ critere: z.enum(['rubrique', 'commission', 'rapporteur', 'numero', 'alpha']) });
 const Arret = z.object({ forcer: z.boolean().default(false) });
 const Reouvrir = z.object({ motif: z.string().trim().min(3).max(500) });
 const Verrou = z.object({ force: z.boolean().default(false) });
 const Pattern = z.object({ pattern: z.string().min(3).max(80).describe('Variables : {ANNEE} {N_SEANCE} {ORDRE} {ORDRE:03} {RUBRIQUE}') });
 const Apercu = Pattern.extend({ seanceId: Id.optional() });
 
-module.exports = ({ makeRouter, odj }) => {
+module.exports = ({ makeRouter, odj, render }) => {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 1 } });
   const r = makeRouter('/api/v1/organismes/:orgId');
   const ADMIN = ['org_admin', 'scc'];
@@ -75,7 +75,8 @@ module.exports = ({ makeRouter, odj }) => {
   r.put('/seances/:id/odj/ordre', { summary: 'Enregistre le classement (résultat du glisser-déposer)', tags: T, org: true, params: PS, body: Ordre,
     description: "`ids` : toutes les lignes actives dans le nouvel ordre. Déplacer un groupe ou plusieurs lignes = envoyer le nouveau tableau. Enregistrement automatique côté client ; historisé." },
   async (req, res) => res.json(await odj.reorder(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
-  r.get('/seances/:id/odj/tri', { summary: 'Aide de tri : ordre proposé (rien n\'est enregistré)', tags: T, org: true, roles: ADMIN, params: PS, query: TriQ },
+  r.get('/seances/:id/odj/tri', { summary: 'Aide de tri : ordre proposé (rien n\'est enregistré)', tags: T, org: true, roles: ADMIN, params: PS, query: TriQ,
+    description: "`commission` regroupe par commission principale du dossier (la première choisie à la rédaction) : c'est elle qui définit l'ordre de passage au conseil. Les autres critères : rubrique, rapporteur, numero, alpha." },
     async (req, res) => res.json(await odj.propose(req.ctx, req.org.id, req.valid.params.id, req.valid.query.critere)));
 
   r.get('/seances/:id/odj/controles', { summary: "Contrôles avant l'arrêt", tags: T, org: true, roles: ADMIN, params: PS }, async (req, res) => res.json(await odj.controles(req.org.id, req.valid.params.id)));
@@ -96,6 +97,17 @@ module.exports = ({ makeRouter, odj }) => {
 
   r.get('/seances/:id/odj/export.csv', { summary: 'Tableau de suivi des délibérations numérotées (CSV)', tags: T, org: true, roles: ADMIN, params: PS },
     async (req, res) => { res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="odj-${req.valid.params.id}.csv"` }); res.send(await odj.exportCsv(req.ctx, req.org.id, req.valid.params.id)); });
+
+  r.get('/seances/:id/odj/pdf', { summary: "PDF de l'ordre du jour (gabarit de la collectivité)", tags: T, org: true, params: PS, responses: { 200: 'application/pdf' },
+    description: "Compose l'ordre du jour au gabarit « odj » : modèle Word s'il est défini (variable {ordre_du_jour}), sinon la mise en page interne. Sections par commission, points numérotés (provisoires tant que l'ordre du jour n'est pas arrêté)." },
+  async (req, res) => {
+    const d = await odj.get(req.ctx, req.org.id, req.valid.params.id);
+    const dt = new Date(d.seance.dateSeance);
+    const dateLabel = dt.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+    const heure = dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }).replace(':', 'h');
+    const doc = await render.odjDocument({ organismeId: req.org.id, items: d.items, sousTitre: `${d.seance.instance} — ${dateLabel} à ${heure}`, title: `Ordre du jour — ${d.seance.instance}` });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="ordre-du-jour-${req.valid.params.id}.pdf"`, 'X-Page-Count': String(doc.pageCount), 'Cache-Control': 'private, no-store' }).send(doc.buffer);
+  });
 
   r.post('/numerotation/apercu', { summary: 'Aperçu en direct d\'un format de numérotation', tags: T, org: true, roles: ADMIN, params: P, body: Apercu },
     async (req, res) => res.json(await odj.previewNumbering(req.org.id, req.valid.body)));

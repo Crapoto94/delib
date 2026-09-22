@@ -370,6 +370,39 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       return svc.view(ctx, organismeId, a0.id);
     },
 
+    /**
+     * Rouvre un acte signé pour modification (décision, arrêté) : la signature est abandonnée, l'acte revient à la
+     * dernière étape réellement traversée du circuit (celle qui précédait la signature) pour correction. Une fois
+     * cette étape validée de nouveau, le circuit se termine et l'acte repart en signature du maire.
+     */
+    async reopen(ctx, organismeId, acteId, { motif } = {}) {
+      const a0 = await actes.load(ctx, organismeId, acteId);
+      if (a0.statut !== 'signe') throw E.conflict('Seul un acte signé peut être rouvert pour modification');
+      if (!a0.circuit_version_id) throw E.conflict("Cet acte n'a pas de circuit : impossible de le rouvrir");
+      const graph = await graphOf(a0.circuit_version_id);
+      const cfg = await settings.resolve(a0.organisme_id);
+      const trail = a0.trail || [];
+      const to = trail.length ? trail[trail.length - 1] : graph.start;
+      const out = await db.tx(async (q) => {
+        const a = await lock(q, organismeId, acteId);
+        if (a.statut !== 'signe') throw E.conflict('Acte déjà rouvert');
+        const def = defOf(graph, a, to);
+        const r = to === graph.start ? { holders: [a.redacteur, ...(a.co_redacteurs || [])] } : await resolveStep(a, def, cfg);
+        const due = def?.slaDays ? addBusinessDays(new Date(), def.slaDays, await holidaysOf(a.organisme_id)) : null;
+        await q.run("INSERT INTO step_instances (acte_id, step_key, label, round, status, holders, mode, quorum, sla_days, due_at, adhoc) VALUES ($1,$2,$3,$4,'current',$5::jsonb,$6,$7,$8,$9,$10)",
+          [a.id, to, def?.label || to, a.circuit_round, JSON.stringify(r.holders || []), def?.mode || 'one', def?.quorum || null, def?.slaDays ?? null, due, !G.stepOf(graph, to)]);
+        await q.run("UPDATE actes SET statut = 'modification_demandee', current_step_key = $2, signe_at = NULL, signe_par = NULL, parapheur_envoi_id = NULL, return_from = 'signe', resume_step = NULL WHERE id = $1", [a.id, to]);
+        const a2 = await q.get('SELECT * FROM actes WHERE id = $1', [a.id]);
+        await refreshPath(q, a2, graph);
+        await event(q, a2, ctx, 'reopen', { from: 'signe', to, comment: motif, meta: { target: 'previous' } });
+        return { acte: a2, to, holders: r.holders || [] };
+      });
+      if (motif) await comments.insert({ acteId, author: ctx.username, body: motif, title: 'Acte rouvert après signature', kind: 'refus', stepKey: out.to });
+      await audit.log(ctx, { organismeId, action: 'circuit.reopen', entity: 'actes', entityId: acteId, before: { statut: 'signe' }, after: { retourA: out.to, motif } });
+      await bus.emit('acte.reopened', { organismeId, acteId, to: out.to, motif, by: ctx.username, holders: out.holders });
+      return svc.view(ctx, organismeId, acteId);
+    },
+
     /** Recalcule la suite du parcours quand un champ pilote change (CIR-14) ; l'étape courante n'est jamais retirée sous les pieds de son détenteur. */
     async recompute(acteId, ctx) {
       const a = await db.get('SELECT * FROM actes WHERE id = $1', [acteId]);

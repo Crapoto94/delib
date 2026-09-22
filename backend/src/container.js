@@ -65,6 +65,8 @@ const { createParapheur } = require('./modules/parapheur/parapheur.service');
 const { createDsihubParapheur } = require('./adapters/parapheur-dsihub');
 const { createParapheurSimulateur } = require('./adapters/parapheur-simulateur');
 const { createS2lowSimulateur } = require('./adapters/s2low-simulateur');
+const { createApmO365 } = require('./adapters/apm-o365');
+const { createCollecteurs } = require('./modules/collecteurs/collecteurs.service');
 const { createOrganisation } = require('./modules/titulaires/organisation.service');
 const { createConvocations } = require('./modules/convocations/convocations.service');
 const { createUsers } = require('./modules/users/users.service');
@@ -101,7 +103,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   titulaires.setDirectionGenerale(async (org) => (await dir.directionGenerale((await settings.resolve(org))['organisation.direction_generale']?.value))?.code ?? null);
   const redaction = createRedaction({ db, audit, access, titulaires, settings, bus });
   const acl = createActeAcl({ db, access, titulaires, settings });
-  const actes = createActes({ db, audit, refs, redaction, dir, acl, bus, late });
+  const actes = createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings });
   const annexes = createAnnexes({ db, audit, storage, refs, actes, config, bus });
   const comments = createComments({ db, audit, actes, acl, bus });
   const textes = createTextes({ db, audit, actes, acl, bus });
@@ -139,7 +141,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const engine = createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late });
   const circuits = createCircuits({ db, audit, engine, titulaires, bus });
   // parapheur : signature du maire pour les décisions et arrêtés (DSIHUB réel si configuré, sinon simulateur)
-  const parapheur = createParapheur({ db, audit, actes, render, bus, config, log,
+  const parapheur = createParapheur({ db, audit, actes, render, storage, bus, config, log, engine,
     adapters: parapheurAdapters || { dsihub: createDsihubParapheur({ tls: config.tls }), simulateur: createParapheurSimulateur() }, acl });
   bus.on('circuit.completed', (p) => parapheur.demanderEnvoiAuto(p.organismeId, p.acteId)); // fin de circuit d'un acte signé → envoi en signature
   const notifications = createNotifications({ db, audit, mail, engine, titulaires, delegations, settings, bus, config, log, actes, acl, late });
@@ -172,14 +174,19 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const externe = createExterne({ db, render, storage });
   const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
   const airs = createAirs({ db, audit, dir, source: airsSource, ad, storage }); // import de l'historique AIRS DELIB (section 25 bis, D111)
+  // collecteurs d'arrêtés : moisson mail Graph / dossier, analyse IA, envoi en signature (parapheur) — créé après le parapheur, la messagerie et l'IA.
+  const o365 = createApmO365(config);
+  const collecteurs = createCollecteurs({ db, audit, settings, config, log, mail, ai: aiAdapter, refs, storage, elus, parapheur, render, o365 });
+  bus.on('acte.document_signe', (p) => collecteurs.retourSigne(p.organismeId, p.acteId).catch((e) => log.warn({ acteId: p.acteId, err: e.message }, 'retour signé (collecteur) en erreur')));
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)
   // sauvegarde nocturne (SAV-04) : plateforme entière, donc une seule fois par tick — portée par l'organisme par défaut
   scheduler.register('sauvegarde', async (orgId) => ((await db.get('SELECT is_default FROM organismes WHERE id = $1', [orgId]))?.is_default ? sauvegarde.siDue() : 0));
   scheduler.register('recherche-alertes', (orgId) => alertes.verifier(orgId)); // alertes de recherche (REC-29) : au plus une vérification par heure et par alerte
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
+  scheduler.register('collecteurs', (orgId) => collecteurs.runDt(orgId)); // collecteurs d'arrêtés : passages selon leur intervalle (1h/4h/24h)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur };
+  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs };
 }
 
 module.exports = { buildContainer };

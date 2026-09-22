@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import FriseSeance from './FriseSeance';
 import { DeleteSeanceModal, EditSeanceModal } from './SeanceActions';
-import { ArrowDown, ArrowUp, BookOpen, Download, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2, Radio, Pencil } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Download, FileText, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2, Radio, Pencil } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -102,12 +102,14 @@ export default function Odj() {
     catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
   };
   const exportCsv = async () => { const r = await api.get(orgPath(o, `/seances/${id}/odj/export.csv`), { responseType: 'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(r.data); a.download = `odj-${id}.csv`; a.click(); };
+  const odjPdf = async () => { try { const r = await api.get(orgPath(o, `/seances/${id}/odj/pdf`), { responseType: 'blob' }); showPdf(r.data, `Ordre du jour — ${d?.seance?.instance ?? ''}`); } catch (e: any) { toast(errMsg(e), 'ko'); } };
   const previewPattern = async (value: string) => { try { setPattern({ value, exemples: (await api.post(orgPath(o, '/numerotation/apercu'), { pattern: value, seanceId: Number(id) })).data.exemples }); } catch (e: any) { setPattern({ value, exemples: [`⚠ ${errMsg(e)}`] }); } };
 
   if (odj.loading && !d) return <Loading />;
   if (odj.error || !d) return <ErrorBox msg={odj.error || 'Séance introuvable'} />;
   const canEdit = d.canEdit;
   let ordre = 0;
+  let dernierGroupe: string | null = null;
 
   return (
     <div>
@@ -122,6 +124,7 @@ export default function Odj() {
           {canEdit && meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/convocation`}><Mail className="h-4 w-4" /> Convocation</Link>}
           {meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/suivi`}><Radio className="h-4 w-4" /> Suivi de séance</Link>}
           {canEdit && meta.data?.kind !== 'commission' && <button className="btn-secondary" onClick={() => setCahierOpen(true)}><BookOpen className="h-4 w-4" /> Cahier de séance</button>}
+          <button className="btn-secondary" onClick={odjPdf}><FileText className="h-4 w-4" /> Ordre du jour (PDF)</button>
           <button className="btn-secondary" onClick={exportCsv}><Download className="h-4 w-4" /> Tableau de suivi (CSV)</button>
           {canEdit && !arrete && <button className="btn-secondary" onClick={() => previewPattern(d.pattern)}>Numérotation…</button>}
           {canEdit && !arrete && <button className="btn-primary" onClick={() => doArret(false)} disabled={busy}>Arrêter l'ordre du jour</button>}
@@ -135,7 +138,7 @@ export default function Odj() {
             <b>{d.totals.deliberations} délibération(s)</b>{d.totals.retires > 0 && <Badge>{d.totals.retires} retirée(s)</Badge>}
             {canEdit && <div className="ml-auto flex flex-wrap gap-2">
               <button className="btn-secondary !py-1" onClick={undo} disabled={!history.length}><Undo2 className="h-3.5 w-3.5" /> Annuler</button>
-              <Select className="input !w-auto !py-1" aria-label="Aide de tri" value="" onChange={(e) => { if (e.target.value) propose(e.target.value); }}><option value="">Trier par…</option><option value="rubrique">Rubrique</option><option value="rapporteur">Rapporteur</option><option value="numero">N° de suivi</option><option value="alpha">Ordre alphabétique</option></Select>
+              <Select className="input !w-auto !py-1" aria-label="Aide de tri" value="" onChange={(e) => { if (e.target.value) propose(e.target.value); }}><option value="">Trier par…</option><option value="commission">Par commission</option><option value="rubrique">Rubrique</option><option value="rapporteur">Rapporteur</option><option value="numero">N° de suivi</option><option value="alpha">Ordre alphabétique</option></Select>
               <button className="btn-secondary !py-1" onClick={() => setPoint({ kind: 'libre', titre: '', description: '', numerote: false, files: [] })}><Plus className="h-3.5 w-3.5" /> Dossier simple / point libre / chapitre</button>
             </div>}
           </div>
@@ -151,8 +154,17 @@ export default function Odj() {
                   {canEdit && <button aria-label="Supprimer le chapitre" onClick={() => run((m) => api.delete(orgPath(o, `/seances/${id}/odj/points/${it.id}`), { params: { motif: m } }))}><Trash2 className="h-4 w-4" /></button>}
                 </li>);
               const retire = it.statut === 'retire';
+              const grpId = it.acte ? String(it.commissionPrincipale?.id ?? 'hc') : null;
+              const band = it.acte && grpId !== dernierGroupe ? (
+                <li key={`g-${it.id}`} className="flex items-center gap-2 border-b border-line bg-slate-100 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-head">
+                  {it.commissions?.[0]?.couleur && <span className="inline-block h-3 w-3 rounded-sm" style={{ background: it.commissions[0].couleur }} />}
+                  {it.commissionPrincipale?.nom ?? 'Hors commission'}
+                </li>) : null;
+              if (it.acte) dernierGroupe = grpId;
               return (
-                <li key={it.id} draggable={canEdit && !retire} onDragStart={() => setDragFrom(idx)} onDragEnd={() => { setDragFrom(null); setOver(null); }} onDragOver={(e) => { if (!retire) { e.preventDefault(); setOver(idx); } }}
+                <Fragment key={it.id}>
+                  {band}
+                  <li draggable={canEdit && !retire} onDragStart={() => setDragFrom(idx)} onDragEnd={() => { setDragFrom(null); setOver(null); }} onDragOver={(e) => { if (!retire) { e.preventDefault(); setOver(idx); } }}
                   onDrop={() => { if (dragFrom !== null && !retire) move(dragFrom, idx); setDragFrom(null); setOver(null); }}
                   className={`flex items-center gap-3 border-b border-l-4 border-line px-3 py-3 ${retire ? 'border-l-slate-300 bg-slate-50 opacity-60' : `${SEANCE_LIGNE[seanceEtat.get(it.id) ?? '']?.bar ?? (it.acte ? BARRE[it.acte.etat] : BARRE.libre)} ${SEANCE_LIGNE[seanceEtat.get(it.id) ?? '']?.bg ?? (it.acte ? ETAT[it.acte.etat]?.bg : 'bg-indigo2-bg/60') ?? 'bg-surface'}`} ${dragFrom === idx ? 'opacity-40' : ''} ${over === idx && dragFrom !== idx ? 'shadow-lift ring-2 ring-action' : ''}`}>
                   {canEdit && !retire ? <GripVertical className="h-5 w-5 shrink-0 cursor-grab text-slate-400" aria-label="Poignée de déplacement" /> : <span className="w-5" />}
@@ -160,6 +172,7 @@ export default function Odj() {
                   <div className="min-w-0 flex-1">
                     <div className={`font-semibold ${retire ? 'line-through' : ''}`}>{it.acte ? <Link className="text-head hover:underline" to={`/dossiers/${it.acte.id}`}>{it.titre}</Link> : it.titre}</div>
                     <div className="text-[12px] text-mute">{it.acte ? `Dossier #${it.acte.numeroSuivi} · ${it.acte.rubrique ?? '—'} · rapporteur : ${it.acte.rapporteur ?? '—'}` : (it.kind === 'libre' && (it.description || it.fichiers?.length) ? 'Dossier simple' : 'Point libre')}{it.ordreDeliberation > 1 || (it.acte && order.filter((x) => x.acte?.id === it.acte.id).length > 1) ? ` · délibération ${it.ordreDeliberation}` : ''}</div>
+                    {it.commissions?.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-1" title="Commissions concernées par le dossier (la principale fixe la rupture de l'ordre du jour)">{it.commissions.map((c: any) => <Badge key={c.id} tone={c.principale ? 'blue' : 'gray'}>{c.principale ? `${c.nom} · principale` : c.nom}</Badge>)}</div>}
                     {it.kind === 'libre' && it.description && <p className="mt-1 whitespace-pre-wrap text-[12px] text-slate-700">{it.description}</p>}
                     {it.kind === 'libre' && !retire && (it.fichiers?.length > 0 || canEdit) && <div className="mt-1 flex flex-wrap items-center gap-1">{(it.fichiers ?? []).map((f: any) => <button key={f.id} className="inline-flex items-center gap-1 rounded-full bg-soft px-2 py-0.5 text-[11px] hover:bg-slate-200" title={f.nom} onClick={async () => { const r = await api.get(orgPath(o, `/seances/${id}/odj/points/${it.id}/fichiers/${f.id}`), { responseType: 'blob' }); if (f.mime === 'application/pdf') showPdf(r.data, f.titre); else { const a = document.createElement('a'); a.href = URL.createObjectURL(r.data); a.download = f.nom; a.click(); } }}><Paperclip className="h-3 w-3" />{f.titre}</button>)}{canEdit && <button className="rounded-full border border-dashed border-line px-2 py-0.5 text-[11px] text-action hover:bg-soft" onClick={() => setDossierOpen(it)}>{it.fichiers?.length ? 'Gérer' : '+ pièce jointe'}</button>}</div>}
                     {retire && <div className="text-[12px] text-ko">Retiré : {it.retireMotif}</div>}
@@ -170,7 +183,8 @@ export default function Odj() {
                     <button className="rounded p-1 hover:bg-slate-100" aria-label="Monter" onClick={() => move(idx, idx - 1)} disabled={idx === 0}><ArrowUp className="h-4 w-4" /></button>
                     <button className="rounded p-1 hover:bg-slate-100" aria-label="Descendre" onClick={() => move(idx, idx + 1)} disabled={idx === active.length - 1}><ArrowDown className="h-4 w-4" /></button>
                     <button className="rounded p-1 text-ko hover:bg-ko-bg" aria-label="Retirer" onClick={() => (it.acte ? retirer(it.acte.id) : run((m) => api.delete(orgPath(o, `/seances/${id}/odj/points/${it.id}`), { params: { motif: m } })))}><Trash2 className="h-4 w-4" /></button></div>}
-                </li>);
+                </li>
+                </Fragment>);
             })}</ol>)}
         </section>
 
@@ -180,7 +194,7 @@ export default function Odj() {
             <>
               <ul className="max-h-[60vh] overflow-auto">{pendingLoad.data.map((a) => (
                 <li key={a.id} className="border-b border-line px-4 py-3"><label className="flex items-start gap-3"><input type="checkbox" className="mt-1" disabled={!canEdit} checked={sel.includes(a.id)} onChange={(e) => setSel(e.target.checked ? [...sel, a.id] : sel.filter((x) => x !== a.id))} />
-                  <span className="min-w-0"><span className="block font-semibold">{a.titre}</span><span className="block text-[12px] text-mute">#{a.numeroSuivi} · {a.rubrique ?? '—'} · {a.rapporteur ?? 'sans rapporteur'}{a.numeroOrigine ? ` · n° source ${a.numeroOrigine}` : ''}</span>
+                  <span className="min-w-0"><span className="block font-semibold">{a.titre}</span><span className="block text-[12px] text-mute">#{a.numeroSuivi} · {a.rubrique ?? '—'} · {a.rapporteur ?? 'sans rapporteur'}{a.numeroOrigine ? ` · n° source ${a.numeroOrigine}` : ''}{a.commissionsNoms?.length ? ` · ${a.commissionsNoms.join(', ')}` : ''}</span>
                     <span className="mt-1 flex flex-wrap gap-1">{a.deliberations > 1 && <Badge>{a.deliberations} délibérations</Badge>}{a.commissions > 0 && <Badge tone={a.avisRendus === a.commissions ? 'ok' : 'warn'}>avis {a.avisRendus}/{a.commissions}</Badge>}{a.seanceViseeId === Number(id) && <Badge tone="blue">séance visée</Badge>}</span></span></label></li>))}</ul>
               {canEdit && <div className="border-t border-line p-3"><button className="btn-primary w-full" disabled={!sel.length || busy} onClick={affecter}>{busy && <Spinner />} Ajouter {sel.length || ''} dossier(s) à l'ordre du jour</button></div>}
             </>)}
@@ -196,7 +210,7 @@ export default function Odj() {
             {visant.data!.map((a: any) => (
               <tr key={a.id} className={`hover:brightness-95 ${a.dansOdj ? '' : ETAT[a.etat]?.bg ?? ''}`}>
                 <td className="font-mono text-[12px]">#{a.numeroSuivi}</td>
-                <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link><div className="text-[12px] text-mute">{a.rubrique ?? '—'} · <AgentName u={a.redacteur} /></div></td>
+                <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link><div className="text-[12px] text-mute">{a.rubrique ?? '—'} · <AgentName u={a.redacteur} /></div>{a.commissionsNoms?.length > 0 && <div className="text-[11px] text-mute">Commission(s) : {a.commissionsNoms.join(', ')}</div>}</td>
                 <td className="text-mute">{a.direction}</td><td>{a.rapporteur ?? <span className="text-warn">à désigner</span>}</td>
                 <td>{a.dansOdj && <Badge tone="ok">À l'ordre du jour</Badge>} {a.etat === 'pret' ? <Badge tone="ok">{a.dansOdj ? 'Circuit terminé' : 'Prêt à affecter'}</Badge> : a.etat === 'brouillon' ? <Badge>En rédaction</Badge> : a.etat === 'a_corriger' ? <Badge tone="warn">À corriger</Badge> : <Badge tone="blue">{a.etape ?? a.statut}</Badge>}{a.holders?.length ? <div className="text-[11px] text-mute">chez <AgentNames list={a.holders} /></div> : null}</td>
                 <td className="text-right">{canEdit && a.eligible && !a.dansOdj && !arrete && <button className="btn-secondary !py-1" disabled={busy} onClick={() => run((motif) => api.post(orgPath(o, `/seances/${id}/odj/affectations`), { acteIds: [a.id], motif }), 'Ajouté à l\'ordre du jour')}>Ajouter à l'ordre du jour</button>}</td>

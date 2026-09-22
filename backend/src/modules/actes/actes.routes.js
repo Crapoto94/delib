@@ -35,6 +35,8 @@ const Assiste = z.object({
   actif: z.boolean().optional(), bienvenue: z.boolean().optional(),
   passees: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
 });
+// Emplacement de la signature du maire (mécanisme du Hub DSI) : page 1-based, centre en % (gauche/haut), w/h en points.
+const Position = z.object({ page: z.number().int().min(1).default(1), x: z.number().min(0).max(100), y: z.number().min(0).max(100), w: z.number().min(10).max(400), h: z.number().min(10).max(400) });
 
 module.exports = ({ makeRouter, actes }) => {
   const r = makeRouter('/api/v1/organismes/:orgId/actes');
@@ -66,6 +68,11 @@ module.exports = ({ makeRouter, actes }) => {
     summary: 'Active/désactive le mode « dossier assisté » et enregistre sa progression', tags: ['actes'], org: true, params: IdP, body: Assiste,
     description: "Le guide pas à pas de rédaction : `actif` active ou coupe l'aide, `passees` mémorise les étapes conseillées passées, `bienvenue` l'accueil déjà vu. Réservé à qui peut modifier l'acte.",
   }, async (req, res) => res.json(await actes.setAssiste(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
+  r.put('/:id/signature-position', {
+    summary: "Définit l'emplacement de la signature du maire sur le document (mécanisme du Hub DSI)", tags: ['actes'], org: true, params: IdP, body: Position,
+    description: 'Cadre de signature : page (1 = première), centre x/y en pourcentage de la largeur / hauteur (x depuis la gauche, y depuis le haut), largeur et hauteur en points PDF. Défini avant l’envoi au parapheur.',
+  }, async (req, res) => res.json(await actes.setSignaturePosition(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
 
   r.post('/:id/abandon', { summary: 'Abandonne un acte (motif obligatoire, jamais de suppression)', tags: ['actes'], org: true, params: IdP, body: Abandon },
     async (req, res) => res.json(await actes.abandon(req.ctx, req.org.id, req.valid.params.id, req.valid.body.motif)));

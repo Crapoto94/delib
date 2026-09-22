@@ -82,6 +82,56 @@ const PIECES = {
 };
 const MAX_PIECE = 20 * 1024 * 1024;
 
+/**
+ * Rupture par commission : regroupe des lignes DANS L'ORDRE REÇU, en coupant à chaque changement de commission
+ * principale (la première choisie à la rédaction). L'ordre de passage arbitré par le SCC est donc respecté ;
+ * un dossier sans commission (« hors commission ») forme sa propre section.
+ */
+function groupesParCommission(items) {
+  const groups = [];
+  for (const it of items) {
+    const c = it.commissionPrincipale || it.commissions?.[0] || null;
+    const cle = c ? String(c.id) : '';
+    const last = groups[groups.length - 1];
+    if (!last || last.cle !== cle) groups.push({ cle, commission: c, items: [it] });
+    else last.items.push(it);
+  }
+  return groups;
+}
+
+/**
+ * Composition d'un ordre du jour en blocs de rendu (PDF/Word) : bandeau de titres, puis une section par commission.
+ * Utilisé par la convocation (SCC) et par l'aperçu à blanc des gabarits.
+ */
+function odjContent({ organisme, sousTitre, items }) {
+  const pieces = (i) => (i.fichiers?.length ? `Pièces jointes : ${i.fichiers.map((f) => f.titre).join(', ')}` : '');
+  const ligne = (i) => (i.kind === 'chapitre' ? `# ${i.titre}`
+    : `**${i.numero ?? '·'}** — ${i.titre}${i.rapporteur ? `\nRapporteur : ${i.rapporteur}${i.rubrique ? ` · ${i.rubrique}` : ''}` : ''}`
+      + ((i.commissions || []).length ? `\nCommission(s) concernée(s) : ${(i.commissions || []).map((c) => c.nom).join(', ')}` : '')
+      + (i.description ? `\n${i.description}` : '') + (pieces(i) ? `\n${pieces(i)}` : ''));
+  const sections = groupesParCommission(items).flatMap((g) => [
+    { type: 'title', text: (g.commission?.nom || 'Hors commission').toUpperCase(), size: 12.5, align: 'left', bold: true, after: 4 },
+    { type: 'runs', runs: [{ type: 'text', text: g.items.map(ligne).join('\n') }] },
+    { type: 'space', h: 8 },
+  ]);
+  return [
+    { type: 'space', h: 20 },
+    { type: 'title', text: organisme || '', size: 14, align: 'center', bold: true, after: 10 },
+    { type: 'title', text: 'ORDRE DU JOUR', size: 18, align: 'center', bold: true, boxed: true, after: 10 },
+    ...(sousTitre ? [{ type: 'title', text: sousTitre, size: 12, align: 'center', bold: true, after: 14 }] : []),
+    ...sections,
+  ];
+}
+
+/** Ordre du jour en Markdown « riche » pour un modèle Word : sections par commission, une ligne par point. */
+function odjMarkdown(items) {
+  return groupesParCommission(items).map((g) => [
+    `**${(g.commission?.nom || 'Hors commission').toUpperCase()}**`,
+    ...g.items.map((i) => (i.kind === 'chapitre' ? `**${i.titre}**`
+      : `**${i.numero ?? '·'}** — ${i.titre}${i.rapporteur ? `\nRapporteur : ${i.rapporteur}` : ''}${(i.commissions || []).length ? `\nCommission(s) concernée(s) : ${(i.commissions || []).map((c) => c.nom).join(', ')}` : ''}`)),
+  ].join('\n')).join('\n\n');
+}
+
 function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage }) {
   const seanceOf = async (q, org, id, lock = false) => {
     const s = await q.get(`SELECT s.*, i.nom AS instance_nom, i.numbering AS instance_numbering, i.kind AS instance_kind, i.commission_id AS instance_commission_id FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2${lock ? ' FOR UPDATE OF s' : ''}`, [id, requireOrg(org)]);
@@ -110,6 +160,9 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
             a.custom->'airs'->>'numero' AS acte_numero_airs,
             trim(e.prenom || ' ' || e.nom) AS rapporteur, d.titre AS delib_titre, d.ordre AS delib_ordre,
             si.label AS etape, si.holders AS etape_holders,
+            (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', c.id, 'nom', c.nom, 'ordre', c.ordre, 'couleur', c.couleur, 'avis', ac.avis) ORDER BY ac.id), '[]'::jsonb)
+               FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id
+               WHERE ac.acte_id = a.id AND ac.retiree_at IS NULL) AS commissions,
             (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', f.id, 'titre', f.titre, 'nom', fl.original_name, 'mime', fl.mime, 'taille', fl.size, 'pages', fl.pages) ORDER BY f.ordre, f.id), '[]'::jsonb)
                FROM seance_item_fichiers f JOIN files fl ON fl.id = f.file_id WHERE f.item_id = it.id) AS fichiers
      FROM seance_items it LEFT JOIN actes a ON a.id = it.acte_id LEFT JOIN ref_items ru ON ru.id = a.rubrique_id
@@ -139,13 +192,24 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
     if (statut === 'brouillon') return 'brouillon';
     return 'en_circuit';
   };
-  const toItem = (r, numeros, i) => ({
-    id: r.id, position: r.position, kind: r.kind, titre: r.kind === 'deliberation' ? (r.delib_titre || r.acte_titre) : r.titre, description: r.description ?? null, fichiers: r.fichiers || [], numerote: r.numerote,
-    numero: numeros.get(r.id) ?? r.numero ?? null, provisoire: !r.numero, statut: r.statut, retireMotif: r.retire_motif, ajouteApresArret: r.ajoute_apres_arret,
-    numeroOrigine: r.acte_numero_airs ?? null,
-    acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: r.rapporteur, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
-    deliberationId: r.deliberation_id, groupe: r.acte_id ? `a${r.acte_id}` : null, ordreDeliberation: r.delib_ordre ?? null, index: i,
-  });
+  /**
+   * Commissions du dossier, dans l'ordre où elles ont été choisies à la rédaction : la PREMIÈRE est la commission
+   * principale, celle qui sert de rupture à l'ordre du jour (elle définit l'ordre de passage).
+   */
+  const commissionsOf = (r) => (Array.isArray(r.commissions) ? r.commissions : []).map((c, idx) => ({ id: c.id, nom: c.nom, ordre: c.ordre, couleur: c.couleur, avis: c.avis, principale: idx === 0 }));
+
+  const toItem = (r, numeros, i) => {
+    const coms = commissionsOf(r);
+    const principale = coms[0] || null;
+    return {
+      id: r.id, position: r.position, kind: r.kind, titre: r.kind === 'deliberation' ? (r.delib_titre || r.acte_titre) : r.titre, description: r.description ?? null, fichiers: r.fichiers || [], numerote: r.numerote,
+      numero: numeros.get(r.id) ?? r.numero ?? null, provisoire: !r.numero, statut: r.statut, retireMotif: r.retire_motif, ajouteApresArret: r.ajoute_apres_arret,
+      numeroOrigine: r.acte_numero_airs ?? null,
+      acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: r.rapporteur, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
+      commissions: coms, commissionPrincipale: principale ? { id: principale.id, nom: principale.nom, ordre: principale.ordre } : null,
+      deliberationId: r.deliberation_id, groupe: r.acte_id ? `a${r.acte_id}` : null, ordreDeliberation: r.delib_ordre ?? null, index: i,
+    };
+  };
 
   async function lockOf(q, seanceId) {
     const l = await q.get('SELECT * FROM seance_locks WHERE seance_id = $1 AND until > now()', [seanceId]);
@@ -231,9 +295,10 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
                 a.custom->'airs'->>'numero' AS numero_airs,
                 (SELECT count(*)::int FROM deliberations d WHERE d.acte_id = a.id) AS nb_delib,
                 (SELECT count(*)::int FROM acte_commissions c WHERE c.acte_id = a.id AND c.retiree_at IS NULL AND c.avis IS NOT NULL) AS avis_rendus,
-                (SELECT count(*)::int FROM acte_commissions c WHERE c.acte_id = a.id AND c.retiree_at IS NULL) AS nb_commissions
+                (SELECT count(*)::int FROM acte_commissions c WHERE c.acte_id = a.id AND c.retiree_at IS NULL) AS nb_commissions,
+                (SELECT COALESCE(jsonb_agg(c.nom ORDER BY ac.id), '[]'::jsonb) FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id WHERE ac.acte_id = a.id AND ac.retiree_at IS NULL) AS commissions_noms
          FROM actes a LEFT JOIN ref_items ru ON ru.id = a.rubrique_id LEFT JOIN elus e ON e.id = a.rapporteur_id WHERE ${w.join(' AND ')} ORDER BY a.numero_suivi`, p);
-      return rows.map((r) => ({ id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, direction: r.direction_label, seanceViseeId: r.seance_visee_id, rubrique: r.rubrique, rapporteur: r.rapporteur, deliberations: r.nb_delib, commissions: r.nb_commissions, avisRendus: r.avis_rendus, numeroOrigine: r.numero_airs ?? null }));
+      return rows.map((r) => ({ id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, direction: r.direction_label, seanceViseeId: r.seance_visee_id, rubrique: r.rubrique, rapporteur: r.rapporteur, deliberations: r.nb_delib, commissions: r.nb_commissions, commissionsNoms: r.commissions_noms || [], avisRendus: r.avis_rendus, numeroOrigine: r.numero_airs ?? null }));
     },
 
     /**
@@ -265,7 +330,8 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       if (isCommission(sc0)) return svc.commissionProjects(org, sc0);
       const rows = await db.all(
         `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.redacteur, a.direction_label, a.current_step_key, a.seance_id, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
-                i.label AS etape, i.holders AS etape_holders, i.due_at AS etape_due
+                i.label AS etape, i.holders AS etape_holders, i.due_at AS etape_due,
+                (SELECT COALESCE(jsonb_agg(c.nom ORDER BY ac.id), '[]'::jsonb) FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id WHERE ac.acte_id = a.id AND ac.retiree_at IS NULL) AS commissions_noms
          FROM actes a LEFT JOIN ref_items ru ON ru.id = a.rubrique_id LEFT JOIN elus e ON e.id = a.rapporteur_id
               LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
          WHERE a.organisme_id = $1 AND a.seance_visee_id = $2 AND a.statut NOT IN ('abandonne', 'retire', 'archive')
@@ -274,6 +340,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       return rows.map((r) => ({
         id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, redacteur: r.redacteur, direction: r.direction_label, rubrique: r.rubrique, rapporteur: r.rapporteur,
         etape: r.etape || null, holders: r.etape_holders || [], dueAt: r.etape_due || null, dansOdj: inOdj.has(r.id) || r.statut === 'inscrit_odj',
+        commissionsNoms: r.commissions_noms || [],
         etat: etatOf(r.statut, r.current_step_key), eligible: AFFECTABLE.includes(r.statut) && !r.seance_id,
       }));
     },
@@ -472,6 +539,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       const ordreRub = cfg['odj.ordre_rubriques']?.value;
       const key = {
         rubrique: (g) => { const i = Array.isArray(ordreRub) ? ordreRub.indexOf(g.rubrique) : -1; return [i < 0 ? 999 : i, g.rubrique || '~']; },
+        commission: (g) => [g.commissions?.[0]?.ordre ?? 999, g.commissions?.[0]?.nom || '~'],
         rapporteur: (g) => [g.rapporteur || '~'], numero: (g) => [g.numero_suivi], alpha: (g) => [String(g.acte_titre || '').toLowerCase()],
       }[critere];
       const groups = []; const byActe = new Map();
@@ -481,6 +549,11 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       const ids = rows.map((r) => (r.kind === 'deliberation' ? queue.shift() : r.id));
       return { critere, ids };
     },
+
+    // Rupture par commission et composition d'un ordre du jour (fonctions pures, réutilisées par la convocation et l'aperçu).
+    groupesParCommission,
+    odjContent,
+    odjMarkdown,
 
     // ------------------------------------------------------------------------------------------ arrêt
     /** Contrôles avant arrêt (aussi exposés seuls) : liste des anomalies bloquantes. */
@@ -622,4 +695,4 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
   return svc;
 }
 
-module.exports = { createOdj, formatNumero, checkPattern, VARS, numeroAffiche };
+module.exports = { createOdj, formatNumero, checkPattern, VARS, numeroAffiche, groupesParCommission, odjContent, odjMarkdown };

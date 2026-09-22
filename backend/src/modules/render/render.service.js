@@ -3,7 +3,7 @@
  * document final (PRE-09) ; cache par empreinte du contenu et de la version du gabarit (PRE-11).
  */
 const crypto = require('crypto');
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
 const { inspectPdf } = require('../../shared/infra');
@@ -11,7 +11,7 @@ const { resolveConfig, DEFAULTS } = require('./defaults');
 const { convertirEnPdf } = require('../../shared/convert');
 const D = require('./docx.service');
 const T = require('./typeset');
-const { numeroAffiche } = require('../seances/odj.service');
+const { numeroAffiche, odjContent, odjMarkdown } = require('../seances/odj.service');
 
 const DOC_TYPES = Object.keys(DEFAULTS);
 const FINAL = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre', 'transmis', 'ar_recu', 'publie', 'executoire', 'archive'];
@@ -38,6 +38,18 @@ function listeParRole(membres) {
   const groupes = new Map();
   for (const m of membres || []) { const g = GROUPE_ROLE(m); if (!groupes.has(g)) groupes.set(g, []); groupes.get(g).push(civElu(m)); }
   return [...groupes.keys()].sort((a, b) => a - b).map((g) => `${groupes.get(g).join(', ')}, ${LIBELLE_GROUPE[g]}`).join('\n\n');
+}
+
+/** Points fictifs pour l'aperçu d'un ordre du jour (aucune séance) : deux dossiers par commission, puis questions diverses. */
+function odjSampleItems(noms) {
+  const items = [];
+  noms.forEach((nom, idx) => {
+    const base = idx * 2 + 1;
+    items.push({ numero: `EX-${String(base).padStart(3, '0')}`, titre: `Dossier d'exemple ${base} — point de ${nom}`, kind: 'deliberation', rapporteur: 'Rapporteur·e (exemple)', rubrique: 'EXEMPLE', commissionPrincipale: { id: idx + 1, nom }, commissions: [{ nom, principale: true }, ...(idx === 0 && noms[1] ? [{ nom: noms[1], principale: false }] : [])] });
+    items.push({ numero: `EX-${String(base + 1).padStart(3, '0')}`, titre: `Dossier d'exemple ${base + 1} — second point de ${nom}`, kind: 'deliberation', rapporteur: 'Rapporteur·e (exemple)', rubrique: 'EXEMPLE', commissionPrincipale: { id: idx + 1, nom }, commissions: [{ nom, principale: true }] });
+  });
+  items.push({ numero: null, titre: 'Questions diverses', kind: 'libre', numerote: false, commissionPrincipale: null, commissions: [] });
+  return items;
 }
 
 function createRender({ db, audit, storage, actes, config }) {
@@ -142,6 +154,100 @@ function createRender({ db, audit, storage, actes, config }) {
       if (!fileId) return null;
       const f = await db.get('SELECT storage_key, original_name, sha256 FROM files WHERE id = $1', [fileId]);
       return f ? { bytes: await storage.get(f.storage_key), name: f.original_name, sha256: f.sha256 } : null;
+    },
+
+    // ---- acte rédigé hors application (document source PDF / Word) ---------------------------------------------------
+    /** Document source d'un acte (rédigé hors application) : { fileId, pdfId, trame } ou null. */
+    sourceOf(a) { return a?.document_source_file_id ? { fileId: a.document_source_file_id, pdfId: a.document_source_pdf_file_id, trame: a.document_source_trame || null } : null; },
+
+    /** Le PDF de consultation du document source (Word converti, trame éventuellement ajoutée). */
+    async sourcePdf(acte) {
+      const f = await db.get('SELECT storage_key, original_name, pages FROM files WHERE id = $1', [acte.document_source_pdf_file_id]);
+      if (!f) throw E.notFound('Document source introuvable');
+      return { buffer: await storage.get(f.storage_key), pageCount: f.pages, name: f.original_name };
+    },
+
+    /**
+     * Pose la trame de la collectivité (en-tête et pied de page du gabarit) dans les marges d'un document PDF
+     * rédigé hors application. Le document lui-même n'est pas modifié en profondeur : on ajoute l'habillage dans
+     * les marges (l'en-tête ne peut pas être placé « sous » un contenu existant). `a` = acte source.
+     */
+    async apposerTrame(organismeId, buffer, a, docType) {
+      const org = requireOrg(organismeId);
+      const tpl = await svc.getTemplate(org, docType || 'deliberation');
+      const cfg = tpl.cfg; const vars = await svc.varsFor(a, null);
+      const doc = await PDFDocument.load(buffer, { updateMetadata: false });
+      const times = (cfg.police?.famille === 'times');
+      const font = await doc.embedFont(times ? StandardFonts.TimesRoman : StandardFonts.Helvetica);
+      const bold = await doc.embedFont(times ? StandardFonts.TimesRomanBold : StandardFonts.HelveticaBold);
+      const M = cfg.marges || {}; const mm = (v, d) => (v ?? d) * T.MM;
+      const remplace = (s) => String(s ?? '').replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+      const pages = doc.getPages();
+      pages.forEach((page, i) => {
+        const { width, height } = page.getSize();
+        let y = height - 6;
+        for (const b of cfg.entete || []) {
+          const txt = remplace(b.texte); if (!txt.trim()) { y -= 10; continue; }
+          const size = Number(b.taille) || 10; const f = b.gras ? bold : font;
+          const w = f.widthOfTextAtSize(txt, size);
+          const x = b.align === 'center' ? (width - w) / 2 : b.align === 'right' ? width - mm(M.droite, 22) - w : mm(M.gauche, 22);
+          page.drawText(txt, { x, y: y - size, size, font: f, color: rgb(0, 0, 0) });
+          y -= size * 1.6;
+        }
+        const pied = remplace(cfg.pied?.texte); const yb = mm(M.bas, 25) - 16;
+        if (pied.trim()) { const size = 8; page.drawText(pied, { x: mm(M.gauche, 22), y: yb, size, font, color: rgb(0.25, 0.25, 0.25) }); }
+        if (cfg.pied?.pagination !== false) { const t = `${i + 1}/${pages.length}`; const w = font.widthOfTextAtSize(t, 8); page.drawText(t, { x: width - mm(M.droite, 22) - w, y: yb, size: 8, font, color: rgb(0.25, 0.25, 0.25) }); }
+      });
+      return Buffer.from(await doc.save());
+    },
+
+    /** Joint (ou remplace) le document source d'un acte : PDF conservé tel quel, Word converti en PDF. */
+    async setSource(ctx, organismeId, acteId, { trame = 'presente' }, file) {
+      const org = requireOrg(organismeId);
+      const a = await actes.load(ctx, org, acteId, { edit: true });
+      if (!file?.buffer) throw E.badRequest('Fichier manquant (champ « file »)');
+      if (!['presente', 'a_ajouter'].includes(trame)) throw E.badRequest('Réponse attendue sur la trame : « presente » ou « a_ajouter »');
+      // eslint-disable-next-line no-control-regex
+      const nom = String(file.originalname || 'document').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 200);
+      const isDocx = /\.docx$/i.test(nom) || (file.buffer[0] === 0x50 && file.buffer[1] === 0x4b);
+      const put = await storage.put(file.buffer, { organismeId: org, ext: isDocx ? 'docx' : 'pdf' });
+      let pages = null;
+      if (!isDocx) { const info = await inspectPdf(file.buffer); pages = info.pages; }
+      const src = await db.get(
+        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [org, put.key, nom, isDocx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf', put.size, pages, put.sha256, ctx.username]);
+      // PDF de consultation : conversion du Word si besoin, puis pose de la trame si elle manque.
+      let pdfBuffer = isDocx ? await convertirEnPdf(file.buffer, 'docx') : file.buffer;
+      if (!pdfBuffer) throw E.incomplete('Conversion Word → PDF indisponible sur le serveur (LibreOffice absent)');
+      const meta = (await db.get('SELECT code FROM ref_items WHERE id = $1', [a.type_id]))?.code || null;
+      const docType = meta === 'decision' ? 'decision' : meta === 'arrete' ? 'arrete' : 'deliberation';
+      if (trame === 'a_ajouter') pdfBuffer = await svc.apposerTrame(org, pdfBuffer, a, docType);
+      const info2 = await inspectPdf(pdfBuffer); pages = info2.pages;
+      let pdfId = src.id;
+      if (isDocx || trame === 'a_ajouter') {
+        const p2 = await storage.put(pdfBuffer, { organismeId: org, ext: 'pdf' });
+        const pf = await db.get(
+          `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,$7) RETURNING *`,
+          [org, p2.key, nom.replace(/\.docx$/i, '') + '.pdf', p2.size, pages, p2.sha256, ctx.username]);
+        pdfId = pf.id;
+      }
+      await db.run('UPDATE actes SET document_source_file_id = $2, document_source_pdf_file_id = $3, document_source_trame = $4 WHERE id = $1', [a.id, src.id, pdfId, trame]);
+      await audit.log(ctx, { organismeId: org, action: 'acte.document_source', entity: 'actes', entityId: a.id, after: { nom, mime: src.mime, trame, pages } });
+      return svc.sourcePdf({ document_source_pdf_file_id: pdfId });
+    },
+
+    async removeSource(ctx, organismeId, acteId) {
+      const org = requireOrg(organismeId);
+      const a = await actes.load(ctx, org, acteId, { edit: true });
+      await db.run('UPDATE actes SET document_source_file_id = NULL, document_source_pdf_file_id = NULL, document_source_trame = NULL WHERE id = $1', [a.id]);
+      await audit.log(ctx, { organismeId: org, action: 'acte.document_source_retire', entity: 'actes', entityId: a.id });
+    },
+
+    /** Le PDF de consultation du document joint (contrôle de visibilité de l'acte). */
+    async sourceFile(ctx, organismeId, acteId) {
+      const a = await actes.load(ctx, organismeId, acteId);
+      if (!a.document_source_pdf_file_id) throw E.notFound('Aucun document joint à cet acte');
+      return svc.sourcePdf(a);
     },
 
     /**
@@ -292,6 +398,11 @@ function createRender({ db, audit, storage, actes, config }) {
         numero_transmis: 'PR-2030-001', transmis_prefecture: '02/01/2030', recu_prefecture: '06/01/2030', publie_affichage: '06/01/2030',
         mention_transmission: "TRANSMIS EN PRÉFECTURE LE 02/01/2030\nREÇU EN PRÉFECTURE LE 06/01/2030\nPUBLIÉ PAR VOIE D'AFFICHAGE LE 06/01/2030",
       };
+      // Ordre du jour : le modèle Word reçoit la liste des points fictifs (sections par commission) via {ordre_du_jour}.
+      if (docType === 'odj') {
+        const coms = await db.all("SELECT nom FROM commissions WHERE organisme_id = $1 AND actif AND type = 'actes' ORDER BY ordre, nom LIMIT 4", [org]);
+        variables.ordre_du_jour = D.markdownToRich(odjMarkdown(odjSampleItems(coms.length ? coms.map((c) => c.nom) : ['La Ville qui débat', 'La Ville en transition'])));
+      }
       const vars = Object.fromEntries(Object.entries(variables).map(([k, v]) => [`{${k}}`, String(v ?? '')]));
       const modele = await svc.docxBytes(tpl.docxFileId);
       const buffer = await D.remplir(modele.bytes, vars);
@@ -384,6 +495,8 @@ function createRender({ db, audit, storage, actes, config }) {
      */
     async renderActe(ctx, organismeId, acteId, { cible = 'expose', deliberationId, mode = 'propre', brouillon = false, watermark: wmOverride, avecAnnexes = true, docType: docTypeForce }) {
       const acte = await actes.load(ctx, organismeId, acteId);
+      // Acte rédigé hors application : le document joint tient lieu de texte (aucune recomposition).
+      const source = acte.document_source_pdf_file_id ? await svc.sourcePdf(acte) : null;
       const { pick, delibs } = await svc.textsFor(ctx, acte, cible, deliberationId);
       const watermark = wmOverride !== undefined ? wmOverride : (FINAL.includes(acte.statut) ? '' : undefined);
       // Le gabarit de l'acte dépend de son TYPE : une décision (ou un arrêté) utilise son propre gabarit d'acte
@@ -408,6 +521,7 @@ function createRender({ db, audit, storage, actes, config }) {
       };
 
       const exposePdf = async () => {
+        if (source) return source;
         const dx = await docxPdf('expose'); if (dx) return dx;
         const tpl = await svc.getTemplate(acte.organisme_id, 'expose');
         const vars = await svc.varsFor(acte, null);
@@ -415,6 +529,7 @@ function createRender({ db, audit, storage, actes, config }) {
         return svc.build({ organismeId: acte.organisme_id, docType: 'expose', content, vars, watermark, title: `Exposé des motifs — ${acte.titre}` });
       };
       const delibPdf = async (d) => {
+        if (source) return source;
         const dx = await docxPdf(acteType, d.id); if (dx) return dx;
         const tpl = await svc.getTemplate(acte.organisme_id, acteType);
         const vars = await svc.varsFor(acte, d);
@@ -429,6 +544,7 @@ function createRender({ db, audit, storage, actes, config }) {
         return svc.build({ organismeId: acte.organisme_id, docType: acteType, content, vars, watermark, title: `${acteType === 'deliberation' ? 'Délibération' : acteType === 'decision' ? 'Décision' : 'Arrêté'} — ${d.titre}` });
       };
       const visasPdf = async (d) => {
+        if (source) return source;
         const dx = await docxPdf('deliberation', d.id); if (dx) return dx;
         const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
         const vars = await svc.varsFor(acte, d);
@@ -436,6 +552,7 @@ function createRender({ db, audit, storage, actes, config }) {
         return svc.build({ organismeId: acte.organisme_id, docType: 'deliberation', content, vars, watermark, title: `Visas et considérants — ${d.titre}` });
       };
       const dispositifPdf = async (d) => {
+        if (source) return source;
         const dx = await docxPdf(acteType, d.id); if (dx) return dx;
         const tpl = await svc.getTemplate(acte.organisme_id, acteType);
         const vars = await svc.varsFor(acte, d);
@@ -458,9 +575,11 @@ function createRender({ db, audit, storage, actes, config }) {
       }
       if (cible === 'dossier') {
         // Un modèle Word « dossier complet » (s'il est défini) remplace l'assemblage par parties.
-        const dxDossier = await docxPdf('dossier'); if (dxDossier) return dxDossier;
-        const parts = [{ titre: 'Exposé des motifs', pdf: await exposePdf() }];
-        for (const d of delibs) parts.push({ titre: `Délibération : ${d.titre}`, pdf: await delibPdf(d) });
+        if (!source) { const dxDossier = await docxPdf('dossier'); if (dxDossier) return dxDossier; }
+        const parts = source
+          ? [{ titre: acte.titre, pdf: source }]
+          : [{ titre: 'Exposé des motifs', pdf: await exposePdf() }];
+        if (!source) for (const d of delibs) parts.push({ titre: `Délibération : ${d.titre}`, pdf: await delibPdf(d) });
         // `avecAnnexes=false` : la visionneuse affiche les annexes à part (documents navigables), pas fusionnées ici.
         if (avecAnnexes !== false) parts.push(...(await svc.annexParts(acte)));
         return svc.assemble({ organismeId: acte.organisme_id, titre: `Dossier n° ${acte.numero_suivi} — ${acte.titre}`, parts, vars: await svc.varsFor(acte, null), watermark });
@@ -518,6 +637,41 @@ function createRender({ db, audit, storage, actes, config }) {
         + 'Le conseil municipal, après en avoir délibéré, décide d\'attribuer une subvention de fonctionnement. '.repeat(14);
       const vars = { organisme: 'Nom de la collectivité', titre: 'Titre de l\'acte (exemple)', rubrique: 'RUBRIQUE', matiere: '7.5 Subventions', date_seance: '1ER JANVIER 2030', numero_suivi: 1, numero: '2030-01-001', direction: 'Direction', service: 'Service', redacteur: 'agent', nature: 'Délibérations', statut: 'brouillon', date_du_jour: new Date().toLocaleDateString('fr-FR') };
       return svc.build({ organismeId, docType, content: [...svc.headerItems(tpl.cfg), { type: 'runs', runs: [{ text: lorem, type: 'text' }] }], vars, title: 'Aperçu du gabarit' });
+    },
+
+    /**
+     * Ordre du jour composé au gabarit « odj » : si un MODÈLE WORD est défini, il est fusionné (variable
+     * {ordre_du_jour} = liste des points, avec rupture par commission) puis converti en PDF ; sinon la mise en page
+     * PDF interne est utilisée. Sert à la convocation (SCC) comme à l'aperçu.
+     */
+    async odjDocument({ organismeId, items, sousTitre = '', title = 'Ordre du jour' }) {
+      const org = requireOrg(organismeId);
+      const orgRow = await db.get('SELECT nom FROM organismes WHERE id = $1', [org]);
+      const organisme = orgRow?.nom || '';
+      const tpl = await svc.getTemplate(org, 'odj');
+      if (tpl.docxFileId) {
+        const variables = { organisme, instance: sousTitre, date_seance: sousTitre, ordre_du_jour: D.markdownToRich(odjMarkdown(items)) };
+        const vars = Object.fromEntries(Object.entries(variables).map(([k, v]) => [`{${k}}`, String(v ?? '')]));
+        const modele = await svc.docxBytes(tpl.docxFileId);
+        const buffer = await D.remplir(modele.bytes, vars);
+        const pdf = await convertirEnPdf(buffer, 'docx');
+        if (!pdf) throw E.incomplete('Conversion Word → PDF indisponible sur le serveur (LibreOffice absent)');
+        const info = await inspectPdf(pdf);
+        return { buffer: pdf, pageCount: info.pages };
+      }
+      return svc.build({ organismeId: org, docType: 'odj', vars: {}, watermark: '', title, content: odjContent({ organisme, sousTitre, items }) });
+    },
+
+    /**
+     * Aperçu d'un ordre du jour À BLANC : points fictifs répartis sur les commissions de l'organisme. Sert à vérifier
+     * la mise en page du gabarit « odj » (rupture par commission, sections, pied de page) sans dépendre d'une séance.
+     */
+    async odjSample(organismeId) {
+      const org = requireOrg(organismeId);
+      const coms = await db.all("SELECT nom FROM commissions WHERE organisme_id = $1 AND actif AND type = 'actes' ORDER BY ordre, nom LIMIT 4", [org]);
+      const noms = coms.length ? coms.map((c) => c.nom) : ['La Ville qui débat', 'La Ville en transition'];
+      const doc = await svc.odjDocument({ organismeId: org, items: odjSampleItems(noms), sousTitre: 'Séance d\'exemple — 18h30 (aperçu)', title: 'Aperçu — Ordre du jour (exemple)' });
+      return { ...doc, name: 'apercu-odj.pdf' };
     },
 
     /** Le nom du fichier PDF d'un rendu, pour que le parapheur affiche le vrai titre du document (jamais « blob »). */

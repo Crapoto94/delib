@@ -106,13 +106,7 @@ function createConvocations({ db, audit, render, odj, storage, mail, settings, c
         ...(sign.length ? ['', '', ...sign] : []),
       ].join('\n') }] },
     ] });
-    const odjDoc = await render.build({ organismeId: org, docType: 'odj', vars, watermark: '', title: `Ordre du jour — ${s.instance_nom}`, content: [
-      { type: 'space', h: 20 },
-      { type: 'title', text: orgRow?.nom || '', size: 14, align: 'center', bold: true, after: 10 },
-      { type: 'title', text: 'ORDRE DU JOUR', size: 18, align: 'center', bold: true, boxed: true, after: 10 },
-      { type: 'title', text: `${s.instance_nom} — ${dateLong(s.date_seance)} à ${heure(s.date_seance)}`, size: 12, align: 'center', bold: true, after: 14 },
-      { type: 'runs', runs: [{ type: 'text', text: items.map((i) => (i.kind === 'chapitre' ? `# ${i.titre}` : `**${i.numero ?? '·'}** — ${i.titre}${i.rapporteur ? `\nRapporteur : ${i.rapporteur}${i.rubrique ? ` · ${i.rubrique}` : ''}` : ''}${i.description ? `\n${i.description}` : ''}${pieces(i) ? `\n${pieces(i)}` : ''}\n`)).join('\n') }] },
-    ] });
+    const odjDoc = await render.odjDocument({ organismeId: org, items, sousTitre: `${s.instance_nom} — ${dateLong(s.date_seance)} à ${heure(s.date_seance)}`, title: `Ordre du jour — ${s.instance_nom}` });
     const store = async (doc, name) => {
       const put = await storage.put(doc.buffer, { organismeId: org, ext: 'pdf' });
       return (await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,$7) RETURNING id`,
@@ -208,7 +202,7 @@ function createConvocations({ db, audit, render, odj, storage, mail, settings, c
       if (!chosen.length) throw E.badRequest('Aucun convoqué : choisissez au moins un élu ou un agent');
 
       const d = await odj.get(ctx, org, seanceId);
-      const items = d.items.filter((i) => i.statut === 'a_traiter').map((i) => ({ numero: i.numero, titre: i.titre, kind: i.kind, rubrique: i.acte?.rubrique ?? null, rapporteur: i.acte?.rapporteur ?? null, description: i.description ?? null, fichiers: (i.fichiers || []).map((f) => ({ id: f.id, titre: f.titre, nom: f.nom, mime: f.mime, taille: f.taille })), key: `${i.acte?.id ?? 't'}:${i.deliberationId ?? i.titre}` }));
+      const items = d.items.filter((i) => i.statut === 'a_traiter').map((i) => ({ numero: i.numero, titre: i.titre, kind: i.kind, rubrique: i.acte?.rubrique ?? null, rapporteur: i.acte?.rapporteur ?? null, description: i.description ?? null, commissionPrincipale: i.commissionPrincipale ?? null, commissions: (i.commissions || []).map((c) => ({ id: c.id, nom: c.nom, principale: !!c.principale })), fichiers: (i.fichiers || []).map((f) => ({ id: f.id, titre: f.titre, nom: f.nom, mime: f.mime, taille: f.taille })), key: `${i.acte?.id ?? 't'}:${i.deliberationId ?? i.titre}` }));
       if (!items.length) throw E.conflict("L'ordre du jour est vide");
       const prev = await db.get('SELECT * FROM convocations WHERE seance_id = $1 ORDER BY version_no DESC LIMIT 1', [seanceId]);
       const version = (prev?.version_no ?? 0) + 1;
