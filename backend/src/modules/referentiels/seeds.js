@@ -19,19 +19,20 @@ const RUBRIQUES = [
 ];
 
 // Chaque type d'acte porte ses composants obligatoires (§7.1) : exposé, visas, nombre minimal de délibérations, nature par défaut.
-// `expose` / `visas` valent 'none' pour les actes qui n'en comportent pas (une décision n'a ni exposé des motifs ni visas :
-// juste la décision elle-même) ; `expose: 'optional'` laisse le texte disponible sans le rendre obligatoire.
+// `expose` / `visas` valent 'none' pour les actes qui n'en comportent pas ; `optional` laisse le texte disponible sans le rendre
+// obligatoire. Une décision et un arrêté comportent des vus et considérants et un « décide » (le dispositif) ; leur exposé des
+// motifs est possible mais facultatif.
 // `signature: true` = acte signé par le maire (parapheur) à la fin du circuit, au lieu d'être inscrit au conseil.
 // `autorisations: true` = l'acte doit lier les délibérations qui l'autorisent (décision prise par délégation du conseil).
 // `aide` et `pastille` servent à la fenêtre de création (quel type choisir) et à la pastille de lecture des listes.
 const AIDE_DELIBERATION = "Acte discuté et voté en conseil municipal. Il est inscrit à l'ordre du jour d'une séance : c'est le cas le plus courant (budget, subventions, conventions, urbanisme…).";
-const AIDE_DECISION = "Acte pris par le maire dans le cadre d'une délégation consentie par le conseil municipal. Il ne passe PAS en conseil : à la fin du circuit, il part en signature du maire. Pensez à lier la ou les délibérations qui autorisent cette décision.";
-const AIDE_ARRETE = "Acte réglementaire ou individuel que le maire prend au nom de la commune (arrêté de voirie, de police, arrêté individuel…). Il ne passe PAS en conseil : à la fin du circuit, il part en signature du maire.";
+const AIDE_DECISION = "Acte pris par le maire dans le cadre d'une délégation consentie par le conseil municipal. Il ne passe PAS en conseil : à la fin du circuit, il part en signature du maire. Il comporte des vus et considérants et un « décide » ; l'exposé des motifs est facultatif. Pensez à lier la ou les délibérations qui autorisent cette décision.";
+const AIDE_ARRETE = "Acte réglementaire ou individuel que le maire prend au nom de la commune (arrêté de voirie, de police, arrêté individuel…). Il ne passe PAS en conseil : à la fin du circuit, il part en signature du maire. Il comporte des vus et considérants et un « décide » ; l'exposé des motifs est facultatif.";
 const TYPES_ACTE = [
   { code: 'deliberation', libelle: 'Délibération', meta: { expose: 'required', minDeliberations: 1, natureCode: 'delib', pastille: 'blue', aide: AIDE_DELIBERATION } },
   { code: 'voeu', libelle: 'Vœu', meta: { expose: 'required', minDeliberations: 1, natureCode: 'delib', pastille: 'blue', aide: "Simple expression d'une position ou d'un vœu de l'assemblée, sans portée décisionnelle. Comme une délibération, il est inscrit à l'ordre du jour d'une séance." } },
-  { code: 'decision', libelle: 'Décision', meta: { expose: 'none', visas: 'none', minDeliberations: 1, natureCode: 'individuels', signature: true, autorisations: true, pastille: 'violet', aide: AIDE_DECISION } },
-  { code: 'arrete', libelle: 'Arrêté', meta: { expose: 'required', minDeliberations: 1, natureCode: 'reglementaires', signature: true, pastille: 'indigo', aide: AIDE_ARRETE } },
+  { code: 'decision', libelle: 'Décision', meta: { expose: 'optional', minDeliberations: 1, natureCode: 'individuels', signature: true, autorisations: true, pastille: 'violet', aide: AIDE_DECISION } },
+  { code: 'arrete', libelle: 'Arrêté', meta: { expose: 'optional', minDeliberations: 1, natureCode: 'reglementaires', signature: true, pastille: 'indigo', aide: AIDE_ARRETE } },
 ];
 
 const ANNEXE_TYPES = [

@@ -235,6 +235,8 @@ function createTextes({ db, audit, actes, acl, bus }) {
     async missingTexts(acte, typeMeta = {}) {
       const rows = await db.all('SELECT kind, deliberation_id, markdown FROM tracked_texts WHERE acte_id = $1', [acte.id]);
       const out = [];
+      // Un acte signé par le maire (décision, arrêté) a un « décide » (son dispositif) ; les autres un « délibéré ».
+      const dispLabel = typeMeta.signature ? 'Décide' : KINDS.dispositif;
       if (typeMeta.expose !== 'none' && typeMeta.expose !== 'optional') {
         const e = rows.find((r) => r.kind === 'expose');
         if (!e || !e.markdown.trim()) out.push({ code: 'expose', label: 'Exposé des motifs' });
@@ -244,7 +246,7 @@ function createTextes({ db, audit, actes, acl, bus }) {
         for (const k of ['visas', 'dispositif']) {
           if (k === 'visas' && typeMeta.visas === 'none') continue;
           const r = rows.find((x) => x.deliberation_id === d.id && x.kind === k);
-          if (!r || !r.markdown.trim()) out.push({ code: `${k}:${d.id}`, label: `${KINDS[k]} (délibération ${d.ordre})` });
+          if (!r || !r.markdown.trim()) out.push({ code: `${k}:${d.id}`, label: `${k === 'dispositif' ? dispLabel : KINDS[k]} (délibération ${d.ordre})` });
         }
       }
       return out;

@@ -257,6 +257,8 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
   const [srcOpen, setSrcOpen] = useState(false);
   // Une décision (ou un arrêté) n'a pas de délibéré : le dispositif est l'acte lui-même, on le nomme par son type.
   const acteLabel = acte.typeCode === 'decision' ? 'Décision' : acte.typeCode === 'arrete' ? 'Arrêté' : null;
+  // Le dispositif d'une délibération est son « délibéré » ; celui d'une décision ou d'un arrêté est son « décide ».
+  const dispositifLabel = acteLabel ? 'Décide' : KIND_LABEL.dispositif;
   // Une fois l'acte signé par le maire, le texte n'est plus modifiable : le PDF signé revenu du parapheur fait foi.
   const signe = acte.statut === 'signe' && !!acte.typeInfo?.meta?.signature;
   // Le guide « dossier assisté » peut demander l'ouverture directe de l'éditeur (bouton « Montrer »).
@@ -275,7 +277,7 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
   if (texts.loading && !texts.data) return <Loading />;
   const dels = acte.deliberations || [];
   const list = texts.data ?? [];
-  const kindLabel = (t: any) => (t.kind === 'dispositif' && acteLabel ? acteLabel : KIND_LABEL[t.kind]);
+  const kindLabel = (t: any) => (t.kind === 'dispositif' ? dispositifLabel : KIND_LABEL[t.kind]);
   const ouvrirSigne = async () => { const m = await openPdf(() => api.get(orgPath(org!.id, `/parapheur/actes/${acte.id}/document-signe`), { responseType: 'blob' }), `${acteLabel || 'Acte'} signé(e) — ${acte.titre}`); if (m) toast(m, 'ko'); };
   // Acte rédigé hors application : c'est le document joint qui fait foi, on ne propose pas l'éditeur de texte.
   const source = acte.documentSource;

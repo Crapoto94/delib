@@ -11,6 +11,7 @@
 
 ## 0.45.0 — Commissions, directions en info, rétroplanning et confort de rédaction
 
+- **Décisions et arrêtés** : ils comportent désormais des **vus et considérants** et un **« Décide »** (leur dispositif, là où une délibération a un « délibéré ») ; l'**exposé des motifs** est **facultatif** (possible, non obligatoire). Les décisions en cours sont complétées au démarrage (migration `0071`).
 - **Rétroplanning en jours calendaires** : chaque étape peut se compter en **jours calendaires** (week-ends et jours fériés compris) ou en **jours ouvrés**, au choix dans **Paramétrages › Rétroplanning** ; le simulateur de dates et la création de séance en tiennent compte. (`time.js` : `addCalendarDays` ; `seances.service.js` : `retroCalendaire`.)
 - **Réunions de commission** : le **lieu par défaut** est **« Teams »**.
 - **Élu rapporteur** : la **fonction** s'affiche à l'**écriture inclusive** (Adjointe, conseillère municipale…) selon la **civilité fournie par le Hub DSI** (« M. » / « Mme ») ; à défaut seulement, elle est déduite du prénom. (`elus.civilite`, migration `0069`, `frontend/src/genre.ts`.)

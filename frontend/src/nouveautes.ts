@@ -18,6 +18,7 @@ export const VERSIONS: Version[] = [
     version: '0.45.0', type: 'minor', titre: 'Commissions, directions en info, rétroplanning et confort de rédaction',
     items: [
       "Rétroplanning d'une séance paramétrable en jours calendaires (week-ends et jours fériés compris) ou en jours ouvrés, au choix dans Paramétrages › Rétroplanning ; le simulateur de dates en tient compte.",
+      "Décisions et arrêtés : ils comportent désormais des vus et considérants et un « Décide » (leur dispositif, là où une délibération a un « délibéré ») ; l'exposé des motifs est facultatif (possible, non obligatoire).",
       "Réunions de commission : le lieu par défaut est « Teams ».",
       "Élu rapporteur : la fonction s'affiche à l'écriture inclusive (Adjointe, conseillère municipale…) selon la civilité fournie par le Hub DSI (M. / Mme) ; à défaut seulement, elle est déduite du prénom.",
       "Élus : la synchronisation avec le Hub DSI reprend le sexe, la liste / groupe politique et les délégations fonctionnelles de chaque élu ; le rattachement aux groupes politiques s'appuie sur la liste du Hub (Paramétrages › Membres).",

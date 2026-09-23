@@ -11,9 +11,9 @@ import BibliothequeVisas from './BibliothequeVisas';
 import { useIa } from './useIa';
 
 export const KIND_LABEL: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispositif: 'Délibéré' };
-/** Libellé d'un texte : une décision (ou un arrêté) n'a pas de délibéré — le dispositif est l'acte lui-même. */
+/** Libellé d'un texte : une décision (ou un arrêté) a un « décide » là où une délibération a un « délibéré ». */
 const textLabel = (acte: any, t: any) => (t?.kind === 'dispositif' && (acte?.typeCode === 'decision' || acte?.typeCode === 'arrete')
-  ? (acte.typeCode === 'decision' ? 'Décision' : 'Arrêté') : KIND_LABEL[t?.kind]);
+  ? 'Décide' : KIND_LABEL[t?.kind]);
 const PLACEHOLDER: Record<string, string> = {
   expose: "Résumez l'intérêt communal en quelques paragraphes simples, sans jargon juridique…",
   visas: 'Vu le code général des collectivités territoriales…\n\nConsidérant que…',
