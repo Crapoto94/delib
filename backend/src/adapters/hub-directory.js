@@ -75,6 +75,7 @@ function createHubDirectory(config) {
         externalId: String(e.id ?? e.email ?? `${e.nom}-${e.prenom}`),
         nom: clean(e.nom) || '', prenom: clean(e.prenom) || '', email: (clean(e.email) || '').toLowerCase() || null,
         telephone: clean(e.telephone) || null, role: clean(e.role) || null, delegation: clean(e.delegation) || null,
+        civilite: clean(e.civilite ?? e.sexe ?? e.genre ?? e.civ) || null,
       })).filter((e) => e.nom);
     },
 

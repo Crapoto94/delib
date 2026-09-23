@@ -22,8 +22,10 @@ const A4_TOL = 6; // points
 const sansAccent = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 const CIV_FEMININ = new Set(['mehadee', 'fenda', 'kheira', 'farida', 'ouarda', 'alexandra', 'audrey', 'fabienne', 'malika', 'marie', 'claire', 'sophie', 'nathalie', 'isabelle', 'sandrine', 'celine', 'valerie', 'caroline', 'emilie', 'julie', 'aurelie', 'helene', 'chantal', 'michele', 'francoise', 'monique', 'christine', 'patricia', 'catherine', 'sylvie', 'veronique', 'laurence', 'anne', 'brigitte', 'nicole', 'danielle', 'martine', 'josette', 'colette', 'genevieve', 'yvette', 'odette', 'eva', 'sarah', 'lea', 'emma', 'nora', 'amira', 'ines', 'lucie', 'camille', 'charlotte', 'manon', 'juliette', 'oceane', 'elodie', 'anais', 'margaux', 'coralie', 'amelie', 'pauline', 'mathilde', 'clara', 'lise', 'lisa', 'agathe', 'alice', 'louise', 'jade', 'lina', 'rose', 'anna', 'laura', 'nina', 'zoe']);
 const CIV_MASCULIN = new Set(['pierre', 'philippe', 'antoine', 'baptiste', 'alexandre', 'guillaume', 'jerome', 'frederic', 'olivier', 'paul', 'pascal', 'michel', 'daniel', 'gabriel', 'samuel', 'emile', 'raphael', 'thibault', 'thibaut', 'claude', 'dominique', 'maxime', 'charles', 'georges', 'jacques', 'francois', 'nicolas', 'vincent', 'simon', 'sebastien', 'karim', 'ayoub', 'malik', 'jubaid', 'laurent', 'stephane', 'christophe', 'david', 'julien', 'benjamin', 'mathieu', 'romain', 'florian', 'quentin', 'lucas', 'hugo', 'theo', 'nathan', 'adrien', 'fabien', 'damien', 'cyril', 'gregory', 'arnaud', 'bertrand', 'clement', 'remi', 'yann', 'gael', 'loic', 'sacha', 'jean-francois']);
-/** Genre déduit du prénom (les élus n'ont pas de champ « genre ») : masculin par défaut. */
+/** Genre : la civilité du Hub DSI (« Mme ») fait foi ; à défaut, déduit du prénom (masculin par défaut). */
 function femininElu(m) {
+  const c = sansAccent(m?.civilite);
+  if (c) { if (/^(mme|mlle|mle|f|femme|madame)/.test(c)) return true; if (/^(m\.?|mr|monsieur|homme)/.test(c)) return false; }
   const p = sansAccent(m?.prenom);
   return CIV_FEMININ.has(p) || (!CIV_MASCULIN.has(p) && /(?:a|ie|ine|ette|elle|enne|yne|ise|ande|ude)$/.test(p));
 }

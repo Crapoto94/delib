@@ -11,15 +11,15 @@ function EluForm({ elu, groupes, onClose, onSaved }: { elu: any | null; groupes:
   const hub = elu?.source === 'hub';
   const [f, setF] = useState<any>({
     nom: elu?.nom ?? '', prenom: elu?.prenom ?? '', email: elu?.email ?? '', mobile: elu?.mobileLocal ?? (elu?.source === 'manual' ? elu?.mobile ?? '' : ''), role: elu?.role ?? '',
-    estElu: elu?.estElu ?? true, groupeId: elu?.groupeId ?? '', mandatDebut: elu?.mandatDebut?.slice(0, 10) ?? '', mandatFin: elu?.mandatFin?.slice(0, 10) ?? '',
+    estElu: elu?.estElu ?? true, groupeId: elu?.groupeId ?? '', mandatDebut: elu?.mandatDebut?.slice(0, 10) ?? '', mandatFin: elu?.mandatFin?.slice(0, 10) ?? '', civilite: elu?.civilite ?? '',
   });
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const enregistrer = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr(null);
     const commun = { mobile: f.mobile || null, groupeId: f.groupeId === '' ? null : Number(f.groupeId), mandatDebut: f.mandatDebut || null, mandatFin: f.mandatFin || null };
     try {
-      if (!elu) await api.post(orgPath(o, '/elus'), { nom: f.nom, prenom: f.prenom || undefined, email: f.email || undefined, role: f.role || undefined, estElu: f.estElu, ...commun, mobile: f.mobile || undefined, groupeId: commun.groupeId, mandatDebut: commun.mandatDebut, mandatFin: commun.mandatFin });
-      else await api.put(orgPath(o, `/elus/${elu.id}`), hub ? commun : { nom: f.nom, prenom: f.prenom, email: f.email || undefined, role: f.role || undefined, estElu: f.estElu, ...commun });
+      if (!elu) await api.post(orgPath(o, '/elus'), { nom: f.nom, prenom: f.prenom || undefined, email: f.email || undefined, role: f.role || undefined, estElu: f.estElu, civilite: f.civilite || undefined, ...commun, mobile: f.mobile || undefined, groupeId: commun.groupeId, mandatDebut: commun.mandatDebut, mandatFin: commun.mandatFin });
+      else await api.put(orgPath(o, `/elus/${elu.id}`), hub ? commun : { nom: f.nom, prenom: f.prenom, email: f.email || undefined, role: f.role || undefined, estElu: f.estElu, civilite: f.civilite || undefined, ...commun });
       onSaved();
     } catch (x) { setErr(errMsg(x)); setBusy(false); }
   };
@@ -31,6 +31,7 @@ function EluForm({ elu, groupes, onClose, onSaved }: { elu: any | null; groupes:
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Nom *"><input className="input" required disabled={hub} value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} /></Field>
           <Field label="Prénom"><input className="input" disabled={hub} value={f.prenom} onChange={(e) => setF({ ...f, prenom: e.target.value })} /></Field>
+          <Field label="Civilité" hint="Fournie par le Hub DSI (« M. » / « Mme »). Sert à l’écriture inclusive des fonctions ; à défaut, déduite du prénom."><Select className="input" disabled={hub} value={f.civilite} onChange={(e) => setF({ ...f, civilite: e.target.value })}><option value="">—</option><option value="M.">M.</option><option value="Mme">Mme</option></Select></Field>
           <Field label="Courriel" hint="Sert d’identifiant de connexion à l’espace des élus."><input className="input" type="email" disabled={hub} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
           <Field label="Mobile" hint="Pour le code SMS « mot de passe oublié » (06…, 07… ou +33…)."><input className="input" type="tel" autoComplete="off" value={f.mobile} onChange={(e) => setF({ ...f, mobile: e.target.value })} placeholder={hub && elu?.mobile ? `Hub : ${elu.mobile}` : '06 12 34 56 78'} /></Field>
           <Field label="Rôle / fonction"><input className="input" disabled={hub} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} placeholder="Adjoint(e), conseiller(ère)…" /></Field>
@@ -78,7 +79,7 @@ export default function AdminMembres() {
           <table className="w-full"><thead><tr><th>Nom</th><th>Rôle</th><th>Groupe</th><th>Courriel</th><th>Mobile</th><th>Source</th><th>État</th><th /></tr></thead><tbody>
             {items.map((e) => (
               <tr key={e.id} className={e.actif ? '' : 'opacity-60'}>
-                <td className="font-semibold">{e.nomComplet}{!e.estElu && <span className="ml-1 text-[11px] font-normal text-mute">(non élu)</span>}</td><td>{e.role}</td><td>{e.groupe || '—'}</td><td className="text-[12px]">{e.email}</td>
+                <td className="font-semibold">{e.civilite ? `${e.civilite} ` : ''}{e.nomComplet}{!e.estElu && <span className="ml-1 text-[11px] font-normal text-mute">(non élu)</span>}</td><td>{e.role}</td><td>{e.groupe || '—'}</td><td className="text-[12px]">{e.email}</td>
                 <td className="whitespace-nowrap text-[12px]">{e.mobile ? <>{e.mobile}{e.mobileLocal && e.source === 'hub' && <span className="text-mute"> (local)</span>}</> : <span className="text-warn">absent</span>}</td>
                 <td><Badge tone={e.source === 'hub' ? 'blue' : 'gray'}>{e.source === 'hub' ? 'Hub' : 'Saisie'}</Badge></td>
                 <td>{e.actif ? <Badge tone="ok">Actif</Badge> : <Badge tone="ko">{e.desactiveManuellement ? 'Désactivé (manuel)' : 'Désactivé'}</Badge>}</td>

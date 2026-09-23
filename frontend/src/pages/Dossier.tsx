@@ -165,7 +165,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
           <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
         {!signature && (
         <Field label="Élu rapporteur *" missing={mq('rapporteur')}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => setF({ ...f, rapporteurId: e.target.value })}>
-          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${roleInclusif(m.role, m.prenom)})` : ''}</option>)}</Select></Field>)}
+          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${roleInclusif(m.role, m.prenom, m.civilite)})` : ''}</option>)}</Select></Field>)}
         <div className="md:col-span-2">
           <Field label="Commissions (pour avis) *" missing={mq('commission')} hint="Le projet est soumis pour avis à la ou les commissions sélectionnées. Obligatoire dès que la collectivité a des commissions actives.">
             {(commissions.data?.items ?? []).some((c: any) => !c.retireeAt) ? (
