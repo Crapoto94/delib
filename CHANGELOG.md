@@ -9,6 +9,22 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.45.0 — Commissions, directions en info, rétroplanning et confort de rédaction
+
+- **Rétroplanning en jours calendaires** : chaque étape peut se compter en **jours calendaires** (week-ends et jours fériés compris) ou en **jours ouvrés**, au choix dans **Paramétrages › Rétroplanning** ; le simulateur de dates et la création de séance en tiennent compte. (`time.js` : `addCalendarDays` ; `seances.service.js` : `retroCalendaire`.)
+- **Réunions de commission** : le **lieu par défaut** est **« Teams »**.
+- **Élu rapporteur** : la **fonction** s'affiche à l'**écriture inclusive** (Adjointe, conseillère municipale…) selon le prénom de l'élu. (`frontend/src/genre.ts`.)
+- **Propositions par mots-clés** : les délibérations passées proposées indiquent la **date de leur séance** et sont classées **de la plus récente à la plus ancienne** ; le filtre de pertinence est appliqué **avant** le tri (correction d'une régression). (`recherche.service.js`.)
+- **Directions « en info » (copie)** : un dossier peut associer une ou plusieurs **directions en info**. Leur **directeur** est **notifié** quand le projet arrive au **SCC** ; leur **DGA** est **notifié** quand la délibération arrive à l'**étape DGA** (règles `acte.info_scc` / `acte.info_dga`, événements `acte.arrive_scc` / `acte.arrive_dga`). Champ dans les **informations clés** de l'acte (migration `0068`).
+- **Commissions sur l'acte** : le **rattachement pour avis** se fait désormais dans le cadre **« Informations clés »** et devient **obligatoire** dès que la collectivité a des **commissions actives** ; le panneau latéral ne montre plus que les **avis**. (`actes.service.js` : complétude.)
+- **Gestion des commissions** : **ajout, retrait et changement de fonction** des **membres élus** (président·e, vice-président·e, membre) depuis la **fiche de la commission** ; **suppression** d'une commission par l'**administrateur** et le **SCC** (les rattachements aux actes sont retirés, les séances de ses réunions restent au registre). (`commissions.service.js` : `remove`, `frontend/pages/Commissions.tsx`.)
+- **Circuit SCC** : un acte **rédigé par un membre du SCC** (sa directrice, par exemple) **passe quand même par l'étape SCC** — l'étape n'est plus contournée par l'auto-validation ni validée implicitement. (`engine.js`.)
+- **Renvoi à la direction par le DGA** : dans **« Demander une modification »**, le DGA peut **renvoyer l'acte à la direction** (niveau directeur), **même si l'étape a été sautée**. (`engine.js` : cible `direction`.)
+- **Import AIRS** : l'**exposé des motifs** et la **délibération** ne sont **plus joints en pièces jointes** (ils figurent déjà dans les **textes** de l'acte) ; seules les **annexes** le sont. (`airs.service.js`.)
+- **Textes d'une délibération** : quand un texte est **rédigé**, la pastille orange **« à rédiger »** laisse place à **« ok »**.
+- **« Mes actes »** : le bloc **« Action attendue de vous »** est **mis en évidence** et placé **en tête** des rubriques.
+- **IA — usage « collecteurs »** : la consigne de l'usage IA des **collecteurs d'arrêtés** est bien prise en compte (les consignes personnalisées sont transmises au service). (`container.js`.)
+
 ## 0.44.0 — Décisions et arrêtés : signature du maire par parapheur
 
 - **Nouveaux types d'acte** : **Décision** et **Arrêté** rejoignent **Délibération** et **Vœu**. Ils sont proposés dès la création, avec une **aide** dans la fenêtre (« Quel type d'acte choisir ? ») et une **pastille** de type dans les listes et sur la fiche. (`referentiels/seeds.js`, `ui.tsx`.)

@@ -11,9 +11,25 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.44.0';
+export const VERSION = '0.45.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.45.0', type: 'minor', titre: 'Commissions, directions en info, rétroplanning et confort de rédaction',
+    items: [
+      "Rétroplanning d'une séance paramétrable en jours calendaires (week-ends et jours fériés compris) ou en jours ouvrés, au choix dans Paramétrages › Rétroplanning ; le simulateur de dates en tient compte.",
+      "Réunions de commission : le lieu par défaut est « Teams ».",
+      "Élu rapporteur : la fonction s'affiche à l'écriture inclusive (Adjointe, conseillère municipale…) selon le prénom de l'élu.",
+      "Création d'un dossier par mots-clés : les délibérations passées proposées indiquent la date de leur séance et sont classées de la plus récente à la plus ancienne.",
+      "Directions « en info » (copie) sur un dossier : le directeur de ces directions est notifié quand le projet arrive au SCC, et leur DGA quand la délibération arrive à l'étape DGA. Nouveau champ dans les informations clés de l'acte.",
+      "Commissions : le rattachement pour avis se fait désormais dans les informations clés de l'acte et devient obligatoire dès que la collectivité a des commissions actives.",
+      "Gestion des commissions : ajout, retrait et changement de fonction des membres élus (président·e, vice-président·e, membre) depuis la fiche de la commission ; suppression d'une commission par l'administrateur et le SCC (les rattachements aux actes sont retirés).",
+      "Circuit : un acte rédigé par un membre du SCC (sa directrice, par exemple) passe quand même par l'étape SCC ; un DGA peut renvoyer l'acte à la direction (niveau directeur), même si l'étape a été sautée.",
+      "Import AIRS : l'exposé des motifs et la délibération ne sont plus joints en pièces jointes (ils figurent déjà dans les textes de l'acte) ; seules les annexes le sont.",
+      "Textes d'une délibération : quand un texte est rédigé, la pastille orange « à rédiger » laisse place à « ok ».",
+      "« Mes actes » : le bloc « Action attendue de vous » est mis en évidence et placé en tête des rubriques.",
+    ],
+  },
   {
     version: '0.44.0', type: 'minor', titre: 'Décisions et arrêtés : signature du maire par parapheur',
     items: [
