@@ -68,7 +68,7 @@ function createHubDirectory(config) {
       };
     },
 
-    /** Élus de la Ville (GET /api/ville/elus) : identité seulement ; groupe politique et mandat sont saisis localement (CMN-02). */
+    /** Élus de la Ville (GET /api/ville/elus) : identité, sexe/civilité, liste politique et délégations ; groupe et mandat se saisissent localement (CMN-02). */
     async listElus() {
       const d = await get('Hub ville/elus', '/api/ville/elus');
       return asList(d, 'elus').map((e) => ({
@@ -76,6 +76,9 @@ function createHubDirectory(config) {
         nom: clean(e.nom) || '', prenom: clean(e.prenom) || '', email: (clean(e.email) || '').toLowerCase() || null,
         telephone: clean(e.telephone) || null, role: clean(e.role) || null, delegation: clean(e.delegation) || null,
         civilite: clean(e.civilite ?? e.sexe ?? e.genre ?? e.civ) || null,
+        sexe: clean(e.sexe) || null,
+        liste: clean(e.liste) || null,
+        delegations: Array.isArray(e.delegations) ? e.delegations.map(clean).filter(Boolean) : [],
       })).filter((e) => e.nom);
     },
 

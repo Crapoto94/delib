@@ -11,6 +11,9 @@ const Elu = z.object({
   nom: z.string().trim().min(1).max(120), prenom: z.string().trim().max(120).optional(), email: z.email().optional(), telephone: z.string().max(40).optional(),
   mobile: z.string().trim().max(40).nullable().optional().describe('Mobile pour le code SMS (mot de passe oublié) ; saisi ici, jamais écrasé par la synchronisation'), role: z.string().max(80).optional(), delegation: z.string().max(160).optional(), estElu: z.boolean().optional(), groupeId: Id.nullable().optional(),
   civilite: z.string().trim().max(10).nullable().optional().describe('Civilité fournie par le Hub DSI (« M. » ou « Mme ») ; sert à l\'écriture inclusive des fonctions. Repli sur le prénom si absente'),
+  sexe: z.enum(['M', 'F']).nullable().optional().describe('Sexe fourni par le Hub DSI (« M » ou « F »)'),
+  liste: z.string().trim().max(160).nullable().optional().describe('Liste / groupe politique fourni par le Hub DSI'),
+  delegations: z.array(z.string().trim().min(1).max(200)).max(50).optional().describe('Délégations fonctionnelles fournies par le Hub DSI'),
   mandatDebut: z.iso.date().nullable().optional(), mandatFin: z.iso.date().nullable().optional(),
 });
 const EluPatch = Elu.partial().extend({ actif: z.boolean().optional() });

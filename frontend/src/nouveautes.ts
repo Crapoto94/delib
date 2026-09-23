@@ -20,6 +20,7 @@ export const VERSIONS: Version[] = [
       "Rétroplanning d'une séance paramétrable en jours calendaires (week-ends et jours fériés compris) ou en jours ouvrés, au choix dans Paramétrages › Rétroplanning ; le simulateur de dates en tient compte.",
       "Réunions de commission : le lieu par défaut est « Teams ».",
       "Élu rapporteur : la fonction s'affiche à l'écriture inclusive (Adjointe, conseillère municipale…) selon la civilité fournie par le Hub DSI (M. / Mme) ; à défaut seulement, elle est déduite du prénom.",
+      "Élus : la synchronisation avec le Hub DSI reprend le sexe, la liste / groupe politique et les délégations fonctionnelles de chaque élu ; le rattachement aux groupes politiques s'appuie sur la liste du Hub (Paramétrages › Membres).",
       "Création d'un dossier par mots-clés : les délibérations passées proposées indiquent la date de leur séance et sont classées de la plus récente à la plus ancienne.",
       "Directions « en info » (copie) sur un dossier : le directeur de ces directions est notifié quand le projet arrive au SCC, et leur DGA quand la délibération arrive à l'étape DGA. Nouveau champ dans les informations clés de l'acte.",
       "Commissions : le rattachement pour avis se fait désormais dans les informations clés de l'acte et devient obligatoire dès que la collectivité a des commissions actives.",

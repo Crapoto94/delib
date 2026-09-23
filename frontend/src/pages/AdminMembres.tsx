@@ -28,6 +28,7 @@ function EluForm({ elu, groupes, onClose, onSaved }: { elu: any | null; groupes:
       <form onSubmit={enregistrer} className="space-y-3">
         <ErrorBox msg={err} />
         {hub && <p className="rounded bg-soft px-3 py-2 text-[13px] text-mute">Élu issu du <b>Hub DSI</b> : son identité n’est pas modifiable ici. Son groupe, son mandat et son <b>mobile</b> (pour le code SMS) se saisissent ici et ne sont jamais écrasés par la synchronisation.</p>}
+        {elu?.delegations?.length > 0 && <p className="rounded bg-soft px-3 py-2 text-[12px] text-mute"><b>Délégations</b> (Hub DSI) : {elu.delegations.join(' ; ')}</p>}
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Nom *"><input className="input" required disabled={hub} value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} /></Field>
           <Field label="Prénom"><input className="input" disabled={hub} value={f.prenom} onChange={(e) => setF({ ...f, prenom: e.target.value })} /></Field>
@@ -76,10 +77,12 @@ export default function AdminMembres() {
       <p className="text-[13px] text-mute">Les élus du Hub DSI se synchronisent ; les <b>membres non élus</b> (CCAS, personnes qualifiées) et les élus d’un autre organisme se saisissent à la main. <b>Un élu désactivé le reste</b>, même après une synchronisation.</p>
       <div className="card overflow-x-auto">
         {list.loading && !list.data ? <Loading /> : list.error ? <div className="p-4"><ErrorBox msg={list.error} /></div> : !items.length ? <Empty>Aucun élu ne correspond.</Empty> : (
-          <table className="w-full"><thead><tr><th>Nom</th><th>Rôle</th><th>Groupe</th><th>Courriel</th><th>Mobile</th><th>Source</th><th>État</th><th /></tr></thead><tbody>
+          <table className="w-full"><thead><tr><th>Nom</th><th>Rôle</th><th>Groupe</th><th>Délégations</th><th>Courriel</th><th>Mobile</th><th>Source</th><th>État</th><th /></tr></thead><tbody>
             {items.map((e) => (
               <tr key={e.id} className={e.actif ? '' : 'opacity-60'}>
-                <td className="font-semibold">{e.civilite ? `${e.civilite} ` : ''}{e.nomComplet}{!e.estElu && <span className="ml-1 text-[11px] font-normal text-mute">(non élu)</span>}</td><td>{e.role}</td><td>{e.groupe || '—'}</td><td className="text-[12px]">{e.email}</td>
+                <td className="font-semibold">{e.civilite ? `${e.civilite} ` : ''}{e.nomComplet}{!e.estElu && <span className="ml-1 text-[11px] font-normal text-mute">(non élu)</span>}</td><td>{e.role}</td><td>{e.groupe || e.liste || '—'}</td>
+                <td className="text-[12px]" title={e.delegations?.length ? e.delegations.join(' ; ') : undefined}>{e.delegations?.length ? `${e.delegations.length} délégation(s)` : '—'}</td>
+                <td className="text-[12px]">{e.email}</td>
                 <td className="whitespace-nowrap text-[12px]">{e.mobile ? <>{e.mobile}{e.mobileLocal && e.source === 'hub' && <span className="text-mute"> (local)</span>}</> : <span className="text-warn">absent</span>}</td>
                 <td><Badge tone={e.source === 'hub' ? 'blue' : 'gray'}>{e.source === 'hub' ? 'Hub' : 'Saisie'}</Badge></td>
                 <td>{e.actif ? <Badge tone="ok">Actif</Badge> : <Badge tone="ko">{e.desactiveManuellement ? 'Désactivé (manuel)' : 'Désactivé'}</Badge>}</td>

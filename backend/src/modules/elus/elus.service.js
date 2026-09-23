@@ -8,7 +8,7 @@ const { requireOrg } = require('../../db/pool');
 
 const toElu = (r) => r && ({
   id: r.id, organismeId: r.organisme_id, source: r.source, nom: r.nom, prenom: r.prenom, nomComplet: `${r.prenom} ${r.nom}`.trim(), email: r.email, telephone: r.telephone,
-  civilite: r.civilite ?? null,
+  civilite: r.civilite ?? null, sexe: r.sexe ?? null, liste: r.liste ?? null, delegations: r.delegations ?? [],
   role: r.role, delegation: r.delegation, estElu: r.est_elu, groupeId: r.groupe_id, groupe: r.groupe_nom ?? undefined, mandatDebut: r.mandat_debut, mandatFin: r.mandat_fin, actif: r.actif,
   mobile: r.mobile_local || r.telephone || null, mobileLocal: r.mobile_local ?? null, desactiveManuellement: !!r.desactive_manuellement,
 });
@@ -50,9 +50,9 @@ function createElus({ db, audit, directoryAdapter, log }) {
       const org = requireOrg(organismeId);
       await svc.checkGroupe(org, b.groupeId);
       const r = await db.get(
-        `INSERT INTO elus (organisme_id, source, nom, prenom, email, telephone, role, delegation, est_elu, groupe_id, mandat_debut, mandat_fin, mobile_local, civilite)
-         VALUES ($1,'manual',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-        [org, b.nom, b.prenom || '', b.email?.toLowerCase() ?? null, b.telephone ?? null, b.role ?? null, b.delegation ?? null, b.estElu ?? true, b.groupeId ?? null, b.mandatDebut ?? null, b.mandatFin ?? null, b.mobile || null, b.civilite ?? null]);
+        `INSERT INTO elus (organisme_id, source, nom, prenom, email, telephone, role, delegation, est_elu, groupe_id, mandat_debut, mandat_fin, mobile_local, civilite, sexe, liste, delegations)
+         VALUES ($1,'manual',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb) RETURNING *`,
+        [org, b.nom, b.prenom || '', b.email?.toLowerCase() ?? null, b.telephone ?? null, b.role ?? null, b.delegation ?? null, b.estElu ?? true, b.groupeId ?? null, b.mandatDebut ?? null, b.mandatFin ?? null, b.mobile || null, b.civilite ?? null, b.sexe ?? null, b.liste ?? null, JSON.stringify(b.delegations || [])]);
       await audit.log(ctx, { organismeId: org, action: 'elu.create', entity: 'elus', entityId: r.id, after: toElu(r) });
       return toElu(r);
     },
@@ -63,10 +63,16 @@ function createElus({ db, audit, directoryAdapter, log }) {
       const before = await svc.get(org, id);
       await svc.checkGroupe(org, patch.groupeId);
       const cols = { groupeId: 'groupe_id', mandatDebut: 'mandat_debut', mandatFin: 'mandat_fin', actif: 'actif', mobile: 'mobile_local' };
-      if (before.source === 'manual') Object.assign(cols, { nom: 'nom', prenom: 'prenom', email: 'email', telephone: 'telephone', role: 'role', delegation: 'delegation', estElu: 'est_elu', civilite: 'civilite' });
-      else if (['nom', 'prenom', 'email', 'telephone', 'role', 'delegation', 'estElu', 'civilite'].some((k) => patch[k] !== undefined)) throw E.conflict("Identité issue du Hub DSI : elle n'est pas modifiable ici");
+      if (before.source === 'manual') Object.assign(cols, { nom: 'nom', prenom: 'prenom', email: 'email', telephone: 'telephone', role: 'role', delegation: 'delegation', estElu: 'est_elu', civilite: 'civilite', sexe: 'sexe', liste: 'liste', delegations: 'delegations' });
+      else if (['nom', 'prenom', 'email', 'telephone', 'role', 'delegation', 'estElu', 'civilite', 'sexe', 'liste', 'delegations'].some((k) => patch[k] !== undefined)) throw E.conflict("Identité issue du Hub DSI : elle n'est pas modifiable ici");
       const set = []; const p = [id, org];
-      for (const [k, col] of Object.entries(cols)) if (patch[k] !== undefined) { p.push(k === 'email' && patch[k] ? patch[k].toLowerCase() : (k === 'mobile' ? (patch[k] || null) : patch[k])); set.push(`${col} = $${p.length}`); }
+      for (const [k, col] of Object.entries(cols)) if (patch[k] !== undefined) {
+        let v = patch[k]; let cast = '';
+        if (k === 'email' && v) v = v.toLowerCase();
+        else if (k === 'mobile') v = v || null;
+        else if (k === 'delegations') { v = JSON.stringify(Array.isArray(v) ? v : []); cast = '::jsonb'; }
+        p.push(v); set.push(`${col} = $${p.length}${cast}`);
+      }
       if (patch.actif !== undefined) { p.push(!patch.actif); set.push(`desactive_manuellement = $${p.length}`); } // désactivé à la main : la synchronisation ne le réactive jamais (ELU-81)
       if (!set.length) return before;
       const r = await db.get(`UPDATE elus SET ${set.join(', ')} WHERE id = $1 AND organisme_id = $2 RETURNING *`, p);
@@ -114,10 +120,11 @@ function createElus({ db, audit, directoryAdapter, log }) {
         seen.add(e.externalId);
         const ex = await db.get("SELECT * FROM elus WHERE organisme_id = $1 AND source = 'hub' AND external_id = $2", [org, e.externalId]);
         if (!ex) {
-          await db.run("INSERT INTO elus (organisme_id, source, external_id, nom, prenom, email, telephone, role, delegation, civilite) VALUES ($1,'hub',$2,$3,$4,$5,$6,$7,$8,$9)",
-            [org, e.externalId, e.nom, e.prenom, e.email, e.telephone, e.role, e.delegation, e.civilite ?? null]); created++;
-        } else if (['nom', 'prenom', 'email', 'telephone', 'role', 'delegation', 'civilite'].some((k) => (ex[k] ?? null) !== (e[k] ?? null))) {
-          await db.run('UPDATE elus SET nom = $2, prenom = $3, email = $4, telephone = $5, role = $6, delegation = $7, civilite = $8, actif = NOT desactive_manuellement WHERE id = $1', [ex.id, e.nom, e.prenom, e.email, e.telephone, e.role, e.delegation, e.civilite ?? null]); updated++;
+          await db.run("INSERT INTO elus (organisme_id, source, external_id, nom, prenom, email, telephone, role, delegation, civilite, sexe, liste, delegations) VALUES ($1,'hub',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)",
+            [org, e.externalId, e.nom, e.prenom, e.email, e.telephone, e.role, e.delegation, e.civilite ?? null, e.sexe ?? null, e.liste ?? null, JSON.stringify(e.delegations || [])]); created++;
+        } else if (['nom', 'prenom', 'email', 'telephone', 'role', 'delegation', 'civilite', 'sexe', 'liste'].some((k) => (ex[k] ?? null) !== (e[k] ?? null)) || JSON.stringify(ex.delegations || []) !== JSON.stringify(e.delegations || [])) {
+          await db.run('UPDATE elus SET nom = $2, prenom = $3, email = $4, telephone = $5, role = $6, delegation = $7, civilite = $8, sexe = $9, liste = $10, delegations = $11::jsonb, actif = NOT desactive_manuellement WHERE id = $1',
+            [ex.id, e.nom, e.prenom, e.email, e.telephone, e.role, e.delegation, e.civilite ?? null, e.sexe ?? null, e.liste ?? null, JSON.stringify(e.delegations || [])]); updated++;
         } else if (!ex.actif && !ex.desactive_manuellement) { await db.run('UPDATE elus SET actif = true WHERE id = $1', [ex.id]); updated++; }
       }
       const gone = (await db.all("SELECT id, external_id FROM elus WHERE organisme_id = $1 AND source = 'hub' AND actif", [org])).filter((r) => !seen.has(r.external_id));
@@ -129,19 +136,20 @@ function createElus({ db, audit, directoryAdapter, log }) {
     },
 
     /**
-     * Le Hub DSI saisit le groupe politique d'un élu dans sa colonne « délégation » (« IVRY AVANT TOUT », « Front Populaire… »).
-     * Les élus du Hub qui n'ont pas encore de groupe local sont rattachés au groupe de ce nom (créé au besoin : le plus nombreux
-     * prend l'ordre 1, c'est la majorité). Un groupe déjà choisi localement n'est JAMAIS écrasé (surcouche locale, CMN-02).
+     * Le groupe politique vient du Hub DSI : sa colonne « liste » (« IVRY AVANT TOUT », « Front Populaire… »),
+     * à défaut son ancienne colonne « délégation ». Les élus du Hub qui n'ont pas encore de groupe local sont
+     * rattachés au groupe de ce nom (créé au besoin : le plus nombreux prend l'ordre 1, c'est la majorité).
+     * Un groupe déjà choisi localement n'est JAMAIS écrasé (surcouche locale, CMN-02).
      */
     async rattacherGroupes(ctx, organismeId) {
       const org = requireOrg(organismeId);
       const key = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-      const elus = await db.all("SELECT id, delegation, groupe_id FROM elus WHERE organisme_id = $1 AND source = 'hub' AND actif AND est_elu AND btrim(COALESCE(delegation, '')) <> ''", [org]);
+      const elus = await db.all("SELECT id, COALESCE(NULLIF(btrim(liste), ''), delegation) AS groupe_hub, groupe_id FROM elus WHERE organisme_id = $1 AND source = 'hub' AND actif AND est_elu AND btrim(COALESCE(liste, delegation, '')) <> ''", [org]);
       const groupes = new Map((await db.all('SELECT id, nom FROM groupes_politiques WHERE organisme_id = $1', [org])).map((g) => [key(g.nom), g.id]));
       const PALETTE = ['#2563EB', '#D97706', '#7C3AED', '#059669', '#DC2626', '#0891B2'];
-      const taille = new Map(); for (const e of elus) taille.set(key(e.delegation), (taille.get(key(e.delegation)) || 0) + 1);
+      const taille = new Map(); for (const e of elus) taille.set(key(e.groupe_hub), (taille.get(key(e.groupe_hub)) || 0) + 1);
       let crees = 0; let rattaches = 0;
-      const noms = new Map(); for (const e of elus) if (!noms.has(key(e.delegation))) noms.set(key(e.delegation), e.delegation.trim());
+      const noms = new Map(); for (const e of elus) if (!noms.has(key(e.groupe_hub))) noms.set(key(e.groupe_hub), e.groupe_hub.trim());
       const ordre = [...noms.keys()].sort((a, b) => taille.get(b) - taille.get(a));
       const next = (await db.get('SELECT COALESCE(max(ordre), 0)::int AS n FROM groupes_politiques WHERE organisme_id = $1', [org])).n;
       for (const k of ordre) {
@@ -151,7 +159,7 @@ function createElus({ db, audit, directoryAdapter, log }) {
       }
       for (const e of elus) {
         if (e.groupe_id) continue;
-        await db.run('UPDATE elus SET groupe_id = $2 WHERE id = $1', [e.id, groupes.get(key(e.delegation))]); rattaches++;
+        await db.run('UPDATE elus SET groupe_id = $2 WHERE id = $1', [e.id, groupes.get(key(e.groupe_hub))]); rattaches++;
       }
       return { groupesCrees: crees, elusRattaches: rattaches };
     },
