@@ -13,6 +13,7 @@ import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, Ty
 import { AgentName, AgentNames } from '../AgentName';
 import { useIa } from '../useIa';
 import { Select } from '../Select';
+import { roleInclusif } from '../genre';
 import { MatiereTree } from '../MatiereTree';
 import DossierAssiste, { ActiverAssiste } from '../DossierAssiste';
 import EnvoiBravo from '../EnvoiBravo';
@@ -91,13 +92,19 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
   const elus = useLoad(async () => (await api.get(orgPath(o, '/elus'))).data.items as any[], [o]);
   // séances proposables : celles à venir (hors annulées) ; la séance déjà visée par le dossier reste toujours affichée, même tenue ou passée
   const seances = useLoad(async () => ((await api.get(orgPath(o, '/seances'), { params: { from: new Date(Date.now() - 86400000).toISOString(), limit: 100 } })).data.items as any[]).filter((s) => s.statut !== 'annulee'), [o]);
+  const commissions = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/commissions`))).data, [acte.id]);
+  const allCommissions = useLoad(async () => ((await api.get(orgPath(o, '/commissions'), { params: { actif: 'true' } })).data.items as any[]).filter((c) => c.type !== 'autre'), [o]);
+  const directions = useLoad(async () => (await api.get('/directory/directions')).data.items as any[], []);
   const [f, setF] = useState<any>({});
   const [cv, setCv] = useState<Record<string, any>>({}); // valeurs des champs personnalisés
+  const [selCommission, setSelCommission] = useState('');
+  const [dirsInfo, setDirsInfo] = useState<any[]>([]);
   const [err, setErr] = useState<string | null>(null); const [saving, setSaving] = useState(false);
   // Un acte signé par le maire (décision, arrêté) ne passe pas au conseil : ni séance à viser, ni élu rapporteur.
   const signature = !!acte.typeInfo?.meta?.signature;
   useEffect(() => { setCv(Object.fromEntries((acte.champs || []).map((c: any) => [c.code, c.valeur]))); }, [acte.champs]);
   useEffect(() => { setF({ titre: acte.titre, matiereId: acte.matiereId ?? '', rubriqueId: acte.rubriqueId ?? '', natureId: acte.natureId ?? '', incidenceFinanciere: acte.incidenceFinanciere, montant: acte.montant ?? '', rapporteurId: acte.rapporteurId ?? '', seanceViseeId: acte.seanceViseeId ?? '', urgence: acte.urgence }); }, [acte]);
+  useEffect(() => { setDirsInfo(Array.isArray(acte.directionsInfo) ? acte.directionsInfo.map((d: any) => ({ ...d })) : []); }, [acte.directionsInfo]);
   const nv = (v: any) => (v === '' ? null : Number(v));
   // Champs obligatoires non renseignés : surlignés pour guider la saisie tant que la fiche est modifiable (CRE-02).
   const manque = {
@@ -106,9 +113,22 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
     rubrique: f.rubriqueId === '' || f.rubriqueId == null,
     nature: f.natureId === '' || f.natureId == null,
     rapporteur: !signature && (f.rapporteurId === '' || f.rapporteurId == null),
+    commission: (allCommissions.data?.length ?? 0) > 0 && !(commissions.data?.items ?? []).some((c: any) => !c.retireeAt),
     incidence: f.incidenceFinanciere == null,
   };
   const mq = (k: keyof typeof manque) => editable && manque[k];
+  const takenCommissions = new Set((commissions.data?.items ?? []).filter((c: any) => !c.retireeAt).map((c: any) => c.commissionId));
+  const addCommission = async () => {
+    if (!selCommission) return; setErr(null);
+    try { await api.post(orgPath(o, `/actes/${acte.id}/commissions`), { commissionId: Number(selCommission) }); setSelCommission(''); commissions.reload(); onSaved(); }
+    catch (x) { setErr(errMsg(x)); }
+  };
+  const removeCommission = async (c: any) => {
+    const motif = c.misADispositionAt ? prompt('Motif du retrait (obligatoire, les membres seront prévenus) :') : undefined;
+    if (c.misADispositionAt && !motif) return;
+    try { await api.delete(orgPath(o, `/actes/${acte.id}/commissions/${c.commissionId}`), { params: { motif } }); commissions.reload(); onSaved(); }
+    catch (x) { setErr(errMsg(x)); }
+  };
 
   const save = async () => {
     setSaving(true); setErr(null);
@@ -116,6 +136,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
       await api.put(orgPath(o, `/actes/${acte.id}`), {
         titre: f.titre, matiereId: nv(f.matiereId), rubriqueId: nv(f.rubriqueId), natureId: nv(f.natureId), incidenceFinanciere: f.incidenceFinanciere,
         montant: f.incidenceFinanciere && f.montant !== '' ? Number(f.montant) : null, rapporteurId: signature ? null : nv(f.rapporteurId), seanceViseeId: signature ? null : nv(f.seanceViseeId), urgence: !!f.urgence,
+        directionsInfo: dirsInfo.map((d: any) => d.code),
         ...((acte.champs || []).length ? { custom: { ...(acte.custom || {}), ...Object.fromEntries((acte.champs || []).filter((c: any) => c.modifiable).map((c: any) => [c.code, cv[c.code] ?? ''])) } } : {}),
       });
       onSaved();
@@ -144,7 +165,33 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
           <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
         {!signature && (
         <Field label="Élu rapporteur *" missing={mq('rapporteur')}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => setF({ ...f, rapporteurId: e.target.value })}>
-          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${m.role})` : ''}</option>)}</Select></Field>)}
+          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${roleInclusif(m.role, m.prenom)})` : ''}</option>)}</Select></Field>)}
+        <div className="md:col-span-2">
+          <Field label="Commissions (pour avis) *" missing={mq('commission')} hint="Le projet est soumis pour avis à la ou les commissions sélectionnées. Obligatoire dès que la collectivité a des commissions actives.">
+            {(commissions.data?.items ?? []).some((c: any) => !c.retireeAt) ? (
+              <ul className="mb-2 flex flex-wrap gap-2">{(commissions.data?.items ?? []).filter((c: any) => !c.retireeAt).map((c: any) => (
+                <li key={c.id} className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1 text-[13px]"><b>{c.commission}</b>{editable && <button type="button" className="text-ko" aria-label={`Retirer ${c.commission}`} onClick={() => removeCommission(c)}><Trash2 className="h-3.5 w-3.5" /></button>}</li>))}</ul>
+            ) : <p className="mb-2 text-[13px] text-mute">{commissions.data?.horsCommission ? 'Hors commission : aucune commission pour avis.' : 'Aucune commission pour avis.'}</p>}
+            {editable && (allCommissions.data?.length ?? 0) > 0 && (
+              <div className="flex gap-2">
+                <Select className="input" value={selCommission} onChange={(e) => setSelCommission(e.target.value)} aria-label="Ajouter une commission">
+                  <option value="">Ajouter une commission…</option>
+                  {(allCommissions.data ?? []).filter((c) => !takenCommissions.has(c.id)).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                </Select>
+                <button type="button" className="btn-secondary" disabled={!selCommission} onClick={addCommission}>Ajouter</button>
+              </div>)}
+          </Field>
+        </div>
+        <div className="md:col-span-2">
+          <Field label="Directions en info (copie)" hint="Facultatif. Le directeur de ces directions est notifié quand le projet arrive au SCC, leur DGA quand la délibération arrive à l'étape DGA.">
+            {dirsInfo.length ? <ul className="mb-2 flex flex-wrap gap-2">{dirsInfo.map((d: any) => (
+              <li key={d.code} className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1 text-[13px]"><b>{d.label || d.code}</b>{editable && <button type="button" className="text-ko" aria-label={`Retirer ${d.code}`} onClick={() => setDirsInfo((x) => x.filter((y) => y.code !== d.code))}><Trash2 className="h-3.5 w-3.5" /></button>}</li>))}</ul> : <p className="mb-2 text-[13px] text-mute">Aucune direction en info.</p>}
+            {editable && <Select className="input" value="" onChange={(e) => { const code = e.target.value; if (!code) return; const d = (directions.data ?? []).find((x) => x.code === code); if (d) setDirsInfo((x) => (x.some((y) => y.code === code) ? x : [...x, { code, label: d.label }])); }} aria-label="Ajouter une direction en info">
+              <option value="">Ajouter une direction en info…</option>
+              {(directions.data ?? []).filter((x) => !dirsInfo.some((y) => y.code === x.code)).map((x) => <option key={x.code} value={x.code}>{x.label || x.code}</option>)}
+            </Select>}
+          </Field>
+        </div>
         <div className={mq('incidence') ? 'rounded-md border-l-4 border-warn bg-warn-bg/50 px-3 py-2' : ''}>
           <span className="label">Impact budgétaire (dépense ou recette) ? *{mq('incidence') && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-warn align-middle" title="À renseigner" aria-label="À renseigner" />}</span>
           <div className="flex items-center gap-4 py-2">
@@ -267,7 +314,7 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
           const md = previews.data?.[t.id] ?? '';
           const inner = (<>
             <div className="mb-1 flex items-center gap-2"><h4 className="text-[15px] font-bold text-head">{kindLabel(t)}{d && dels.length > 1 ? ` — délibération ${d.ordre}` : ''}</h4>
-              {t.empty ? <Badge tone="warn">à rédiger</Badge> : <Badge tone="ok">v{t.version}</Badge>}{t.tracking && <Badge tone="blue">suivi actif</Badge>}{!signe && <span className="ml-auto text-[12px] font-semibold text-action">{editable ? 'Modifier' : 'Ouvrir'} →</span>}</div>
+              {t.empty ? <Badge tone="warn">à rédiger</Badge> : <Badge tone="ok">ok</Badge>}{t.tracking && <Badge tone="blue">suivi actif</Badge>}{!signe && <span className="ml-auto text-[12px] font-semibold text-action">{editable ? 'Modifier' : 'Ouvrir'} →</span>}</div>
             {md ? <div className="text-preview line-clamp-4 text-[14px] leading-[22px] text-slate-700" dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} /> : <p className="text-mute">Cliquez pour rédiger ce texte.</p>}
           </>);
           return signe
@@ -626,13 +673,11 @@ function Completude({ c }: { c: any }) {
 }
 
 /* ---------------------------------------------------------------------------------------------- commissions (avis) */
+/** Suivi des avis de commission (le rattachement se fait depuis la fiche, « infos clés »). */
 function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolean; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth(); const o = org!.id;
   const mine = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/commissions`))).data, [acte.id]);
-  const all = useLoad(async () => ((await api.get(orgPath(o, '/commissions'), { params: { actif: 'true' } })).data.items as any[]).filter((c) => c.type !== 'autre'), [o]);
-  const [sel, setSel] = useState('');
   const AVIS: Record<string, string> = { favorable: 'Favorable', defavorable: 'Défavorable', reserve: 'Réservé', sans_avis: 'Sans avis' };
-  const add = async () => { try { await api.post(orgPath(o, `/actes/${acte.id}/commissions`), { commissionId: Number(sel) }); setSel(''); mine.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
   const remove = async (c: any) => {
     const motif = c.misADispositionAt ? prompt('Motif du retrait (obligatoire, les membres seront prévenus) :') : undefined;
     if (c.misADispositionAt && !motif) return;
@@ -642,10 +687,9 @@ function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolea
     const v = prompt('Avis (favorable, defavorable, reserve, sans_avis) :', 'favorable'); if (!v) return;
     try { await api.put(orgPath(o, `/actes/${acte.id}/commissions/${c.commissionId}/avis`), { avis: v }); mine.reload(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
-  const taken = new Set((mine.data?.items ?? []).filter((c: any) => !c.retireeAt).map((c: any) => c.commissionId));
   return (
     <div className="card p-5">
-      <h3 className="mb-2">Commissions (pour avis)</h3>
+      <h3 className="mb-2">Avis des commissions</h3>
       {mine.data?.horsCommission ? <p className="text-mute">Hors commission.</p> : (
         <ul className="space-y-2">{mine.data?.items.filter((c: any) => !c.retireeAt).map((c: any) => (
           <li key={c.id} className="rounded border border-line p-2">
@@ -653,8 +697,6 @@ function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolea
             <div className="text-[12px] text-mute">{c.suspendue ? '⏸ mise à disposition suspendue' : c.misADispositionAt ? `Mis à disposition le ${d(c.misADispositionAt)}` : 'Mise à disposition à la validation DGS'}</div>
             {c.avis ? <Badge tone={c.avis === 'favorable' ? 'ok' : c.avis === 'defavorable' ? 'ko' : 'warn'}>{AVIS[c.avis]}</Badge> : c.misADispositionAt && <button className="text-[12px] font-semibold text-action" onClick={() => avis(c)}>Saisir l'avis</button>}
           </li>))}</ul>)}
-      {editable && <div className="mt-3 flex gap-2"><Select className="input" value={sel} onChange={(e) => setSel(e.target.value)} aria-label="Ajouter une commission"><option value="">Ajouter une commission…</option>
-        {all.data?.filter((c) => !taken.has(c.id)).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</Select><button className="btn-secondary" disabled={!sel} onClick={add}>Ajouter</button></div>}
     </div>
   );
 }

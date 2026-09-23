@@ -89,6 +89,12 @@ const RULES = [
   { code: 'commission.reunion', nom: 'Réunion de commission (convocation, modification, annulation)', family: 'suivi', kind: 'event', mandatory: false,
     trigger: { event: 'commission.reunion' }, recipients: ['commission_membres', 'commission_secretaires'],
     subject: 'Réunion {commission} — {changement}', body: "Réunion de la commission « {commission} » ({changement}).\nDate : {date_reunion}\nLieu : {lieu}\nVisioconférence Teams : {lien_teams}" },
+  { code: 'acte.info_scc', nom: 'Projet en copie arrivé au SCC', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'acte.arrive_scc' }, recipients: ['info_directeurs'],
+    subject: 'Pour information (SCC) : {titre}', body: "Le projet n° {numero} « {titre} » arrive au SCC. Votre direction est associée « en info » à ce dossier.\n{lien}" },
+  { code: 'acte.info_dga', nom: 'Délibération en copie arrivée au DGA', family: 'suivi', kind: 'event', mandatory: false,
+    trigger: { event: 'acte.arrive_dga' }, recipients: ['info_dgas'],
+    subject: 'Pour information (DGA) : {titre}', body: "La délibération n° {numero} « {titre} » arrive à l'étape DGA. Votre direction est associée « en info » à ce dossier.\n{lien}" },
 
   // ---- temporelles : relances (paliers par défaut de la section 22.3 bis, jours ouvrés) ------------------------------
   { code: 'relance.etape', nom: "Relance d'un acte qui attend un valideur", family: 'validation', kind: 'temporal', mandatory: true,

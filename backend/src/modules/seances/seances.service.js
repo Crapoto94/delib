@@ -5,7 +5,7 @@
  */
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
-const { addBusinessDays, parisParts, parisToDate } = require('../../shared/time');
+const { addBusinessDays, addCalendarDays, parisParts, parisToDate } = require('../../shared/time');
 
 const SEANCE_TYPES = ['ordinaire', 'extraordinaire', 'budgetaire', 'autre'];
 const STATUTS = ['planifiee', 'convoquee', 'tenue', 'close', 'annulee'];
@@ -74,10 +74,10 @@ function createSeances({ db, audit, actes, acl, settings, bus, late, meeting, lo
     },
 
     // ------------------------------------------------------------------------------------------ séances
-    /** Rétroplanning de l'organisme (configuré, sinon les étapes par défaut). */
+    /** Rétroplanning de l'organisme (configuré, sinon les étapes par défaut) et son mode de calcul. */
     async retroplanning(organismeId) {
       const cfg = await settings.resolve(organismeId);
-      return { etapes: svc.retroConfig(cfg) || RETRO_DEFAUT, defaut: !svc.retroConfig(cfg) };
+      return { etapes: svc.retroConfig(cfg) || RETRO_DEFAUT, defaut: !svc.retroConfig(cfg), calendaire: svc.retroCalendaire(cfg) };
     },
 
     /** Rétroplanning configuré (liste d'étapes) s'il existe, sinon null. */
@@ -87,16 +87,25 @@ function createSeances({ db, audit, actes, acl, settings, bus, late, meeting, lo
       return Array.isArray(etapes) && etapes.length ? etapes : null;
     },
 
+    /** Mode de calcul : `true` = jours calendaires (week-ends et jours fériés comptés), `false` (défaut) = jours ouvrés. */
+    retroCalendaire(cfg) {
+      const v = cfg['seances.retroplanning']?.value;
+      return v?.calendaire === true || cfg['seances.retroplanning.calendaire']?.value === true;
+    },
+
     /**
      * Dates clés proposées d'après la date de séance.
-     *  - Si un rétroplanning est configuré (`seances.retroplanning`) : chaque étape est à J-x JOURS OUVRÉS de la suivante,
-     *    la dernière étant le jour du conseil. Les codes `soumissions`/`redaction`, `dgs`, `commissions`/`mad`, `convocation`
-     *    alimentent les champs fixes de la séance ; les autres deviennent des jalons complémentaires.
+     *  - Si un rétroplanning est configuré (`seances.retroplanning`) : chaque étape est à J-x jours (OUVRÉS, ou CALENDAIRES
+     *    si `calendaire: true`) de la suivante, la dernière étant le jour du conseil. Les codes `soumissions`/`redaction`,
+     *    `dgs`, `commissions`/`mad`, `convocation` alimentent les champs fixes de la séance ; les autres deviennent des
+     *    jalons complémentaires.
      *  - Sinon : les décalages historiques (`seances.decalage.*`).
      */
     async proposeDates(organismeId, dateSeance, typeActeId) {
       const cfg = await settings.resolve(organismeId, { typeActeId });
       const holidays = await holidaysOf(organismeId);
+      const calendaire = svc.retroCalendaire(cfg);
+      const addDays = (d, n) => (calendaire ? addCalendarDays(d, n) : addBusinessDays(d, n, holidays));
       const p = parisParts(new Date(dateSeance));
       const day = new Date(Date.UTC(p.y, p.m - 1, p.d));
       const eod = (dt) => parisToDate(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate(), 23, 59);
@@ -106,7 +115,7 @@ function createSeances({ db, audit, actes, acl, settings, bus, late, meeting, lo
         let d = day;
         for (let i = etapes.length - 1; i >= 0; i--) {
           const e = etapes[i];
-          if (i < etapes.length - 1) d = addBusinessDays(d, -Math.max(0, Number(e.jours) || 0), holidays);
+          if (i < etapes.length - 1) d = addDays(d, -Math.max(0, Number(e.jours) || 0));
           jalons[i] = { code: e.code, label: e.label, jours: Number(e.jours) || 0, date: eod(d) };
         }
         const byCode = (codes) => jalons.find((j) => codes.includes(j.code))?.date ?? null;
@@ -121,9 +130,9 @@ function createSeances({ db, audit, actes, acl, settings, bus, late, meeting, lo
       const get = (k, d) => Number(cfg[k]?.value ?? d);
       const conv = new Date(day.getTime() - (get('seances.decalage.convocation', 5) + 1) * 86400000); // « jours francs » : veille comprise
       const out = {
-        dateLimiteRedaction: eod(addBusinessDays(day, -get('seances.decalage.redaction', 30), holidays)),
-        dateLimiteDgs: eod(addBusinessDays(day, -get('seances.decalage.dgs', 20), holidays)),
-        dateLimiteMadCommissions: eod(addBusinessDays(day, -get('seances.decalage.mad', 12), holidays)),
+        dateLimiteRedaction: eod(addDays(day, -get('seances.decalage.redaction', 30))),
+        dateLimiteDgs: eod(addDays(day, -get('seances.decalage.dgs', 20))),
+        dateLimiteMadCommissions: eod(addDays(day, -get('seances.decalage.mad', 12))),
         dateEnvoiConvocation: eod(conv),
       };
       out.jalons = [

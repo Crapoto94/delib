@@ -222,7 +222,7 @@ describe('activer / désactiver chaque usage de l’IA (D83)', () => {
   const set = (code, actif) => as(admin).put(`${PR()}/${code}`, { actif });
 
   it('tout est activé par défaut ; le contrôle complet figure dans la liste sans consigne propre', async () => {
-    expect(await statut()).toEqual({ orthographe: true, style: true, visas: true, complet: true, copie: true, aide: true });
+    expect(await statut()).toEqual({ orthographe: true, style: true, visas: true, complet: true, copie: true, collecteurs: true, aide: true });
     const l = (await as(admin).get(PR())).body.items;
     expect(l.map((i) => i.code)).toEqual(['orthographe', 'style', 'visas', 'complet', 'copie', 'aide']);
     expect(l.find((i) => i.code === 'complet')).toMatchObject({ sansConsigne: true, actif: true });
@@ -274,7 +274,7 @@ describe('activer / désactiver chaque usage de l’IA (D83)', () => {
   it('la réactivation rétablit l’usage ; l’interrupteur est réservé à l’administrateur', async () => {
     expect((await as(t.dupont).put(`${PR()}/style`, { actif: true })).status).toBe(403);
     for (const c of ['style', 'orthographe', 'visas', 'complet', 'copie', 'aide']) expect((await set(c, true)).status).toBe(200);
-    expect(await statut()).toEqual({ orthographe: true, style: true, visas: true, complet: true, copie: true, aide: true });
+    expect(await statut()).toEqual({ orthographe: true, style: true, visas: true, complet: true, copie: true, collecteurs: true, aide: true });
     expect((await as(t.dupont).post(`${P(acte.id)}/ia/analyse`, { type: 'style' })).status).toBe(202);
     await settle();
   });

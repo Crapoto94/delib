@@ -41,7 +41,7 @@ module.exports = ({ makeRouter, recherche, alertes }) => {
 
   r.get('/propositions', {
     summary: 'Délibérations passées correspondant à des mots-clés, à reprendre comme modèle à la création d’un dossier', tags: T, org: true, params: P, query: Propositions,
-    description: 'Comparaison insensible aux accents sur le titre et l’exposé (les actes importés n’ont pas d’index plein texte). Tri par nombre de mots-clés trouvés ; un acte que je ne peux pas voir n’apparaît jamais.',
+    description: 'Comparaison insensible aux accents sur le titre et l’exposé (les actes importés n’ont pas d’index plein texte). Tri de la séance la plus récente à la plus ancienne ; à défaut de séance, par nombre de mots-clés trouvés. Un acte que je ne peux pas voir n’apparaît jamais.',
   }, async (req, res) => res.json(await recherche.propositions(req.ctx, req.org.id, req.valid.query)));
 
   r.get('/enregistrees', { summary: 'Mes recherches enregistrées', tags: T, org: true, params: P }, async (req, res) => res.json({ items: await recherche.enregistrees(req.ctx, req.org.id) }));

@@ -51,6 +51,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
   /** Étape dont on n'affiche pas les noms, seulement l'étape de validation (paramétrable dans le circuit : `masquerNoms`) ; par défaut, les étapes tenues par un groupe (financier, juridique, SCC…). */
   const masqueNoms = (def) => (def?.masquerNoms !== undefined ? !!def.masquerNoms : def?.resolver?.kind === 'groupe');
   const baseKeyOf = (a, key) => (a.adhoc_steps || []).find((s) => s.key === key)?.afterKey || key;
+  /** Clé de l'étape « direction » du circuit (titulaire directeur), pour le retour proposé aux DGA. */
+  const directionStepKey = (graph) => (graph.steps.find((s) => s.resolver?.kind === 'titulaire' && s.resolver?.fonction === 'directeur') || {}).key || null;
 
   /** Titulaires d'une étape (CIR-20). Le rédacteur ne valide jamais sa propre étape (CIR-24). */
   async function resolveStep(a, step, cfg) {
@@ -70,11 +72,15 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     else if (r.kind === 'groupe') holders = await titulaires.groupMembers(org, r.code);
     else if (r.kind === 'agent') holders = [r.username];
     holders = [...new Set(holders.map((h) => h.toLowerCase()))];
+    // L'étape SCC ne se contourne jamais du fait de l'auto-validation : un acte rédigé par un membre du SCC
+    // (sa directrice, par exemple) passe quand même par le SCC. Le rédacteur est écarté s'il reste d'autres
+    // membres pour valider ; s'il est seul, il valide son propre acte à cette étape.
+    const forceScc = r.kind === 'groupe' && r.code === 'scc';
     if (r.kind !== 'redacteur' && cfg['circuit.autovalidation']?.value !== true) {
       const self = new Set([a.redacteur, ...(a.co_redacteurs || [])]);
       const others = holders.filter((h) => !self.has(h));
-      if (holders.length && !others.length) return { holders: [], skipped: true, reason: 'auto_validation', via };
-      holders = others;
+      if (holders.length && !others.length && !forceScc) return { holders: [], skipped: true, reason: 'auto_validation', via };
+      holders = others.length || !forceScc ? others : holders;
     }
     if (!holders.length && r.kind !== 'redacteur') return step.optional ? { holders: [], skipped: true, reason: 'sans_titulaire' } : { holders: [], missing: true };
     return { holders, via };
@@ -187,7 +193,9 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       }
       // Quand la même personne doit valider plusieurs étapes de suite (chef de service puis directeur, par exemple), elle ne valide
       // qu'une fois : les étapes suivantes sont validées implicitement (D69). Désactivable : `circuit.dedupe = false`.
-      if (cfg['circuit.dedupe']?.value !== false && !r.missing && ctx?.username && (def.mode || 'one') === 'one' && r.holders.includes(ctx.username) && fromKey !== graph.start) {
+      // L'étape SCC en est exclue : elle reste obligatoire même si son détenteur a validé l'étape précédente.
+      const stepScc = def.resolver?.kind === 'groupe' && def.resolver?.code === 'scc';
+      if (cfg['circuit.dedupe']?.value !== false && !r.missing && !stepScc && ctx?.username && (def.mode || 'one') === 'one' && r.holders.includes(ctx.username) && fromKey !== graph.start) {
         await q.run("INSERT INTO step_instances (acte_id, step_key, label, round, status, holders, decision, acted_by, acted_at) VALUES ($1,$2,$3,$4,'done',$5::jsonb,'auto',$6, now())", [a.id, key, def.label, a.circuit_round, JSON.stringify(r.holders), ctx.username]);
         trail.push(key); applyDone(def);
         await event(q, a, ctx, 'auto_validate', { to: key });
@@ -206,6 +214,9 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       await refreshPath(q, a, graph);
       await event(q, a, ctx, 'enter', { from: fromKey, to: key, meta: { holders: r.holders } });
       events.push(['step.entered', { organismeId: a.organisme_id, acteId: a.id, stepKey: key, holders: r.holders, label: def.label, dueAt: due, from: fromKey }]);
+      // Événements dédiés pour les directions « en info » : arrivée au SCC et arrivée au DGA (leur homologue).
+      if (def.resolver?.kind === 'groupe' && def.resolver?.code === 'scc') events.push(['acte.arrive_scc', { organismeId: a.organisme_id, acteId: a.id, stepKey: key, label: def.label }]);
+      if (def.resolver?.kind === 'titulaire' && def.resolver?.fonction === 'dga') events.push(['acte.arrive_dga', { organismeId: a.organisme_id, acteId: a.id, stepKey: key, label: def.label }]);
       if (r.missing) events.push(['circuit.blocked', { organismeId: a.organisme_id, acteId: a.id, stepKey: key, label: def.label }]);
       return { acte: await q.get('SELECT * FROM actes WHERE id = $1', [a.id]), events };
     }
@@ -345,14 +356,21 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         if (target === 'previous') to = earlier[earlier.length - 1];
         else if (target === 'first') { if (cfg['circuit.retour_premiere']?.value === false) throw E.forbidden('Le retour à la première étape est désactivé'); to = earlier[0]; }
         else {
-          if (cfg['circuit.refus_cible_libre']?.value === false) throw E.forbidden('Le refus vers une étape au choix est désactivé : « previous » ou « first »');
-          if (!earlier.includes(target)) throw E.badRequest(`Étape cible invalide : « ${target} » (étapes antérieures : ${earlier.join(', ')})`);
-          to = target;
+          const dk = directionStepKey(graph);
+          // Retour à la direction demandé par un DGA : l'étape du directeur peut ne pas avoir été traversée (sautée).
+          if (dk && target === dk) to = dk;
+          else {
+            if (cfg['circuit.refus_cible_libre']?.value === false) throw E.forbidden('Le refus vers une étape au choix est désactivé : « previous » ou « first »');
+            if (!earlier.includes(target)) throw E.badRequest(`Étape cible invalide : « ${target} » (étapes antérieures : ${earlier.join(', ')})`);
+            to = target;
+          }
         }
         const mode = resume || cfg['circuit.reprise']?.value || 'direct';
         const def = defOf(graph, a, to);
         await q.run("UPDATE step_instances SET status = 'returned', acted_by = $2, on_behalf_of = $3, acted_at = now(), decision = 'refus', comment = $4 WHERE id = $1", [inst.id, ctx.username, who.onBehalfOf, motif]);
-        const newTrail = trail.slice(0, trail.lastIndexOf(to) + 1);
+        let newTrail;
+        if (trail.includes(to)) newTrail = trail.slice(0, trail.lastIndexOf(to) + 1);
+        else { const proj = await buildPath(a, graph); const idx = proj.findIndex((p) => p.key === to); newTrail = idx >= 0 ? proj.slice(0, idx + 1).map((p) => p.key) : [to]; }
         const r = to === graph.start ? { holders: [a.redacteur, ...(a.co_redacteurs || [])] } : await resolveStep(a, def, cfg);
         const due = def?.slaDays ? addBusinessDays(new Date(), def.slaDays, await holidaysOf(a.organisme_id)) : null;
         await q.run("INSERT INTO step_instances (acte_id, step_key, label, round, status, holders, mode, quorum, sla_days, due_at, adhoc) VALUES ($1,$2,$3,$4,'current',$5::jsonb,$6,$7,$8,$9,$10)",
@@ -488,12 +506,20 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         canValidate = v.ok; canRefuse = r.ok; onBehalfOf = v.onBehalfOf || r.onBehalfOf;
       }
       const returnedToMe = a.statut === 'modification_demandee' && a.current_step_key === graph.start && (IS_DRAFTER(ctx, a) || acl.isAdmin(ctx, a.organisme_id));
-      const targets = curIdx > 0 && canRefuse ? trail.slice(0, curIdx).map((k) => ({ key: k, label: path.find((p) => p.key === k)?.label || k, first: k === trail[0] })) : [];
+      const baseTargets = curIdx > 0 && canRefuse ? trail.slice(0, curIdx).map((k) => ({ key: k, label: path.find((p) => p.key === k)?.label || k, first: k === trail[0] })) : [];
+      let targets = baseTargets;
+      // Le DGA peut aussi renvoyer l'acte à la direction (étape du directeur), même si elle a été sautée.
+      const curDef = a.current_step_key ? defOf(graph, a, a.current_step_key) : null;
+      if (canRefuse && curDef?.resolver?.kind === 'titulaire' && curDef.resolver.fonction === 'dga') {
+        const dk = directionStepKey(graph);
+        if (dk) targets = targets.some((t) => t.key === dk) ? targets.map((t) => (t.key === dk ? { ...t, label: 'Direction' } : t)) : [...targets, { key: dk, label: 'Direction', first: false }];
+      }
+      const prevKey = baseTargets.length ? baseTargets[baseTargets.length - 1].key : null;
       return {
         acteId: a.id, statut: a.statut, submitted: true, versionId: a.circuit_version_id, currentStepKey: a.current_step_key, round: a.circuit_round,
         blocked: !!inst && inst.holders.length === 0, resume: a.resume_step ? { step: a.resume_step, from: a.return_from } : null,
-        path, refuseTargets: targets, previous: targets.length ? targets[targets.length - 1].key : null,
-        refuseDefault: (() => { const c = defOf(graph, a, a.current_step_key)?.refusTo; return c && targets.some((x) => x.key === c) ? c : (targets.length ? targets[targets.length - 1].key : null); })(),
+        path, refuseTargets: targets, previous: prevKey,
+        refuseDefault: (() => { const c = defOf(graph, a, a.current_step_key)?.refusTo; return c && targets.some((x) => x.key === c) ? c : prevKey; })(),
         actions: { submit: returnedToMe, validate: canValidate, refuse: canRefuse, onBehalfOf },
         due: inst?.due_at || null, late: !!inst?.due_at && new Date(inst.due_at) < new Date(), events,
       };

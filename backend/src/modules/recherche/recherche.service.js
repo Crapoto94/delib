@@ -418,16 +418,19 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
                + CASE WHEN EXISTS (SELECT 1 FROM annexes an2 WHERE an2.acte_id = a.id AND ${compact("COALESCE(an2.titre, '')")} LIKE ${like}) THEN 1 ELSE 0 END)`;
       }).join(' + ');
       const rows = await db.all(
-        `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.direction_label, a.custom->'motsCles' AS mots_cles,
-                m.libelle AS matiere,
-                (SELECT it.numero FROM seance_items it WHERE it.acte_id = a.id AND it.statut = 'a_traiter' ORDER BY it.id DESC LIMIT 1) AS numero,
-                (SELECT s.date_seance FROM seance_items it JOIN seances s ON s.id = it.seance_id WHERE it.acte_id = a.id ORDER BY it.id DESC LIMIT 1) AS date_seance,
-                (${score}) AS score
-         FROM actes a LEFT JOIN ref_items m ON m.id = a.matiere_id
-         WHERE a.organisme_id = $1 AND ${vis.where} AND a.statut = ANY(${add(['adopte', 'executoire', 'publie', 'ar_recu', 'transmis', 'archive'])}::text[])
-         ORDER BY score DESC, a.id DESC LIMIT 12`, p);
+        `SELECT * FROM (
+           SELECT a.id, a.numero_suivi, a.titre, a.statut, a.direction_label, a.custom->'motsCles' AS mots_cles,
+                  m.libelle AS matiere,
+                  (SELECT it.numero FROM seance_items it WHERE it.acte_id = a.id AND it.statut = 'a_traiter' ORDER BY it.id DESC LIMIT 1) AS numero,
+                  (SELECT s.date_seance FROM seance_items it JOIN seances s ON s.id = it.seance_id WHERE it.acte_id = a.id ORDER BY it.id DESC LIMIT 1) AS date_seance,
+                  (${score}) AS score
+           FROM actes a LEFT JOIN ref_items m ON m.id = a.matiere_id
+           WHERE a.organisme_id = $1 AND ${vis.where} AND a.statut = ANY(${add(['adopte', 'executoire', 'publie', 'ar_recu', 'transmis', 'archive'])}::text[])
+         ) t
+         WHERE t.score > 0
+         ORDER BY t.date_seance DESC NULLS LAST, t.score DESC, t.id DESC LIMIT 12`, p);
       return {
-        items: rows.filter((r) => Number(r.score) > 0).map((r) => ({
+        items: rows.map((r) => ({
           acteId: r.id, numeroSuivi: r.numero_suivi, numero: r.numero || null, titre: r.titre, statut: r.statut,
           direction: r.direction_label || null, matiere: r.matiere || null,
           dateSeance: r.date_seance, annee: r.date_seance ? new Date(r.date_seance).getFullYear() : null,

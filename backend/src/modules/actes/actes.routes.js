@@ -10,6 +10,7 @@ const Fields = {
   rapporteurId: Id.nullable().optional(), rapporteurComplId: Id.nullable().optional(), seanceViseeId: Id.nullable().optional(),
   urgence: z.boolean().optional(), dateLimite: z.iso.date().nullable().optional(),
   confidentialite: z.enum(['normale', 'confidentiel', 'huis_clos']).optional(), custom: z.record(z.string(), z.unknown()).optional(),
+  directionsInfo: z.array(z.string().trim().min(1).max(40)).max(20).optional().describe('Directions associées « en info » (copie) : leur directeur est notifié à l\'arrivée au SCC, leur DGA à l\'arrivée au DGA'),
 };
 const Create = z.object({
   typeId: Id, titre: z.string().trim().min(3).max(500),

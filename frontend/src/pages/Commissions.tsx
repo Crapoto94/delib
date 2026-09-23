@@ -1,15 +1,19 @@
 import { AgentNames } from '../AgentName';
 import { FormEvent, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { ReunionsSection } from '../Reunions';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, useLoad } from '../ui';
 
-function Detail({ id, onClose }: { id: number; onClose: () => void }) {
+function Detail({ id, onClose, onDeleted }: { id: number; onClose: () => void; onDeleted: () => void }) {
   const { org, isScc } = useAuth();
   const c = useLoad(async () => (await api.get(orgPath(org!.id, `/commissions/${id}`))).data, [id]);
   const setType = async (t: 'actes' | 'autre') => { await api.put(orgPath(org!.id, `/commissions/${id}`), { type: t }); c.reload(); };
+  const supprimer = async () => {
+    if (!confirm(`Supprimer la commission « ${c.data?.nom ?? ''} » ?\n\nLes rattachements aux actes seront retirés ; ses membres et secrétaires suivent.`)) return;
+    try { await api.delete(orgPath(org!.id, `/commissions/${id}`)); onDeleted(); } catch (e) { alert(errMsg(e)); }
+  };
   return (
     <Modal title={c.data?.nom ?? 'Commission'} onClose={onClose} wide>
       {c.loading || !c.data ? <Loading /> : (
@@ -21,6 +25,7 @@ function Detail({ id, onClose }: { id: number; onClose: () => void }) {
             {c.data.membres.length === 0 ? <p className="text-mute">Aucun membre.</p> : <ul className="grid gap-1 md:grid-cols-2">{c.data.membres.map((m: any) => <li key={m.eluId} className="rounded bg-soft px-3 py-2">{m.prenom} {m.nom} {m.fonction !== 'membre' && <Badge tone="blue">{m.fonction.replace('_', '-')}</Badge>} <span className="text-mute">{m.groupe}</span></li>)}</ul>}</div>
           <ReunionsSection commissionId={id} canEdit={isScc} />
           <div><h3 className="mb-1">Secrétaires</h3>{c.data.secretaires.length ? <AgentNames list={c.data.secretaires} /> : <span className="text-mute">Aucun</span>}</div>
+          {isScc && <div className="border-t border-line pt-3"><button className="btn-ko" onClick={supprimer}><Trash2 className="h-4 w-4" /> Supprimer la commission</button></div>}
         </div>)}
     </Modal>
   );
@@ -38,7 +43,7 @@ export default function Commissions() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{list.data.map((c) => (
           <button key={c.id} onClick={() => setOpen(c.id)} className="card p-5 text-left hover:shadow-lift"><h3>{c.nom}</h3><p className="mt-1 line-clamp-3 text-mute">{c.description || '—'}</p><p className="mt-3"><Badge tone="blue">{c.nbMembres}{c.sieges ? ` / ${c.sieges}` : ''} membre(s)</Badge> {c.type === 'autre' && <Badge tone="warn">autre (sans lien avec les actes)</Badge>} {!c.actif && <Badge>inactive</Badge>}</p></button>))}</div>)}
       {creating && <Modal title="Nouvelle commission" onClose={() => setCreating(false)}><form onSubmit={create} className="space-y-4"><ErrorBox msg={err} /><Field label="Nom"><input className="input" autoFocus required value={nom} onChange={(e) => setNom(e.target.value)} /></Field><TypeChoix value={type} onChange={setType} /><div className="flex justify-end"><button className="btn-primary">Créer</button></div></form></Modal>}
-      {open && <Detail id={open} onClose={() => setOpen(null)} />}
+      {open && <Detail id={open} onClose={() => setOpen(null)} onDeleted={() => { setOpen(null); list.reload(); }} />}
     </div>
   );
 }

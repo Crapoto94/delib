@@ -949,7 +949,7 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
     const o = requireOrg(org); await lotDe(o, importId);
     const items = await db.all(`SELECT i.* FROM airs_import_items i
       WHERE i.import_id = $1 AND i.kind = 'acte' AND i.acte_id IS NOT NULL
-        AND NOT EXISTS (SELECT 1 FROM annexes an WHERE an.acte_id = i.acte_id AND an.titre ILIKE '%document d''origine%')
+        AND NOT EXISTS (SELECT 1 FROM annexes an WHERE an.acte_id = i.acte_id)
       ORDER BY i.id`, [importId]);
     let n = 0;
     await majProgression(importId, { enCours: true, phase: 'import', fait: 0, total: items.length, libelle: 'Rattachement des documents' });
@@ -1079,13 +1079,13 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
     if (archive) {
       if (typeof source.fichiers !== 'function') return { ajoutes: 0 };
       let fichiers; try { fichiers = await avecDelai(source.fichiers({ docId, archive: true }), 20000, 'AIRS injoignable'); } catch { return { ajoutes: 0, erreur: 'AIRS injoignable' }; }
-      for (const f of (fichiers || [])) liste.push({ nom: f.nom, cheminServ: f.cheminServ, titre: LIBELLE_FIC[f.tfp] || f.libelle || f.nom });
+      // L'exposé des motifs et la délibération sont repris dans les textes de l'acte : on ne les remet pas en pièce jointe.
+      for (const f of (fichiers || [])) { if (f.tfp === 4 || f.tfp === 5) continue; liste.push({ nom: f.nom, cheminServ: f.cheminServ, titre: LIBELLE_FIC[f.tfp] || f.libelle || f.nom }); }
     } else {
       const rapId = str(item.payload?.rap_id).trim();
-      let docs = []; let anne = [];
-      try { if (typeof source.documentsCourants === 'function') docs = await avecDelai(source.documentsCourants({ delId: docId, rapId }), 20000, 'AIRS injoignable'); } catch { /* ignoré */ }
+      let anne = [];
       try { if (rapId && typeof source.annexesDeRapport === 'function') anne = await avecDelai(source.annexesDeRapport(rapId), 20000, 'AIRS injoignable'); } catch { /* ignoré */ }
-      for (const d of docs) liste.push({ nom: d.nom, cheminServ: d.cheminServ, titre: d.source === 'rapport' ? "Exposé des motifs (document d'origine AIRS)" : "Délibération (document d'origine AIRS)" });
+      // `documentsCourants` ne contient que l'exposé des motifs et la délibération, déjà repris dans les textes : seules les annexes sont jointes.
       for (const a of anne) liste.push({ nom: a.nom, cheminServ: a.cheminServ, titre: a.libelle || a.nom });
     }
     let n = 0;

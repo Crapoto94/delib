@@ -9,9 +9,9 @@ import { SeanceVisee } from '../SeanceVisee';
 import { Select } from '../Select';
 import { BoutonNouveauDossier, NewDossier } from './Dossiers';
 
-const CATEGORIES: { cle: string; titre: string; sous: string; match: (r: string[]) => boolean }[] = [
+const CATEGORIES: { cle: string; titre: string; sous: string; accent?: boolean; match: (r: string[]) => boolean }[] = [
+  { cle: 'action', titre: 'Action attendue de vous', sous: 'Dossiers en attente de votre validation ou renvoyés à votre attention.', accent: true, match: (r) => r.includes('action') },
   { cle: 'brouillons', titre: 'En cours de rédaction', sous: 'Vos dossiers non encore envoyés.', match: (r) => r.includes('mes_brouillons') },
-  { cle: 'action', titre: 'Action attendue de vous', sous: 'Dossiers en attente de votre validation ou renvoyés à votre attention.', match: (r) => r.includes('action') },
   { cle: 'equipe', titre: 'Rédaction / validation de mon équipe', sous: 'Ce que vos collaborateurs rédigent ou font valider.', match: (r) => r.some((x) => ['redaction', 'correction', 'validation'].includes(x)) },
   { cle: 'valide', titre: 'Validés par vous, en circuit', sous: 'Ils poursuivent leur circuit sans vous.', match: (r) => r.includes('valide') },
   { cle: 'poursuite', titre: 'Dans le circuit', sous: 'Actes que vous suivez et qui ne sont plus à votre étape (encore en circuit, ou validés en attente de séance).', match: (r) => r.includes('poursuite') },
@@ -63,10 +63,10 @@ export default function MonEspace() {
         <td className="text-[12px]">{t.step?.dueAt ? (t.enRetard ? <Badge tone="ko">En retard · {dt(t.step.dueAt, { dateStyle: 'short' })}</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>
       </tr>);
   };
-  const tableau = (cle: string, titre: string, sous: string, lst: any[], showEtape: boolean) => (
-    <section key={cle} className="card">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
-        <h3 className="!text-[15px]">{titre}</h3><Badge tone="blue">{lst.length}</Badge>
+  const tableau = (cle: string, titre: string, sous: string, lst: any[], showEtape: boolean, accent = false) => (
+    <section key={cle} className={`card ${accent ? 'border-l-4 border-l-action ring-1 ring-action/20' : ''}`}>
+      <div className={`flex flex-wrap items-center gap-2 border-b px-5 py-3 ${accent ? 'border-action/30 bg-action/5' : 'border-line'}`}>
+        <h3 className={`!text-[15px] ${accent ? '!text-action' : ''}`}>{accent && <span aria-hidden className="mr-1">★</span>}{titre}</h3><Badge tone={accent ? 'warn' : 'blue'}>{lst.length}</Badge>
         {sous && <span className="ml-2 text-[12px] text-mute">{sous}</span>}
       </div>
       <div className="overflow-x-auto"><table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Rédacteur</th>{showEtape && <th>Étape</th>}<th>Séance visée</th><th>Statut</th><th>Échéance</th></tr></thead><tbody>
@@ -116,7 +116,7 @@ export default function MonEspace() {
             ? CATEGORIES.map((cat, i) => {
               const g = items.filter((it: any) => CATEGORIES.findIndex((c) => c.match(it.raisons)) === i);
               if (!g.length) return null;
-              return tableau(cat.cle, cat.titre, cat.sous, g, cat.cle === 'equipe' || cat.cle === 'poursuite');
+              return tableau(cat.cle, cat.titre, cat.sous, g, cat.cle === 'equipe' || cat.cle === 'poursuite', !!cat.accent);
             })
             : parConseil.map((grp) => tableau(grp.cle, grp.libelle, '', grp.items, true))}
         </>

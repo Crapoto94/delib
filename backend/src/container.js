@@ -176,7 +176,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const airs = createAirs({ db, audit, dir, source: airsSource, ad, storage }); // import de l'historique AIRS DELIB (section 25 bis, D111)
   // collecteurs d'arrêtés : moisson mail Graph / dossier, analyse IA, envoi en signature (parapheur) — créé après le parapheur, la messagerie et l'IA.
   const o365 = createApmO365(config);
-  const collecteurs = createCollecteurs({ db, audit, settings, config, log, mail, ai: aiAdapter, refs, storage, elus, parapheur, render, o365 });
+  const collecteurs = createCollecteurs({ db, audit, settings, config, log, mail, ai: aiAdapter, prompts: aiPrompts, refs, storage, elus, parapheur, render, o365 });
   bus.on('acte.document_signe', (p) => collecteurs.retourSigne(p.organismeId, p.acteId).catch((e) => log.warn({ acteId: p.acteId, err: e.message }, 'retour signé (collecteur) en erreur')));
   const scheduler = createScheduler({ db, notifications, config, log });
   scheduler.register('entrainement', (orgId) => entrainement.purger(orgId)); // purge des dossiers d'entraînement (UX-22)

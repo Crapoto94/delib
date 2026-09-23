@@ -25,6 +25,13 @@ function businessDaysBetween(a, b, holidays = new Set()) {
   return n;
 }
 
+/** Ajoute n jours calendaires (n peut être négatif, ou fractionnaire : arrondi au supérieur). Week-ends et jours fériés comptent. */
+function addCalendarDays(from, n) {
+  const d = new Date(from.getTime());
+  d.setUTCDate(d.getUTCDate() + Math.sign(n) * Math.ceil(Math.abs(n)));
+  return d;
+}
+
 const TZ = 'Europe/Paris';
 const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -59,4 +66,4 @@ function nextSendWindow(date, holidays = new Set(), from = 8, to = 18) {
   return parisToDate(target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), from, 0);
 }
 
-module.exports = { addBusinessDays, businessDaysBetween, isBusinessDay, isoDay, parisParts, parisToDate, isSendWindow, nextSendWindow };
+module.exports = { addBusinessDays, addCalendarDays, businessDaysBetween, isBusinessDay, isoDay, parisParts, parisToDate, isSendWindow, nextSendWindow };

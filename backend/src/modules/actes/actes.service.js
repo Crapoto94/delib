@@ -16,6 +16,7 @@ const toActe = (r) => r && ({
   montant: r.montant === null ? null : Number(r.montant), rapporteurId: r.rapporteur_id, rapporteurComplId: r.rapporteur_compl_id,
   seanceViseeId: r.seance_visee_id, seanceId: r.seance_id, urgence: r.urgence, dateLimite: r.date_limite, confidentialite: r.confidentialite,
   commentaireInitial: r.commentaire_initial, custom: r.custom, currentStepKey: r.current_step_key, participants: r.participants,
+  directionsInfo: r.directions_info ?? [],
   submittedAt: r.submitted_at, abandonedAt: r.abandoned_at, abandonMotif: r.abandon_motif, createdAt: r.created_at, updatedAt: r.updated_at,
   signeAt: r.signe_at ?? null, signePar: r.signe_par ?? null, parapheurEnvoiId: r.parapheur_envoi_id ?? null,
   documentSourceTrame: r.document_source_trame ?? null,
@@ -81,6 +82,18 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
       if (b.seanceViseeId) await late.seances.assertViseable(org, b.seanceViseeId);
     },
 
+    /** Directions « en info » (copie) : valide les codes contre l'organigramme et fige leur libellé. */
+    async resolveDirectionsInfo(directionCodes) {
+      const all = await dir.directions();
+      const out = [];
+      for (const code of [...new Set((directionCodes || []).map((x) => (typeof x === 'string' ? x : x?.code)).filter(Boolean))]) {
+        const d = all.find((x) => x.code === code);
+        if (!d && all.length) throw E.badRequest(`Direction inconnue de l'organigramme : ${code}`);
+        out.push({ code, label: d?.label || null });
+      }
+      return out;
+    },
+
     async create(ctx, organismeId, b) {
       const org = requireOrg(organismeId);
       const type = await refs.require('type_acte', b.typeId, org);
@@ -101,6 +114,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
 
       await svc.checkRefs(org, b);
       if (b.custom && late.champs) b.custom = await late.champs.valider(ctx, { organisme_id: org, type_id: type.id, statut: 'brouillon', redacteur: ctx.username, co_redacteurs: [] }, b.custom, {});
+      const directionsInfo = b.directionsInfo !== undefined ? await svc.resolveDirectionsInfo(b.directionsInfo) : [];
       const acte = await db.tx(async (q) => {
         // Les actes importés d'AIRS ont des numéros de suivi élevés : le compteur ne doit jamais les dépasser par le bas.
         const maxSuivi = (await q.get('SELECT COALESCE(max(numero_suivi), 0)::int AS m FROM actes WHERE organisme_id = $1', [org])).m;
@@ -108,11 +122,11 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
         const a = await q.get(
           `INSERT INTO actes (organisme_id, numero_suivi, type_id, titre, redacteur, direction_code, direction_label, service_code, service_label,
              nature_id, matiere_id, rubrique_id, incidence_financiere, montant, rapporteur_id, rapporteur_compl_id, seance_visee_id,
-             urgence, date_limite, confidentialite, commentaire_initial, custom)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22::jsonb) RETURNING *`,
+             urgence, date_limite, confidentialite, commentaire_initial, custom, directions_info)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22::jsonb,$23::jsonb) RETURNING *`,
           [org, numero, type.id, b.titre, ctx.username, directionCode, directionLabel, serviceCode, serviceLabelFinal, natureId, matiereId, rubriqueId,
             b.incidenceFinanciere ?? null, b.montant ?? null, b.rapporteurId ?? null, b.rapporteurComplId ?? null, b.seanceViseeId ?? null,
-            !!b.urgence, b.dateLimite ?? null, b.confidentialite || 'normale', b.commentaire ?? null, JSON.stringify(b.custom || {})]);
+            !!b.urgence, b.dateLimite ?? null, b.confidentialite || 'normale', b.commentaire ?? null, JSON.stringify(b.custom || {}), JSON.stringify(directionsInfo)]);
         const n = Math.max(1, type.meta?.minDeliberations ?? 1);
         for (let i = 1; i <= n; i++) await q.run('INSERT INTO deliberations (acte_id, ordre, titre) VALUES ($1,$2,$3)', [a.id, i, n === 1 ? b.titre : `${b.titre} (${i})`]);
         return a;
@@ -221,6 +235,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
         if (before.custom?.entrainement) c.entrainement = true; else delete c.entrainement; // le marqueur du bac à sable ne s'enlève ni ne s'ajoute à la main
         add('custom', JSON.stringify(c), '::jsonb');
       }
+      if (patch.directionsInfo !== undefined) add('directions_info', JSON.stringify(await svc.resolveDirectionsInfo(patch.directionsInfo)), '::jsonb');
       if (patch.coRedacteurs !== undefined) {
         if (before.redacteur !== ctx.username && !acl.isAdmin(ctx, org)) throw E.forbidden('Seul le rédacteur désigne ses co-rédacteurs');
         add('co_redacteurs', JSON.stringify([...new Set(patch.coRedacteurs.map((u) => u.toLowerCase()))].filter((u) => u !== before.redacteur)), '::jsonb');
@@ -412,6 +427,12 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
       need(!!a.rubrique_id, 'rubrique', 'Rubrique');
       need(!!a.nature_id, 'nature', 'Nature');
       if (!type?.meta?.signature) need(!!a.rapporteur_id, 'rapporteur', 'Élu rapporteur'); // décision / arrêté : pas d'élu rapporteur
+      // Commissions pour avis : obligatoire dès que la collectivité a des commissions actives (au moins une à rattacher).
+      const nbCommissions = (await db.get('SELECT count(*)::int AS n FROM commissions WHERE organisme_id = $1 AND actif', [a.organisme_id])).n;
+      if (nbCommissions) {
+        const nbAvis = (await db.get('SELECT count(*)::int AS n FROM acte_commissions WHERE acte_id = $1 AND retiree_at IS NULL', [a.id])).n;
+        need(nbAvis > 0, 'commission', 'Au moins une commission pour avis');
+      }
       const n = (await db.get('SELECT count(*)::int AS n FROM deliberations WHERE acte_id = $1', [a.id])).n;
       need(n >= Math.max(1, type?.meta?.minDeliberations ?? 1), 'deliberation', 'Au moins une délibération');
       // Délibérations d'autorisation : facultatives par défaut ; l'administrateur peut les rendre obligatoires.

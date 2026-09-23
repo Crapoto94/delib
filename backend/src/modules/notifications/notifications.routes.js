@@ -71,7 +71,7 @@ module.exports = ({ makeRouter, notifications }) => {
     async (req, res) => res.json(await notifications.listRules(req.org.id)));
   r.put('/notifications/regles/:code', {
     summary: 'Modifie une règle pour cet organisme (crée une surcharge)', tags: T, org: true, roles: ['org_admin'], params: PC, body: Rule,
-    description: 'Destinataires (résolveurs) : redacteur, holders, delegues, circuit, acteurs, mentions, scc, admins, superieur, chef_service, directeur, dga, dgs, agent:<login>. Variables de gabarit : {titre} {numero} {etape} {lien} {redacteur} {acteur} {motif} {echeance} {retard}… Audité (avant/après).',
+    description: 'Destinataires (résolveurs) : redacteur, holders, delegues, circuit, acteurs, mentions, scc, admins, superieur, chef_service, directeur, dga, dgs, info_directeurs, info_dgas, agent:<login>. Variables de gabarit : {titre} {numero} {etape} {lien} {redacteur} {acteur} {motif} {echeance} {retard}… Audité (avant/après).',
   }, async (req, res) => res.json(await notifications.putRule(req.ctx, req.org.id, req.valid.params.code, req.valid.body)));
   r.delete('/notifications/regles/:code', { summary: 'Supprime la surcharge : retour à la règle de la plateforme', tags: T, org: true, roles: ['org_admin'], params: PC },
     async (req, res) => res.json(await notifications.resetRule(req.ctx, req.org.id, req.valid.params.code)));

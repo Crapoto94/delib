@@ -40,6 +40,9 @@ module.exports = ({ makeRouter, commissions, seances }) => {
     async (req, res) => res.json(await commissions.get(req.org.id, req.valid.params.id)));
   r.put('/commissions/:id', { summary: 'Modifie une commission', tags: T, org: true, roles: ADMIN, params: PC, body: CommissionPatch },
     async (req, res) => res.json(await commissions.update(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+  r.delete('/commissions/:id', { summary: 'Supprime une commission (administrateur ou SCC)', tags: T, org: true, roles: ADMIN, params: PC,
+    description: "Les rattachements de la commission aux actes sont retirés, ses membres et secrétaires suivent. Les séances de ses réunions restent au registre ; son instance de réunions est désactivée." },
+  async (req, res) => res.json(await commissions.remove(req.ctx, req.org.id, req.valid.params.id)));
   r.put('/commissions/:id/membres', { summary: 'Remplace les membres élus (un président au plus)', tags: T, org: true, roles: ADMIN, params: PC, body: Membres },
     async (req, res) => res.json(await commissions.setMembres(req.ctx, req.org.id, req.valid.params.id, req.valid.body.membres)));
   r.put('/commissions/:id/secretaires', { summary: 'Remplace les secrétaires (agents)', tags: T, org: true, roles: ADMIN, params: PC, body: Secretaires },

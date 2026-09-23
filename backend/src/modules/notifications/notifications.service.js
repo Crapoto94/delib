@@ -43,6 +43,17 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
   }
   const fonctionUsers = async (orgId, fonction, a) => (await titulaires.resolve(orgId, fonction, { directionCode: a.direction_code, serviceCode: a.service_code })).flatMap((t) => [t.username, t.suppleant].filter(Boolean));
 
+  /** Directeurs (ou DGA) des directions associées « en info » à l'acte (copie). */
+  const infoDirections = async (orgId, acte, fonction) => {
+    const codes = [...new Set((acte.directions_info || []).map((d) => (typeof d === 'string' ? d : d?.code)).filter(Boolean))];
+    const out = [];
+    for (const code of codes) {
+      const t = await titulaires.resolveFor(orgId, fonction, { directionCode: code });
+      out.push(...(t.holders || []));
+    }
+    return out;
+  };
+
   /** Personnes ayant réellement eu affaire à l'acte : validations faites, commentaires, amendements, avis de commission. */
   async function acteursOf(acteId) {
     const rows = await db.all(`
@@ -78,6 +89,8 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
       else if (r === 'commission_secretaires') list = payload.commissionId ? (await late.commissions.recipients(payload.commissionId)).secretaires : [];
       else if (r === 'admins') list = await usersWithRole(orgId, 'org_admin');
       else if (r === 'scc') list = [...await usersWithRole(orgId, 'scc'), ...await titulaires.groupMembers(orgId, 'scc')];
+      else if (r === 'info_directeurs') list = await infoDirections(orgId, acte, 'directeur');
+      else if (r === 'info_dgas') list = await infoDirections(orgId, acte, 'dga');
       else if (r === 'superieur') {
         const graph = acte.circuit_version_id ? await engine.graphOf(acte.circuit_version_id) : null;
         const step = graph && inst ? G.stepOf(graph, inst.step_key) : null;
@@ -161,7 +174,7 @@ function createNotifications({ db, audit, mail, engine, titulaires, delegations,
 
   // ------------------------------------------------------------------------------------------- événements
   const EVENT_MAP = ['tlt.document', 'tlt.ar', 'step.entered', 'acte.refused', 'circuit.completed', 'circuit.recalculated', 'comment.added', 'delegation.created', 'redaction.granted', 'circuit.blocked', 'circuit.published', 'circuit.missing_holders',
-  'derogation.requested', 'derogation.decided', 'commission.mise_a_disposition', 'commission.suspendue', 'commission.retiree', 'commission.avis', 'acte.seance_changed', 'odj.arrete', 'odj.modifie', 'ai.done', 'ai.failed', 'commission.reunion'];
+  'derogation.requested', 'derogation.decided', 'commission.mise_a_disposition', 'commission.suspendue', 'commission.retiree', 'commission.avis', 'acte.seance_changed', 'odj.arrete', 'odj.modifie', 'ai.done', 'ai.failed', 'commission.reunion', 'acte.arrive_scc', 'acte.arrive_dga'];
 
   async function onEvent(type, p0) {
     let p = p0;

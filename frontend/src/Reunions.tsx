@@ -38,7 +38,7 @@ export function ReunionsSection({ commissionId, canEdit }: { commissionId: numbe
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const list = useLoad(async () => (await api.get(orgPath(o, `/commissions/${commissionId}/reunions`))).data.items as any[], [commissionId]);
   const [creating, setCreating] = useState(false); const [teamsFor, setTeamsFor] = useState<any>(null);
-  const [f, setF] = useState({ date: '', duree: 90, lieu: '', teams: 'lien-plus-tard' as 'auto' | 'lien' | 'aucun' | 'lien-plus-tard', joinUrl: '', inviter: false });
+  const [f, setF] = useState({ date: '', duree: 90, lieu: 'Teams', teams: 'lien-plus-tard' as 'auto' | 'lien' | 'aucun' | 'lien-plus-tard', joinUrl: '', inviter: false });
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const now = Date.now();
   const create = async (e: FormEvent) => {

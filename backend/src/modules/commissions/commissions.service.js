@@ -49,6 +49,23 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log, late = {
       } catch (e) { if (e.code === '23505') throw E.conflict('Une commission porte déjà ce nom'); throw e; }
     },
 
+    /** Supprime une commission : administrateur d'organisme ou SCC. Ses rattachements aux actes sont retirés, ses membres et secrétaires suivent. */
+    async remove(ctx, organismeId, id) {
+      const org = requireOrg(organismeId);
+      if (!acl.isAdmin(ctx, org)) throw E.forbidden("Seuls l'administrateur et le SCC suppriment une commission");
+      const c = await db.get('SELECT * FROM commissions WHERE id = $1 AND organisme_id = $2', [id, org]);
+      if (!c) throw E.notFound('Commission introuvable');
+      const liens = (await db.get('SELECT count(*)::int AS n FROM acte_commissions WHERE commission_id = $1', [id])).n;
+      await db.tx(async (q) => {
+        await q.run('DELETE FROM acte_commissions WHERE commission_id = $1', [id]);
+        // l'instance de réunions de la commission ne sert plus : on la désactive (ses séances restent au registre)
+        await q.run('UPDATE instances SET actif = false WHERE commission_id = $1', [id]);
+        await q.run('DELETE FROM commissions WHERE id = $1 AND organisme_id = $2', [id, org]);
+      });
+      await audit.log(ctx, { organismeId: org, action: 'commission.delete', entity: 'commissions', entityId: id, before: toC(c), after: { liensRetires: liens } });
+      return { supprime: id, liensRetires: liens };
+    },
+
     async update(ctx, organismeId, id, b) {
       const org = requireOrg(organismeId);
       const before = await svc.get(org, id);

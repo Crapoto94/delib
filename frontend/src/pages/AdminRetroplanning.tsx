@@ -10,20 +10,21 @@ type Etape = { code: string; label: string; jours: number };
 /** Rétroplanning : étapes clés d'une séance, chacune à J-x jours ouvrés de la suivante (la dernière = le conseil). */
 export default function AdminRetroplanning() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
-  const d = useLoad(async () => (await api.get(orgPath(o, '/seances/retroplanning'))).data as { etapes: Etape[]; defaut: boolean }, [o]);
+  const d = useLoad(async () => (await api.get(orgPath(o, '/seances/retroplanning'))).data as { etapes: Etape[]; defaut: boolean; calendaire?: boolean }, [o]);
   const [etapes, setEtapes] = useState<Etape[] | null>(null);
+  const [calendaire, setCalendaire] = useState(false);
   const [date, setDate] = useState(''); const [prop, setProp] = useState<any[] | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (d.data) setEtapes(d.data.etapes.map((e) => ({ ...e }))); }, [d.data]);
+  useEffect(() => { if (d.data) { setEtapes(d.data.etapes.map((e) => ({ ...e }))); setCalendaire(!!d.data.calendaire); } }, [d.data]);
   const setE = (i: number, patch: Partial<Etape>) => setEtapes((x) => x!.map((e, k) => (k === i ? { ...e, ...patch } : e)));
   const move = (i: number, dir: number) => setEtapes((x) => { const n = [...x!]; const j = i + dir; if (j < 0 || j >= n.length) return n; [n[i], n[j]] = [n[j], n[i]]; return n; });
   const add = () => setEtapes((x) => [...(x ?? []), { code: `etape${(x?.length ?? 0) + 1}`, label: 'Nouvelle étape', jours: 3 }]);
-  const save = async () => { setBusy(true); try { await api.put(orgPath(o, '/settings/seances.retroplanning'), { value: { etapes }, scope: 'organisme' }); toast('Rétroplanning enregistré'); d.reload(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); } };
+  const save = async () => { setBusy(true); try { await api.put(orgPath(o, '/settings/seances.retroplanning'), { value: { etapes, calendaire }, scope: 'organisme' }); toast('Rétroplanning enregistré'); d.reload(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); } };
   const proposer = async () => { if (!date) return; try { setProp((await api.get(orgPath(o, '/seances/dates-proposees'), { params: { dateSeance: new Date(date).toISOString() } })).data.jalons); } catch (e) { toast(errMsg(e), 'ko'); } };
   if (d.loading || !etapes) return <Loading />;
   return (
     <div className="space-y-5">
-      <PageTitle title="Rétroplanning" sub="Étapes clés d'une séance : chacune est à J-x jours ouvrés de la suivante ; la dernière est le jour du conseil." />
+      <PageTitle title="Rétroplanning" sub={`Étapes clés d'une séance : chacune est à J-x ${calendaire ? 'jours calendaires' : 'jours ouvrés'} de la suivante ; la dernière est le jour du conseil.`} />
       <section className="card p-5">
         <ul className="space-y-2">
           {etapes.map((e, i) => (
@@ -37,6 +38,7 @@ export default function AdminRetroplanning() {
               </div>
             </li>))}
         </ul>
+        <label className="mt-3 flex items-start gap-2 rounded border border-line bg-soft p-3 text-[13px]"><input type="checkbox" className="mt-0.5" checked={calendaire} onChange={(e) => setCalendaire(e.target.checked)} /><span><b>Compter en jours calendaires</b><br /><span className="text-[12px] text-mute">Les week-ends et jours fériés sont comptés. Décochez pour calculer en jours ouvrés (jours fériés exclus).</span></span></label>
         <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" className="btn-secondary" onClick={add}><Plus className="h-4 w-4" /> Ajouter une étape</button>
           <button type="button" className="btn-primary ml-auto" disabled={busy} onClick={save}>{busy && <Spinner />} <Save className="h-4 w-4" /> Enregistrer</button></div>
         <p className="mt-2 text-[12px] text-mute">Codes reconnus (alimentent les champs de la séance) : <code>soumissions</code> (date limite de rédaction), <code>dgs</code>, <code>commissions</code>, <code>convocation</code>. Les autres deviennent des jalons complémentaires. {d.data?.defaut && <Badge tone="warn">valeurs par défaut</Badge>}</p>

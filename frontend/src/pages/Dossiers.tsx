@@ -86,7 +86,7 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
   };
   const infos = (p: any) => [
     p.numero ? `N° délibération : ${p.numero}` : null,
-    p.annee ? `Année : ${p.annee}` : null,
+    p.dateSeance ? `Séance du : ${dt(p.dateSeance, { dateStyle: 'long' })}` : (p.annee ? `Année : ${p.annee}` : null),
     p.direction ? `Direction : ${p.direction}` : null,
     p.matiere ? `Matière : ${p.matiere}` : null,
     p.statut ? `Statut : ${String(p.statut).replace(/_/g, ' ')}` : null,
@@ -128,7 +128,7 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
                 <li key={p.acteId} className="flex items-center justify-between gap-2" title={infos(p)}>
                   <span className="min-w-0 cursor-help">
                     <span className="block truncate font-semibold text-head">{p.titre}</span>
-                    <span className="block truncate text-[12px] text-mute">#{p.numeroSuivi}{p.annee ? ` · ${p.annee}` : ''}{p.numero ? ` · ${p.numero}` : ''}{p.direction ? ` · ${p.direction}` : ''}{p.correspondances ? ` · ${p.correspondances} mot(s)-clé(s)` : ''}</span>
+                    <span className="block truncate text-[12px] text-mute">#{p.numeroSuivi}{p.dateSeance ? ` · séance du ${dt(p.dateSeance, { dateStyle: 'short' })}` : p.annee ? ` · ${p.annee}` : ''}{p.numero ? ` · ${p.numero}` : ''}{p.direction ? ` · ${p.direction}` : ''}{p.correspondances ? ` · ${p.correspondances} mot(s)-clé(s)` : ''}</span>
                   </span>
                   <button type="button" className="btn-secondary shrink-0" disabled={busyModele !== null} onClick={() => prendreModele(p)}>{busyModele === p.acteId && <Spinner />} Utiliser comme modèle</button>
                 </li>
