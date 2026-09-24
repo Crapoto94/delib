@@ -11,9 +11,29 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.45.0';
+export const VERSION = '0.46.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.46.0', type: 'minor', titre: 'Annexes Word/Excel, taille des pièces jointes, suivi des modifications et ordre du jour interne',
+    items: [
+      "Annexes : PDF, Word et Excel acceptés. Les fichiers Word et Excel sont convertis en PDF associé à la validation finale du dossier (l'original reste conservé).",
+      "Ré-upload d'un fichier de même nom sur un dossier : il remplace l'annexe existante et crée une nouvelle version (l'ancienne reste consultable), au lieu d'ajouter un doublon.",
+      "Taille maximale des pièces jointes réglable dans Paramétrages › Pièces jointes (30 Mo par défaut, plafonnée par le serveur). Vaut pour les annexes et pour les pièces ajoutées à un dossier simple de l'ordre du jour.",
+      "Suivi des modifications : le diff se fait désormais par rapport à la personne précédente, jamais contre soi-même. Corriger puis retirer sa propre écriture ne laisse donc plus d'amendement à valider.",
+      "Les modifications suivies s'affichent de la plus récente à la plus ancienne.",
+      "« Mes actes » et « Tous les actes » indiquent l'étape du circuit où se trouve le dossier (Service juridique, DGS, SCC…) plutôt qu'un simple « En circuit ».",
+      "Fiche du dossier : le montant d'un impact budgétaire est explicitement facultatif (jamais bloquant).",
+      "Fiche du dossier : l'ajout ou le retrait d'une commission ne réinitialise plus les saisies en cours (domaine, rubrique, élu…).",
+      "Élu rapporteur : quand l'élu porte plusieurs délégations fonctionnelles, l'application propose de choisir la délégation concernée ; elle est reprise dans les listes et le tri de l'ordre du jour.",
+      "Élu rapporteur : le nom de l'élu est mis en gras dans la liste de choix.",
+      "Arbre des matières : les groupes (ex. « 1.1 ») ne sont pas sélectionnables — ils se déplient (mention « groupe », infobulle et aide) ; seules les matières précises se choisissent.",
+      "Dossier : la carte « Avis des commissions » est masquée quand il n'y a pas de commission (plus de mention « Hors commission »).",
+      "Textes d'une délibération : une fois rédigés, ils affichent « ok » sans conserver de cadre orange « à rédiger ».",
+      "Nouveau document « Ordre du jour interne » (PDF), depuis l'ordre du jour : délibérations prévues avec direction rédactrice, état d'avancement, présence d'annexe et date du dernier passage hiérarchique ; tri par commission (ordre de passage), par rapporteur ou par délégation de rapporteur.",
+      "Un acte marqué « urgent » porte une pastille « Urgent » : dans « Mes actes », « Tous les actes », les dossiers, le tableau de bord, la fiche du dossier et l'ordre du jour.",
+    ],
+  },
   {
     version: '0.45.0', type: 'minor', titre: 'Commissions, directions en info, rétroplanning et confort de rédaction',
     items: [

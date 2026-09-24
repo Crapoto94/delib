@@ -4,7 +4,7 @@ import { api, org as orgPath } from '../api';
 import { AgentName } from '../AgentName';
 import { useAuth } from '../auth';
 import { dt } from '../format';
-import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutOuEtape, TypeBadge, useLoad } from '../ui';
+import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutOuEtape, TypeBadge, UrgentBadge, useLoad } from '../ui';
 import { SeanceVisee } from '../SeanceVisee';
 
 type Vue = 'etape' | 'conseil';
@@ -47,7 +47,7 @@ export default function TousLesActes() {
   const ligne = (it: any) => (
     <tr key={it.acte.id} className={it.enRetard ? 'bg-ko-bg' : 'hover:bg-soft'}>
       <td className="w-16 font-mono text-[12px]">#{it.acte.numeroSuivi}</td>
-                    <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${it.acte.id}`}>{it.acte.titre}</Link> <TypeBadge acte={it.acte} /><div className="text-[12px] text-mute">{it.acte.direction?.label ? `${it.acte.direction.label} · ` : ''}<AgentName u={it.acte.redacteur} /></div></td>
+                    <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${it.acte.id}`}>{it.acte.titre}</Link> <TypeBadge acte={it.acte} /> {it.acte.urgence && <UrgentBadge urgent />}<div className="text-[12px] text-mute">{it.acte.direction?.label ? `${it.acte.direction.label} · ` : ''}<AgentName u={it.acte.redacteur} /></div></td>
       {vue === 'conseil' && <td>{it.enRetard ? <Badge tone="ko">{it.etape.label}</Badge> : <span className="text-[12px]">{it.etape.label}</span>}</td>}
       <td><SeanceVisee acte={it.acte} /></td>
       <td><StatutOuEtape statut={it.acte.statut} etape={it.etape} /></td>

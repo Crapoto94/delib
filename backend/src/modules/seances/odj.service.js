@@ -193,7 +193,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage, u
   }
 
   const rowsOf = (q, seanceId) => q.all(
-    `SELECT it.*, a.titre AS acte_titre, a.numero_suivi, a.statut AS acte_statut, a.current_step_key AS acte_step, a.direction_label, a.redacteur, a.rubrique_id, ru.libelle AS rubrique,
+    `SELECT it.*, a.titre AS acte_titre, a.numero_suivi, a.statut AS acte_statut, a.current_step_key AS acte_step, a.direction_label, a.redacteur, a.rubrique_id, a.urgence AS acte_urgence, ru.libelle AS rubrique,
             a.custom->'airs'->>'numero' AS acte_numero_airs,
             a.rapporteur_delegation, trim(e.prenom || ' ' || e.nom) AS rapporteur, d.titre AS delib_titre, d.ordre AS delib_ordre,
             si.label AS etape, si.holders AS etape_holders,
@@ -245,7 +245,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage, u
       id: r.id, position: r.position, kind: r.kind, titre: r.kind === 'deliberation' ? (r.delib_titre || r.acte_titre) : r.titre, description: r.description ?? null, fichiers: r.fichiers || [], numerote: r.numerote,
       numero: numeros.get(r.id) ?? r.numero ?? null, provisoire: !r.numero, statut: r.statut, retireMotif: r.retire_motif, ajouteApresArret: r.ajoute_apres_arret,
       numeroOrigine: r.acte_numero_airs ?? null,
-      acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: rapporteurLabel(r.rapporteur, r.rapporteur_delegation), rapporteurDelegation: r.rapporteur_delegation ?? null, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
+      acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: rapporteurLabel(r.rapporteur, r.rapporteur_delegation), rapporteurDelegation: r.rapporteur_delegation ?? null, urgence: !!r.acte_urgence, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
       commissions: coms, commissionPrincipale: principale ? { id: principale.id, nom: principale.nom, ordre: principale.ordre } : null,
       deliberationId: r.deliberation_id, groupe: r.acte_id ? `a${r.acte_id}` : null, ordreDeliberation: r.delib_ordre ?? null, index: i,
     };

@@ -9,6 +9,18 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.46.0 — Annexes Word/Excel, taille des pièces jointes, suivi des modifications et ordre du jour interne
+
+- **Annexes** : accepte désormais **PDF, Word et Excel**. Les **Word/Excel sont convertis en PDF associé** à la **validation finale** du dossier (l'original reste conservé). **Ré-uploader un fichier de même nom** remplace l'annexe et crée une **nouvelle version** au lieu d'un doublon (ANN-04). Le dossier complet et la visionneuse utilisent le PDF associé. (`annexes.service.js`, `annexes.routes.js`, `render.service.js`.)
+- **Pièces jointes — taille maximale** : réglable dans **Paramétrages › Pièces jointes** (**défaut 30 Mo**, plafonnée par la variable serveur `MAX_UPLOAD_MB`). Vaut pour les **annexes** du dossier et pour les **pièces d'un dossier simple** de l'ordre du jour ; endpoint `GET /organismes/:orgId/fichiers/limite`. (`shared/upload-limit.js`, `AdminPieces.tsx`, `usePJ.ts`.)
+- **Suivi des modifications** : le diff se fait **par rapport à la personne précédente**, jamais contre soi-même — corriger puis retirer sa propre écriture **ne laisse plus d'amendement** à valider. Les modifications s'affichent de la **plus récente à la plus ancienne**. (`spans.js`, `textes.service.js`.)
+- **Mes actes / Tous les actes** : affichent l'**étape du circuit** (« Service juridique », « DGS », « SCC »…) au lieu de « En circuit ». (`ui.tsx`, `MonEspace.tsx`, `TousLesActes.tsx`.)
+- **Fiche du dossier** : le **montant** d'un impact budgétaire est explicitement **facultatif** ; l'**ajout ou le retrait d'une commission** ne réinitialise plus les **saisies en cours** ; choix de la **délégation de l'élu rapporteur** quand il en porte plusieurs (migration `0072`), reportée dans les listes et le **tri de l'ordre du jour**. Le **nom de l'élu** est en **gras** dans la liste de choix.
+- **Arbre des matières** : les **groupes** (ex. « 1.1 ») ne sont **pas sélectionnables** — mention « groupe », infobulle et aide au dépliage ; seules les **matières précises** se choisissent. (`MatiereTree.tsx`.)
+- **Dossier** : la carte « **Avis des commissions** » est **masquée** quand il n'y a pas de commission ; les **textes rédigés** affichent « **ok** » sans cadre orange.
+- **Nouveau document « Ordre du jour interne »** (PDF), depuis l'ordre du jour : délibérations prévues avec **direction rédactrice**, **état d'avancement**, **présence d'annexe** et **date du dernier passage hiérarchique** ; **tri** par **commission** (ordre de passage des commissions), par **rapporteur** ou par **délégation de rapporteur**. (`odj.service.js`, `odj.routes.js`, `render.service.js`, `defaults.js`.)
+- **Acte urgent** : une **pastille « Urgent »** s'affiche dans « Mes actes », « Tous les actes », les dossiers, le tableau de bord, la fiche du dossier et l'ordre du jour. (`ui.tsx` : `UrgentBadge`.)
+
 ## 0.45.0 — Commissions, directions en info, rétroplanning et confort de rédaction
 
 - **Décisions et arrêtés** : ils comportent désormais des **vus et considérants** et un **« Décide »** (leur dispositif, là où une délibération a un « délibéré ») ; l'**exposé des motifs** est **facultatif** (possible, non obligatoire). Les décisions en cours sont complétées au démarrage (migration `0071`).

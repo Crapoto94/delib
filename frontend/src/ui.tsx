@@ -61,6 +61,8 @@ const TONES: Record<string, string> = {
 };
 export const Badge = ({ tone = 'gray', children, title }: { tone?: keyof typeof TONES; children: ReactNode; title?: string }) => <span className={`badge ${TONES[tone]}`} title={title}>{children}</span>;
 export const StatutBadge = ({ statut }: { statut: string }) => { const s = STATUTS[statut] ?? { label: statut, tone: 'gray' as const }; return <Badge tone={s.tone}>{s.label}</Badge>; };
+/** Pastille « Urgent » d'un acte marqué urgent (traitement renforcé) ; rien si l'acte n'est pas urgent. */
+export const UrgentBadge = ({ urgent }: { urgent?: boolean }) => (urgent ? <Badge tone="ko" title="Dossier urgent : traitement renforcé et suivi de plus près">Urgent</Badge> : null);
 /**
  * Colonne « statut » d'une liste d'actes : un acte encore en circuit indique OÙ il en est (l'étape courante —
  * « Service juridique », « DGS »…), pas le simple « En circuit ». Hors circuit, le statut habituel est affiché.

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
-import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutOuEtape, TypeBadge, useLoad } from '../ui';
+import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutOuEtape, TypeBadge, UrgentBadge, useLoad } from '../ui';
 import { AgentName } from '../AgentName';
 import { SeanceVisee } from '../SeanceVisee';
 import { Select } from '../Select';
@@ -55,7 +55,7 @@ export default function MonEspace() {
     return (
       <tr key={t.acte.id} className={vert ? 'bg-ok-bg' : t.enRetard ? 'bg-ko-bg' : 'hover:bg-soft'}>
         <td className="w-16 font-mono text-[12px]">#{t.acte.numeroSuivi}</td>
-                  <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link> <TypeBadge acte={t.acte} />{inscrit && <span className="ml-2"><Badge tone="ok">Inscrit au conseil</Badge></span>}<div className="text-[12px] text-mute">{porteuse(t.acte)}</div></td>
+                  <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${t.acte.id}`}>{t.acte.titre}</Link> <TypeBadge acte={t.acte} /> {t.acte.urgence && <UrgentBadge urgent />}{inscrit && <span className="ml-2"><Badge tone="ok">Inscrit au conseil</Badge></span>}<div className="text-[12px] text-mute">{porteuse(t.acte)}</div></td>
         <td className="text-[12px]"><AgentName u={t.acte.redacteur} /></td>
         {showEtape && <td className="text-[12px]">{t.step?.label ?? '—'}</td>}
         <td><SeanceVisee acte={t.acte} /></td>

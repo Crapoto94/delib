@@ -3,7 +3,7 @@ import { AlertTriangle, CalendarCheck, ClipboardCheck, PenLine, Route, Users } f
 import { api, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
-import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutBadge, useLoad } from '../ui';
+import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutBadge, UrgentBadge, useLoad } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
 import { SeanceVisee } from '../SeanceVisee';
 import { Mascotte } from '../DossierAssiste';
@@ -79,7 +79,7 @@ export function Synthese() {
             {inscrits.data!.slice(0, 25).map((a) => (
               <tr key={a.id} className="hover:bg-soft">
                 <td className="w-20 font-mono text-[12px]">#{a.numeroSuivi}</td>
-                <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link></td>
+                <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link>{a.urgence && <span className="ml-2 align-middle"><UrgentBadge urgent /></span>}</td>
                 <td className="text-mute">{a.direction?.label}</td>
                 <td><SeanceVisee acte={a} /></td>
                 <td><StatutBadge statut={a.statut} /></td>
@@ -91,7 +91,7 @@ export function Synthese() {
           <div className="flex items-center gap-2 border-b border-line px-5 py-3"><AlertTriangle className="h-5 w-5 text-warn" /><h3 id="retard">Actes en retard dans mon périmètre</h3></div>
           {late.loading ? <Loading /> : !late.data?.length ? <Empty>Aucun retard. Bravo !</Empty> : (
             <ul>{late.data.map((t) => (
-              <li key={t.acte.id} className="border-b border-line px-5 py-3 last:border-0"><Link to={`/dossiers/${t.acte.id}`} className="font-semibold text-head hover:underline">{t.acte.titre}</Link>
+              <li key={t.acte.id} className="border-b border-line px-5 py-3 last:border-0"><Link to={`/dossiers/${t.acte.id}`} className="font-semibold text-head hover:underline">{t.acte.titre}</Link>{t.acte.urgence && <span className="ml-2 align-middle"><UrgentBadge urgent /></span>}
                 <div className="text-[12px] text-mute">Étape « {t.step.label} » · échue le {dt(t.step.dueAt, { dateStyle: 'medium' })} · chez <AgentNames list={t.step.holders} /></div></li>))}
             </ul>
           )}

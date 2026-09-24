@@ -9,7 +9,7 @@ import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { showDocs, type PdfDoc } from '../PdfViewer';
 import { useAuth } from '../auth';
 import { d, dt } from '../format';
-import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, TypeBadge, useLoad, useToast } from '../ui';
+import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, TypeBadge, UrgentBadge, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
 import { useIa } from '../useIa';
 import { useLimitePJ } from '../usePJ';
@@ -890,7 +890,7 @@ export default function Dossier() {
     <div className="space-y-6">
       <div>
         <div className="mb-1 text-[12px] text-mute"><Link to="/" className="hover:underline">Mes actes</Link> › Dossier #{a.numeroSuivi}</div>
-        <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><TypeBadge acte={a} /><StatutBadge statut={a.statut} />
+        <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><TypeBadge acte={a} />{a.urgence && <UrgentBadge urgent />}<StatutBadge statut={a.statut} />
           <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
           <button className="btn-secondary" onClick={apercuDossier}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button>
           {modeleDocx && <button className="btn-secondary" onClick={telechargerDocx}><FileText className="h-4 w-4" /> {libelleType} Word</button>}

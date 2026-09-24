@@ -10,7 +10,7 @@ import { TeamsForm, TeamsLink } from '../Reunions';
 import CahierModal from '../Cahier';
 import { showPdf } from '../PdfViewer';
 import SeanceKpis from '../SeanceKpis';
-import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
+import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, UrgentBadge, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
 import { useLimitePJ } from '../usePJ';
 import { Select } from '../Select';
@@ -175,7 +175,7 @@ export default function Odj() {
                   {canEdit && !retire ? <GripVertical className="h-5 w-5 shrink-0 cursor-grab text-slate-400" aria-label="Poignée de déplacement" /> : <span className="w-5" />}
                   <div className="w-36 shrink-0"><div className={`font-mono text-[13px] font-bold ${it.provisoire ? 'italic text-mute' : 'text-head'}`}>{it.numero ?? '—'}</div>{it.numero && it.provisoire && <div className="text-[10px] uppercase text-mute">provisoire</div>}{it.numeroOrigine && <div className="text-[10px] text-mute" title="Numéro d'origine (source AIRS)">n° source {it.numeroOrigine}</div>}{it.ajouteApresArret && <Badge tone="warn">ajouté</Badge>}</div>
                   <div className="min-w-0 flex-1">
-                    <div className={`font-semibold ${retire ? 'line-through' : ''}`}>{it.acte ? <Link className="text-head hover:underline" to={`/dossiers/${it.acte.id}`}>{it.titre}</Link> : it.titre}</div>
+                    <div className={`font-semibold ${retire ? 'line-through' : ''}`}>{it.acte ? <Link className="text-head hover:underline" to={`/dossiers/${it.acte.id}`}>{it.titre}</Link> : it.titre}{it.acte?.urgence && <span className="ml-2 align-middle"><UrgentBadge urgent /></span>}</div>
                     <div className="text-[12px] text-mute">{it.acte ? `Dossier #${it.acte.numeroSuivi} · ${it.acte.rubrique ?? '—'} · rapporteur : ${it.acte.rapporteur ?? '—'}` : (it.kind === 'libre' && (it.description || it.fichiers?.length) ? 'Dossier simple' : 'Point libre')}{it.ordreDeliberation > 1 || (it.acte && order.filter((x) => x.acte?.id === it.acte.id).length > 1) ? ` · délibération ${it.ordreDeliberation}` : ''}</div>
                     {it.commissions?.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-1" title="Commissions concernées par le dossier (la principale fixe la rupture de l'ordre du jour)">{it.commissions.map((c: any) => <Badge key={c.id} tone={c.principale ? 'blue' : 'gray'}>{c.principale ? `${c.nom} · principale` : c.nom}</Badge>)}</div>}
                     {it.kind === 'libre' && it.description && <p className="mt-1 whitespace-pre-wrap text-[12px] text-slate-700">{it.description}</p>}
