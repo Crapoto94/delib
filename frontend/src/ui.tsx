@@ -59,8 +59,17 @@ export function Pagination({ total, limit, page, onPage, itemLabel = 'élément'
 const TONES: Record<string, string> = {
   gray: 'bg-slate-100 text-slate-700 border-slate-300/70', blue: 'bg-action/10 text-action border-action/30', ok: 'bg-ok-bg text-ok-text border-ok/30', warn: 'bg-warn-bg text-warn border-warn/30', ko: 'bg-ko-bg text-ko border-ko/30',
 };
-export const Badge = ({ tone = 'gray', children }: { tone?: keyof typeof TONES; children: ReactNode }) => <span className={`badge ${TONES[tone]}`}>{children}</span>;
+export const Badge = ({ tone = 'gray', children, title }: { tone?: keyof typeof TONES; children: ReactNode; title?: string }) => <span className={`badge ${TONES[tone]}`} title={title}>{children}</span>;
 export const StatutBadge = ({ statut }: { statut: string }) => { const s = STATUTS[statut] ?? { label: statut, tone: 'gray' as const }; return <Badge tone={s.tone}>{s.label}</Badge>; };
+/**
+ * Colonne « statut » d'une liste d'actes : un acte encore en circuit indique OÙ il en est (l'étape courante —
+ * « Service juridique », « DGS »…), pas le simple « En circuit ». Hors circuit, le statut habituel est affiché.
+ */
+export const StatutOuEtape = ({ statut, etape }: { statut: string; etape?: { label?: string | null; holders?: string[] | null } | null }) => (
+  statut === 'en_circuit' && etape?.label
+    ? <Badge tone="blue" title={etape.holders?.length ? `En attente chez ${etape.holders.join(', ')}` : undefined}>{etape.label}</Badge>
+    : <StatutBadge statut={statut} />
+);
 
 /** Pastille de type d'acte : l'icône du type, seule (infobulle = libellé), un peu à l'écart du titre. */
 const TYPE_ICONES: Record<string, string> = {

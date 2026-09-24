@@ -124,7 +124,7 @@ export const scc: Article = {
           <P>Le bouton <BoutonUI>Dossier simple / point libre / chapitre</BoutonUI> ajoute :</P>
           <DefListe items={[
             [<>Un chapitre</>, <>Un simple titre de regroupement, sans numéro, pour organiser l'ordre du jour.</>],
-            [<>Un point libre / dossier simple</>, <>Un sujet avec nom, description et pièces jointes (PDF, images, Word/Excel/PowerPoint, 20 Mo max par fichier).</>],
+            [<>Un point libre / dossier simple</>, <>Un sujet avec nom, description et pièces jointes (PDF, images, Word/Excel/PowerPoint — taille maximale réglable dans Paramétrages › Pièces jointes).</>],
           ]} />
           <SousTitre>Numérotation</SousTitre>
           <P>Avant l'arrêt, les numéros sont <Terme>provisoires</Terme> (affichés en italique). Le bouton <BoutonUI>Numérotation…</BoutonUI> règle le format de la séance (variables <Terme>{'{ANNEE}'}</Terme>, <Terme>{'{N_SEANCE}'}</Terme>, <Terme>{'{ORDRE}'}</Terme>, <Terme>{'{RUBRIQUE}'}</Terme>). Les numéros déjà attribués ne changent jamais.</P>
@@ -144,7 +144,7 @@ export const scc: Article = {
           <P>Selon l'endroit, trois sortes de documents coexistent :</P>
           <Tableau entetes={['Document', 'Où l’ajouter ?', 'Formats']} lignes={[
             [<>Annexes d'un acte</>, <>Fiche du dossier → « Pièces jointes au dossier »</>, <>PDF uniquement</>],
-            [<>Pièces jointes d'un point libre</>, <>Ordre du jour → point libre → « Gérer »</>, <>PDF, images, Word, Excel, PowerPoint, OpenDocument (20 Mo)</>],
+            [<>Pièces jointes d'un point libre</>, <>Ordre du jour → point libre → « Gérer »</>, <>PDF, images, Word, Excel, PowerPoint, OpenDocument (taille maximale paramétrable)</>],
             [<>Documents de séance</>, <>Générés : cahier de séance, procès-verbal, liste des délibérations, extraits du registre</>, <>Produits par l'application</>],
           ]} />
           <SousTitre>Le cahier de séance</SousTitre>

@@ -8,6 +8,7 @@ const Fields = {
   natureId: Id.nullable().optional(), matiereId: Id.nullable().optional(), rubriqueId: Id.nullable().optional(),
   incidenceFinanciere: z.boolean().nullable().optional(), montant: z.number().min(0).max(1e12).nullable().optional(),
   rapporteurId: Id.nullable().optional(), rapporteurComplId: Id.nullable().optional(), seanceViseeId: Id.nullable().optional(),
+  rapporteurDelegation: z.string().trim().max(200).nullable().optional().describe("Délégation fonctionnelle de l'élu rapporteur (quand il en porte plusieurs) : sert au tri de l'ordre du jour"),
   urgence: z.boolean().optional(), dateLimite: z.iso.date().nullable().optional(),
   confidentialite: z.enum(['normale', 'confidentiel', 'huis_clos']).optional(), custom: z.record(z.string(), z.unknown()).optional(),
   directionsInfo: z.array(z.string().trim().min(1).max(40)).max(20).optional().describe('Directions associées « en info » (copie) : leur directeur est notifié à l\'arrivée au SCC, leur DGA à l\'arrivée au DGA'),

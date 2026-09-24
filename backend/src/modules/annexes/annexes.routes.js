@@ -17,14 +17,14 @@ const VersionQ = z.object({ version: z.coerce.number().int().min(1).optional(), 
 module.exports = ({ makeRouter, annexes, config }) => {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.storage.maxUploadBytes, files: 1 } });
   const r = makeRouter('/api/v1/organismes/:orgId/actes/:id/annexes');
-  const multipart = (spec) => ({ ...spec, description: `${spec.description || ''} Requête multipart/form-data : champ « file » (PDF) + métadonnées.`.trim() });
+  const multipart = (spec) => ({ ...spec, description: `${spec.description || ''} Requête multipart/form-data : champ « file » (PDF, Word ou Excel) + métadonnées.`.trim() });
 
   r.get('/', { summary: "Annexes d'un acte", tags: ['annexes'], org: true, params: P },
     async (req, res) => res.json({ items: await annexes.list(req.ctx, req.org.id, req.valid.params.id) }));
 
   r.post('/', multipart({
-    summary: 'Ajoute une annexe (PDF)', tags: ['annexes'], org: true, params: P, responses: { 201: 'Créé' },
-    description: 'PDF uniquement : signature %PDF vérifiée, non chiffré, sans JavaScript ni pièce jointe intégrée (ANN-01).',
+    summary: 'Ajoute une annexe (PDF, Word ou Excel)', tags: ['annexes'], org: true, params: P, responses: { 201: 'Créé' },
+    description: "PDF contrôlé (signature %PDF, non chiffré, sans contenu actif) ; Word (.docx, .doc) et Excel (.xlsx, .xls) acceptés et convertis en PDF à la validation finale. Un fichier de même nom remplace l\'annexe et crée une nouvelle version (ANN-01, ANN-04).",
   }), upload.single('file'), async (req, res, next) => {
     const meta = Meta.safeParse(req.body || {});
     if (!meta.success) return next(require('../../shared/errors').E.badRequest('Requête invalide', meta.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))));

@@ -80,8 +80,6 @@ const PIECES = {
   pptx: { mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', magic: [0x50, 0x4b] }, odt: { mime: 'application/vnd.oasis.opendocument.text', magic: [0x50, 0x4b] },
   ods: { mime: 'application/vnd.oasis.opendocument.spreadsheet', magic: [0x50, 0x4b] }, odp: { mime: 'application/vnd.oasis.opendocument.presentation', magic: [0x50, 0x4b] },
 };
-const MAX_PIECE = 20 * 1024 * 1024;
-
 /**
  * Rupture par commission : regroupe des lignes DANS L'ORDRE REÇU, en coupant à chaque changement de commission
  * principale (la première choisie à la rédaction). L'ordre de passage arbitré par le SCC est donc respecté ;
@@ -132,7 +130,46 @@ function odjMarkdown(items) {
   ].join('\n')).join('\n\n');
 }
 
-function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage }) {
+/**
+ * Ordre du jour INTERNE (document de travail du SCC) : liste des délibérations prévues avec la direction
+ * rédactrice, l'avancement, la présence d'annexe et la date du dernier passage hiérarchique. Les lignes sont
+ * regroupées selon le tri choisi (commission, rapporteur ou délégation de rapporteur).
+ */
+function odjInterneContent({ organisme, sousTitre, items, tri = 'commission' }) {
+  const groupe = (x) => (tri === 'rapporteur' ? (x.rapporteur || 'Sans rapporteur') + (x.rapporteurDelegation ? ` (${x.rapporteurDelegation})` : '')
+    : tri === 'delegation' ? (x.rapporteurDelegation || 'Sans délégation')
+      : (x.commission || 'Hors commission'));
+  const ligne = (x) => [
+    `**${x.numero ?? '·'}** — ${x.titre}`,
+    `Direction rédactrice : ${x.direction || '—'} · Avancement : ${x.avancement || '—'} · Annexe : ${x.annexe ? `oui (${x.annexes})` : 'non'}`,
+    `${x.rapporteur ? `Rapporteur : ${x.rapporteur}${x.rapporteurDelegation ? ` (${x.rapporteurDelegation})` : ''} · ` : ''}Dernier passage hiérarchique : ${x.dernierPassage ? fmtDate(x.dernierPassage) : '—'}`,
+  ].join('\n');
+  const sections = [];
+  for (const x of items) { const g = groupe(x); let sec = sections.find((y) => y.titre === g); if (!sec) { sec = { titre: g, items: [] }; sections.push(sec); } sec.items.push(x); }
+  return [
+    { type: 'space', h: 20 },
+    { type: 'title', text: organisme || '', size: 14, align: 'center', bold: true, after: 10 },
+    { type: 'title', text: 'ORDRE DU JOUR INTERNE', size: 18, align: 'center', bold: true, boxed: true, after: 10 },
+    ...(sousTitre ? [{ type: 'title', text: sousTitre, size: 12, align: 'center', bold: true, after: 14 }] : []),
+    ...sections.flatMap((sec) => [
+      { type: 'title', text: sec.titre.toUpperCase(), size: 12.5, align: 'left', bold: true, after: 4 },
+      { type: 'runs', runs: [{ type: 'text', text: sec.items.map(ligne).join('\n') }] },
+      { type: 'space', h: 8 },
+    ]),
+  ];
+}
+
+/** Libellé français d'une date (heure de Paris) pour les documents. */
+const fmtDate = (v) => (v ? new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'long' }).format(new Date(v)) : '');
+
+/** Avancement d'un acte pour l'ordre du jour interne : étape du circuit, ou statut hors circuit. */
+const AVANCEMENT_HORS = {
+  brouillon: 'Rédaction', modification_demandee: 'À corriger', valide_dgs: 'Validé DGS', en_attente_scc: 'En attente SCC',
+  mis_a_disposition: 'Mis à disposition', avis_rendu: 'Avis rendu', inscrit_odj: 'Inscrit au conseil', texte_definitif_pret: 'Texte définitif prêt',
+  pret_a_transmettre: 'Prêt à transmettre', a_signer: 'À signer', signe: 'Signé', signature_refusee: 'Signature refusée',
+};
+
+function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage, uploadLimit }) {
   const seanceOf = async (q, org, id, lock = false) => {
     const s = await q.get(`SELECT s.*, i.nom AS instance_nom, i.numbering AS instance_numbering, i.kind AS instance_kind, i.commission_id AS instance_commission_id FROM seances s JOIN instances i ON i.id = s.instance_id WHERE s.id = $1 AND s.organisme_id = $2${lock ? ' FOR UPDATE OF s' : ''}`, [id, requireOrg(org)]);
     if (!s) throw E.notFound('Séance introuvable');
@@ -158,7 +195,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
   const rowsOf = (q, seanceId) => q.all(
     `SELECT it.*, a.titre AS acte_titre, a.numero_suivi, a.statut AS acte_statut, a.current_step_key AS acte_step, a.direction_label, a.redacteur, a.rubrique_id, ru.libelle AS rubrique,
             a.custom->'airs'->>'numero' AS acte_numero_airs,
-            trim(e.prenom || ' ' || e.nom) AS rapporteur, d.titre AS delib_titre, d.ordre AS delib_ordre,
+            a.rapporteur_delegation, trim(e.prenom || ' ' || e.nom) AS rapporteur, d.titre AS delib_titre, d.ordre AS delib_ordre,
             si.label AS etape, si.holders AS etape_holders,
             (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', c.id, 'nom', c.nom, 'ordre', c.ordre, 'couleur', c.couleur, 'avis', ac.avis) ORDER BY ac.id), '[]'::jsonb)
                FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id
@@ -198,6 +235,9 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
    */
   const commissionsOf = (r) => (Array.isArray(r.commissions) ? r.commissions : []).map((c, idx) => ({ id: c.id, nom: c.nom, ordre: c.ordre, couleur: c.couleur, avis: c.avis, principale: idx === 0 }));
 
+  /** « Prénom NOM (délégation) » quand le rapporteur porte une délégation précise : distingue un même élu à plusieurs délégations. */
+  const rapporteurLabel = (name, delegation) => (name ? (delegation ? `${name} (${delegation})` : name) : null);
+
   const toItem = (r, numeros, i) => {
     const coms = commissionsOf(r);
     const principale = coms[0] || null;
@@ -205,7 +245,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       id: r.id, position: r.position, kind: r.kind, titre: r.kind === 'deliberation' ? (r.delib_titre || r.acte_titre) : r.titre, description: r.description ?? null, fichiers: r.fichiers || [], numerote: r.numerote,
       numero: numeros.get(r.id) ?? r.numero ?? null, provisoire: !r.numero, statut: r.statut, retireMotif: r.retire_motif, ajouteApresArret: r.ajoute_apres_arret,
       numeroOrigine: r.acte_numero_airs ?? null,
-      acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: r.rapporteur, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
+      acte: r.acte_id ? { id: r.acte_id, numeroSuivi: r.numero_suivi, titre: r.acte_titre, statut: r.acte_statut, direction: r.direction_label, redacteur: r.redacteur, rubrique: r.rubrique, rapporteur: rapporteurLabel(r.rapporteur, r.rapporteur_delegation), rapporteurDelegation: r.rapporteur_delegation ?? null, etape: r.etape || null, holders: r.etape_holders || [], etat: etatOf(r.acte_statut, r.acte_step) } : null,
       commissions: coms, commissionPrincipale: principale ? { id: principale.id, nom: principale.nom, ordre: principale.ordre } : null,
       deliberationId: r.deliberation_id, groupe: r.acte_id ? `a${r.acte_id}` : null, ordreDeliberation: r.delib_ordre ?? null, index: i,
     };
@@ -291,14 +331,14 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       if (rapporteurId) { p.push(rapporteurId); w.push(`a.rapporteur_id = $${p.length}`); }
       if (q) { p.push(`%${q}%`); w.push(`(a.titre ILIKE $${p.length} OR a.numero_suivi::text = $${p.length - 0})`); }
       const rows = await db.all(
-        `SELECT a.id, a.numero_suivi, a.titre, a.direction_label, a.seance_visee_id, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
+        `SELECT a.id, a.numero_suivi, a.titre, a.direction_label, a.seance_visee_id, a.rapporteur_delegation, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
                 a.custom->'airs'->>'numero' AS numero_airs,
                 (SELECT count(*)::int FROM deliberations d WHERE d.acte_id = a.id) AS nb_delib,
                 (SELECT count(*)::int FROM acte_commissions c WHERE c.acte_id = a.id AND c.retiree_at IS NULL AND c.avis IS NOT NULL) AS avis_rendus,
                 (SELECT count(*)::int FROM acte_commissions c WHERE c.acte_id = a.id AND c.retiree_at IS NULL) AS nb_commissions,
                 (SELECT COALESCE(jsonb_agg(c.nom ORDER BY ac.id), '[]'::jsonb) FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id WHERE ac.acte_id = a.id AND ac.retiree_at IS NULL) AS commissions_noms
          FROM actes a LEFT JOIN ref_items ru ON ru.id = a.rubrique_id LEFT JOIN elus e ON e.id = a.rapporteur_id WHERE ${w.join(' AND ')} ORDER BY a.numero_suivi`, p);
-      return rows.map((r) => ({ id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, direction: r.direction_label, seanceViseeId: r.seance_visee_id, rubrique: r.rubrique, rapporteur: r.rapporteur, deliberations: r.nb_delib, commissions: r.nb_commissions, commissionsNoms: r.commissions_noms || [], avisRendus: r.avis_rendus, numeroOrigine: r.numero_airs ?? null }));
+      return rows.map((r) => ({ id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, direction: r.direction_label, seanceViseeId: r.seance_visee_id, rubrique: r.rubrique, rapporteur: rapporteurLabel(r.rapporteur, r.rapporteur_delegation), deliberations: r.nb_delib, commissions: r.nb_commissions, commissionsNoms: r.commissions_noms || [], avisRendus: r.avis_rendus, numeroOrigine: r.numero_airs ?? null }));
     },
 
     /**
@@ -307,7 +347,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
      */
     async commissionProjects(org, sc, { onlyFree = false } = {}) {
       const rows = await db.all(
-        `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.redacteur, a.direction_label, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
+        `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.redacteur, a.direction_label, a.rapporteur_delegation, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
                 ac.avis, ac.mis_a_disposition_at, ac.suspendue,
                 (SELECT count(*)::int FROM deliberations d WHERE d.acte_id = a.id) AS nb_delib,
                 EXISTS (SELECT 1 FROM seance_items it WHERE it.seance_id = $2 AND it.acte_id = a.id AND it.statut = 'a_traiter') AS dans_odj
@@ -315,7 +355,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
          WHERE a.organisme_id = $1 AND ac.commission_id = $3 AND ac.retiree_at IS NULL AND ac.mis_a_disposition_at IS NOT NULL AND a.statut NOT IN ('abandonne', 'retire', 'archive')
          ORDER BY a.numero_suivi`, [org, sc.id, sc.instance_commission_id]);
       return rows.filter((r) => !onlyFree || !r.dans_odj).map((r) => ({
-        id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, redacteur: r.redacteur, direction: r.direction_label, direction_label: r.direction_label, rubrique: r.rubrique, rapporteur: r.rapporteur,
+        id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, redacteur: r.redacteur, direction: r.direction_label, direction_label: r.direction_label, rubrique: r.rubrique, rapporteur: rapporteurLabel(r.rapporteur, r.rapporteur_delegation),
         deliberations: r.nb_delib, commissions: 1, avisRendus: r.avis ? 1 : 0, avis: r.avis, suspendue: r.suspendue, dansOdj: r.dans_odj, eligible: !r.dans_odj && !r.suspendue, etape: null, holders: [], seanceViseeId: null,
       }));
     },
@@ -329,7 +369,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       const sc0 = await seanceOf(db, org, seanceId);
       if (isCommission(sc0)) return svc.commissionProjects(org, sc0);
       const rows = await db.all(
-        `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.redacteur, a.direction_label, a.current_step_key, a.seance_id, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
+        `SELECT a.id, a.numero_suivi, a.titre, a.statut, a.redacteur, a.direction_label, a.current_step_key, a.seance_id, a.rapporteur_delegation, ru.libelle AS rubrique, trim(e.prenom || ' ' || e.nom) AS rapporteur,
                 i.label AS etape, i.holders AS etape_holders, i.due_at AS etape_due,
                 (SELECT COALESCE(jsonb_agg(c.nom ORDER BY ac.id), '[]'::jsonb) FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id WHERE ac.acte_id = a.id AND ac.retiree_at IS NULL) AS commissions_noms
          FROM actes a LEFT JOIN ref_items ru ON ru.id = a.rubrique_id LEFT JOIN elus e ON e.id = a.rapporteur_id
@@ -338,7 +378,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
          ORDER BY a.numero_suivi`, [org, seanceId]);
       const inOdj = new Set((await db.all("SELECT acte_id FROM seance_items WHERE seance_id = $1 AND statut = 'a_traiter' AND acte_id IS NOT NULL", [seanceId])).map((r) => r.acte_id));
       return rows.map((r) => ({
-        id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, redacteur: r.redacteur, direction: r.direction_label, rubrique: r.rubrique, rapporteur: r.rapporteur,
+        id: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, statut: r.statut, redacteur: r.redacteur, direction: r.direction_label, rubrique: r.rubrique, rapporteur: rapporteurLabel(r.rapporteur, r.rapporteur_delegation),
         etape: r.etape || null, holders: r.etape_holders || [], dueAt: r.etape_due || null, dansOdj: inOdj.has(r.id) || r.statut === 'inscrit_odj',
         commissionsNoms: r.commissions_noms || [],
         etat: etatOf(r.statut, r.current_step_key), eligible: AFFECTABLE.includes(r.statut) && !r.seance_id,
@@ -457,7 +497,8 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
     async addFichier(ctx, organismeId, seanceId, itemId, { titre, motif }, file) {
       const org = requireOrg(organismeId);
       if (!file?.buffer?.length) throw E.badRequest('Fichier manquant (champ « file »)');
-      if (file.buffer.length > MAX_PIECE) throw E.badRequest('Fichier trop volumineux (20 Mo au plus)');
+      const maxMo = await uploadLimit.mb(org);
+      if (file.buffer.length > maxMo * 1048576) throw E.badRequest(`Fichier trop volumineux (${maxMo} Mo au plus)`);
       const ext = String(file.originalname || '').split('.').pop().toLowerCase();
       const def = PIECES[ext];
       if (!def) throw E.badRequest(`Type de fichier non accepté (.${ext}) : PDF, images (png, jpg), documents Office ou OpenDocument`);
@@ -540,7 +581,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       const key = {
         rubrique: (g) => { const i = Array.isArray(ordreRub) ? ordreRub.indexOf(g.rubrique) : -1; return [i < 0 ? 999 : i, g.rubrique || '~']; },
         commission: (g) => [g.commissions?.[0]?.ordre ?? 999, g.commissions?.[0]?.nom || '~'],
-        rapporteur: (g) => [g.rapporteur || '~'], numero: (g) => [g.numero_suivi], alpha: (g) => [String(g.acte_titre || '').toLowerCase()],
+        rapporteur: (g) => [g.rapporteur || '~', g.rapporteur_delegation || '~'], numero: (g) => [g.numero_suivi], alpha: (g) => [String(g.acte_titre || '').toLowerCase()],
       }[critere];
       const groups = []; const byActe = new Map();
       for (const r of rows) if (r.kind === 'deliberation') { if (!byActe.has(r.acte_id)) { const g = { ...r, ids: [] }; byActe.set(r.acte_id, g); groups.push(g); } byActe.get(r.acte_id).ids.push(r.id); }
@@ -548,6 +589,42 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
       const queue = groups.flatMap((g) => g.ids);
       const ids = rows.map((r) => (r.kind === 'deliberation' ? queue.shift() : r.id));
       return { critere, ids };
+    },
+
+    /**
+     * Ordre du jour INTERNE : les délibérations prévues à la séance, avec direction rédactrice, avancement,
+     * présence d'annexe et date du dernier passage hiérarchique (arrivée à l'étape courante). Tri : commission,
+     * rapporteur ou délégation de rapporteur (le SCC décide ainsi de l'ordre de passage des commissions).
+     */
+    async ordreDuJourInterne(ctx, organismeId, seanceId, { tri = 'commission' } = {}) {
+      const org = requireOrg(organismeId);
+      const s = await seanceOf(db, org, seanceId);
+      const rows = await db.all(
+        `SELECT it.id, it.numero, COALESCE(d.titre, a.titre) AS titre, a.id AS acte_id, a.numero_suivi, a.statut AS acte_statut,
+                a.direction_label, i.label AS etape, i.arrived_at, trim(e.prenom || ' ' || e.nom) AS rapporteur, a.rapporteur_delegation,
+                (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id) AS annexes,
+                (SELECT c.nom FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id WHERE ac.acte_id = a.id AND ac.retiree_at IS NULL ORDER BY ac.id LIMIT 1) AS commission,
+                (SELECT c.ordre FROM acte_commissions ac JOIN commissions c ON c.id = ac.commission_id WHERE ac.acte_id = a.id AND ac.retiree_at IS NULL ORDER BY ac.id LIMIT 1) AS commission_ordre
+         FROM seance_items it JOIN actes a ON a.id = it.acte_id
+              LEFT JOIN deliberations d ON d.id = it.deliberation_id
+              LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
+              LEFT JOIN elus e ON e.id = a.rapporteur_id
+         WHERE it.seance_id = $1 AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
+         ORDER BY it.position, it.id`, [s.id]);
+      const items = rows.map((r) => ({
+        numero: r.numero, titre: r.titre, acteId: r.acte_id, numeroSuivi: r.numero_suivi,
+        direction: r.direction_label, avancement: r.etape || AVANCEMENT_HORS[r.acte_statut] || r.acte_statut,
+        annexe: r.annexes > 0, annexes: r.annexes, dernierPassage: r.arrived_at || null,
+        commission: r.commission || null, commissionOrdre: r.commission_ordre ?? 999,
+        rapporteur: r.rapporteur || null, rapporteurDelegation: r.rapporteur_delegation || null,
+      }));
+      const key = {
+        commission: (x) => [x.commissionOrdre, x.commission || '~', x.numero ?? ''],
+        rapporteur: (x) => [x.rapporteur || '~', x.rapporteurDelegation || '~', x.numero ?? ''],
+        delegation: (x) => [x.rapporteurDelegation || '~', x.rapporteur || '~', x.numero ?? ''],
+      }[tri] || ((x) => [x.numero ?? '']);
+      items.sort((a, b) => { const ka = key(a); const kb = key(b); for (let i = 0; i < ka.length; i++) { if (ka[i] < kb[i]) return -1; if (ka[i] > kb[i]) return 1; } return 0; });
+      return { seance: { id: s.id, instance: s.instance_nom, dateSeance: s.date_seance }, tri, items };
     },
 
     // Rupture par commission et composition d'un ordre du jour (fonctions pures, réutilisées par la convocation et l'aperçu).
@@ -695,4 +772,4 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage })
   return svc;
 }
 
-module.exports = { createOdj, formatNumero, checkPattern, VARS, numeroAffiche, groupesParCommission, odjContent, odjMarkdown };
+module.exports = { createOdj, formatNumero, checkPattern, VARS, numeroAffiche, groupesParCommission, odjContent, odjMarkdown, odjInterneContent };

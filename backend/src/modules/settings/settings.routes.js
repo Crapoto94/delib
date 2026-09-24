@@ -17,13 +17,18 @@ const DeleteQuery = z.object({ scope: Scope.default('organisme'), subId: IdQ });
 const PlatformPut = z.object({ value: z.unknown().refine((v) => v !== undefined, 'value requis') });
 
 /** Paramètres hiérarchiques : plateforme -> organisme -> instance -> type d'acte. La valeur la plus spécifique l'emporte. */
-module.exports = ({ makeRouter, settings }) => {
+module.exports = ({ makeRouter, settings, uploadLimit }) => {
   const r = makeRouter('/api/v1/organismes');
 
   r.get('/:orgId/settings', {
     summary: "Paramètres résolus d'un organisme, avec l'origine de chaque valeur", tags: ['paramètres'], org: true, params: OrgParams, query: ResolveQuery,
     description: 'Chaque clé porte sa valeur et son origine (`platform`, `organisme`, `instance`, `type_acte`). Passer `instanceId` et/ou `typeActeId` pour résoudre jusqu\'à ce niveau.',
   }, async (req, res) => res.json({ settings: await settings.resolve(req.org.id, req.valid.query) }));
+
+  r.get('/:orgId/fichiers/limite', {
+    summary: 'Taille maximale des pièces jointes (Mo), réglée par la collectivité et bornée par le serveur', tags: ['paramètres'], org: true, params: OrgParams,
+    description: '`tailleMaxMo` : limite en vigueur ; `defautMo` : valeur par défaut (30) ; `maximumMo` : plafond technique du serveur (variable `MAX_UPLOAD_MB`).',
+  }, async (req, res) => res.json(await uploadLimit.info(req.org.id)));
 
   r.put('/:orgId/settings/:key', {
     summary: 'Définit un paramètre à un niveau', tags: ['paramètres'], org: true, roles: ['org_admin'], params: KeyParams, body: PutBody,

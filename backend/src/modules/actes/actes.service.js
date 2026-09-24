@@ -14,6 +14,7 @@ const toActe = (r) => r && ({
   direction: { code: r.direction_code, label: r.direction_label }, service: r.service_code || r.service_label ? { code: r.service_code, label: r.service_label } : null,
   natureId: r.nature_id, matiereId: r.matiere_id, rubriqueId: r.rubrique_id, incidenceFinanciere: r.incidence_financiere,
   montant: r.montant === null ? null : Number(r.montant), rapporteurId: r.rapporteur_id, rapporteurComplId: r.rapporteur_compl_id,
+  rapporteurDelegation: r.rapporteur_delegation ?? null,
   seanceViseeId: r.seance_visee_id, seanceId: r.seance_id, urgence: r.urgence, dateLimite: r.date_limite, confidentialite: r.confidentialite,
   commentaireInitial: r.commentaire_initial, custom: r.custom, currentStepKey: r.current_step_key, participants: r.participants,
   directionsInfo: r.directions_info ?? [],
@@ -121,11 +122,11 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
         const numero = await nextCounter(q, org, 'acte', { plancher: maxSuivi });
         const a = await q.get(
           `INSERT INTO actes (organisme_id, numero_suivi, type_id, titre, redacteur, direction_code, direction_label, service_code, service_label,
-             nature_id, matiere_id, rubrique_id, incidence_financiere, montant, rapporteur_id, rapporteur_compl_id, seance_visee_id,
+             nature_id, matiere_id, rubrique_id, incidence_financiere, montant, rapporteur_id, rapporteur_compl_id, rapporteur_delegation, seance_visee_id,
              urgence, date_limite, confidentialite, commentaire_initial, custom, directions_info)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22::jsonb,$23::jsonb) RETURNING *`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23::jsonb,$24::jsonb) RETURNING *`,
           [org, numero, type.id, b.titre, ctx.username, directionCode, directionLabel, serviceCode, serviceLabelFinal, natureId, matiereId, rubriqueId,
-            b.incidenceFinanciere ?? null, b.montant ?? null, b.rapporteurId ?? null, b.rapporteurComplId ?? null, b.seanceViseeId ?? null,
+            b.incidenceFinanciere ?? null, b.montant ?? null, b.rapporteurId ?? null, b.rapporteurComplId ?? null, b.rapporteurDelegation ?? null, b.seanceViseeId ?? null,
             !!b.urgence, b.dateLimite ?? null, b.confidentialite || 'normale', b.commentaire ?? null, JSON.stringify(b.custom || {}), JSON.stringify(directionsInfo)]);
         const n = Math.max(1, type.meta?.minDeliberations ?? 1);
         for (let i = 1; i <= n; i++) await q.run('INSERT INTO deliberations (acte_id, ordre, titre) VALUES ($1,$2,$3)', [a.id, i, n === 1 ? b.titre : `${b.titre} (${i})`]);
@@ -224,6 +225,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
       if (patch.incidenceFinanciere !== undefined) add('incidence_financiere', patch.incidenceFinanciere);
       if (patch.montant !== undefined) add('montant', patch.montant);
       if (patch.rapporteurId !== undefined) add('rapporteur_id', patch.rapporteurId);
+      if (patch.rapporteurDelegation !== undefined) add('rapporteur_delegation', patch.rapporteurDelegation);
       if (patch.rapporteurComplId !== undefined) add('rapporteur_compl_id', patch.rapporteurComplId);
       if (patch.seanceViseeId !== undefined) add('seance_visee_id', patch.seanceViseeId);
       if (patch.urgence !== undefined) add('urgence', patch.urgence);

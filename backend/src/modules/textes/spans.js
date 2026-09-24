@@ -64,6 +64,22 @@ function applyDiffToSpans(prevSpans, oldClean, newClean, amender, { at = new Dat
   return mergeAdjacent(result);
 }
 
+/**
+ * Identifiants des modifications d'un auteur postérieures à `sinceAt` (bornes de sa série en cours).
+ * Sert à « défaire » les changements d'une personne avant de la comparer à la personne précédente :
+ * on ne se diffe jamais contre soi-même.
+ */
+function authorChangeIds(spans, author, sinceAt = null) {
+  const since = sinceAt ? new Date(sinceAt).getTime() : null;
+  const ids = new Set();
+  for (const s of spans) {
+    if (s.type === 'text' || s.author !== author || !s.cid) continue;
+    if (since !== null && !(s.at && new Date(s.at).getTime() >= since)) continue;
+    ids.add(s.cid);
+  }
+  return [...ids];
+}
+
 /** Fusionne les spans contigus de même nature (même type, auteur, modification) pour garder la structure compacte. */
 function mergeAdjacent(spans) {
   const out = [];
@@ -78,15 +94,28 @@ function mergeAdjacent(spans) {
 
 /**
  * Reconstruit les spans en rejouant les instantanés (du plus ancien au plus récent) : jamais de perte silencieuse.
+ * Une série de versions du même auteur est recollée en une seule modification nette, pour comparer chacun à la
+ * personne précédente (et non à lui-même).
  * `versions` : [{ markdown, author, name, color, created_at, tracking, cid }] ordonnées par version.
  */
 function rebuildSpans(versions) {
   let spans = [];
   let prev = null;
+  let streakAuthor = null;
+  let boundary = null; // début de la série d'écritures de l'auteur courant
   for (const v of versions) {
     const md = normalize(v.markdown);
-    if (prev === null || !v.tracking) spans = initialSpans(md);
-    else if (md !== prev) spans = applyDiffToSpans(spans, prev, md, { author: v.author, name: v.name, color: v.color }, { at: new Date(v.created_at).toISOString(), cid: v.cid });
+    if (prev === null || !v.tracking) { spans = initialSpans(md); prev = md; streakAuthor = null; boundary = null; continue; }
+    const startStreak = v.author !== streakAuthor;
+    if (md !== prev) {
+      let base = spans;
+      if (!startStreak && boundary !== null) {
+        const mine = authorChangeIds(base, v.author, boundary);
+        if (mine.length) base = resolveChanges(base, mine, 'reject');
+      }
+      spans = applyDiffToSpans(base, liveText(base), md, { author: v.author, name: v.name, color: v.color }, { at: new Date(v.created_at).toISOString(), cid: v.cid });
+    }
+    if (startStreak) { streakAuthor = v.author; boundary = v.created_at; }
     prev = md;
   }
   return spans;
@@ -110,7 +139,7 @@ function resolveChanges(spans, cids, decision) {
 /** Tout accepter : version « propre » consolidée (TRK-10). */
 const acceptAll = (spans) => resolveChanges(spans, spans.filter((s) => s.type !== 'text').map((s) => s.cid), 'accept');
 
-/** Liste des modifications (un groupe par cid) avec auteur, couleur, date et extraits. */
+/** Liste des modifications (un groupe par cid) avec auteur, couleur, date et extraits, la plus récente d'abord. */
 function listChanges(spans) {
   const map = new Map();
   for (const s of spans) {
@@ -119,7 +148,7 @@ function listChanges(spans) {
     if (s.type === 'insert') c.inserted += s.text; else c.deleted += s.text;
     map.set(s.cid, c);
   }
-  return [...map.values()];
+  return [...map.values()].sort((a, b) => ((Date.parse(b.at) || 0) - (Date.parse(a.at) || 0)) || String(b.cid).localeCompare(String(a.cid)));
 }
 
 /**
@@ -150,5 +179,5 @@ const pickColor = (usedCount) => PALETTE[usedCount % PALETTE.length];
 
 module.exports = {
   PALETTE, normalize, initialSpans, liveText, applyDiffToSpans, rebuildSpans, isConsistent, resolveChanges, acceptAll,
-  listChanges, sinceView, annotatedMarkdown, pickColor, mergeAdjacent, diffParts: diffWordsWithSpace,
+  listChanges, sinceView, annotatedMarkdown, pickColor, mergeAdjacent, authorChangeIds, diffParts: diffWordsWithSpace,
 };

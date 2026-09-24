@@ -19,14 +19,15 @@ const Point = z.object({ kind: z.enum(['libre', 'chapitre']).default('libre'), t
 const PointPatch = z.object({ titre: z.string().trim().min(2).max(300).optional(), description: z.string().trim().max(5000).nullable().optional(), numerote: z.boolean().optional(), motif: Motif.optional() });
 const Ordre = z.object({ ids: z.array(Id).max(1000), motif: Motif.optional() });
 const TriQ = z.object({ critere: z.enum(['rubrique', 'commission', 'rapporteur', 'numero', 'alpha']) });
+const TriInterneQ = z.object({ tri: z.enum(['commission', 'rapporteur', 'delegation']).default('commission') });
 const Arret = z.object({ forcer: z.boolean().default(false) });
 const Reouvrir = z.object({ motif: z.string().trim().min(3).max(500) });
 const Verrou = z.object({ force: z.boolean().default(false) });
 const Pattern = z.object({ pattern: z.string().min(3).max(80).describe('Variables : {ANNEE} {N_SEANCE} {ORDRE} {ORDRE:03} {RUBRIQUE}') });
 const Apercu = Pattern.extend({ seanceId: Id.optional() });
 
-module.exports = ({ makeRouter, odj, render }) => {
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 1 } });
+module.exports = ({ makeRouter, odj, render, config }) => {
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.storage.maxUploadBytes, files: 1 } });
   const r = makeRouter('/api/v1/organismes/:orgId');
   const ADMIN = ['org_admin', 'scc'];
 
@@ -58,7 +59,7 @@ module.exports = ({ makeRouter, odj, render }) => {
 
   // ---- pièces jointes d'un dossier simple (point libre)
   r.post('/seances/:id/odj/points/:itemId/fichiers', { summary: "Joint un fichier à un dossier simple (point libre)", tags: T, org: true, params: PI, responses: { 201: 'Créé' },
-    description: "Requête multipart/form-data : champ « file » (PDF, png, jpg, documents Office ou OpenDocument, 20 Mo au plus ; type vérifié par l'extension et par la signature du fichier), `titre` et `motif` (obligatoire après l'arrêt de l'ordre du jour) facultatifs." },
+    description: "Requête multipart/form-data : champ « file » (PDF, png, jpg, documents Office ou OpenDocument ; type vérifié par l'extension et par la signature du fichier), `titre` et `motif` (obligatoire après l'arrêt de l'ordre du jour) facultatifs. Taille max : réglage « Pièces jointes » de la collectivité." },
   upload.single('file'), async (req, res, next) => {
     const meta = Piece.safeParse(req.body || {});
     if (!meta.success) return next(require('../../shared/errors').E.badRequest('Requête invalide', meta.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))));
@@ -107,6 +108,18 @@ module.exports = ({ makeRouter, odj, render }) => {
     const heure = dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }).replace(':', 'h');
     const doc = await render.odjDocument({ organismeId: req.org.id, items: d.items, sousTitre: `${d.seance.instance} — ${dateLabel} à ${heure}`, title: `Ordre du jour — ${d.seance.instance}` });
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="ordre-du-jour-${req.valid.params.id}.pdf"`, 'X-Page-Count': String(doc.pageCount), 'Cache-Control': 'private, no-store' }).send(doc.buffer);
+  });
+
+  r.get('/seances/:id/odj-interne/pdf', {
+    summary: "Ordre du jour interne (PDF) : délibérations prévues, direction, avancement, annexes, dernier passage",
+    tags: T, org: true, roles: ADMIN, params: PS, query: TriInterneQ, responses: { 200: 'application/pdf' },
+    description: "Document de travail du SCC : une ligne par délibération prévue (titre, direction rédactrice, état d'avancement, présence d'annexe, date du dernier passage hiérarchique). Regroupement et tri par `tri` : commission (défaut, ordre de passage des commissions), rapporteur ou délégation de rapporteur.",
+  }, async (req, res) => {
+    const data = await odj.ordreDuJourInterne(req.ctx, req.org.id, req.valid.params.id, { tri: req.valid.query.tri });
+    const dt = new Date(data.seance.dateSeance);
+    const label = dt.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+    const doc = await render.odjInterneDocument({ organismeId: req.org.id, items: data.items, sousTitre: `${data.seance.instance} — ${label}`, title: 'Ordre du jour interne', tri: data.tri });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="odj-interne-${req.valid.params.id}.pdf"`, 'X-Page-Count': String(doc.pageCount), 'Cache-Control': 'private, no-store' }).send(doc.buffer);
   });
 
   r.post('/numerotation/apercu', { summary: 'Aperçu en direct d\'un format de numérotation', tags: T, org: true, roles: ADMIN, params: P, body: Apercu },

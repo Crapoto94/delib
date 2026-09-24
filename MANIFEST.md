@@ -671,7 +671,7 @@ Fusion page à page avec le PDF de fond (pdf-lib) : fond dessous, contenu dessus
 
 ## 13. Annexes
 
-- **ANN-01** — **PDF uniquement** (contrôle du type par signature `%PDF`, pas seulement l'extension/MIME), taille max paramétrable (défaut 50 Mo, comme le parapheur), PDF non protégé par mot de passe.
+- **ANN-01** — **PDF, Word ou Excel** (contrôle du type par extension et signature du fichier ; le PDF est contrôlé par sa signature `%PDF`), Word/Excel convertis en **PDF associé à la validation finale** du dossier, taille max paramétrable dans l'administration (« Paramétrages › Pièces jointes », défaut 30 Mo, plafonnée par la variable serveur `MAX_UPLOAD_MB`), PDF non protégé par mot de passe.
 - **ANN-02** — Ajout par **glisser-déposer** multiple ; par annexe : **titre**, **type d'annexe** (référentiel), **ordre** (glisser pour réordonner), numéro auto (« Annexe 1 »). Le **type d'annexe** est un code `CodeTypePJ` de la classification S²LOW lorsque l'annexe est transmissible (TLT-04).
 - **ANN-03** — Aperçu intégré (`pdfjs-dist`), nombre de pages, empreinte **SHA-256** enregistrée.
 - **ANN-04** — **Versionnement** : remplacer un fichier crée une nouvelle version ; l'ancienne reste consultable.
@@ -686,7 +686,7 @@ Fusion page à page avec le PDF de fond (pdf-lib) : fond dessous, contenu dessus
 
 - **COM-01** — Fil de discussion **par acte**, visible de **toutes les personnes du circuit** (VIS-01) ; auteur, date, étape à laquelle il a été posté.
 - **COM-02** — Le commentaire rattaché à un **refus** est obligatoire et repris dans la notification.
-- **COM-04** — **Réalisation** : une commission de type « autre » ne peut pas être rattachée à un acte (400) et n'est pas proposée dans le choix des commissions d'un dossier ; ses réunions reçoivent des **dossiers simples** (point libre avec **description** et **pièces jointes** : PDF, png, jpg, documents Office ou OpenDocument, **20 Mo** au plus, type contrôlé par l'extension **et** la signature du fichier) ; les pièces se gèrent depuis l'ordre du jour de la réunion (ajout, retrait, description) ; **après l'arrêt de l'ordre du jour, tout changement demande un motif**.
+- **COM-04** — **Réalisation** : une commission de type « autre » ne peut pas être rattachée à un acte (400) et n'est pas proposée dans le choix des commissions d'un dossier ; ses réunions reçoivent des **dossiers simples** (point libre avec **description** et **pièces jointes** : PDF, png, jpg, documents Office ou OpenDocument, **taille paramétrable** (défaut 30 Mo, Paramétrages › Pièces jointes), type contrôlé par l'extension **et** la signature du fichier) ; les pièces se gèrent depuis l'ordre du jour de la réunion (ajout, retrait, description) ; **après l'arrêt de l'ordre du jour, tout changement demande un motif**.
 - **COM-05** — Le convoqué **consulte les pièces jointes** depuis son lien personnel (PDF dans la visionneuse, autres fichiers en téléchargement) ; seules les pièces de **sa version** de la convocation sont accessibles et **chaque consultation est journalisée** (évènement « pièce jointe consultée »). La convocation et l'ordre du jour en PDF reprennent la description et la liste des pièces.
 - **COM-03** — Réponses imbriquées, **mentions `@agent`** (notification), résolution d'un commentaire (« traité »).
 - **COM-04** — Commentaire **ancré sur un passage du texte** (sélection) : phase 2.

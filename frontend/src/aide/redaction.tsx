@@ -102,7 +102,7 @@ export const redaction: Article = {
             [<>Rubrique *</>, <>La thématique (Finances, Culture, Action sociale…). Elle sert aussi de classement interne.</>],
             [<>Nature *</>, <>Le type juridique de l'acte (Délibérations, Actes réglementaires…).</>],
             [<>Élu rapporteur *</>, <>L'élu qui présentera le sujet devant l'assemblée.</>],
-            [<>Impact budgétaire *</>, <>Oui ou non ; si oui, indiquez le montant. Cela peut ajouter une validation du <Terme>Service financier</Terme> au circuit.</>],
+            [<>Impact budgétaire *</>, <>Oui ou non. Le <b>montant est facultatif</b> (jamais bloquant). Une réponse « Oui » ajoute une validation du <Terme>Service financier</Terme> au circuit.</>],
             [<>Séance visée</>, <>La séance de conseil à laquelle vous destinez l'acte. Vous proposez, la hiérarchie peut modifier, le SCC affecte définitivement.</>],
             [<>Dossier urgent</>, <>Cochez pour un traitement renforcé et suivi de plus près.</>],
           ]} />

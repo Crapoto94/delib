@@ -12,6 +12,7 @@ import { d, dt } from '../format';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, Spinner, StatutBadge, TypeBadge, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
 import { useIa } from '../useIa';
+import { useLimitePJ } from '../usePJ';
 import { Select } from '../Select';
 import { roleInclusif } from '../genre';
 import { MatiereTree } from '../MatiereTree';
@@ -85,7 +86,7 @@ function ChampInput({ c, v, onChange, disabled, elus }: { c: any; v: any; onChan
 }
 
 /* --------------------------------------------------------------------------------------------------- fiche de l'acte */
-function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSaved: () => void }) {
+function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable: boolean; onSaved: () => void; onCommissions: () => void }) {
   const { org } = useAuth(); const o = org!.id;
   const rubriques = useLoad(async () => (await api.get(orgPath(o, '/referentiels/rubrique'))).data.items as any[], [o]);
   const natures = useLoad(async () => (await api.get(orgPath(o, '/referentiels/nature'))).data.items as any[], [o]);
@@ -103,7 +104,10 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
   // Un acte signé par le maire (décision, arrêté) ne passe pas au conseil : ni séance à viser, ni élu rapporteur.
   const signature = !!acte.typeInfo?.meta?.signature;
   useEffect(() => { setCv(Object.fromEntries((acte.champs || []).map((c: any) => [c.code, c.valeur]))); }, [acte.champs]);
-  useEffect(() => { setF({ titre: acte.titre, matiereId: acte.matiereId ?? '', rubriqueId: acte.rubriqueId ?? '', natureId: acte.natureId ?? '', incidenceFinanciere: acte.incidenceFinanciere, montant: acte.montant ?? '', rapporteurId: acte.rapporteurId ?? '', seanceViseeId: acte.seanceViseeId ?? '', urgence: acte.urgence }); }, [acte]);
+  // Recharge les valeurs de la fiche UNIQUEMENT quand on change de dossier : un rechargement de l'acte (ajout d'une
+  // commission, validation d'une étape…) ne doit pas écraser les saisies en cours (matière, rubrique, élu…).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setF({ titre: acte.titre, matiereId: acte.matiereId ?? '', rubriqueId: acte.rubriqueId ?? '', natureId: acte.natureId ?? '', incidenceFinanciere: acte.incidenceFinanciere, montant: acte.montant ?? '', rapporteurId: acte.rapporteurId ?? '', rapporteurDelegation: acte.rapporteurDelegation ?? '', seanceViseeId: acte.seanceViseeId ?? '', urgence: acte.urgence }); }, [acte.id]);
   useEffect(() => { setDirsInfo(Array.isArray(acte.directionsInfo) ? acte.directionsInfo.map((d: any) => ({ ...d })) : []); }, [acte.directionsInfo]);
   const nv = (v: any) => (v === '' ? null : Number(v));
   // Champs obligatoires non renseignés : surlignés pour guider la saisie tant que la fiche est modifiable (CRE-02).
@@ -117,16 +121,19 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
     incidence: f.incidenceFinanciere == null,
   };
   const mq = (k: keyof typeof manque) => editable && manque[k];
+  // Délégations fonctionnelles de l'élu rapporteur choisi : si plusieurs, on précise celle du dossier (tri de l'ODJ).
+  const eluSel = (elus.data ?? []).find((m: any) => String(m.id) === String(f.rapporteurId));
+  const delegationsElu: string[] = eluSel?.delegations ?? [];
   const takenCommissions = new Set((commissions.data?.items ?? []).filter((c: any) => !c.retireeAt).map((c: any) => c.commissionId));
   const addCommission = async () => {
     if (!selCommission) return; setErr(null);
-    try { await api.post(orgPath(o, `/actes/${acte.id}/commissions`), { commissionId: Number(selCommission) }); setSelCommission(''); commissions.reload(); onSaved(); }
+    try { await api.post(orgPath(o, `/actes/${acte.id}/commissions`), { commissionId: Number(selCommission) }); setSelCommission(''); commissions.reload(); onCommissions(); }
     catch (x) { setErr(errMsg(x)); }
   };
   const removeCommission = async (c: any) => {
     const motif = c.misADispositionAt ? prompt('Motif du retrait (obligatoire, les membres seront prévenus) :') : undefined;
     if (c.misADispositionAt && !motif) return;
-    try { await api.delete(orgPath(o, `/actes/${acte.id}/commissions/${c.commissionId}`), { params: { motif } }); commissions.reload(); onSaved(); }
+    try { await api.delete(orgPath(o, `/actes/${acte.id}/commissions/${c.commissionId}`), { params: { motif } }); commissions.reload(); onCommissions(); }
     catch (x) { setErr(errMsg(x)); }
   };
 
@@ -135,7 +142,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
     try {
       await api.put(orgPath(o, `/actes/${acte.id}`), {
         titre: f.titre, matiereId: nv(f.matiereId), rubriqueId: nv(f.rubriqueId), natureId: nv(f.natureId), incidenceFinanciere: f.incidenceFinanciere,
-        montant: f.incidenceFinanciere && f.montant !== '' ? Number(f.montant) : null, rapporteurId: signature ? null : nv(f.rapporteurId), seanceViseeId: signature ? null : nv(f.seanceViseeId), urgence: !!f.urgence,
+        montant: f.incidenceFinanciere && f.montant !== '' ? Number(f.montant) : null, rapporteurId: signature ? null : nv(f.rapporteurId), rapporteurDelegation: signature ? null : (f.rapporteurDelegation || null), seanceViseeId: signature ? null : nv(f.seanceViseeId), urgence: !!f.urgence,
         directionsInfo: dirsInfo.map((d: any) => d.code),
         ...((acte.champs || []).length ? { custom: { ...(acte.custom || {}), ...Object.fromEntries((acte.champs || []).filter((c: any) => c.modifiable).map((c: any) => [c.code, cv[c.code] ?? ''])) } } : {}),
       });
@@ -164,8 +171,13 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
         <Field label="Nature *" missing={mq('nature')}><Select className="input" disabled={dis} value={f.natureId ?? ''} onChange={(e) => setF({ ...f, natureId: e.target.value })}>
           <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
         {!signature && (
-        <Field label="Élu rapporteur *" missing={mq('rapporteur')}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => setF({ ...f, rapporteurId: e.target.value })}>
-          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${roleInclusif(m.role, m.prenom, m.civilite)})` : ''}</option>)}</Select></Field>)}
+        <Field label="Élu rapporteur *" missing={mq('rapporteur')}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => { const id = e.target.value; const elu = (elus.data ?? []).find((m: any) => String(m.id) === id); setF({ ...f, rapporteurId: id, rapporteurDelegation: elu?.delegations?.length === 1 ? elu.delegations[0] : '' }); }}>
+          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}{m.role ? ` (${roleInclusif(m.role, m.prenom, m.civilite)})` : ''}{m.delegations?.length ? ` · ${m.delegations.join(' · ')}` : ''}</option>)}</Select></Field>)}
+        {!signature && delegationsElu.length > 1 && (
+        <Field label="Délégation de l'élu rapporteur *" missing={editable && !f.rapporteurDelegation} hint="Cet élu porte plusieurs délégations : précisez celle concernée. Elle sert au tri des dossiers à l'ordre du jour.">
+          <Select className="input" disabled={dis} value={f.rapporteurDelegation ?? ''} onChange={(e) => setF({ ...f, rapporteurDelegation: e.target.value })}>
+            <option value="">— choisir —</option>{delegationsElu.map((d) => <option key={d} value={d}>{d}</option>)}
+          </Select></Field>)}
         <div className="md:col-span-2">
           <Field label="Commissions (pour avis) *" missing={mq('commission')} hint="Le projet est soumis pour avis à la ou les commissions sélectionnées. Obligatoire dès que la collectivité a des commissions actives.">
             {(commissions.data?.items ?? []).some((c: any) => !c.retireeAt) ? (
@@ -197,7 +209,7 @@ function Fiche({ acte, editable, onSaved }: { acte: any; editable: boolean; onSa
           <div className="flex items-center gap-4 py-2">
             {[[true, 'Oui'], [false, 'Non']].map(([v, l]) => (
               <label key={String(v)} className="flex items-center gap-1"><input type="radio" name="inc" disabled={dis} checked={f.incidenceFinanciere === v} onChange={() => setF({ ...f, incidenceFinanciere: v })} /> {l as string}</label>))}
-            {f.incidenceFinanciere && <label className="flex items-center gap-2 rounded bg-soft px-3 py-1">Montant <input type="number" min={0} className="w-28 bg-transparent font-semibold outline-none" disabled={dis} value={f.montant ?? ''} onChange={(e) => setF({ ...f, montant: e.target.value })} /> €</label>}
+            {f.incidenceFinanciere && <label className="flex items-center gap-2 rounded bg-soft px-3 py-1">Montant <span className="text-[12px] font-normal text-mute">(facultatif)</span> <input type="number" min={0} className="w-28 bg-transparent font-semibold outline-none" disabled={dis} value={f.montant ?? ''} onChange={(e) => setF({ ...f, montant: e.target.value })} /> €</label>}
           </div>
         </div>
         {(acte.champs || []).filter((c: any) => (!c.visibleSi || String(c.visibleSi?.egal ?? '') === '' || String(cv[c.visibleSi?.champ] ?? '') === String(c.visibleSi?.egal ?? ''))).map((c: any) => (
@@ -324,7 +336,7 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
             : <button key={t.id} onClick={() => setOpen(t.id)} className="block w-full rounded-lg border border-line bg-surface p-4 text-left hover:border-action hover:shadow-lift" aria-label={`Ouvrir ${kindLabel(t)}`}>{inner}</button>;
         })}
       </div>
-      {open !== null && !signe && <TexteModal acte={acte} texts={list} initialId={open} editable={editable} onClose={() => setOpen(null)} onChanged={() => { previews.reload(); onChanged(); }} toast={toast} />}
+      {open !== null && !signe && <TexteModal acte={acte} texts={list} initialId={open} editable={editable} onClose={() => { texts.reload(); setOpen(null); }} onChanged={() => { texts.reload(); previews.reload(); onChanged(); }} toast={toast} />}
     </section>
   );
 }
@@ -332,12 +344,13 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
 /* ------------------------------------------------------------------------------------------------------- annexes */
 function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth(); const o = org!.id;
+  const { tailleMaxMo } = useLimitePJ();
   const list = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/annexes`))).data.items as any[], [acte.id]);
   const [busy, setBusy] = useState(false); const input = useRef<HTMLInputElement>(null);
   const [comm, setComm] = useState(true);
   const upload = async (file: File) => {
     setBusy(true);
-    try { const fd = new FormData(); fd.append('titre', file.name.replace(/\.pdf$/i, '')); fd.append('communicable', comm ? 'true' : 'false'); fd.append('file', file); await api.post(orgPath(o, `/actes/${acte.id}/annexes`), fd); list.reload(); }
+    try { const fd = new FormData(); fd.append('titre', file.name.replace(/\.[^.]+$/i, '')); fd.append('communicable', comm ? 'true' : 'false'); fd.append('file', file); await api.post(orgPath(o, `/actes/${acte.id}/annexes`), fd); list.reload(); }
     catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
   };
   const toggle = async (a: any) => { try { await api.put(orgPath(o, `/actes/${acte.id}/annexes/${a.id}`), { communicable: !a.communicable }); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
@@ -357,8 +370,8 @@ function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toas
           <div className="mb-2 cursor-pointer rounded-lg border-2 border-dashed border-action/30 bg-soft p-6 text-center" onClick={() => input.current?.click()}
             onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) upload(f); }}>
             {busy ? <Spinner /> : <Upload className="mx-auto h-6 w-6 text-action" />}
-            <div className="mt-1 font-semibold">Glissez votre fichier ici ou cliquez pour choisir</div><div className="text-[12px] text-mute">PDF uniquement (annexes, plans, devis…)</div>
-            <input ref={input} type="file" accept="application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
+            <div className="mt-1 font-semibold">Glissez votre fichier ici ou cliquez pour choisir</div><div className="text-[12px] text-mute">PDF, Word ou Excel (annexes, plans, devis…) — convertis en PDF à la validation finale · {tailleMaxMo} Mo au plus</div>
+            <input ref={input} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
           </div>
           <label className="mb-4 flex items-center justify-center gap-2 text-[12px] text-mute"><input type="checkbox" checked={comm} onChange={(e) => setComm(e.target.checked)} /> Communicable (visible dans la bibliothèque et par les élus)</label>
         </>)}
@@ -689,16 +702,18 @@ function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolea
     const v = prompt('Avis (favorable, defavorable, reserve, sans_avis) :', 'favorable'); if (!v) return;
     try { await api.put(orgPath(o, `/actes/${acte.id}/commissions/${c.commissionId}/avis`), { avis: v }); mine.reload(); } catch (e) { toast(errMsg(e), 'ko'); }
   };
+  const actives = (mine.data?.items ?? []).filter((c: any) => !c.retireeAt);
+  // Rien à afficher (hors commission, aucune commission pour avis, ou chargement) : on ne montre pas la carte.
+  if (!mine.data || mine.data.horsCommission || !actives.length) return null;
   return (
     <div className="card p-5">
       <h3 className="mb-2">Avis des commissions</h3>
-      {mine.data?.horsCommission ? <p className="text-mute">Hors commission.</p> : (
-        <ul className="space-y-2">{mine.data?.items.filter((c: any) => !c.retireeAt).map((c: any) => (
+      <ul className="space-y-2">{actives.map((c: any) => (
           <li key={c.id} className="rounded border border-line p-2">
             <div className="flex items-center justify-between"><b>{c.commission}</b>{editable && <button className="text-ko" aria-label="Retirer" onClick={() => remove(c)}><Trash2 className="h-4 w-4" /></button>}</div>
             <div className="text-[12px] text-mute">{c.suspendue ? '⏸ mise à disposition suspendue' : c.misADispositionAt ? `Mis à disposition le ${d(c.misADispositionAt)}` : 'Mise à disposition à la validation DGS'}</div>
             {c.avis ? <Badge tone={c.avis === 'favorable' ? 'ok' : c.avis === 'defavorable' ? 'ko' : 'warn'}>{AVIS[c.avis]}</Badge> : c.misADispositionAt && <button className="text-[12px] font-semibold text-action" onClick={() => avis(c)}>Saisir l'avis</button>}
-          </li>))}</ul>)}
+          </li>))}</ul>
     </div>
   );
 }
@@ -885,7 +900,7 @@ export default function Dossier() {
       {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          <Fiche acte={a} editable={editable} onSaved={() => { reloadAll(); toast('Fiche enregistrée'); }} />
+          <Fiche acte={a} editable={editable} onSaved={() => { reloadAll(); toast('Fiche enregistrée'); }} onCommissions={reloadAll} />
           {a.typeInfo?.meta?.autorisations && <Autorisations acte={a} editable={editable} onChanged={() => { reloadAll(); toast('Délibérations d\'autorisation mises à jour'); }} toast={toast} />}
           <Textes acte={a} editable={editable || !!c?.actions?.validate} onChanged={acte.reload} onApercu={apercuDossier} toast={toast} />
           {a.typeInfo?.meta?.signature && <Signature acte={a} toast={toast} onChanged={reloadAll} />}          <Annexes acte={a} editable={editable} toast={toast} />

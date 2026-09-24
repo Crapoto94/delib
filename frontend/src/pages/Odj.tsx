@@ -12,6 +12,7 @@ import { showPdf } from '../PdfViewer';
 import SeanceKpis from '../SeanceKpis';
 import { Badge, Empty, ErrorBox, Field, Loading, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
 import { AgentName, AgentNames } from '../AgentName';
+import { useLimitePJ } from '../usePJ';
 import { Select } from '../Select';
 
 /** Ordre du jour d'une séance : classement par glisser-déposer (ou clavier), numérotation, affectation, arrêt (section 16.2). */
@@ -39,6 +40,7 @@ const Legende = () => (
 export default function Odj() {
   const { id } = useParams();
   const { org, isScc } = useAuth(); const o = org!.id; const { toast, node } = useToast(); const navigate = useNavigate();
+  const { tailleMaxMo } = useLimitePJ();
   const odj = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj`))).data, [o, id]);
   const visant = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj/visant`))).data.items as any[], [o, id]);
   const pendingLoad = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}/odj/en-attente`))).data.items as any[], [o, id]);
@@ -48,6 +50,7 @@ export default function Odj() {
   const [point, setPoint] = useState<{ kind: 'libre' | 'chapitre'; titre: string; description: string; numerote: boolean; files: File[] } | null>(null);
   const [dossierOpen, setDossierOpen] = useState<any>(null);
   const [pattern, setPattern] = useState<{ value: string; exemples: string[] } | null>(null);
+  const [triInterne, setTriInterne] = useState<'commission' | 'rapporteur' | 'delegation'>('commission');
   const lockTimer = useRef<any>(null);
   const meta = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}`))).data, [o, id]);
   // avancement de la séance elle-même (point en cours, résultats des votes) : colore l'ordre du jour au fur et à mesure
@@ -103,6 +106,7 @@ export default function Odj() {
   };
   const exportCsv = async () => { const r = await api.get(orgPath(o, `/seances/${id}/odj/export.csv`), { responseType: 'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(r.data); a.download = `odj-${id}.csv`; a.click(); };
   const odjPdf = async () => { try { const r = await api.get(orgPath(o, `/seances/${id}/odj/pdf`), { responseType: 'blob' }); showPdf(r.data, `Ordre du jour — ${d?.seance?.instance ?? ''}`); } catch (e: any) { toast(errMsg(e), 'ko'); } };
+  const odjInternePdf = async () => { try { const r = await api.get(orgPath(o, `/seances/${id}/odj-interne/pdf`), { params: { tri: triInterne }, responseType: 'blob' }); showPdf(r.data, `Ordre du jour interne — ${d?.seance?.instance ?? ''}`); } catch (e: any) { toast(errMsg(e), 'ko'); } };
   const previewPattern = async (value: string) => { try { setPattern({ value, exemples: (await api.post(orgPath(o, '/numerotation/apercu'), { pattern: value, seanceId: Number(id) })).data.exemples }); } catch (e: any) { setPattern({ value, exemples: [`⚠ ${errMsg(e)}`] }); } };
 
   if (odj.loading && !d) return <Loading />;
@@ -125,6 +129,7 @@ export default function Odj() {
           {meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/suivi`}><Radio className="h-4 w-4" /> Suivi de séance</Link>}
           {canEdit && meta.data?.kind !== 'commission' && <button className="btn-secondary" onClick={() => setCahierOpen(true)}><BookOpen className="h-4 w-4" /> Cahier de séance</button>}
           <button className="btn-secondary" onClick={odjPdf}><FileText className="h-4 w-4" /> Ordre du jour (PDF)</button>
+          {canEdit && <span className="inline-flex items-center gap-1"><Select className="input !w-auto !py-1" aria-label="Tri de l'ordre du jour interne" value={triInterne} onChange={(e) => setTriInterne(e.target.value as any)}><option value="commission">Par commission</option><option value="rapporteur">Par rapporteur</option><option value="delegation">Par délégation</option></Select><button className="btn-secondary" onClick={odjInternePdf} title="Document de travail du SCC : avancement, annexes, dernier passage hiérarchique"><FileText className="h-4 w-4" /> Ordre du jour interne</button></span>}
           <button className="btn-secondary" onClick={exportCsv}><Download className="h-4 w-4" /> Tableau de suivi (CSV)</button>
           {canEdit && !arrete && <button className="btn-secondary" onClick={() => previewPattern(d.pattern)}>Numérotation…</button>}
           {canEdit && !arrete && <button className="btn-primary" onClick={() => doArret(false)} disabled={busy}>Arrêter l'ordre du jour</button>}
@@ -223,7 +228,7 @@ export default function Odj() {
         <Field label={point.kind === 'libre' ? 'Nom du dossier' : 'Intitulé'}><input className="input" autoFocus value={point.titre} onChange={(e) => setPoint({ ...point, titre: e.target.value })} /></Field>
         {point.kind === 'libre' && <>
           <Field label="Description (facultatif)"><textarea className="input min-h-[90px]" value={point.description} maxLength={5000} onChange={(e) => setPoint({ ...point, description: e.target.value })} /></Field>
-          <Field label="Pièces jointes (facultatif)" hint="PDF, images, documents Office ou OpenDocument — 20 Mo au plus par fichier."><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.pptx,.odt,.ods,.odp" onChange={(e) => setPoint({ ...point, files: [...point.files, ...Array.from(e.target.files ?? [])] })} /></Field>
+          <Field label="Pièces jointes (facultatif)" hint={`PDF, images, documents Office ou OpenDocument — ${tailleMaxMo} Mo au plus par fichier.`}><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.pptx,.odt,.ods,.odp" onChange={(e) => setPoint({ ...point, files: [...point.files, ...Array.from(e.target.files ?? [])] })} /></Field>
           {point.files.length > 0 && <ul className="space-y-1 text-[12px]">{point.files.map((f, i) => <li key={i} className="flex items-center gap-2"><Paperclip className="h-3 w-3" />{f.name}<button className="text-ko" aria-label="Retirer" onClick={() => setPoint({ ...point, files: point.files.filter((_, k) => k !== i) })}>×</button></li>)}</ul>}
           <label className="flex items-center gap-2"><input type="checkbox" checked={point.numerote} onChange={(e) => setPoint({ ...point, numerote: e.target.checked })} /> Numéroter ce point</label></>}
         <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setPoint(null)}>Annuler</button>

@@ -89,7 +89,7 @@ export function Utilisateurs() {
 
 /* ------------------------------------------------------------------------------------------------------- gabarits */
 const DOCS: Record<string, string> = {
-  expose: 'Exposé des motifs', deliberation: 'Délibération', decision: 'Décision', arrete: 'Arrêté', dossier: 'Dossier complet', garde: 'Page de garde', intercalaire: 'Intercalaire de point', sommaire: 'Sommaire', odj: 'Ordre du jour', convocation: 'Convocation', registre: 'Extrait du registre',
+  expose: 'Exposé des motifs', deliberation: 'Délibération', decision: 'Décision', arrete: 'Arrêté', dossier: 'Dossier complet', garde: 'Page de garde', intercalaire: 'Intercalaire de point', sommaire: 'Sommaire', odj: 'Ordre du jour', 'odj-interne': 'Ordre du jour interne', convocation: 'Convocation', registre: 'Extrait du registre',
 };
 export function Gabarits() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();

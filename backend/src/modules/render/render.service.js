@@ -11,7 +11,7 @@ const { resolveConfig, DEFAULTS } = require('./defaults');
 const { convertirEnPdf } = require('../../shared/convert');
 const D = require('./docx.service');
 const T = require('./typeset');
-const { numeroAffiche, odjContent, odjMarkdown } = require('../seances/odj.service');
+const { numeroAffiche, odjContent, odjMarkdown, odjInterneContent } = require('../seances/odj.service');
 
 const DOC_TYPES = Object.keys(DEFAULTS);
 const FINAL = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre', 'transmis', 'ar_recu', 'publie', 'executoire', 'archive'];
@@ -54,7 +54,7 @@ function odjSampleItems(noms) {
   return items;
 }
 
-function createRender({ db, audit, storage, actes, config }) {
+function createRender({ db, audit, storage, actes, config, annexes }) {
   const measures = new Map();
   const measure = (family = 'interstate') => { if (!measures.has(family)) measures.set(family, T.createMeasure(family, config.fontsDir)); return measures.get(family); };
   const cache = new Map();
@@ -595,7 +595,12 @@ function createRender({ db, audit, storage, actes, config }) {
      * est remplacée par une page d'avertissement : le document reste imprimable. `onlyCommunicable` : profils « élus » et « public ».
      */
     async annexParts(acte, { onlyCommunicable = false } = {}) {
-      const rows = await db.all(`SELECT a.titre, a.ordre, f.storage_key, f.pages FROM annexes a JOIN files f ON f.id = a.file_id WHERE a.acte_id = $1 ${onlyCommunicable ? 'AND a.communicable' : ''} ORDER BY a.ordre, a.id`, [acte.id]);
+      // Word/Excel : on s'assure du PDF associé avant de composer le dossier (conversion mise en cache).
+      if (annexes) {
+        const ids = await db.all(`SELECT id FROM annexes WHERE acte_id = $1 ${onlyCommunicable ? 'AND communicable' : ''}`, [acte.id]);
+        for (const r of ids) { try { await annexes.ensurePdf(acte.organisme_id, r.id); } catch { /* conversion indisponible : page d'avertissement ci-dessous */ } }
+      }
+      const rows = await db.all(`SELECT a.titre, a.ordre, COALESCE(pf.storage_key, f.storage_key) AS storage_key, COALESCE(pf.pages, f.pages) AS pages FROM annexes a JOIN files f ON f.id = a.file_id LEFT JOIN files pf ON pf.id = a.pdf_file_id WHERE a.acte_id = $1 ${onlyCommunicable ? 'AND a.communicable' : ''} ORDER BY a.ordre, a.id`, [acte.id]);
       const parts = [];
       for (const [i, a] of rows.entries()) {
         try { parts.push({ titre: `Annexe ${i + 1} : ${a.titre}`, pdf: { buffer: await storage.get(a.storage_key), pageCount: a.pages } }); }
@@ -662,6 +667,13 @@ function createRender({ db, audit, storage, actes, config }) {
         return { buffer: pdf, pageCount: info.pages };
       }
       return svc.build({ organismeId: org, docType: 'odj', vars: {}, watermark: '', title, content: odjContent({ organisme, sousTitre, items }) });
+    },
+
+    /** Ordre du jour INTERNE (document de travail du SCC) : délibérations prévues, avancement, annexes, dernier passage. */
+    async odjInterneDocument({ organismeId, items, sousTitre = '', title = 'Ordre du jour interne', tri = 'commission' }) {
+      const org = requireOrg(organismeId);
+      const orgRow = await db.get('SELECT nom FROM organismes WHERE id = $1', [org]);
+      return svc.build({ organismeId: org, docType: 'odj-interne', vars: {}, watermark: '', title, content: odjInterneContent({ organisme: orgRow?.nom || '', sousTitre, items, tri }) });
     },
 
     /**

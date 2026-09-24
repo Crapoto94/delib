@@ -127,6 +127,40 @@ describe('suivi des modifications : spans', () => {
     expect(spans.some((s) => s.type === 'insert' && s.author === 'alice' && s.cid === 'c1')).toBe(true);
   });
 
+  it("ne se diffe pas contre soi-même : une écriture annulée par son auteur ne laisse aucun amendement", () => {
+    const versions = [
+      { markdown: 'Le conseil approuve.', author: 'alice', tracking: false, created_at: '2026-01-01T00:00:00Z' },
+      { markdown: 'Le conseil municipal approuve.', author: 'alice', name: 'Alice', color: '#2563EB', tracking: true, created_at: '2026-01-02T00:00:00Z', cid: 'c1' },
+      { markdown: 'Le conseil approuve.', author: 'alice', name: 'Alice', color: '#2563EB', tracking: true, created_at: '2026-01-03T00:00:00Z', cid: 'c2' },
+    ];
+    const spans = S.rebuildSpans(versions);
+    expect(S.liveText(spans)).toBe('Le conseil approuve.');
+    expect(spans.every((s) => s.type === 'text')).toBe(true);
+    expect(S.listChanges(spans)).toEqual([]);
+  });
+
+  it("recolle les écritures successives d'une même personne en un seul changement net", () => {
+    const versions = [
+      { markdown: 'Article 1.', author: 'alice', tracking: false, created_at: '2026-01-01T00:00:00Z' },
+      { markdown: 'Article 1 : budget.', author: 'alice', color: '#2563EB', tracking: true, created_at: '2026-01-02T00:00:00Z', cid: 'c1' },
+      { markdown: 'Article 1 : budget primitif.', author: 'alice', color: '#2563EB', tracking: true, created_at: '2026-01-03T00:00:00Z', cid: 'c2' },
+    ];
+    const spans = S.rebuildSpans(versions);
+    expect(S.liveText(spans)).toBe('Article 1 : budget primitif.');
+    const changes = S.listChanges(spans);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].author).toBe('alice');
+    expect(changes[0].inserted).toContain('budget primitif');
+  });
+
+  it('liste les modifications de la plus récente à la plus ancienne', () => {
+    let spans = S.initialSpans('Base.');
+    spans = edit(spans, 'Base.', 'Base. Ancien.', A, '2026-01-01T00:00:00.000Z');
+    spans = edit(spans, 'Base. Ancien.', 'Base. Ancien. Récent.', B, '2026-02-01T00:00:00.000Z');
+    const changes = S.listChanges(spans);
+    expect(changes.map((c) => c.author)).toEqual(['bruno', 'alice']);
+  });
+
   it('échappe le HTML dans le rendu annoté', () => {
     const spans = [{ id: '1', text: '<script>alert(1)</script> & ', type: 'text' }, { id: '2', text: '<b>x</b>', type: 'insert', color: '#2563EB', cid: 'c' }];
     const html = S.annotatedMarkdown(spans);

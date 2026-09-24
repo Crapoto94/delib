@@ -61,11 +61,23 @@ function createTextes({ db, audit, actes, acl, bus }) {
     let spans; let cid = null;
     if (!t.tracking) spans = S.initialSpans(next);
     else {
-      const who = await authorFor(t.id, ctx);
       let prev = t.spans;
       if (!S.isConsistent(prev, old)) prev = await rebuild(t);
-      cid = require('crypto').randomBytes(6).toString('hex');
-      spans = S.applyDiffToSpans(prev, old, next, who, { cid });
+      // On ne se diffe jamais contre soi-même : si la version précédente est du même auteur, on « défait » sa
+      // série d'écritures pour repartir du texte de la personne précédente. Chaque personne est donc comparée à
+      // celle d'avant, jamais à elle-même ; une écriture annulée par son auteur ne laisse aucun amendement.
+      const last = await db.get('SELECT author FROM text_versions WHERE text_id = $1 ORDER BY version_no DESC LIMIT 1', [t.id]);
+      if (last && last.author === ctx.username) {
+        const other = await db.get('SELECT created_at FROM text_versions WHERE text_id = $1 AND author <> $2 ORDER BY version_no DESC LIMIT 1', [t.id, ctx.username]);
+        const mine = S.authorChangeIds(prev, ctx.username, other?.created_at ?? null);
+        if (mine.length) prev = S.resolveChanges(prev, mine, 'reject');
+      }
+      const refText = S.liveText(prev);
+      if (refText !== next) {
+        const who = await authorFor(t.id, ctx);
+        cid = require('crypto').randomBytes(6).toString('hex');
+        spans = S.applyDiffToSpans(prev, refText, next, who, { cid });
+      } else spans = prev;
     }
     const version = t.version_no + 1;
     await db.tx(async (q) => {

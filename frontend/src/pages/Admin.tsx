@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ArrowLeftRight, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileSignature, FileText, GitBranch, HardDrive, Inbox, KeyRound, Landmark, ListPlus, Menu, Network, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Timer, Trash2, Upload, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileSignature, FileText, GitBranch, HardDrive, Inbox, KeyRound, Landmark, ListPlus, Menu, Network, Paperclip, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Timer, Trash2, Upload, Users, type LucideIcon } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -21,6 +21,7 @@ import AdminIa from './AdminIa';
 import AdminImportAirs from './AdminImportAirs';
 import AdminOrganisation from './AdminOrganisation';
 import AdminRetroplanning from './AdminRetroplanning';
+import AdminPieces from './AdminPieces';
 import AdminCollecteurs from './AdminCollecteurs';
 import AgentPicker, { AgentList } from '../AgentPicker';
 import Collectivites from './Collectivites';
@@ -168,7 +169,7 @@ export function menu(isAdmin: boolean, plateforme: boolean, scc = false): Groupe
   const g: Groupe[] = [
     { titre: 'Organisme', entrees: [
       { k: 'identite', label: 'Identité & logo', icon: Building2 }, { k: 'utilisateurs', label: 'Utilisateurs & rôles', icon: Users },
-      { k: 'titulaires', label: 'Titulaires & droits', icon: ShieldCheck }, { k: 'organisation', label: 'Organisation', icon: Network }, { k: 'retroplanning', label: 'Rétroplanning', icon: Timer }, { k: 'calendrier', label: 'Jours fériés', icon: CalendarDays }] },
+      { k: 'titulaires', label: 'Titulaires & droits', icon: ShieldCheck }, { k: 'organisation', label: 'Organisation', icon: Network }, { k: 'retroplanning', label: 'Rétroplanning', icon: Timer }, { k: 'pieces-jointes', label: 'Pièces jointes', icon: Paperclip }, { k: 'calendrier', label: 'Jours fériés', icon: CalendarDays }] },
     { titre: 'Circuits et rédaction', entrees: [
       { k: 'circuits', label: 'Circuits', icon: GitBranch }, { k: 'gabarits', label: 'Gabarits', icon: FileText },
       ...(isAdmin ? [{ k: 'champs', label: 'Champs personnalisés', icon: ListPlus }] : []),
@@ -232,7 +233,7 @@ export default function Admin() {
           <Routes>
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
-        <Route path="titulaires" element={<Titulaires />} /><Route path="organisation" element={<AdminOrganisation />} /><Route path="retroplanning" element={<AdminRetroplanning />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
+        <Route path="titulaires" element={<Titulaires />} /><Route path="organisation" element={<AdminOrganisation />} /><Route path="retroplanning" element={<AdminRetroplanning />} /><Route path="pieces-jointes" element={<AdminPieces />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
         <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="parapheur" element={<AdminParapheur />} /><Route path="collecteurs" element={<AdminCollecteurs />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} />        <Route path="visas" element={<AdminVisas />} /><Route path="calendrier" element={<Calendrier />} /><Route path="import-airs" element={<AdminImportAirs />} />
       </Routes>
         </div>

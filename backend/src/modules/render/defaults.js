@@ -39,6 +39,7 @@ const DEFAULTS = {
   intercalaire: { ...BASE, filigrane: '' },
   sommaire: { ...BASE, filigrane: '' },
   odj: { ...BASE },
+  'odj-interne': { ...BASE, filigrane: '' },
   convocation: { ...BASE, filigrane: '' },
   registre: { ...BASE, filigrane: '' },
 };
