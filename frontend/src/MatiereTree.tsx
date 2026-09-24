@@ -94,7 +94,7 @@ export function MatiereTree({ value, onChange, disabled, className = 'input' }: 
               {courant && <Check className="h-4 w-4 shrink-0 text-action" aria-label="Sélectionné" />}
             </button>
           ) : (
-            <span className="min-w-0 flex-1 truncate py-1.5 text-[13px] font-semibold text-slate-700"><span className="font-mono text-[11px] text-mute">{n.code}</span> {n.libelle}</span>
+            <span className="min-w-0 flex-1 cursor-default truncate py-1.5 text-[13px] font-semibold text-slate-700" title="Groupe : dépliez-le avec la flèche, puis choisissez une matière précise (les groupes ne sont pas sélectionnables)."><span className="font-mono text-[11px] text-mute">{n.code}</span> {n.libelle} <span className="font-normal uppercase text-[10px] tracking-wide text-mute">groupe</span></span>
           )}
         </div>
       </li>);
@@ -110,7 +110,7 @@ export function MatiereTree({ value, onChange, disabled, className = 'input' }: 
       {ouvert && pos && createPortal(
         <div ref={liste} style={{ position: 'fixed', left: pos.left, width: pos.width, ...(pos.haut ? { bottom: window.innerHeight - pos.top + 4 } : { top: pos.top + 4 }), zIndex: 70 }}
           className="overflow-hidden rounded-lg border border-line bg-surface shadow-float" onMouseDown={(e) => e.stopPropagation()}>
-          <div className="border-b border-line p-2"><input autoFocus className="input !py-1.5" placeholder="Rechercher une matière…" aria-label="Rechercher une matière" value={filtre} onChange={(e) => setFiltre(e.target.value)} /></div>
+          <div className="border-b border-line p-2"><input autoFocus className="input !py-1.5" placeholder="Rechercher une matière…" aria-label="Rechercher une matière" value={filtre} onChange={(e) => setFiltre(e.target.value)} /><p className="mt-1 text-[11px] leading-snug text-mute">Les <b>groupes</b> (ex. « 1.1 ») se déplient avec la flèche — ils ne sont pas sélectionnables. Choisissez une <b>matière précise</b>.</p></div>
           <ul role="tree" className="max-h-[min(340px,50vh)] overflow-y-auto py-1">
             {!garde.size && <li className="px-3 py-2 text-[13px] text-mute">Aucune matière trouvée</li>}
             {lignes(items, 0)}

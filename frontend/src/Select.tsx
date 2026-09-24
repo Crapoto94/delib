@@ -8,7 +8,7 @@ import { Check, ChevronDown } from 'lucide-react';
  * {@link SEUIL_FILTRE} choix. Clavier : ↓ ↑ pour parcourir, Entrée pour choisir, Échap pour fermer, frappe directe pour filtrer.
  * Un vrai `<select>` invisible reste dans la page : validation `required` des formulaires et lecteurs d'écran.
  */
-type Opt = { value: string; label: string; disabled?: boolean; groupe?: string };
+type Opt = { value: string; label: string; disabled?: boolean; groupe?: string; noeud?: ReactNode };
 export const SEUIL_FILTRE = 6;
 
 const texte = (n: ReactNode): string => Children.toArray(n).map((c) => (typeof c === 'string' || typeof c === 'number' ? String(c) : isValidElement(c) ? texte((c.props as { children?: ReactNode }).children) : '')).join('');
@@ -19,7 +19,7 @@ function lireOptions(children: ReactNode, groupe?: string): Opt[] {
   Children.forEach(children, (c) => {
     if (!isValidElement(c)) return;
     const p = c.props as { value?: string | number; children?: ReactNode; disabled?: boolean; label?: string; hidden?: boolean };
-    if (c.type === 'option') { if (!p.hidden) out.push({ value: p.value === undefined ? texte(p.children) : String(p.value), label: texte(p.children), disabled: p.disabled, groupe }); }
+    if (c.type === 'option') { if (!p.hidden) out.push({ value: p.value === undefined ? texte(p.children) : String(p.value), label: texte(p.children), disabled: p.disabled, groupe, noeud: p.children }); }
     else if (c.type === 'optgroup') out.push(...lireOptions(p.children, p.label));
     else if (c.type === Fragment) out.push(...lireOptions(p.children, groupe));
   });
@@ -89,7 +89,7 @@ export function Select({ value, defaultValue, onChange, children, className = 'i
         <ChevronDown className="h-4 w-4 shrink-0 text-mute" aria-hidden="true" />
       </button>
       {/* vrai <select> invisible : validation « required » des formulaires, lecteurs d'écran, tests */}
-      <select tabIndex={-1} aria-hidden="true" name={name} required={required} disabled={disabled} value={courant} onChange={() => undefined} className="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0">{children}</select>
+      <select tabIndex={-1} aria-hidden="true" name={name} required={required} disabled={disabled} value={courant} onChange={() => undefined} className="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0">{options.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}</select>
       {ouvert && pos && createPortal(
         <div ref={liste} style={{ position: 'fixed', left: pos.left, width: pos.width, ...(pos.haut ? { bottom: window.innerHeight - pos.top + 4 } : { top: pos.top + 4 }), zIndex: 70 }}
           className="overflow-hidden rounded-lg border border-line bg-surface shadow-float" onMouseDown={(e) => e.stopPropagation()}>
@@ -104,7 +104,7 @@ export function Select({ value, defaultValue, onChange, children, className = 'i
                   <li role="option" aria-selected={o.value === courant} aria-disabled={o.disabled} data-actif={i === actif}
                     className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[13px] ${i === actif ? 'bg-soft' : ''} ${o.disabled ? 'cursor-not-allowed opacity-50' : ''} ${o.value === '' ? 'text-mute' : ''}`}
                     onMouseEnter={() => setActif(i)} onClick={() => choisir(o)}>
-                    <span className="min-w-0 flex-1">{o.label}</span>{o.value === courant && <Check className="h-4 w-4 shrink-0 text-action" aria-hidden="true" />}
+                    <span className="min-w-0 flex-1">{o.noeud ?? o.label}</span>{o.value === courant && <Check className="h-4 w-4 shrink-0 text-action" aria-hidden="true" />}
                   </li>
                 </Fragment>);
             })}
