@@ -705,6 +705,17 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     if (!inst) return false;
     return (await actorOf(ctx, a, inst, 'edit')).ok || inst.holders.includes(ctx.username);
   });
+
+  // Joindre une annexe : possible à CHAQUE étape, même quand l'étape ne permet pas de modifier le texte.
+  // Le détenteur de l'étape courante (ou son délégué habilité à valider) et le rédacteur peuvent verser une pièce.
+  acl.registerAttachHook(async (ctx, a) => {
+    if (!IN_CIRCUIT.includes(a.statut) || !a.current_step_key || !a.circuit_version_id) return false;
+    if (IS_DRAFTER(ctx, a)) return true;
+    const inst = await db.get("SELECT * FROM step_instances WHERE acte_id = $1 AND status = 'current'", [a.id]);
+    if (!inst) return false;
+    return (await actorOf(ctx, a, inst, 'validate')).ok || inst.holders.includes(ctx.username);
+  });
+
   bus.on('acte.driver_changed', (p) => svc.recompute(p.acteId, p.ctx));
   bus.on('delegation.created', async (p) => { await refreshHolderActes(p.organismeId, p.delegation.delegant); });
   bus.on('delegation.revoked', async (p) => { await refreshHolderActes(p.organismeId, p.delegation.delegant); });

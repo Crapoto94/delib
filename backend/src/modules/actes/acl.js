@@ -14,6 +14,7 @@ const DEFAULT_MODE = 'service';
 
 function createActeAcl({ db, access, titulaires, settings }) {
   const editHooks = [];
+  const attachHooks = [];
   const isStaff = (ctx, orgId) => ctx.isPlatformAdmin || access.rolesIn(ctx, orgId).some((r) => ['org_admin', 'scc', 'lecteur'].includes(r));
   const isAdmin = (ctx, orgId) => ctx.isPlatformAdmin || access.rolesIn(ctx, orgId).some((r) => ['org_admin', 'scc'].includes(r));
 
@@ -25,6 +26,7 @@ function createActeAcl({ db, access, titulaires, settings }) {
     isAdmin,
     isStaff,
     registerEditHook: (fn) => editHooks.push(fn),
+    registerAttachHook: (fn) => attachHooks.push(fn),
 
     MODES, DEFAULT_MODE,
 
@@ -58,6 +60,17 @@ function createActeAcl({ db, access, titulaires, settings }) {
         if (sameService(ctx, acte) && (await settings.resolve(acte.organisme_id))['redaction.coedition_service']?.value === true) return true;
       }
       for (const hook of editHooks) if (await hook(ctx, acte)) return true;
+      return false;
+    },
+
+    /**
+     * Joindre (ou retirer) une annexe : le rédacteur et les étapes éditables, plus le détenteur de l'étape
+     * courante même si l'étape ne permet pas de modifier le texte. Chacun peut ainsi verser une pièce au
+     * dossier à son étape du circuit, pas seulement pendant la rédaction.
+     */
+    async canAttach(ctx, acte) {
+      if (await this.canEdit(ctx, acte)) return true;
+      for (const hook of attachHooks) if (await hook(ctx, acte)) return true;
       return false;
     },
 

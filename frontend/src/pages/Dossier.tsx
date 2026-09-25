@@ -14,7 +14,6 @@ import { AgentName, AgentNames } from '../AgentName';
 import { useIa } from '../useIa';
 import { useLimitePJ } from '../usePJ';
 import { Select } from '../Select';
-import { roleInclusif } from '../genre';
 import { MatiereTree } from '../MatiereTree';
 import DossierAssiste, { ActiverAssiste } from '../DossierAssiste';
 import EnvoiBravo from '../EnvoiBravo';
@@ -172,7 +171,7 @@ function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable
           <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
         {!signature && (
         <Field label="Élu rapporteur *" missing={mq('rapporteur')}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => { const id = e.target.value; const elu = (elus.data ?? []).find((m: any) => String(m.id) === id); setF({ ...f, rapporteurId: id, rapporteurDelegation: elu?.delegations?.length === 1 ? elu.delegations[0] : '' }); }}>
-          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}><b>{m.nomComplet}</b>{m.role ? ` (${roleInclusif(m.role, m.prenom, m.civilite)})` : ''}{m.delegations?.length ? ` · ${m.delegations.join(' · ')}` : ''}</option>)}</Select></Field>)}
+          <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}><b>{m.nomComplet}</b></option>)}</Select></Field>)}
         {!signature && delegationsElu.length > 1 && (
         <Field label="Délégation de l'élu rapporteur *" missing={editable && !f.rapporteurDelegation} hint="Cet élu porte plusieurs délégations : précisez celle concernée. Elle sert au tri des dossiers à l'ordre du jour.">
           <Select className="input" disabled={dis} value={f.rapporteurDelegation ?? ''} onChange={(e) => setF({ ...f, rapporteurDelegation: e.target.value })}>
@@ -903,7 +902,7 @@ export default function Dossier() {
           <Fiche acte={a} editable={editable} onSaved={() => { reloadAll(); toast('Fiche enregistrée'); }} onCommissions={reloadAll} />
           {a.typeInfo?.meta?.autorisations && <Autorisations acte={a} editable={editable} onChanged={() => { reloadAll(); toast('Délibérations d\'autorisation mises à jour'); }} toast={toast} />}
           <Textes acte={a} editable={editable || !!c?.actions?.validate} onChanged={acte.reload} onApercu={apercuDossier} toast={toast} />
-          {a.typeInfo?.meta?.signature && <Signature acte={a} toast={toast} onChanged={reloadAll} />}          <Annexes acte={a} editable={editable} toast={toast} />
+          {a.typeInfo?.meta?.signature && <Signature acte={a} toast={toast} onChanged={reloadAll} />}          <Annexes acte={a} editable={editable || !!c?.actions?.validate} toast={toast} />
           <Discussion acte={a} toast={toast} />
         </div>
         <aside className="space-y-4">

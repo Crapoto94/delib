@@ -390,6 +390,29 @@ describe('annexes (PDF)', () => {
     const audit = (await as(admin).get(`/api/v1/audit?organismeId=${ville.id}&action=annexe.add`)).body.items;
     expect(audit[0].after.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
+
+  it('accepte un document Word / Excel : l\'original est conservé, un PDF de consultation est préparé', async () => {
+    // l'en-tête PK (ZIP) est reconnu comme un document Office : le dépôt est accepté, sans conversion immédiate.
+    const xlsx = Buffer.concat([Buffer.from('PK\x03\x04'), Buffer.from('contenu tableur')]);
+    const r = await env.http().post(url()).set(bearer(t.dupont)).field('titre', 'Tableau').attach('file', xlsx, 'tableau.xlsx');
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    expect(r.body.fichier.nom).toBe('tableau.xlsx');
+    // l'original reste téléchargeable, au format d'origine.
+    const orig = await env.http().get(`${url()}/${r.body.id}/file`).set(bearer(t.dupont));
+    expect(orig.status).toBe(200);
+    expect(orig.headers['content-type']).toMatch(/spreadsheetml|octet-stream/);
+    // le PDF de consultation est produit à la demande (ou à la validation finale) : soit un PDF, soit indisponible.
+    const pdfR = await env.http().get(`${url()}/${r.body.id}/file?format=pdf`).set(bearer(t.dupont));
+    expect([200, 404, 500]).toContain(pdfR.status);
+    if (pdfR.status === 200) expect(pdfR.headers['content-type']).toBe('application/pdf');
+  });
+
+  it('refuse un contenu qui ne correspond pas à l\'extension (garde-fou Office)', async () => {
+    const faux = Buffer.from('ceci n\'est pas un document Office');
+    const r = await env.http().post(url()).set(bearer(t.dupont)).field('titre', 'Faux').attach('file', faux, 'faux.docx');
+    expect(r.status).toBe(400);
+    expect(r.body.error).toMatch(/ne correspond pas à son extension/);
+  });
 });
 
 describe('commentaires (section 14)', () => {

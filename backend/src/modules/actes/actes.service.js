@@ -57,10 +57,11 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
     },
 
     /** Charge un acte et vérifie que l'utilisateur peut le voir (404 sinon : on ne révèle pas l'existence). */
-    async load(ctx, organismeId, id, { edit = false } = {}) {
+    async load(ctx, organismeId, id, { edit = false, attach = false } = {}) {
       const a = await svc.raw(organismeId, id);
       if (!(await acl.canView(ctx, a))) throw E.notFound('Acte introuvable');
       if (edit && !(await acl.canEdit(ctx, a))) throw E.forbidden("Vous ne pouvez pas modifier cet acte à ce stade");
+      if (attach && !(await acl.canAttach(ctx, a))) throw E.forbidden("Vous ne pouvez pas joindre d'annexe à ce stade");
       return a;
     },
 

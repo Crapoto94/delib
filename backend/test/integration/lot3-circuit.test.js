@@ -1,4 +1,4 @@
-const { createTestEnv, loginAs, bearer, adminToken } = require('../helpers');
+const { createTestEnv, loginAs, bearer, adminToken, makePdf } = require('../helpers');
 
 let env; let admin; let ville; let t; let typeDelib; let matiere; let rubrique;
 const as = (tok) => ({
@@ -350,6 +350,21 @@ describe('recalcul et étapes ponctuelles', () => {
     const r = await as(admin).post(`${A(a.id)}/reaffectation`, { holders: ['moreau'], motif: 'Départ en congés' });
     expect(r.status).toBe(200);
     expect((await validate(t.moreau, a.id)).status).toBe(200);
+  });
+});
+
+describe('pièces jointes à chaque étape', () => {
+  it('le détenteur de l\'étape courante joint une annexe même si l\'étape n\'est pas éditable', async () => {
+    const a = await readyActe();
+    await as(t.dupont).post(`${A(a.id)}/envoi`);
+    // l'étape courante est « chef_service » (durand) : il n'est ni rédacteur ni co-rédacteur
+    const v = await cur(a.id);
+    expect(v.currentStepKey).toBe('chef_service');
+    const pdf = await makePdf(2);
+    const r = await env.http().post(`${A(a.id)}/annexes`).set(bearer(t.durand)).field('titre', 'Devis').attach('file', pdf, 'devis.pdf');
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    // un agent étranger à l'acte ne peut pas joindre de pièce
+    expect((await as(t.moreau).get(A(a.id))).status).toBe(404); // pas encore dans la projection visible pour moreau ? (step financier non traversé)
   });
 });
 

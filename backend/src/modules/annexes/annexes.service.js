@@ -77,7 +77,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
     },
 
     async add(ctx, organismeId, acteId, meta, file) {
-      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const a = await actes.load(ctx, organismeId, acteId, { attach: true });
       const typeId = meta.typeId ? (await refs.require('annexe_type', meta.typeId, a.organisme_id)).id : null;
       const f = await svc.store(ctx, a.organisme_id, file);
       // Ré-upload d'un fichier de même nom : c'est une nouvelle version de l'annexe existante, jamais un doublon (ANN-04).
@@ -106,7 +106,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
     },
 
     async update(ctx, organismeId, acteId, id, patch) {
-      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const a = await actes.load(ctx, organismeId, acteId, { attach: true });
       const typeId = patch.typeId === undefined ? undefined : (patch.typeId === null ? null : (await refs.require('annexe_type', patch.typeId, a.organisme_id)).id);
       const r = await db.get(
         `UPDATE annexes SET titre = COALESCE($3, titre), type_id = CASE WHEN $4 THEN $5 ELSE type_id END,
@@ -119,7 +119,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
 
     /** Remplace le fichier : nouvelle version, l'ancienne reste consultable (ANN-04). */
     async replaceFile(ctx, organismeId, acteId, id, file) {
-      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const a = await actes.load(ctx, organismeId, acteId, { attach: true });
       const cur = await db.get('SELECT * FROM annexes WHERE id = $1 AND acte_id = $2', [id, a.id]);
       if (!cur) throw E.notFound('Annexe introuvable');
       const f = await svc.store(ctx, a.organisme_id, file);
@@ -141,14 +141,14 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
     },
 
     async remove(ctx, organismeId, acteId, id) {
-      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const a = await actes.load(ctx, organismeId, acteId, { attach: true });
       const r = await db.get('DELETE FROM annexes WHERE id = $1 AND acte_id = $2 RETURNING *', [id, a.id]);
       if (!r) throw E.notFound('Annexe introuvable');
       await audit.log(ctx, { organismeId: a.organisme_id, action: 'annexe.delete', entity: 'annexes', entityId: id, before: { titre: r.titre } });
     },
 
     async reorder(ctx, organismeId, acteId, ids) {
-      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const a = await actes.load(ctx, organismeId, acteId, { attach: true });
       const cur = (await db.all('SELECT id FROM annexes WHERE acte_id = $1', [a.id])).map((x) => x.id);
       if (ids.length !== cur.length || !ids.every((i) => cur.includes(i))) throw E.badRequest("La liste doit contenir exactement les annexes de l'acte");
       await db.tx(async (q) => { for (const [i, id] of ids.entries()) await q.run('UPDATE annexes SET ordre = $2 WHERE id = $1', [id, i + 1]); });
