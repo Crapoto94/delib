@@ -98,7 +98,7 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
       if (tpl.cfg.a4Strict !== false && (Math.abs(info.width - T.A4.w) > A4_TOL || Math.abs(info.height - T.A4.h) > A4_TOL)) {
         throw E.badRequest(`Le fond doit être au format A4 (reçu ${Math.round(info.width)} × ${Math.round(info.height)} pt)`);
       }
-      const put = await storage.put(file.buffer, { organismeId: org, ext: 'pdf' });
+      const put = await storage.put(file.buffer, { organismeId: org, ext: 'pdf', categorie: 'gabarits', nom: String(file.originalname || 'fond.pdf'), titre: `Fond de page (${docType})`, auteur: ctx.username });
       const f = await db.get(
         `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,$7) RETURNING *`,
         [org, put.key, String(file.originalname || 'fond.pdf').slice(0, 200), put.size, info.pages, put.sha256, ctx.username]);
@@ -133,7 +133,7 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
       const nom = String(file.originalname || 'modele.docx');
       const zip = file.buffer.length > 3 && file.buffer[0] === 0x50 && file.buffer[1] === 0x4b;
       if (!/\.docx$/i.test(nom) || !zip) throw E.badRequest('Le modèle doit être un fichier Word .docx');
-      const put = await storage.put(file.buffer, { organismeId: org, ext: 'docx' });
+      const put = await storage.put(file.buffer, { organismeId: org, ext: 'docx', categorie: 'gabarits', nom, titre: `Modèle Word (${docType})`, auteur: ctx.username });
       const f = await db.get(
         `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,$4,$5,NULL,$6,$7) RETURNING *`,
         [org, put.key, nom.slice(0, 200), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', put.size, put.sha256, ctx.username]);
@@ -212,7 +212,7 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
       // eslint-disable-next-line no-control-regex
       const nom = String(file.originalname || 'document').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 200);
       const isDocx = /\.docx$/i.test(nom) || (file.buffer[0] === 0x50 && file.buffer[1] === 0x4b);
-      const put = await storage.put(file.buffer, { organismeId: org, ext: isDocx ? 'docx' : 'pdf' });
+      const put = await storage.put(file.buffer, { organismeId: org, ext: isDocx ? 'docx' : 'pdf', categorie: 'documents-source', nom, titre: `Document source — ${a.titre || a.numeroSuivi || ''}`, auteur: ctx.username });
       let pages = null;
       if (!isDocx) { const info = await inspectPdf(file.buffer); pages = info.pages; }
       const src = await db.get(
@@ -227,7 +227,7 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
       const info2 = await inspectPdf(pdfBuffer); pages = info2.pages;
       let pdfId = src.id;
       if (isDocx || trame === 'a_ajouter') {
-        const p2 = await storage.put(pdfBuffer, { organismeId: org, ext: 'pdf' });
+        const p2 = await storage.put(pdfBuffer, { organismeId: org, ext: 'pdf', categorie: 'documents-source', nom: nom.replace(/\.docx$/i, '') + '.pdf', titre: `Document source (PDF) — ${a.titre || a.numeroSuivi || ''}`, auteur: ctx.username });
         const pf = await db.get(
           `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,$7) RETURNING *`,
           [org, p2.key, nom.replace(/\.docx$/i, '') + '.pdf', p2.size, pages, p2.sha256, ctx.username]);

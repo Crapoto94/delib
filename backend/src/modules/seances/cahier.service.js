@@ -203,9 +203,10 @@ function createCahier({ db, audit, render, odj, storage, log, bus }) {
       await db.run("UPDATE cahier_builds SET statut = 'running' WHERE id = $1", [build.id]);
       try {
         const out = await assemble(ctx, org, s, build, progress);
-        const put = await storage.put(out.buffer, { organismeId: org, ext: 'pdf' });
+        const nom = `cahier-seance-${s.id}-v${build.version_no}.pdf`;
+        const put = await storage.put(out.buffer, { organismeId: org, ext: 'pdf', categorie: 'cahiers', nom, titre: `Cahier de séance — ${s.instance_nom || ''}`.trim(), auteur: ctx.username });
         const f = await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,$7) RETURNING id`,
-          [org, put.key, `cahier-seance-${s.id}-v${build.version_no}.pdf`, put.size, out.pages, put.sha256, ctx.username]);
+          [org, put.key, nom, put.size, out.pages, put.sha256, ctx.username]);
         await db.run("UPDATE cahier_builds SET statut = 'done', file_id = $2, pages = $3, sha256 = $4, snapshot = $5::jsonb, step_label = 'Terminé', progress = total, finished_at = now() WHERE id = $1", [build.id, f.id, out.pages, put.sha256, JSON.stringify(out.snapshot)]);
         Promise.resolve(bus?.emit?.('cahier.built', { organismeId: org, seanceId: s.id })).catch(() => undefined); // archivage automatique en GED (facultatif)
       } catch (e) {

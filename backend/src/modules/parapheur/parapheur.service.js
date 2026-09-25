@@ -307,11 +307,12 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
         if (!docs.length) return;
         const f = await ad.telechargerDocument(cfg, envoi.ref_externe, docs[0].id);
         if (!f?.buffer?.length) return;
-        const put = await storage.put(f.buffer, { organismeId: org, ext: 'pdf' });
+        const nom = String(f.name || 'document-signe.pdf').slice(0, 200);
+        const put = await storage.put(f.buffer, { organismeId: org, ext: 'pdf', categorie: 'parapheur', nom, titre: `Document signé — ${nom.replace(/\.[^.]+$/, '')}`, description: 'Parapheur' });
         const file = await db.get(
           `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by)
            VALUES ($1,$2,$3,$4,$5,$6,'parapheur') RETURNING id`,
-          [org, put.key, String(f.name || 'document-signe.pdf').slice(0, 200), f.mime || 'application/pdf', put.size, put.sha256]);
+          [org, put.key, nom, f.mime || 'application/pdf', put.size, put.sha256]);
         await db.run('UPDATE parapheur_envois SET document_signe_file_id = $2, updated_at = now() WHERE id = $1', [envoiId, file.id]);
         await j(org, envoiId, acteId, 'entrant', { resume: `Document signé récupéré (${f.name || 'PDF'})`, httpStatus: 200 });
       } catch (e) {

@@ -58,10 +58,10 @@ describe('Alfresco comme stockage des fichiers (GED-09, GED-10)', () => {
     expect(cle).toMatch(/^alf:\d+:[0-9a-f-]{36}$/);
     const noeud = await env.db.get('SELECT nom, parent_id FROM ged_sim_nodes WHERE id = $1', [cle.split(':')[2]]);
     expect(noeud.nom).toMatch(/\.pdf$/);
-    const parent = await env.db.get('SELECT nom, parent_id FROM ged_sim_nodes WHERE id = $1', [noeud.parent_id]);
-    const an = await env.db.get('SELECT nom FROM ged_sim_nodes WHERE id = $1', [parent.parent_id]);
-    const dossier = await env.db.get('SELECT nom FROM ged_sim_nodes WHERE id = $1', [(await env.db.get('SELECT parent_id FROM ged_sim_nodes WHERE id = $1', [parent.parent_id])).parent_id]);
-    expect(dossier.nom).toBe('90 Stockage applicatif'); expect(an.nom).toMatch(/^\d{4}$/); expect(parent.nom).toMatch(/^\d{2}$/);
+    const annee = await env.db.get('SELECT nom, parent_id FROM ged_sim_nodes WHERE id = $1', [noeud.parent_id]);
+    const categorie = await env.db.get('SELECT nom, parent_id FROM ged_sim_nodes WHERE id = $1', [annee.parent_id]);
+    const dossier = await env.db.get('SELECT nom FROM ged_sim_nodes WHERE id = $1', [categorie.parent_id]);
+    expect(dossier.nom).toBe('90 Stockage applicatif'); expect(categorie.nom).toBe('Annexes'); expect(annee.nom).toMatch(/^\d{4}$/);
     expect(Buffer.from(await env.c.storage.get(cle)).equals(a.buf)).toBe(true);
     fs.rmSync(path.join(env.config.storage.dir, '.cache-alfresco'), { recursive: true, force: true });   // sans cache : relecture en GED
     expect(Buffer.from(await env.c.storage.get(cle)).equals(a.buf)).toBe(true);
@@ -112,6 +112,23 @@ describe('Alfresco comme stockage des fichiers (GED-09, GED-10)', () => {
     expect(logo).toMatch(/^alf:/);
     expect(Buffer.from(await env.c.storage.get(logo)).equals(png)).toBe(true);
     expect((await as(admin).get(G('/stockage'))).body.logo).toBe('alfresco');
+    await as(admin).put(G('/config'), { stockage: 'local' });
+  });
+
+  it('reclassement : simulation sans écriture, puis rangement par catégorie avec nom lisible (GED-11)', async () => {
+    await as(admin).put(G('/config'), { stockage: 'alfresco' });
+    const buf = await pdf();
+    const put = await env.c.storage.put(buf, { organismeId: ville.id, ext: 'pdf' });
+    expect(put.key).toMatch(/^alf:/);
+    const nodeId = put.key.split(':')[2];
+    const sim = (await as(admin).post(G('/stockage/reclassement'), { appliquer: false })).body;
+    expect(sim.simule).toBe(true); expect(sim.restant).toBeGreaterThanOrEqual(1);
+    const app = (await as(admin).post(G('/stockage/reclassement'), { appliquer: true })).body;
+    expect(app.deplaces).toBeGreaterThanOrEqual(1);
+    const parent = await env.db.get('SELECT nom, parent_id FROM ged_sim_nodes WHERE id = $1', [(await env.db.get('SELECT parent_id FROM ged_sim_nodes WHERE id = $1', [nodeId])).parent_id]);
+    expect(parent.nom).not.toBe('90 Stockage applicatif');
+    const encore = (await as(admin).post(G('/stockage/reclassement'), { appliquer: true })).body;
+    expect(encore.deplaces).toBe(0);
     await as(admin).put(G('/config'), { stockage: 'local' });
   });
 

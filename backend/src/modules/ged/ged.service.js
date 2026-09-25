@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const { createSecretBox } = require('../../shared/secretbox');
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
+const { categorieLabel, reclasser } = require('./reclassement');
 
 const sha = (x) => crypto.createHash('sha256').update(typeof x === 'string' || Buffer.isBuffer(x) ? x : JSON.stringify(x)).digest('hex');
 const day = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
@@ -103,14 +104,22 @@ function createGed({ db, audit, config, log, adapters, render, tenue, pv, tlt, s
       if (cfg.mode === 'alfresco' && (!cfg.url || !cfg.utilisateur || !cfg.motDePasse)) return null;
       return { cfg, ad: adapterOf(cfg) };
     },
-    /** Dossier technique « 90 Stockage applicatif / année / mois » (mémorisé). */
-    async dossierStockage(org, cible) {
-      const d = new Date(); const an = String(d.getUTCFullYear()); const mois = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const clef = `${org}:${cible.cfg.mode}:${cible.cfg.url}:${an}-${mois}`;
+    /** Dossier technique « 90 Stockage applicatif / <catégorie> / <année> » (mémorisé), par catégorie métier. */
+    async dossierCategorie(org, cible, categorie = 'divers', annee = String(new Date().getUTCFullYear())) {
+      const clef = `${org}:${cible.cfg.mode}:${cible.cfg.url}:${categorie}:${annee}`;
       if (dossiersStockage.has(clef)) return dossiersStockage.get(clef);
-      const id = (await cible.ad.ensurePath(cible.cfg, [...(await racineSegments(org)), { nom: '90 Stockage applicatif', description: 'Fichiers de VibeDélib (annexes, pièces produites…). Noms opaques : ne pas modifier ni supprimer à la main.' }, { nom: an }, { nom: mois }])).id;
+      const nom = categorieLabel(categorie);
+      const id = (await cible.ad.ensurePath(cible.cfg, [
+        ...(await racineSegments(org)),
+        { nom: '90 Stockage applicatif', description: 'Fichiers de VibeDélib (annexes, pièces produites…), classés par type de document. Ne pas modifier ni supprimer à la main.' },
+        { nom, description: `Fichiers de type « ${nom} » (${categorie}).` },
+        { nom: String(annee) },
+      ])).id;
       dossiersStockage.set(clef, id);
       return id;
+    },
+    async dossierStockage(org, cible, categorie = 'divers') {
+      return svc.dossierCategorie(org, cible, categorie, String(new Date().getUTCFullYear()));
     },
     /** Sonde : écrit puis relit un petit fichier dans le dossier technique (validation avant de confier le stockage à la GED). */
     async sonder(cfg) {
@@ -415,6 +424,15 @@ function createGed({ db, audit, config, log, adapters, render, tenue, pv, tlt, s
       if (seanceId) { p.push(seanceId); w = 'AND seance_id = $2'; }
       const rows = await db.all(`SELECT * FROM ged_documents WHERE organisme_id = $1 ${w} ORDER BY archive_le DESC LIMIT 500`, p);
       return { items: rows.map((r) => ({ id: r.id, seanceId: r.seance_id, acteId: r.acte_id, nom: r.nom, chemin: r.chemin, nodeId: r.node_id, version: r.version_label, taille: r.taille, mode: r.mode, statut: r.statut, erreur: r.erreur, archivePar: r.archive_par, archiveLe: r.archive_le })) };
+    },
+
+    // ------------------------------------------------------------------------------------ reclassement du stockage (GED-11)
+    /** Reclasse le stockage existant : catégorie, nom lisible et métadonnées, sans re-téléversement. `appliquer: false` = simulation. */
+    async reclasserStockage(ctx, organismeId, opts = {}) {
+      const org = requireOrg(organismeId);
+      const r = await reclasser({ db, log, ged: svc, organismeId: org, ...opts });
+      if (opts.appliquer) await audit.log(ctx, { organismeId: org, action: 'ged.reclassement', entity: 'files', after: { total: r.total, deplaces: r.deplaces, renommes: r.renommes, ignores: r.ignores, erreurs: r.erreurs.length } });
+      return r;
     },
   };
   void cahier; void tenue;

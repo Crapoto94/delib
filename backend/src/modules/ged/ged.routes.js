@@ -52,6 +52,10 @@ module.exports = ({ makeRouter, ged }) => {
   r.post('/verification', { summary: 'Vérifie (GED → local) que chaque document déposé existe toujours dans la GED ; les absents sont marqués « manquants » et seront redéposés', tags: T, org: true, roles: ARCH, params: P },
     async (req, res) => res.json(await ged.verifier(req.ctx, req.org.id)));
   r.get('/documents', { summary: 'Documents déposés en GED (chemin, nœud, version, date, statut)', tags: T, org: true, roles: ARCH, params: P, query: DocQ }, async (req, res) => res.json(await ged.documents(req.ctx, req.org.id, req.valid.query)));
+  r.post('/stockage/reclassement', { summary: 'Reclasse le stockage GED par catégorie, nom lisible et métadonnées (simulation par défaut, rejouable)', tags: T, org: true, roles: ADMIN, params: P,
+    body: z.object({ appliquer: z.boolean().default(false), limite: z.coerce.number().int().min(0).max(10000).default(0) }),
+    description: "Sans `appliquer`, renvoie le plan (répartition par catégorie) sans rien modifier. Avec `appliquer`, déplace et renomme les nœuds sans re-téléversement ; un document déjà classé est ignoré." },
+  async (req, res) => res.json(await ged.reclasserStockage(req.ctx, req.org.id, req.valid.body)));
 
   return [r];
 };

@@ -509,7 +509,7 @@ function createOdj({ db, audit, acl, titulaires, settings, bus, late, storage, u
       await mutate(ctx, org, seanceId, { motif }, async (q, s) => {
         const it = await q.get('SELECT * FROM seance_items WHERE id = $1 AND seance_id = $2', [itemId, s.id]);
         if (!it || it.kind !== 'libre') throw E.notFound('Dossier simple introuvable (seul un point libre peut avoir des pièces jointes)');
-        const put = await storage.put(file.buffer, { organismeId: org, ext });
+        const put = await storage.put(file.buffer, { organismeId: org, ext, categorie: 'pieces-seance', nom: String(file.originalname).slice(0, 200), titre: (titre || String(file.originalname).replace(/\.[^.]+$/, '')).slice(0, 200), auteur: ctx.username });
         const f = await q.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
           [org, put.key, String(file.originalname).slice(0, 200), def.mime, put.size, pages, put.sha256, ctx.username]);
         const ordre = (await q.get('SELECT COALESCE(MAX(ordre), 0) + 1 AS n FROM seance_item_fichiers WHERE item_id = $1', [itemId])).n;

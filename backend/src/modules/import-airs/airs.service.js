@@ -1094,7 +1094,7 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
       try {
         const buf = await avecDelai(lireFichierAir(o, f.cheminServ), 30000, 'serveur de fichiers injoignable');
         const ext = (path.extname(f.nom || '') || '.pdf').slice(1).toLowerCase();
-        const put = await storage.put(buf, { organismeId: o, ext });
+        const put = await storage.put(buf, { organismeId: o, ext, categorie: 'reprise-airs', nom: f.nom, titre: f.titre, description: 'Reprise AIRS', auteur: ctx.username });
         const file = await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,$4,$5,NULL,$6,$7) RETURNING id`,
           [o, put.key, f.nom, MIME_FIC[ext] || 'application/octet-stream', put.size, put.sha256, ctx.username]);
         const placeholders = `INSERT INTO annexes (acte_id, titre, ordre, file_id, publiable, communicable, transmissible, created_by) VALUES ($1,$2,$3,$4,true,true,true,$5) RETURNING id`;
@@ -1104,7 +1104,7 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
         if (EXT_CONVERTIBLES.has(ext)) {
           const pdf = await convertirEnPdf(buf, ext);
           if (pdf) {
-            const p2 = await storage.put(pdf, { organismeId: o, ext: 'pdf' });
+            const p2 = await storage.put(pdf, { organismeId: o, ext: 'pdf', categorie: 'reprise-airs', nom: `${f.nom}.pdf`, titre: `${f.titre} (PDF)`, description: 'Reprise AIRS', auteur: ctx.username });
             const pf = await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,NULL,$5,$6) RETURNING id`,
               [o, p2.key, `${f.nom}.pdf`, p2.size, p2.sha256, ctx.username]);
             await db.run('UPDATE annexes SET pdf_file_id = $2 WHERE id = $1', [an.id, pf.id]);

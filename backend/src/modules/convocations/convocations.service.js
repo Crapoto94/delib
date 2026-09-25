@@ -107,12 +107,12 @@ function createConvocations({ db, audit, render, odj, storage, mail, settings, c
       ].join('\n') }] },
     ] });
     const odjDoc = await render.odjDocument({ organismeId: org, items, sousTitre: `${s.instance_nom} — ${dateLong(s.date_seance)} à ${heure(s.date_seance)}`, title: `Ordre du jour — ${s.instance_nom}` });
-    const store = async (doc, name) => {
-      const put = await storage.put(doc.buffer, { organismeId: org, ext: 'pdf' });
+    const store = async (doc, name, categorie, titre) => {
+      const put = await storage.put(doc.buffer, { organismeId: org, ext: 'pdf', categorie, nom: name, titre, auteur: ctx.username });
       return (await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,$7) RETURNING id`,
         [org, put.key, name, put.size, doc.pageCount, put.sha256, ctx.username])).id;
     };
-    return { convocationFileId: await store(conv, `convocation-seance-${s.id}-v${version}.pdf`), odjFileId: await store(odjDoc, `odj-seance-${s.id}-v${version}.pdf`) };
+    return { convocationFileId: await store(conv, `convocation-seance-${s.id}-v${version}.pdf`, 'convocations', `Convocation — ${s.instance_nom} du ${dateLong(s.date_seance)}`), odjFileId: await store(odjDoc, `odj-seance-${s.id}-v${version}.pdf`, 'ordres-du-jour', `Ordre du jour — ${s.instance_nom} du ${dateLong(s.date_seance)}`) };
   }
 
   // ------------------------------------------------------------------------------------------ envoi

@@ -105,7 +105,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
   }
 
   async function storePdf(org, ctx, buffer, name) {
-    const put = await storage.put(buffer, { organismeId: org, ext: 'pdf' });
+    const put = await storage.put(buffer, { organismeId: org, ext: 'pdf', categorie: 'controle-legalite', nom: name, titre: name, auteur: ctx.username });
     return (await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6) RETURNING id`, [org, put.key, name, put.size, put.sha256, ctx.username])).id;
   }
 
@@ -349,7 +349,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
           try {
             const xml = await adapter.arActe?.(tx.remote_id);
             if (xml) {
-              const put = await storage.put(Buffer.from(xml, 'utf8'), { organismeId: org, ext: 'xml' });
+              const put = await storage.put(Buffer.from(xml, 'utf8'), { organismeId: org, ext: 'xml', categorie: 'controle-legalite', nom: `ARActe-${tx.numero_transmis}.xml`, titre: `Accusé de réception — ${tx.numero_transmis}`, auteur: actor });
               const f = await db.get("INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by) VALUES ($1,$2,$3,'application/xml',$4,$5,$6) RETURNING id", [org, put.key, `ARActe-${tx.numero_transmis}.xml`, put.size, put.sha256, actor]);
               await db.run('UPDATE tlt_transactions SET ar_file_id = $2 WHERE id = $1', [tx.id, f.id]);
               await journal(tx.id, actor, 'ar_xml', { fichier: `ARActe-${tx.numero_transmis}.xml` });

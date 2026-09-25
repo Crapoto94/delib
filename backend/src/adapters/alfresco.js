@@ -66,13 +66,14 @@ function createAlfresco({ tls, http: injected } = {}) {
       return { id: cur, crees };
     },
 
-    async deposer(cfg, dossierId, { nom, buffer, mime = 'application/pdf', description, proprietes }) {
+    async deposer(cfg, dossierId, { nom, buffer, mime = 'application/pdf', titre, description, auteur, proprietes }) {
       const http = clientOf(cfg);
       const form = new FormData();
       form.append('filedata', new Blob([buffer], { type: mime }), nom);
       form.append('name', nom); form.append('nodeType', 'cm:content'); form.append('autoRename', 'false');
-      form.append('cm:title', nom.replace(/\.[^.]+$/, ''));
-      if (description) form.append('cm:description', description);
+      form.append('cm:title', String(titre || nom.replace(/\.[^.]+$/, '')).slice(0, 250));
+      const desc = [description, auteur ? `Déposé par : ${auteur}` : null].filter(Boolean).join('\n');
+      if (desc) form.append('cm:description', desc.slice(0, 4000));
       for (const [k, v] of Object.entries(proprietes || {})) if (v !== undefined && v !== null) form.append(k, String(v));
       const r = await http.post(`${API}/nodes/${dossierId}/children`, form, { maxBodyLength: Infinity, maxContentLength: Infinity }).catch((e) => { throw failNet(e); });
       if (r.status === 201) return { nodeId: r.data.entry.id, versionLabel: r.data.entry.properties?.['cm:versionLabel'] || '1.0', nouveau: true, nouvelleVersion: false };
@@ -85,6 +86,38 @@ function createAlfresco({ tls, http: injected } = {}) {
         return { nodeId: id, versionLabel: u.data?.entry?.properties?.['cm:versionLabel'] || null, nouveau: false, nouvelleVersion: true };
       }
       throw E.upstream(`Dépôt de « ${nom} » : ${explain(r)}`);
+    },
+
+    /** Déplace un nœud sous un autre parent (les enfants suivent ; l'identifiant du nœud ne change pas). */
+    async deplacer(cfg, nodeId, parentId) {
+      const http = clientOf(cfg);
+      const r = await http.post(`${API}/nodes/${nodeId}/move`, { targetParentId: parentId }, { headers: { 'Content-Type': 'application/json' } }).catch((e) => { throw failNet(e); });
+      if (r.status !== 200) throw E.upstream(`Déplacement du nœud ${nodeId} : ${explain(r)}`);
+      return r.data.entry.id;
+    },
+
+    /** Met à jour le nom et/ou les propriétés d'un nœud (cm:title, cm:description). */
+    async majNode(cfg, nodeId, { name, titre, description } = {}) {
+      const http = clientOf(cfg);
+      const body = {};
+      if (name) body.name = name;
+      const properties = {};
+      if (titre !== undefined) properties['cm:title'] = String(titre).slice(0, 250);
+      if (description !== undefined) properties['cm:description'] = String(description).slice(0, 4000);
+      if (Object.keys(properties).length) body.properties = properties;
+      if (!Object.keys(body).length) return null;
+      const r = await http.put(`${API}/nodes/${nodeId}`, body, { headers: { 'Content-Type': 'application/json' } }).catch((e) => { throw failNet(e); });
+      if (r.status !== 200) throw E.upstream(`Mise à jour du nœud ${nodeId} : ${explain(r)}`);
+      return r.data.entry;
+    },
+
+    /** État d'un nœud (nom et nom du parent), pour savoir s'il est déjà classé. */
+    async nodeInfo(cfg, nodeId) {
+      const http = clientOf(cfg);
+      const r = await http.get(`${API}/nodes/${nodeId}`, { params: { include: 'path' }, fields: 'id,name,path' }).catch((e) => { throw failNet(e); });
+      if (r.status !== 200) return null;
+      const path = r.data.entry.path?.elements || [];
+      return { id: r.data.entry.id, nom: r.data.entry.name, parentNom: path.length ? path[path.length - 1].name : null };
     },
 
     async enfants(cfg, nodeId) {

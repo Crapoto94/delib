@@ -58,7 +58,7 @@ function StockageFichiers({ o, rev, onDone }: { o: number; rev: number; onDone: 
   const m = d.migration;
   return (
     <section className="card space-y-3 p-5"><h3 className="flex items-center gap-2">Stockage des fichiers <Badge tone={d.stockage === 'alfresco' ? 'blue' : 'ok'}>{d.stockage === 'alfresco' ? 'Alfresco' : 'Volume local'}</Badge></h3>
-      <p className="max-w-4xl text-mute">Où sont enregistrés <b>tous les fichiers de l’application</b> : annexes déposées, pièces de l’ordre du jour, convocations, cahiers de séance, PDF produits, logo. Avec Alfresco, ils sont rangés dans <b>« 90 Stockage applicatif »</b> (noms techniques : ne pas les modifier à la main). Ceci est indépendant de l’<b>archivage</b> organisé ci-dessous.</p>
+      <p className="max-w-4xl text-mute">Où sont enregistrés <b>tous les fichiers de l’application</b> : annexes déposées, pièces de l’ordre du jour, convocations, cahiers de séance, PDF produits, logo. Avec Alfresco, ils sont rangés dans <b>« 90 Stockage applicatif »</b>, par <b>type de document</b> (voir « Reclassement du stockage » ci-dessous). Ceci est indépendant de l’<b>archivage</b> organisé ci-dessous.</p>
       <div className="grid gap-3 md:grid-cols-2" role="radiogroup" aria-label="Stockage des fichiers">
         {([['local', 'Volume local du serveur', 'Simple et rapide ; à sauvegarder avec la base.'], ['alfresco', 'Alfresco (GED)', 'Les fichiers vivent dans la GED, sauvegardée et gouvernée avec le reste. Exige une GED active et validée.']] as const).map(([k, titre, desc]) => (
           <button key={k} role="radio" aria-checked={d.stockage === k} disabled={!!busy || d.stockage === k || (k === 'alfresco' && !d.gedActive)} onClick={() => choisir(k)}
@@ -76,6 +76,44 @@ function StockageFichiers({ o, rev, onDone }: { o: number; rev: number; onDone: 
       </div>
       {m && <div className="text-[13px]">{m.enCours ? <><Spinner /> Migration en cours : <b>{m.faits}</b> / {m.total} fichier(s)…</> : <>Dernière migration ({m.sens === 'vers_alfresco' ? 'local → Alfresco' : 'Alfresco → local'}) : <Badge tone={m.echecs ? 'warn' : 'ok'}>{m.faits} / {m.total} migré(s){m.echecs ? `, ${m.echecs} échec(s)` : ''}</Badge></>}
         {m.erreurs?.length > 0 && <ul className="mt-1 list-disc pl-5 text-ko">{m.erreurs.map((x: any, i: number) => <li key={i}>{x.fichier} : {x.erreur}</li>)}</ul>}</div>}
+      {node}
+    </section>
+  );
+}
+
+/** Reclassement du stockage (GED-11) : range les fichiers existants par catégorie métier, avec un nom lisible et des métadonnées. */
+function ReclassementGED({ o, rev, onDone }: { o: number; rev: number; onDone: () => void }) {
+  const { toast, node } = useToast();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [rapport, setRapport] = useState<any>(null);
+  const lancer = async (appliquer: boolean) => {
+    if (appliquer && !window.confirm('Reclasser le stockage GED ? Les documents sont déplacés dans leur dossier de catégorie et renommés (lisiblement), sans re-téléversement. Rejouable.')) return;
+    setBusy(appliquer ? 'apply' : 'sim'); setRapport(null);
+    try {
+      const r = (await api.post(orgPath(o, '/ged/stockage/reclassement'), { appliquer })).data;
+      setRapport({ appliquer, ...r });
+      toast(appliquer ? `${r.deplaces ?? 0} déplacé(s), ${r.renommes ?? 0} renommé(s)` : `${r.restant} fichier(s) à reclasser`, r.erreurs?.length ? 'ko' : 'ok');
+      onDone();
+    } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); }
+  };
+  const cats = rapport?.parCategorie ? Object.entries(rapport.parCategorie).sort((a: any, b: any) => b[1] - a[1]) : [];
+  return (
+    <section className="card space-y-3 p-5"><h3>Reclassement du stockage</h3>
+      <p className="text-mute">Range les fichiers déjà déposés <b>par type de document</b> (annexes, convocations, ordres du jour, cahiers, parapheurs, contrôle de légalité, gabarits, logos, reprise AIRS…) avec un <b>nom lisible</b> et des <b>métadonnées</b> (acte, séance, nature, matière, déposant). Le document est <b>déplacé</b>, pas recopié : les liens restent valides et le classement est <b>rejouable</b> (un fichier déjà rangé est ignoré).</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="btn-secondary" disabled={!!busy} onClick={() => lancer(false)}>{busy === 'sim' && <Spinner />} Simuler</button>
+        <button className="btn-primary" disabled={!!busy} onClick={() => lancer(true)}>{busy === 'apply' && <Spinner />} Reclasser maintenant</button>
+      </div>
+      {rapport && (
+        <div className="rounded border border-line p-3 text-[13px]">
+          {rapport.simule ? (
+            <><b>{rapport.restant}</b> fichier(s) à reclasser sur <b>{rapport.total}</b>{cats.length > 0 && <ul className="mt-1 flex flex-wrap gap-2">{cats.map(([c, n]: any) => <li key={c}><Badge>{c} : {n}</Badge></li>)}</ul>}
+              {rapport.exemple?.length > 0 && <ul className="mt-2 max-h-40 overflow-y-auto font-mono text-[11px] text-mute">{rapport.exemple.map((x: any, i: number) => <li key={i}>{x.categorie} → {x.nom}</li>)}</ul>}</>
+          ) : (
+            <div className="flex flex-wrap gap-2"><Badge tone="ok">{rapport.deplaces} déplacé(s)</Badge><Badge tone="blue">{rapport.renommes} renommé(s)</Badge><Badge>{rapport.ignores} déjà classé(s)</Badge>{rapport.erreurs?.length > 0 && <Badge tone="ko">{rapport.erreurs.length} échec(s)</Badge>}</div>
+          )}
+        </div>
+      )}
       {node}
     </section>
   );
@@ -174,6 +212,8 @@ export default function AdminGed() {
       </section>
 
       <StockageFichiers o={o} rev={rev} onDone={() => setRev((n) => n + 1)} />
+
+      <ReclassementGED o={o} rev={rev} onDone={() => setRev((n) => n + 1)} />
 
       <Synchronisation o={o} rev={rev} onDone={() => setRev((n) => n + 1)} />
 

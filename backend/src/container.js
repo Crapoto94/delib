@@ -151,7 +151,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const relance = createRelance({ db, audit, kpis, notifications, settings });
   // GED : simulateur persistant par défaut, Alfresco (REST v1) choisi par organisme ; adaptateurs injectables pour les tests
   const ged = createGed({ db, audit, config, log, adapters: gedAdapters || { simulateur: createGedSimulateur({ db }), alfresco: createAlfresco({ tls: config.tls }) }, render, tenue, pv, tlt, storage, cahier });
-  storage.attach({ cible: (org) => ged.cibleStockage(org), ad: (org) => ged.adapteurLecture(org), dossier: (org, cible) => ged.dossierStockage(org, cible) }); // Alfresco comme stockage (GED-09)
+  storage.attach({ cible: (org) => ged.cibleStockage(org), ad: (org) => ged.adapteurLecture(org), dossier: (org, cible, categorie) => ged.dossierStockage(org, cible, categorie) }); // Alfresco comme stockage (GED-09)
   // pré-contrôle des références à l'entrée dans l'étape « Service juridique » (IA-37) : par le code, non bloquant, désactivable (ai.precontrole_juridique = false)
   bus.on('step.entered', async (p) => {
     if (p.stepKey !== 'juridique' || p.reassigned) return;

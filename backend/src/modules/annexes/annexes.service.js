@@ -43,10 +43,10 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
       let pages = null;
       if (ext === 'pdf') pages = (await inspectPdf(file.buffer)).pages;
       else if (!(startsWith(file.buffer, ZIP) || startsWith(file.buffer, OLE))) throw E.badRequest('Le contenu du fichier ne correspond pas à son extension');
-      const put = await storage.put(file.buffer, { organismeId, ext });
+      const put = await storage.put(file.buffer, { organismeId, ext, categorie: 'annexes', nom: name, auteur: ctx.username });
       return db.get(
-        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [organismeId, put.key, name, mime, put.size, pages, put.sha256, ctx.username]);
+        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by, categorie) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [organismeId, put.key, name, mime, put.size, pages, put.sha256, ctx.username, 'annexes']);
     },
 
     /** PDF associé d'une annexe : le fichier lui-même s'il est déjà PDF, sinon conversion Word/Excel (mise en cache). */
@@ -58,10 +58,11 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
       const pdf = await convertirEnPdf(await storage.get(row.storage_key), extOf(row.original_name));
       if (!pdf) throw E.incomplete('Conversion en PDF indisponible sur le serveur (Word/Excel/LibreOffice requis)');
       const info = await inspectPdf(pdf);
-      const put = await storage.put(pdf, { organismeId, ext: 'pdf' });
+      const nomPdf = String(row.original_name).replace(/\.[^.]+$/, '') + '.pdf';
+      const put = await storage.put(pdf, { organismeId, ext: 'pdf', categorie: 'annexes-pdf', nom: nomPdf });
       const pf = await db.get(
-        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,'system') RETURNING *`,
-        [organismeId, put.key, String(row.original_name).replace(/\.[^.]+$/, '') + '.pdf', put.size, info.pages, put.sha256]);
+        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by, categorie) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,'system',$7) RETURNING *`,
+        [organismeId, put.key, nomPdf, put.size, info.pages, put.sha256, 'annexes-pdf']);
       await db.run('UPDATE annexes SET pdf_file_id = $2 WHERE id = $1', [annexeId, pf.id]);
       return pf.id;
     },

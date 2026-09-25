@@ -65,7 +65,7 @@ function createOrganismes({ db, audit, storage }) {
       if (!mime) throw E.badRequest('Le logo doit être une image PNG ou JPEG');
       const { PDFDocument } = require('pdf-lib');
       try { const d = await PDFDocument.create(); if (mime === 'image/png') await d.embedPng(file.buffer); else await d.embedJpg(file.buffer); } catch { throw E.badRequest('Image illisible ou corrompue'); }
-      const put = await storage.put(file.buffer, { organismeId: id, ext: mime === 'image/png' ? 'png' : 'jpg' });
+      const put = await storage.put(file.buffer, { organismeId: id, ext: mime === 'image/png' ? 'png' : 'jpg', categorie: 'logos', nom: `logo.${mime === 'image/png' ? 'png' : 'jpg'}`, titre: `Logo — ${org.nom}`, auteur: ctx.username });
       const old = await db.get('SELECT logo_path FROM organismes WHERE id = $1', [id]);
       await db.run('UPDATE organismes SET logo_path = $2, logo_mime = $3, logo_sha256 = $4, logo_updated_at = now() WHERE id = $1', [id, put.key, mime, put.sha256]);
       if (old?.logo_path) await storage.remove(old.logo_path).catch(() => {});

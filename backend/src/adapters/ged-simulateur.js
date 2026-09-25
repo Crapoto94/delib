@@ -7,6 +7,8 @@
  *   testConnexion(cfg)                      -> { ok, message, details }
  *   ensurePath(cfg, [{ nom, description }]) -> { id, crees: [chemin…] }   (idempotent)
  *   deposer(cfg, dossierId, { nom, buffer, mime, description, proprietes }) -> { nodeId, versionLabel, nouveau, nouvelleVersion }
+ *   deplacer(cfg, nodeId, parentId)         -> id du nœud (déplacement, l'identifiant ne change pas)
+ *   majNode(cfg, nodeId, { name, titre, description }) -> nœud mis à jour
  *   enfants(cfg, nodeId|null)               -> [{ id, nom, dossier, taille, version, modifieLe, description }]
  *   contenu(cfg, nodeId)                    -> Buffer
  */
@@ -58,6 +60,24 @@ function createGedSimulateur({ db }) {
       return { nodeId: id, versionLabel: '1.0', nouveau: true, nouvelleVersion: false };
     },
 
+    /** Déplace un nœud sous un autre parent (l'identifiant est conservé). */
+    async deplacer(cfg, nodeId, parentId) {
+      const r = await db.get('UPDATE ged_sim_nodes SET parent_id = $3, updated_at = now() WHERE id = $1 AND organisme_id = $2 RETURNING id', [nodeId, cfg.organismeId, parentId]);
+      if (!r) throw new Error(`Nœud introuvable : ${nodeId}`);
+      return r.id;
+    },
+
+    /** Met à jour le nom et/ou les propriétés d'un nœud (titre, description). */
+    async majNode(cfg, nodeId, { name, titre, description } = {}) {
+      const props = {};
+      if (titre !== undefined) props['cm:title'] = titre;
+      const r = await db.get(
+        'UPDATE ged_sim_nodes SET nom = COALESCE($3, nom), description = COALESCE($4, description), proprietes = proprietes || $5::jsonb, updated_at = now() WHERE id = $1 AND organisme_id = $2 RETURNING id, nom, description',
+        [nodeId, cfg.organismeId, name ?? null, description ?? null, JSON.stringify(props)]);
+      if (!r) throw new Error(`Nœud introuvable : ${nodeId}`);
+      return r;
+    },
+
     async enfants(cfg, nodeId) {
       const parent = nodeId || (await racineOf(cfg));
       const rows = await db.all('SELECT id, nom, dossier, taille, version, updated_at, description FROM ged_sim_nodes WHERE organisme_id = $1 AND parent_id = $2 ORDER BY dossier DESC, nom', [cfg.organismeId, parent]);
@@ -67,6 +87,14 @@ function createGedSimulateur({ db }) {
     async supprimer(cfg, nodeId) { await db.run('DELETE FROM ged_sim_nodes WHERE id = $1 AND organisme_id = $2 AND NOT dossier', [nodeId, cfg.organismeId]); },
 
     async existe(cfg, nodeId) { return !!(await db.get('SELECT 1 AS x FROM ged_sim_nodes WHERE id = $1 AND organisme_id = $2', [nodeId, cfg.organismeId])); },
+
+    /** État d'un nœud (nom et nom du parent), pour savoir s'il est déjà classé. */
+    async nodeInfo(cfg, nodeId) {
+      const r = await db.get(
+        `SELECT n.id, n.nom, p.nom AS parent_nom FROM ged_sim_nodes n LEFT JOIN ged_sim_nodes p ON p.id = n.parent_id
+         WHERE n.id = $1 AND n.organisme_id = $2`, [nodeId, cfg.organismeId]);
+      return r ? { id: r.id, nom: r.nom, parentNom: r.parent_nom } : null;
+    },
 
     async contenu(cfg, nodeId) {
       const r = await db.get('SELECT contenu FROM ged_sim_nodes WHERE id = $1 AND organisme_id = $2 AND NOT dossier', [nodeId, cfg.organismeId]);

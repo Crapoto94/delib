@@ -15,11 +15,13 @@ export const VERSION = '0.47.0';
 
 export const VERSIONS: Version[] = [
   {
-    version: '0.47.0', type: 'minor', titre: 'Pièces jointes à chaque étape, rapporteur sans délégation et étape SCC garantie',
+    version: '0.47.0', type: 'minor', titre: 'Pièces jointes à chaque étape, rapporteur sans délégation, étape SCC garantie et stockage GED classé',
     items: [
       "Élu rapporteur : la liste ne montre que les noms et prénoms (en gras) — ni fonction ni délégations. La délégation concernée se choisit au champ suivant quand l'élu en porte plusieurs.",
       "Pièces jointes : on peut en ajouter (et en retirer, remplacer ou réordonner) à toutes les étapes du circuit, pas seulement pendant la rédaction — le détenteur de l'étape courante et le rédacteur sont autorisés.",
       "Circuit : un acte rédigé par le SCC (agent ou directrice de la DAJCP) conserve toujours l'étape finale de validation SCC — c'est l'étape finale pour tous les cas de figure.",
+      "Stockage GED classé par type de document : les fichiers sont rangés par catégorie métier (annexes, convocations, ordres du jour, cahiers, parapheurs, contrôle de légalité, gabarits, logos, reprise AIRS…) avec un nom lisible et des métadonnées (acte, séance, nature, matière, déposant).",
+      "Nouveau bouton « Reclasser le stockage » (Paramétrages › GED) : range les documents déjà déposés par catégorie, sans re-téléversement ; simulation possible avant, et opération rejouable.",
     ],
   },
   {

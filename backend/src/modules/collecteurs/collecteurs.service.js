@@ -163,11 +163,12 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
 
   // --------------------------------------------------------------------------------------------------- création de fichier
   const copieFichier = async (buffer, org, originalName, ext, createdBy) => {
-    const put = await storage.put(buffer, { organismeId: org, ext });
+    const nom = String(originalName || `acte.${ext}`).slice(0, 200);
+    const put = await storage.put(buffer, { organismeId: org, ext, categorie: 'annexes', nom, titre: nom.replace(/\.[^.]+$/, ''), description: "Collecteur d'arrêtés", auteur: createdBy });
     return db.get(
       `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [org, put.key, String(originalName || `acte.${ext}`).slice(0, 200), ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', put.size, put.sha256, createdBy]);
+      [org, put.key, nom, ext === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', put.size, put.sha256, createdBy]);
   };
 
   // ------------------------------------------------------------------------------------------------------ création acte

@@ -18,9 +18,10 @@ async function nextCounter(runner, organismeId, key, { plancher = 0 } = {}) {
 
 /**
  * StoragePort — volume local OU Alfresco, au choix de chaque organisme (GED-09, D95).
- * La clé dit où est le fichier : « 12/2026/09/ab12….pdf » (volume local) ou « alf:<organisme>:<nœud> » (Alfresco) ; les deux coexistent.
- * Les clés sont générées par le serveur (jamais fournies par l'utilisateur). Le backend Alfresco est branché après coup (`attach`) :
- * il dépend de la configuration GED, qui elle-même dépend du stockage. Pas de repli silencieux : si Alfresco est choisi et injoignable, `put` échoue.
+ * La clé dit où est le fichier : « <organisme>/<catégorie>/<année>/<mois>/… » (volume local) ou « alf:<organisme>:<nœud> »
+ * (Alfresco) ; les deux coexistent. Les clés sont générées par le serveur (jamais fournies par l'utilisateur).
+ * Le backend Alfresco est branché après coup (`attach`) : il dépend de la configuration GED, qui elle-même dépend du
+ * stockage. Pas de repli silencieux : si Alfresco est choisi et injoignable, `put` échoue.
  */
 const ALF = /^alf:(\d+):([0-9a-fA-F-]{8,64})$/;
 const MIME = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
@@ -36,11 +37,21 @@ function createStorage(config) {
   };
   const cacheFile = (nodeId) => path.join(cacheDir, nodeId);
 
+  const extSûre = (ext) => String(ext || 'bin').replace(/[^a-z0-9]/gi, '') || 'bin';
+  const categorieSûre = (c) => String(c || 'divers').normalize('NFC').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40) || 'divers';
+  /** Nom déposé dans la GED : nom lisible fourni + suffixe court (empreinte) pour rester unique, sinon nom opaque. */
+  const nomGed = (fourni, sha256, ext) => {
+    // eslint-disable-next-line no-control-regex
+    const base = String(fourni || '').normalize('NFC').replace(/[\\/:*?"<>|\x00-\x1f]/g, '-').replace(/\s+/g, ' ').trim();
+    const sansExt = base.replace(/\.[^.]+$/, '').slice(0, 100).trim();
+    return `${sansExt ? `${sansExt}_` : ''}${sha256.slice(0, 8)}.${extSûre(ext)}`;
+  };
+
   const local = {
-    async put(buffer, { organismeId, ext = 'bin' }) {
+    async put(buffer, { organismeId, ext = 'bin', categorie = 'divers' }) {
       const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
       const d = new Date();
-      const key = `${organismeId}/${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${sha256.slice(0, 16)}-${crypto.randomBytes(4).toString('hex')}.${ext.replace(/[^a-z0-9]/gi, '')}`;
+      const key = `${organismeId}/${categorieSûre(categorie)}/${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${sha256.slice(0, 16)}-${crypto.randomBytes(4).toString('hex')}.${extSûre(ext)}`;
       const full = resolve(key);
       await fs.promises.mkdir(path.dirname(full), { recursive: true });
       await fs.promises.writeFile(full, buffer, { flag: 'wx' });
@@ -57,13 +68,18 @@ function createStorage(config) {
     isAlfresco: (key) => ALF.test(String(key)),
     local,
 
-    async put(buffer, { organismeId, ext = 'bin' }) {
+    /**
+     * Dépose un fichier. `opts` : `categorie` métier (organise l'arborescence GED), `nom` lisible, `titre` (cm:title),
+     * `description` (cm:description) et `auteur`. Le nom déposé reste unique (suffixe d'empreinte) : un titre identique
+     * n'écrase pas le précédent. Sans `nom`, le nom reste opaque (compatibilité).
+     */
+    async put(buffer, { organismeId, ext = 'bin', categorie = 'divers', nom, titre, description, auteur } = {}) {
       const cible = alf && organismeId ? await alf.cible(organismeId) : null;
-      if (!cible) return local.put(buffer, { organismeId, ext });
+      if (!cible) return local.put(buffer, { organismeId, ext, categorie });
       const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
-      const nom = `${sha256.slice(0, 16)}-${crypto.randomBytes(4).toString('hex')}.${ext.replace(/[^a-z0-9]/gi, '') || 'bin'}`;
-      const dossierId = await alf.dossier(organismeId, cible);
-      const r = await cible.ad.deposer(cible.cfg, dossierId, { nom, buffer, mime: MIME[ext] || 'application/octet-stream', description: 'Fichier de VibeDélib (stockage applicatif)' });
+      const nomDepot = nomGed(nom, sha256, ext);
+      const dossierId = await alf.dossier(organismeId, cible, categorie);
+      const r = await cible.ad.deposer(cible.cfg, dossierId, { nom: nomDepot, buffer, mime: MIME[extSûre(ext)] || 'application/octet-stream', titre, description: description || `Fichier de VibeDélib — ${categorie}`, auteur });
       try { await fs.promises.mkdir(cacheDir, { recursive: true }); await fs.promises.writeFile(cacheFile(r.nodeId), buffer); } catch { /* le cache est facultatif */ }
       return { key: `alf:${organismeId}:${r.nodeId}`, sha256, size: buffer.length };
     },
