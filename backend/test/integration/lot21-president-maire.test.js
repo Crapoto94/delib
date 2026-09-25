@@ -1,6 +1,6 @@
 const { createTestEnv, loginAs, bearer, adminToken } = require('../helpers');
 
-let env; let admin; let ville; let martin; let instance; let commission;
+let env; let admin; let ville; let martin; let instance;
 const as = (tok) => ({
   get: (u) => env.http().get(u).set(bearer(tok)),
   post: (u, b) => env.http().post(u).set(bearer(tok)).send(b),
@@ -41,6 +41,5 @@ describe('président de séance : le maire par défaut au conseil', () => {
     const seance = (await as(martin).post(`${base()}/seances`, { instanceId: instance.id, dateSeance: inDays(40) })).body;
     const r = await as(martin).post(`${base()}/seances/${seance.id}/tenue/ouverture`);
     expect(r.body.tenue.presidentId).toBeNull();
-    void commission;
   });
 });

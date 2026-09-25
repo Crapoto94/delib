@@ -41,7 +41,7 @@ function normaliserCle(cle) {
 
 /** Lecture tolérante d'un CSV (séparateur ; ou ,, guillemets doubles) → tableau d'objets d'après la ligne d'en-tête. */
 function lireCsv(texte) {
-  const lignes = String(texte || '').replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim());
+  const lignes = String(texte || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
   if (lignes.length < 2) return [];
   const sep = (lignes[0].match(/;/g) || []).length >= (lignes[0].match(/,/g) || []).length ? ';' : ',';
   const decoupe = (l) => { const out = []; let cur = ''; let q = false; for (let i = 0; i < l.length; i++) { const c = l[i]; if (q) { if (c === '"' && l[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c; } else if (c === '"') q = true; else if (c === sep) { out.push(cur); cur = ''; } else cur += c; } out.push(cur); return out.map((x) => x.trim()); };

@@ -11,9 +11,17 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.46.0';
+export const VERSION = '0.47.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.47.0', type: 'minor', titre: 'Pièces jointes à chaque étape, rapporteur sans délégation et étape SCC garantie',
+    items: [
+      "Élu rapporteur : la liste ne montre que les noms et prénoms (en gras) — ni fonction ni délégations. La délégation concernée se choisit au champ suivant quand l'élu en porte plusieurs.",
+      "Pièces jointes : on peut en ajouter (et en retirer, remplacer ou réordonner) à toutes les étapes du circuit, pas seulement pendant la rédaction — le détenteur de l'étape courante et le rédacteur sont autorisés.",
+      "Circuit : un acte rédigé par le SCC (agent ou directrice de la DAJCP) conserve toujours l'étape finale de validation SCC — c'est l'étape finale pour tous les cas de figure.",
+    ],
+  },
   {
     version: '0.46.0', type: 'minor', titre: 'Annexes Word/Excel, taille des pièces jointes, suivi des modifications et ordre du jour interne',
     items: [
@@ -26,14 +34,11 @@ export const VERSIONS: Version[] = [
       "Fiche du dossier : le montant d'un impact budgétaire est explicitement facultatif (jamais bloquant).",
       "Fiche du dossier : l'ajout ou le retrait d'une commission ne réinitialise plus les saisies en cours (domaine, rubrique, élu…).",
       "Élu rapporteur : quand l'élu porte plusieurs délégations fonctionnelles, l'application propose de choisir la délégation concernée ; elle est reprise dans les listes et le tri de l'ordre du jour.",
-      "Élu rapporteur : la liste ne montre que les noms et prénoms — ni fonction ni délégations (la délégation se choisit au champ suivant) ; le nom est mis en gras.",
-      "Pièces jointes : on peut en ajouter (et en retirer) à toutes les étapes du circuit, pas seulement pendant la rédaction — le détenteur de l'étape courante et le rédacteur sont autorisés.",
       "Arbre des matières : les groupes (ex. « 1.1 ») ne sont pas sélectionnables — ils se déplient (mention « groupe », infobulle et aide) ; seules les matières précises se choisissent.",
       "Dossier : la carte « Avis des commissions » est masquée quand il n'y a pas de commission (plus de mention « Hors commission »).",
       "Textes d'une délibération : une fois rédigés, ils affichent « ok » sans conserver de cadre orange « à rédiger ».",
       "Nouveau document « Ordre du jour interne » (PDF), depuis l'ordre du jour : délibérations prévues avec direction rédactrice, état d'avancement, présence d'annexe et date du dernier passage hiérarchique ; tri par commission (ordre de passage), par rapporteur ou par délégation de rapporteur.",
       "Un acte marqué « urgent » porte une pastille « Urgent » : dans « Mes actes », « Tous les actes », les dossiers, le tableau de bord, la fiche du dossier et l'ordre du jour.",
-      "Circuit : un acte rédigé par le SCC (agent ou directrice de la DAJCP) conserve toujours l'étape finale de validation SCC — c'est l'étape finale pour tous les cas de figure.",
     ],
   },
   {

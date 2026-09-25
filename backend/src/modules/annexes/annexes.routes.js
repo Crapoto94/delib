@@ -24,7 +24,7 @@ module.exports = ({ makeRouter, annexes, config }) => {
 
   r.post('/', multipart({
     summary: 'Ajoute une annexe (PDF, Word ou Excel)', tags: ['annexes'], org: true, params: P, responses: { 201: 'Créé' },
-    description: "PDF contrôlé (signature %PDF, non chiffré, sans contenu actif) ; Word (.docx, .doc) et Excel (.xlsx, .xls) acceptés et convertis en PDF à la validation finale. Un fichier de même nom remplace l\'annexe et crée une nouvelle version (ANN-01, ANN-04).",
+    description: "PDF contrôlé (signature %PDF, non chiffré, sans contenu actif) ; Word (.docx, .doc) et Excel (.xlsx, .xls) acceptés et convertis en PDF à la validation finale. Un fichier de même nom remplace l'annexe et crée une nouvelle version (ANN-01, ANN-04).",
   }), upload.single('file'), async (req, res, next) => {
     const meta = Meta.safeParse(req.body || {});
     if (!meta.success) return next(require('../../shared/errors').E.badRequest('Requête invalide', meta.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))));

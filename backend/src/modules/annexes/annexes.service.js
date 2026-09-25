@@ -16,6 +16,7 @@ const MIMES = {
 };
 const extOf = (name) => String(name || '').split('.').pop().toLowerCase();
 const startsWith = (buf, magic) => magic.every((b, i) => buf[i] === b);
+// eslint-disable-next-line no-control-regex -- on retire les caractères de contrôle des noms de fichiers
 const cleanName = (name) => String(name || 'annexe').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 200);
 
 const toAnnexe = (r) => ({
