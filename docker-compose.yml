@@ -5,9 +5,9 @@
 #   docker compose up -d --build                  backend + frontend, PostgreSQL = celui du .env (serveur partagé)
 #   docker compose --profile local-db up -d --build   ajoute un PostgreSQL local (POSTGRES_HOST=postgres dans le .env)
 #   docker compose --profile bureau up -d --build     ajoute le serveur de documents (édition Word/Excel dans le
-#                                                     navigateur), relayé par le frontal sous /office/ — aucun port
+#                                                     navigateur), relayé par le frontal sous /office-delib/ — aucun port
 #                                                     publié ; BUREAU_MOTEUR=onlyoffice, BUREAU_URL,
-#                                                     BUREAU_URL_NAVIGATEUR=/office, BUREAU_URL_RAPPEL et
+#                                                     BUREAU_URL_NAVIGATEUR=/office-delib, BUREAU_URL_RAPPEL et
 #                                                     BUREAU_JWT_SECRET sont alors nécessaires.
 #
 # Fichiers persistants : ./backend/storage (annexes, fonds de page, logo). Polices de la Ville : ./police (lecture seule).
@@ -37,8 +37,8 @@ services:
   # conversion en PDF. Son stockage interne est un volume à part (documents temporaires + cache de rendu) : les
   # documents, eux, restent chez nous (disque ou Alfresco), le moteur ne fait que les lire et les rendre.
   #
-  # ATTENTION : AUCUN port n'est publié pour le moteur, et c'est voulu. Le frontal relaie /office/ sous le même nom
-  # d'hôte que l'application (donc en HTTPS, sans contenu mixte) : BUREAU_URL_NAVIGATEUR=/office côté .env.
+  # ATTENTION : AUCUN port n'est publié pour le moteur, et c'est voulu. Le frontal relaie /office-delib/ sous le même nom
+  # d'hôte que l'application (donc en HTTPS, sans contenu mixte) : BUREAU_URL_NAVIGATEUR=/office-delib côté .env.
   # Si vous publiiez le moteur sur son propre port, l'application en HTTPS chargerait un cadre en HTTP : le navigateur
   # marquerait la page « Non sécurisé » et finirait par bloquer l'éditeur (contenu mixte).
   #
@@ -65,7 +65,7 @@ services:
     depends_on: [backend]
     # Port publié UNIQUEMENT pour le développement local (application sur un poste, moteur sur ce serveur) : il permet
     # au poste de charger l'éditeur et d'appeler /converter en HTTP. La PRODUCTION ne s'en sert pas : elle passe par le
-    # frontal, sous /office, sur le même nom d'hôte (donc en HTTPS). Ne pas exposer ce port au-delà du réseau interne.
+    # frontal, sous /office-delib, sur le même nom d'hôte (donc en HTTPS). Ne pas exposer ce port au-delà du réseau interne.
     ports: ["9980:80"]
     # Démarrage lent (migration de base interne au premier lancement) : prévoyez quelques minutes avant la première édition.
 
