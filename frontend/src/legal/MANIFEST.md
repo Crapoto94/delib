@@ -2045,23 +2045,34 @@ fichiers que le backend lui sert, et renvoie ce que l'agent a écrit. Les identi
 l'historique restent chez nous.
 
 ```
-navigateur ──▶ moteur  (éditeur, WebSocket ; origine propre : http://<hôte>:9980)
+navigateur ──▶ https://<app>/office/  (frontal : même origine, HTTPS, WebSocket) ──▶ moteur
 moteur      ──▶ /api/v1/public/bureau/…   ──▶ backend (téléchargement de la source, sauvegarde)
 backend     ──▶ /converter                ──▶ moteur  (conversion PDF mutualisée)
 ```
 
 Trois adresses, trois sens de circulation, **aucune en dur** (`.env`) :
 
-| Variable | Vue par | Rôle | Valeur type en Docker |
+| Variable | Vue par | Rôle | Valeur en Docker |
 |---|---|---|---|
-| `BUREAU_URL` | le backend | conversion PDF | `http://documentserver:80` (réseau Docker) ou `http://<hôte>:9980` |
-| `BUREAU_URL_NAVIGATEUR` | le navigateur | chargement de l'éditeur | `http://<hôte>:9980` — **absolue, obligatoire** |
-| `BUREAU_URL_RAPPEL` | le moteur | source à ouvrir, sauvegardes | `http://backend:3021` (réseau Docker) |
+| `BUREAU_URL` | le backend | conversion PDF | `http://documentserver:80` (réseau Docker) |
+| `BUREAU_URL_NAVIGATEUR` | le navigateur | chargement de l'éditeur | `/office` (relatif : le frontal relaie) |
+| `BUREAU_URL_RAPPEL` | le moteur | source à ouvrir, sauvegardes | `http://backend:3021` (réseau Docker), ou l'adresse de l'hôte |
 
-**Le moteur occupe sa propre origine, jamais un sous-chemin.** C'est une contrainte d'ONLYOFFICE, pas un choix : relayé
-sous `/office/`, il construit certaines URL internes sans le préfixe et l'éditeur finit par ouvrir autre chose que le
-document (« le contenu du fichier ne correspond pas à l'extension du fichier »). Son port est donc publié, et
-`BUREAU_URL_NAVIGATEUR` porte toujours `http://…` (une valeur relative est un défaut de configuration).
+**Deux pièges, tous deux vécus et corrigés en production :**
+
+1. **Le moteur doit rester sous le même nom d'hôte que l'application** (`/office`), et non sur un port publié séparé.
+   Une application en HTTPS (`vibedelib.ivry.local`) qui charge l'éditeur en HTTP fait marquer la page « Non sécurisé »
+   au navigateur, qui finit par bloquer le cadre (contenu mixte). Relayé par le frontal, le moteur est en HTTPS,
+   sans certificat ni port supplémentaire, et le navigateur ne voit qu'une seule origine.
+2. **La redirection versionnée du moteur doit être ramenée dans le préfixe.** Le moteur redirige la page de l'éditeur
+   vers `/9.4.0-<empreinte>/web-apps/…` : hors de `/office`, le navigateur demanderait ce chemin à l'application et
+   ouvrirait sa page (éditeur blanc). Le frontal la réécrit (`proxy_redirect … /office/$1`, dans `frontend/nginx.conf`)
+   — c'est aussi ce qui corrige l'erreur « le contenu du fichier ne correspond pas à l'extension ». **Ne pas retirer
+   cette ligne.**
+3. Pour le rappel, préférer une valeur sans résolution de nom côté moteur (l'adresse de l'hôte) : le moteur résout
+   l'hôte de l'URL de rappel pour son filtre d'IP, et une résolution manquée (recréation de conteneur) fait échouer
+   l'enregistrement. `BUREAU_URL_RAPPEL=http://10.0.0.12:3021` est le plus sûr ; `http://backend:3021` fonctionne
+   quand le réseau Docker est stable.
 
 `BUREAU_MOTEUR=simulateur` (défaut) = aucun moteur : tout fonctionne, le bouton « Modifier » reste masqué et le dépôt
 manuel prend le relais. `BUREAU_MOTEUR=onlyoffice` sans les trois adresses = **refus de démarrer** (erreur de
@@ -2107,7 +2118,7 @@ configuration explicite, pas un mode dégradé silencieux).
    ```ini
    BUREAU_MOTEUR=onlyoffice
    BUREAU_URL=http://documentserver:80
-   BUREAU_URL_NAVIGATEUR=http://<hôte ou IP du serveur>:9980   # ABSOLUE : voir l'avertissement plus haut
+   BUREAU_URL_NAVIGATEUR=/office                              # relatif : le frontal sert le moteur en HTTPS
    BUREAU_URL_RAPPEL=http://backend:3021
    BUREAU_JWT_SECRET=<le secret ci-dessus>
    ```
@@ -2118,7 +2129,8 @@ configuration explicite, pas un mode dégradé silencieux).
    ```
 5. **Vérification** : `GET /api/v1/organismes/:id/bureau` doit répondre `enabled: true` (le bouton « Modifier »
    apparaît alors dans le dossier) ; ouvrir une annexe `.docx`, enregistrer, vérifier la nouvelle version et le PDF
-   régénéré. Le conteneur doit répondre `true` sur `http://<hôte>:9980/healthcheck`.
+   régénéré. Sans session, on peut déjà vérifier le relais : `https://<app>/office/healthcheck` doit répondre `true`
+   et `https://<app>/office/web-apps/apps/api/documents/api.js` renvoyer le SDK.
 6. **Activation** : Paramétrages › Pièces jointes › activer l'édition en ligne pour l'organisme.
 
 Le profil `bureau` est **facultatif** : sans lui, l'application démarre normalement et le bouton « Modifier » reste
