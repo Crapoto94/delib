@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const multer = require('multer');
+const { nomsUtf8 } = require('../../http/middleware/noms-fichiers');
 const { E } = require('../../shared/errors');
 const { DOC_TYPES } = require('./render.service');
 const { available } = require('./fonts');
@@ -85,7 +86,7 @@ module.exports = ({ makeRouter, render, config }) => {
   r.post('/gabarits/:docType/fond/:page', {
     summary: 'Dépose le PDF de fond (première page ou pages suivantes)', tags: ['mise en page'], org: true, roles: ['org_admin'], params: PW,
     description: 'multipart/form-data, champ « file » : PDF A4 valide. `first` = première page, `next` = pages suivantes (à défaut, le fond de la première page sert partout).',
-  }, upload.single('file'), async (req, res) => res.json(await render.setBackground(req.ctx, req.org.id, req.valid.params.docType, req.valid.params.page, req.file)));
+  }, upload.single('file'), nomsUtf8, async (req, res) => res.json(await render.setBackground(req.ctx, req.org.id, req.valid.params.docType, req.valid.params.page, req.file)));
 
   r.delete('/gabarits/:docType/fond/:page', { summary: 'Retire un PDF de fond', tags: ['mise en page'], org: true, roles: ['org_admin'], params: PW },
     async (req, res) => res.json(await render.removeBackground(req.ctx, req.org.id, req.valid.params.docType, req.valid.params.page)));
@@ -93,7 +94,7 @@ module.exports = ({ makeRouter, render, config }) => {
   r.post('/gabarits/:docType/docx', {
     summary: 'Dépose le modèle Word (.docx) à variables du gabarit', tags: ['mise en page'], org: true, roles: ['org_admin'], params: P,
     description: 'multipart/form-data, champ « file » : fichier .docx. À la génération, ses variables {…} sont remplacées par les valeurs de l’acte et de ses zones (exposé, visas, dispositif).',
-  }, upload.single('file'), async (req, res) => res.json(await render.setDocxTemplate(req.ctx, req.org.id, req.valid.params.docType, req.file)));
+  }, upload.single('file'), nomsUtf8, async (req, res) => res.json(await render.setDocxTemplate(req.ctx, req.org.id, req.valid.params.docType, req.file)));
 
   r.delete('/gabarits/:docType/docx', { summary: 'Retire le modèle Word du gabarit', tags: ['mise en page'], org: true, roles: ['org_admin'], params: P },
     async (req, res) => res.json(await render.removeDocxTemplate(req.ctx, req.org.id, req.valid.params.docType)));
@@ -128,7 +129,7 @@ module.exports = ({ makeRouter, render, config }) => {
   r.post('/actes/:id/document-source', {
     summary: "Joint le document rédigé hors application (PDF ou Word) — il remplace la composition dans l’outil", tags: ['mise en page'], org: true, params: PA,
     description: "multipart/form-data, champ « file » (.pdf ou .docx) et champ « trame » : « presente » (le document porte déjà la trame de la collectivité) ou « a_ajouter » (l’en-tête et le pied de page du gabarit sont posés dans les marges). Dans ce mode, les textes ne sont plus composés dans l’application : ils ne sont pas corrigeables en cours de circuit.",
-  }, upload.single('file'), async (req, res) => res.json(await render.setSource(req.ctx, req.org.id, req.valid.params.id, { trame: req.body?.trame === 'a_ajouter' ? 'a_ajouter' : 'presente' }, req.file)));
+  }, upload.single('file'), nomsUtf8, async (req, res) => res.json(await render.setSource(req.ctx, req.org.id, req.valid.params.id, { trame: req.body?.trame === 'a_ajouter' ? 'a_ajouter' : 'presente' }, req.file)));
 
   r.delete('/actes/:id/document-source', { summary: 'Retire le document joint (retour à la rédaction dans l’outil)', tags: ['mise en page'], org: true, params: PA },
     async (req, res) => { await render.removeSource(req.ctx, req.org.id, req.valid.params.id); res.json({ ok: true }); });

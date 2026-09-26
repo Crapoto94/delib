@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const multer = require('multer');
+const { nomsUtf8 } = require('../../http/middleware/noms-fichiers');
 
 const Id = z.coerce.number().int().positive();
 const P = z.object({ orgId: Id });
@@ -60,7 +61,7 @@ module.exports = ({ makeRouter, odj, render, config }) => {
   // ---- pièces jointes d'un dossier simple (point libre)
   r.post('/seances/:id/odj/points/:itemId/fichiers', { summary: "Joint un fichier à un dossier simple (point libre)", tags: T, org: true, params: PI, responses: { 201: 'Créé' },
     description: "Requête multipart/form-data : champ « file » (PDF, png, jpg, documents Office ou OpenDocument ; type vérifié par l'extension et par la signature du fichier), `titre` et `motif` (obligatoire après l'arrêt de l'ordre du jour) facultatifs. Taille max : réglage « Pièces jointes » de la collectivité." },
-  upload.single('file'), async (req, res, next) => {
+  upload.single('file'), nomsUtf8, async (req, res, next) => {
     const meta = Piece.safeParse(req.body || {});
     if (!meta.success) return next(require('../../shared/errors').E.badRequest('Requête invalide', meta.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))));
     res.status(201).json(await odj.addFichier(req.ctx, req.org.id, req.valid.params.id, req.valid.params.itemId, meta.data, req.file));

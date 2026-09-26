@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const multer = require('multer');
+const { nomsUtf8 } = require('../../http/middleware/noms-fichiers');
 
 const Id = z.coerce.number().int().positive();
 const P = z.object({ orgId: Id, id: Id });
@@ -25,7 +26,7 @@ module.exports = ({ makeRouter, annexes, config }) => {
   r.post('/', multipart({
     summary: 'Ajoute une annexe (PDF, Word ou Excel)', tags: ['annexes'], org: true, params: P, responses: { 201: 'Créé' },
     description: "PDF contrôlé (signature %PDF, non chiffré, sans contenu actif) ; Word (.docx, .doc) et Excel (.xlsx, .xls) acceptés et convertis en PDF à la validation finale. Un fichier de même nom remplace l'annexe et crée une nouvelle version (ANN-01, ANN-04).",
-  }), upload.single('file'), async (req, res, next) => {
+  }), upload.single('file'), nomsUtf8, async (req, res, next) => {
     const meta = Meta.safeParse(req.body || {});
     if (!meta.success) return next(require('../../shared/errors').E.badRequest('Requête invalide', meta.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))));
     res.status(201).json(await annexes.add(req.ctx, req.org.id, req.valid.params.id, meta.data, req.file));
@@ -38,7 +39,7 @@ module.exports = ({ makeRouter, annexes, config }) => {
     async (req, res) => res.json(await annexes.update(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId, req.valid.body)));
 
   r.put('/:annexeId/file', multipart({ summary: 'Remplace le fichier (nouvelle version)', tags: ['annexes'], org: true, params: PA }),
-    upload.single('file'), async (req, res) => res.json(await annexes.replaceFile(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId, req.file)));
+    upload.single('file'), nomsUtf8, async (req, res) => res.json(await annexes.replaceFile(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId, req.file)));
 
   r.get('/:annexeId/versions', { summary: "Versions d'une annexe", tags: ['annexes'], org: true, params: PA },
     async (req, res) => res.json({ items: await annexes.versions(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId) }));

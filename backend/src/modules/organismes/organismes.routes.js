@@ -26,6 +26,7 @@ const RoleBody = z.object({ username: z.string().trim().min(1).max(128), role: z
 const AdminBody = z.object({ username: z.string().trim().min(1).max(128) });
 
 const multer = require('multer');
+const { nomsUtf8 } = require('../../http/middleware/noms-fichiers');
 
 module.exports = ({ makeRouter, organismes, circuits, seances }) => {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
@@ -64,7 +65,7 @@ module.exports = ({ makeRouter, organismes, circuits, seances }) => {
 
   r.post('/:orgId/logo', { summary: "Dépose le logo de l'organisme (PNG ou JPEG)", tags: ['organismes'], org: true, roles: ['org_admin'], params: OrgParams,
     description: "multipart/form-data, champ « file ». C'est aussi le logo de l'application (en-tête, page de connexion, icône) et des PDF (option « logo » des gabarits). 1,5 Mo au plus." },
-  upload.single('file'), async (req, res) => res.json(await organismes.setLogo(req.ctx, req.org.id, req.file)));
+  upload.single('file'), nomsUtf8, async (req, res) => res.json(await organismes.setLogo(req.ctx, req.org.id, req.file)));
   r.delete('/:orgId/logo', { summary: "Retire le logo de l'organisme", tags: ['organismes'], org: true, roles: ['org_admin'], params: OrgParams },
     async (req, res) => res.json(await organismes.removeLogo(req.ctx, req.org.id)));
 

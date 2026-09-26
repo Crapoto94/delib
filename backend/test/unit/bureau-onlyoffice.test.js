@@ -8,7 +8,7 @@ const { createBureauSimulateur } = require('../../src/adapters/bureau-simulateur
 const SECRET = 'secret-partage-bureau-en-ligne-0123456789';
 const base = (extra = {}) => ({
   url: 'http://moteur:8080',
-  urlNavigateur: '/office',
+  urlNavigateur: 'http://moteur:8080',
   urlRappel: 'https://delib.ville.fr',
   jwtSecret: SECRET,
   sources: async () => ({ jeton: 'a'.repeat(32) }),
@@ -31,7 +31,9 @@ describe('bureau en ligne — adaptateur OnlyOffice', () => {
   it('renvoie une configuration signée, avec forcesave (chaque Ctrl+S nous est signalé)', () => {
     const p = createBureauOnlyOffice(base());
     const { sdk, config } = p.open({ cle: 'cle-1', nom: 'annexe.docx', url: 'https://delib.ville.fr/f', user: { username: 'a.mairie' }, mobile: true });
-    expect(sdk).toBe('/office/web-apps/apps/api/documents/api.js');
+    expect(sdk).toBe('http://moteur:8080/web-apps/apps/api/documents/api.js');
+    // le moteur est servi sur sa propre origine : le SDK doit la connaître explicitement (voir MANIFEST §35)
+    expect(config.documentServerUrl).toBe('http://moteur:8080');
     expect(config.documentType).toBe('word');
     expect(config.document.fileType).toBe('docx');
     expect(config.type).toBe('mobile');                       // écran de téléphone : l'éditeur se replie
