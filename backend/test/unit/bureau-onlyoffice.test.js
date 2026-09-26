@@ -94,6 +94,23 @@ describe('bureau en ligne — adaptateur OnlyOffice', () => {
     expect(axios.get.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${jeton}` });
   });
 
+  it('rappel : le moteur annonce son adresse PUBLIQUE — on le relit par l’adresse interne, sans le préfixe', async () => {
+    // Cas de production : le moteur est servi sous /office-delib par le frontal, il annonce donc ses fichiers sur
+    // « https://delib.ville.fr/office-delib/cache/… » alors que le backend l'atteint en « http://documentserver ».
+    const p = createBureauOnlyOffice(base({ url: 'http://documentserver:80', urlNavigateur: '/office-delib', publicBaseUrl: 'https://delib.ville.fr' }));
+    axios.get.mockResolvedValue({ status: 200, data: Buffer.from('PK') });
+    const r = await p.readBack({ url: 'https://delib.ville.fr/office-delib/cache/files/data/k/Editor.bin/Editor.bin?md5=x&expires=1', filetype: 'docx', jeton: 'j' });
+    expect(r).toEqual({ buffer: expect.any(Buffer), ext: 'docx' });
+    expect(axios.get.mock.calls[0][0]).toBe('http://documentserver/cache/files/data/k/Editor.bin/Editor.bin?md5=x&expires=1');
+  });
+
+  it('rappel : un hôte inconnu reste refusé, même avec le bon préfixe (pas de SSRF)', async () => {
+    const p = createBureauOnlyOffice(base({ url: 'http://documentserver:80', urlNavigateur: '/office-delib', publicBaseUrl: 'https://delib.ville.fr' }));
+    expect(await p.readBack({ url: 'https://ailleurs.example/office-delib/cache/files/x', jeton: 'j' })).toBeNull();
+    expect(await p.readBack({ url: 'http://169.254.169.254/latest/meta-data/', jeton: 'j' })).toBeNull();
+    expect(axios.get).not.toHaveBeenCalled();
+  });
+
   it('conversion : le document part du dépôt à usage unique, le PDF revient du moteur', async () => {
     const p = createBureauOnlyOffice(base());
     axios.post.mockResolvedValue({ status: 200, data: { error: 0, fileUrl: 'http://moteur:8080/cache/files/out.pdf' } });

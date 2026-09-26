@@ -103,7 +103,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   // par organisme est un réglage (`bureau.edition_documents`). Sans moteur, l'adaptateur simulateur garde le comportement
   // d'aujourd'hui : dépôt manuel et conversion locale.
   const bureauPort = assertBureauPort(bureauAdapters || (config.bureau.moteur === 'onlyoffice'
-    ? createBureauOnlyOffice({ ...config.bureau, log, sources: (buffer, meta) => transitoire.mettre(buffer, meta) })
+          ? createBureauOnlyOffice({ ...config.bureau, publicBaseUrl: config.publicBaseUrl, log, sources: (buffer, meta) => transitoire.mettre(buffer, meta) })
     : createBureauSimulateur()));
   const late = {}; // services liés après coup pour éviter les dépendances circulaires (textes suivis, circuit…)
   const elus = createElus({ db, audit, directoryAdapter, log });

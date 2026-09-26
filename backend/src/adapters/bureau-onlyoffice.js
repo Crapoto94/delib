@@ -30,15 +30,40 @@ const extDe = (nom) => String(nom || '').split('.').pop().toLowerCase();
 const sansPointFinal = (s) => String(s || '').replace(/\/+$/, '');
 const MAX_TELECHARGE = 64 * 1048576;   // garde-fou : on ne charge jamais plus de 64 Mio depuis le moteur
 
-function createBureauOnlyOffice({ url, urlNavigateur, urlRappel, jwtSecret, langue = 'fr-FR', delaiMs = 60000, sources, log }) {
+function createBureauOnlyOffice({ url, urlNavigateur, urlRappel, jwtSecret, publicBaseUrl, langue = 'fr-FR', delaiMs = 60000, sources, log }) {
   const serveur = sansPointFinal(url);
   const hote = serveur ? new URL(serveur).host : '';
   const formats = Object.keys(TYPE_PAR_EXT);
+  // Adresse PUBLIQUE vue par le navigateur : c'est sous cette forme que le moteur annonce ses propres fichiers
+  // (document, cache, PDF converti). Si le navigateur charge le moteur par un chemin de l'application
+  // (`BUREAU_URL_NAVIGATEUR=/office-delib`), l'hôte public est celui de l'application (`PUBLIC_BASE_URL`).
+  const absoluNavigateur = /^https?:\/\//i.test(String(urlNavigateur || ''));
+  const hotePublic = absoluNavigateur
+    ? new URL(urlNavigateur).host
+    : (publicBaseUrl ? new URL(publicBaseUrl).host : '');
+  const prefixePublic = absoluNavigateur ? '' : String(urlNavigateur || '').replace(/\/+$/, '');   // ex. « /office-delib »
 
-  /** Un lien reçu du moteur n'est suivi que s'il pointe vers le moteur lui-même (anti-SSRF). */
+  /** Un lien reçu du moteur n'est suivi que s'il pointe vers le moteur lui-même (anti-SSRF) : par son adresse
+   *  interne (`BUREAU_URL`, ce que le backend appelle) ou par son adresse publique (`BUREAU_URL_NAVIGATEUR`, celle que
+   *  le moteur annonce et que le navigateur utilise). Toute autre adresse est ignorée. */
   const deConfiance = (cible) => {
-    try { return !!hote && new URL(String(cible)).host === hote; } catch { return false; }
+    try {
+      const h = new URL(String(cible)).host;
+      return (!!hote && h === hote) || (!!hotePublic && h === hotePublic);
+    } catch { return false; }
   };
+
+  /** Adresse de relecture côté serveur. Le moteur annonce ses fichiers sur son adresse PUBLIQUE
+   *  (`https://<app>/office-delib/cache/…`) : le backend, lui, les relit par l'adresse INTERNE, en retirant le
+   *  préfixe public. Cela évite au passage de dépendre du certificat du frontal et de sa mise en cache. */
+  const urlInterne = (cible) => {
+    const u = new URL(String(cible));
+    if (u.host === hote || !hotePublic) return u.toString();          // déjà l'adresse interne
+    const chemin = (prefixePublic && u.pathname.startsWith(`${prefixePublic}/`))
+      ? u.pathname.slice(prefixePublic.length) : u.pathname;
+    return new URL(`${chemin}${u.search}`, sansPointFinal(url)).toString();
+  };
+
   const signer = (payload) => jwt.sign(payload, jwtSecret, { expiresIn: '2h' });
 
   return {
@@ -107,7 +132,7 @@ function createBureauOnlyOffice({ url, urlNavigateur, urlRappel, jwtSecret, lang
     async readBack({ url, filetype, jeton } = {}) {
       if (!url || !deConfiance(url)) { log?.warn?.({}, 'rappel du moteur : lien hors du moteur, ignoré'); return null; }
       const entetes = jeton ? { Authorization: `Bearer ${jeton}` } : {};
-      const r = await axios.get(url, { headers: entetes, responseType: 'arraybuffer', timeout: delaiMs, maxBodyLength: MAX_TELECHARGE, maxContentLength: MAX_TELECHARGE, validateStatus: () => true });
+      const r = await axios.get(urlInterne(url), { headers: entetes, responseType: 'arraybuffer', timeout: delaiMs, maxBodyLength: MAX_TELECHARGE, maxContentLength: MAX_TELECHARGE, validateStatus: () => true });
       if (r.status !== 200 || !r.data?.length) { log?.warn?.({ status: r.status }, 'relecture du document impossible'); return null; }
       return { buffer: Buffer.from(r.data), ext: String(filetype || extDe(new URL(url).pathname) || '').toLowerCase() };
     },
@@ -158,7 +183,8 @@ function createBureauOnlyOffice({ url, urlNavigateur, urlRappel, jwtSecret, lang
         const sortie = data.fileUrl || data.url;
         if (!sortie || !deConfiance(sortie)) return null;
         // Le PDF temporaire se retélécharge avec le même jeton : il porte le corps de la demande, dont l'URL générée.
-        const p = await axios.get(sortie, { headers: { Authorization: `Bearer ${signature}` }, responseType: 'arraybuffer', timeout: delaiMs, maxBodyLength: MAX_TELECHARGE, maxContentLength: MAX_TELECHARGE, validateStatus: () => true });
+        // Comme pour le rappel, on le relit par l'adresse INTERNE du moteur (il est annoncé sur l'adresse publique).
+        const p = await axios.get(urlInterne(sortie), { headers: { Authorization: `Bearer ${signature}` }, responseType: 'arraybuffer', timeout: delaiMs, maxBodyLength: MAX_TELECHARGE, maxContentLength: MAX_TELECHARGE, validateStatus: () => true });
         if (p.status !== 200 || !p.data?.length) return null;
         return { buffer: Buffer.from(p.data), moteur: 'onlyoffice' };
       } catch (e) { log?.warn?.({ err: e.message }, 'conversion via le moteur impossible'); return null; }
