@@ -63,6 +63,10 @@ services:
       - ALLOW_META_IP_ADDRESS=false
     volumes: ["officecache:/var/www/onlyoffice/Data", "officelogs:/var/log/onlyoffice"]
     depends_on: [backend]
+    # Port publié UNIQUEMENT pour le développement local (application sur un poste, moteur sur ce serveur) : il permet
+    # au poste de charger l'éditeur et d'appeler /converter en HTTP. La PRODUCTION ne s'en sert pas : elle passe par le
+    # frontal, sous /office, sur le même nom d'hôte (donc en HTTPS). Ne pas exposer ce port au-delà du réseau interne.
+    ports: ["9980:80"]
     # Démarrage lent (migration de base interne au premier lancement) : prévoyez quelques minutes avant la première édition.
 
   # PostgreSQL local : uniquement avec --profile local-db (en production on utilise le serveur partagé du .env).
