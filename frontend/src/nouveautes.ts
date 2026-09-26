@@ -22,6 +22,7 @@ export const VERSIONS: Version[] = [
       "Un serveur de documents unique, déployé côté serveur, assure le rendu et la conversion en PDF : ce qu'on lit à l'écran et ce qu'on imprime ne peuvent plus diverger.",
       "Sans moteur déployé, le bouton n'apparaît pas et l'application fonctionne exactement comme avant (dépôt manuel des annexes).",
       "Activation par organisme : Paramétrages > Pièces jointes > Édition en ligne des documents.",
+      "Historique : le bouton « Versions (N) » sur une annexe liste toutes ses versions (auteur, date, taille) et permet de télécharger n'importe laquelle.",
       "Sécurité : échanges signés avec le moteur, moteur non exposé sur un port, fichier servi au moteur à usage unique et expirant, URL renvoyées par le moteur filtrées.",
       "Mise en production : docker compose --profile bureau up -d --build (prévoir environ 2 Go de RAM en plus). L'édition communautaire d'OnlyOffice est AGPL-3.0 et limitée en connexions simultanées.",
     ],

@@ -2097,15 +2097,37 @@ configuration explicite, pas un mode dégradé silencieux).
   mal signé = `{"error": 1}`.
 - Le jeton voyage en en-tête `Authorization` **et** dans le corps (`JWT_IN_BODY=true`) ; la relecture du document et le
   téléchargement du PDF converti renvoient le jeton correspondant, faute de quoi le moteur répond 401.
-- Le moteur est **publié sur son propre port** (jamais relayé sous un sous-chemin, cf. plus haut). Il reste protégé par
-  le jeton partagé : sans signature valide, ni configuration d'éditeur, ni conversion, ni rappel ne sont acceptés.
+- Le moteur est **relayé par le frontal sous `/office-delib/`** (même nom d'hôte que l'application, donc en HTTPS) et
+  n'est publié sur aucun port en production ; il reste protégé par le jeton partagé : sans signature valide, ni
+  configuration d'éditeur, ni conversion, ni rappel ne sont acceptés.
 - `ALLOW_PRIVATE_IP_ADDRESS=true` est nécessaire (le moteur rappelle le backend en 10.x / 172.x) et constitue une
   relaxation assumée : le moteur peut télécharger une URL privée, mais il ne connaît que les adresses qu'on lui donne.
   `ALLOW_META_IP_ADDRESS=false` reste en place (pas d'accès aux métadonnées d'instance).
-- Toute URL renvoyée par le moteur est **filtrée sur son hôte** avant téléchargement (anti-SSRF), et la taille est
-  bornée à 64 Mio.
+- Toute URL renvoyée par le moteur est **filtrée sur son hôte** avant téléchargement (adresse interne *ou* adresse
+  publique déclarée), et la taille est bornée à 64 Mio. Le moteur **annonce ses fichiers sur son adresse publique**
+  (`https://<app>/office-delib/cache/…`) : le backend les **relit par l'adresse interne** (`BUREAU_URL`), en retirant le
+  préfixe public — pas de dépendance au certificat du frontal ni à sa mise en cache.
 - La clé de session applicative de l'auteur est **rechargée à chaque sauvegarde** : un agent révoqué entre-temps voit
   son écriture refusée au rappel suivant.
+
+### Les trois pièges de mise en production (tous rencontrés pour de vrai)
+
+1. **Le moteur annonce ses propres URL** (document, cache, images, PDF) et il les construit à partir de
+   `X-Forwarded-Proto`, `X-Forwarded-Host` et `X-Forwarded-Prefix`. Derrière un proxy qui termine le TLS, **sans ces
+   en-têtes** il annonce `http://…` : le navigateur bloque alors le cadre sur une page HTTPS (« échec du
+   téléchargement »). Le frontal pose donc, sur `/office-delib/` :
+   ```nginx
+   proxy_set_header X-Forwarded-Proto https;          # le proxy qui termine le TLS relaie en HTTP : ne pas mettre $scheme
+   proxy_set_header X-Forwarded-Host  $host/office-delib;   # hôte ET préfixe
+   proxy_set_header X-Forwarded-Prefix "";            # vide, sinon ONLYOFFICE ajoute le préfixe deux fois
+   ```
+   Côté application, **`PUBLIC_BASE_URL` doit être l'adresse publique réelle** (ex. `https://vibedelib.ivry.local`) :
+   c'est elle qui permet au backend de reconnaître l'hôte que le moteur annonce, donc d'enregistrer les modifications.
+2. **Le préfixe doit être explicitement retiré** (`rewrite ^/office-delib/?(.*)$ /$1 break;`) : avec une variable dans
+   `proxy_pass`, nginx transmet l'URI **telle quelle** (contrairement à un `proxy_pass` littéral).
+3. **Se méfier du cache du proxy amont.** Un proxy qui met en cache peut figer une ancienne réponse (un 302 erroné nous
+   a coûté 74 minutes d'indisponibilité). D'où le préfixe distinct `/office-delib/` (et non `/office/`) et le conseil de
+   désactiver le cache sur ce chemin.
 
 ### Mise en production (Docker)
 
@@ -2121,6 +2143,7 @@ configuration explicite, pas un mode dégradé silencieux).
    BUREAU_URL_NAVIGATEUR=/office-delib                        # relatif : le frontal sert le moteur en HTTPS
    BUREAU_URL_RAPPEL=http://backend:3021
    BUREAU_JWT_SECRET=<le secret ci-dessus>
+   PUBLIC_BASE_URL=https://<adresse publique de l'application> # indispensable (hôte annoncé par le moteur + liens des mails)
    ```
 4. **Démarrage** :
    ```bash
