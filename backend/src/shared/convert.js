@@ -1,8 +1,13 @@
 /**
- * Conversion de documents Office en PDF, côté serveur.
- *  - Windows : s'appuie sur Microsoft Office installé (Word / Excel / PowerPoint) via COM.
- *  - Linux / Docker : s'appuie sur LibreOffice (`soffice`), installé dans l'image backend.
- * Sans l'un ou l'autre, la conversion échoue proprement (l'appelant attache alors le fichier d'origine seul).
+ * Conversion de documents Office en PDF, côté serveur. Trois moteurs, dans cet ordre :
+ *  1. le moteur externe (port `bureau` : le conteneur du serveur de documents, mutualisé pour l'édition ET la conversion) ;
+ *  2. Windows : Microsoft Office installé (Word / Excel / PowerPoint) via COM ;
+ *  3. Linux / Docker : LibreOffice (`soffice`), installé dans l'image backend.
+ * Un moteur qui échoue laisse la main au suivant ; si aucun ne répond, la conversion échoue proprement
+ * (l'appelant attache alors le fichier d'origine seul).
+ *
+ * Le moteur qui a produit le PDF est renvoyé avec le tampon (`moteur`) : il est enregistré dans `files.moteur`,
+ * car le PDF d'une annexe entre dans le dossier remis au conseil et au contrôle de légalité.
  */
 const fs = require('fs');
 const os = require('os');
@@ -65,11 +70,26 @@ async function viaLibreOffice(buffer, e) {
   finally { await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {}); }
 }
 
-/** Convertit un tampon Office en PDF ; renvoie le tampon PDF ou `null` si la conversion n'est pas possible. */
-async function convertirEnPdf(buffer, ext) {
+/** Convertit un tampon Office en PDF et indique le moteur employé ; `null` si la conversion est impossible. */
+async function convertirEnPdfTrace(buffer, ext, { moteur } = {}) {
   const e = String(ext || '').toLowerCase().replace(/^\./, '');
   if (!EXT_CONVERTIBLES.has(e)) return null;
-  return process.platform === 'win32' ? viaWord(buffer, e) : viaLibreOffice(buffer, e);
+  const essais = [
+    moteur ? async () => { const r = await moteur.versPdf({ buffer, ext: e }); return r ? { buffer: r.buffer, moteur: r.moteur } : null; } : null,
+    process.platform === 'win32' ? async () => { const b = await viaWord(buffer, e); return b ? { buffer: b, moteur: 'office' } : null; } : null,
+    async () => { const b = await viaLibreOffice(buffer, e); return b ? { buffer: b, moteur: 'libreoffice' } : null; },
+  ];
+  for (const essai of essais) {
+    if (!essai) continue;
+    try { const r = await essai(); if (r) return r; } catch { /* moteur suivant */ }
+  }
+  return null;
 }
 
-module.exports = { convertirEnPdf, EXT_CONVERTIBLES };
+/** Convertit un tampon Office en PDF ; renvoie le tampon PDF ou `null` si la conversion n'est pas possible. */
+async function convertirEnPdf(buffer, ext, opts) {
+  const r = await convertirEnPdfTrace(buffer, ext, opts);
+  return r ? r.buffer : null;
+}
+
+module.exports = { convertirEnPdf, convertirEnPdfTrace, EXT_CONVERTIBLES };

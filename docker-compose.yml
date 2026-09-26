@@ -1,9 +1,12 @@
-# VibeDélib — Docker Compose : backend + frontend (+ PostgreSQL local facultatif).
+# VibeDélib — Docker Compose : backend + frontend (+ PostgreSQL local facultatif, + serveur de documents facultatif).
 # Ports : frontend 5160 (nginx, relaie /api), backend 3021, espace élus DMZ 5161 (à venir).
 # Les secrets viennent du fichier .env à la racine (jamais versionné) ; aucune URL ni clé n'est écrite ici.
 #
 #   docker compose up -d --build                  backend + frontend, PostgreSQL = celui du .env (serveur partagé)
 #   docker compose --profile local-db up -d --build   ajoute un PostgreSQL local (POSTGRES_HOST=postgres dans le .env)
+#   docker compose --profile bureau up -d --build     ajoute le serveur de documents (édition Word/Excel dans le
+#                                                     navigateur) ; BUREAU_MOTEUR=onlyoffice et les trois adresses
+#                                                     BUREAU_URL* + BUREAU_JWT_SECRET sont alors nécessaires.
 #
 # Fichiers persistants : ./backend/storage (annexes, fonds de page, logo). Polices de la Ville : ./police (lecture seule).
 services:
@@ -28,6 +31,39 @@ services:
     depends_on: [backend]
     ports: ["5160:80"]
 
+  # Serveur de documents (bureau en ligne, D39) : édite les annexes Word/Excel dans le navigateur et sert aussi à la
+  # conversion en PDF. Son stockage interne est un volume à part (documents temporaires + cache de rendu) : les
+  # documents, eux, restent chez nous (disque ou Alfresco), le moteur ne fait que les lire et les rendre.
+  #
+  # ATTENTION : le moteur est publié sur SON PROPRE PORT, et non relayé sous « /office/ » par le frontal. Ce n'est pas
+  # un détail de confort : placé sous un sous-chemin, ONLYOFFICE construit certaines URL internes sans le préfixe et
+  # l'éditeur ouvre un mauvais contenu (« le contenu du fichier ne correspond pas à l'extension du fichier »).
+  # C'est pourquoi BUREAU_URL_NAVIGATEUR doit être une adresse ABSOLUE (http://<hôte>:9980), jamais un chemin relatif.
+  #
+  # Version épinglée sur une branche de versions maintenue (« 9.4 » = tous les correctifs 9.4.x) : la tag flottante
+  # « latest » ferait monter la version majeure sans contrôle ni test.
+  # ATTENTION : l'édition communautaire est sous licence AGPL-3.0 et limitée en nombre de connexions simultanées
+  # (documentserver community). Au-delà, licence OnlyOffice Server (commerciale) — voir MANIFEST §35.
+  # Consommateur de ressources : prévoir ~2 Go de RAM et un CPU de plus que l'application seule.
+  documentserver:
+    profiles: ["bureau"]
+    image: onlyoffice/documentserver:9.4
+    restart: always
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=${BUREAU_JWT_SECRET:?secret partagé avec le backend (BUREAU_JWT_SECRET) requis}
+      - JWT_HEADER=Authorization
+      - JWT_IN_BODY=true                   # le jeton voyage aussi dans le corps : relu par notre route de rappel
+      # Le moteur rappelle le backend sur une adresse interne (10.x / 172.x) : il faut l'autoriser explicitement.
+      # Conséquence assumée : le moteur peut télécharger une URL privée — il ne connaît que les adresses qu'on lui donne
+      # (dépôt à usage unique) et ne répond à rien. ALLOW_META_IP_ADDRESS reste bloqué (pas de métadonnées d'instance).
+      - ALLOW_PRIVATE_IP_ADDRESS=true
+      - ALLOW_META_IP_ADDRESS=false
+    ports: ["9980:80"]                     # BUREAU_URL_NAVIGATEUR=http://<hôte>:9980 (adresse absolue, obligatoire)
+    volumes: ["officecache:/var/www/onlyoffice/Data", "officelogs:/var/log/onlyoffice"]
+    depends_on: [backend]
+    # Démarrage lent (migration de base interne au premier lancement) : prévoyez quelques minutes avant la première édition.
+
   # PostgreSQL local : uniquement avec --profile local-db (en production on utilise le serveur partagé du .env).
   postgres:
     profiles: ["local-db"]
@@ -44,3 +80,5 @@ services:
 
 volumes:
   pgdata:
+  officecache:
+  officelogs:

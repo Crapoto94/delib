@@ -79,7 +79,12 @@ function createEspaceElus({ db, audit, settings, render, tenue, storage, cahier,
       }
       const v = sha({ k: 'projet', t: texts.filter((t) => t.deliberation_id === it.deliberation_id).map((t) => [t.id, t.version_no]), tpl: await tplVersion(org, 'deliberation'), a: a.updated_at });
       docs.push({ key: `p:${it.id}:projet`, type: 'projet', titre: 'Projet de délibération', version: v });
-      for (const x of await db.all(`SELECT an.id, an.titre, f.sha256, f.mime FROM annexes an JOIN files f ON f.id = an.file_id WHERE an.acte_id = $1 AND an.communicable AND f.mime = 'application/pdf' ORDER BY an.ordre, an.id`, [a.id])) {
+      // Annexe communicable : c'est le PDF converti qui fait foi (le dossier, le cahier et l'espace élus le montrent),
+      // pas le fichier Word d'origine — sans quoi une annexe Word markée communicable disparaîtrait du manifeste.
+      for (const x of await db.all(
+        `SELECT an.id, an.titre, COALESCE(pf.sha256, f.sha256) AS sha256, COALESCE(pf.mime, f.mime) AS mime
+         FROM annexes an JOIN files f ON f.id = an.file_id LEFT JOIN files pf ON pf.id = an.pdf_file_id
+         WHERE an.acte_id = $1 AND an.communicable AND COALESCE(pf.mime, f.mime) = 'application/pdf' ORDER BY an.ordre, an.id`, [a.id])) {
         docs.push({ key: `a:${it.id}:${x.id}`, type: 'annexe', titre: x.titre, version: x.sha256 });
       }
     } else if (it.kind === 'libre') {
@@ -199,7 +204,7 @@ function createEspaceElus({ db, audit, settings, render, tenue, storage, cahier,
           buffer = r.buffer; name = `${b === 'expose' ? 'expose' : 'projet'}-${it.numero || it.id}.pdf`;
         } else {
           const f = k === 'a'
-            ? await db.get('SELECT fl.storage_key, an.titre FROM annexes an JOIN files fl ON fl.id = an.file_id WHERE an.id = $1 AND an.acte_id = $2 AND an.communicable', [Number(b), it.acte_id])
+            ? await db.get('SELECT fl.storage_key, an.titre FROM annexes an JOIN files fl ON fl.id = COALESCE(an.pdf_file_id, an.file_id) WHERE an.id = $1 AND an.acte_id = $2 AND an.communicable', [Number(b), it.acte_id])
             : await db.get('SELECT fl.storage_key, x.titre FROM seance_item_fichiers x JOIN files fl ON fl.id = x.file_id WHERE x.id = $1 AND x.item_id = $2', [Number(b), it.id]);
           if (!f) throw E.notFound('Document introuvable');
           buffer = await storage.get(f.storage_key); name = `${(f.titre || 'piece').replace(/[^\w-]+/g, '_')}.pdf`;

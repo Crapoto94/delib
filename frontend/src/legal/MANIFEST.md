@@ -1,6 +1,6 @@
 # MANIFEST — VibeDélib : gestion des délibérations
 
-> **Statut : v1.46 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
+> **Statut : v1.47 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
 > Tout ce qui est **hypothèse** est marqué `[H]` ; tout ce qui attend une réponse est renvoyé vers la section 32 (`Q29`, `Q33`…). Les décisions déjà prises sont en section 0.
 
@@ -1886,6 +1886,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
 | **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.47** | 2026-09-25 | **Pièces jointes à chaque étape** : ajout, remplacement, réordonnancement et retrait d'annexes possibles à **toutes les étapes du circuit** (droit `canAttach` adossé au moteur, `acl.js` / `engine.js` / `annexes.service.js`) ; **élu rapporteur** : liste réduite aux **noms et prénoms** (fonction et délégations masquées, la délégation se choisit au champ suivant) ; **étape finale SCC garantie** pour un acte rédigé par le SCC (agent ou directrice de la DAJCP) ; **stockage GED classé par catégorie** (nom lisible et métadonnées, migration `0073`) avec **reclassement du stockage existant** (simulation, rejouable, sans re-téléversement) — écran Paramétrages › GED, script et endpoint ; qualité : deux erreurs de lint préexistantes corrigées |
 | **1.46** | 2026-09-24 | **Annexes Word/Excel** (converties en PDF à la validation finale, ré-upload d'un même nom = nouvelle version, ANN-01/04) ; **taille des pièces jointes paramétrable** (Paramétrages › Pièces jointes, défaut 30 Mo) ; **suivi des modifications** : diff par rapport à la personne précédente (jamais contre soi-même) et affichage chronologique décroissant ; **étape du circuit** affichée dans « Mes actes » et « Tous les actes » ; fiche : montant facultatif, commission sans perte de saisie, **délégation de l'élu rapporteur** (migration `0072`) ; « Avis des commissions » masqué sans commission ; **Ordre du jour interne** (PDF) trié par commission / rapporteur / délégation ; **pastille « Urgent »** sur les actes urgents |
 | **1.44** | 2026-09-21 | **D113** : **gabarits Word (.docx) à variables** pour tous les documents (exposé, délibération, visas/délibéré, dossier complet) — fusion des zones, tableaux et images, conversion PDF (LibreOffice), dépôt/aperçu du modèle par gabarit ; **variable `{numero}`** (numéro du dossier au conseil, dans l'ordre de passage) ; **éditeur enrichi** (images insérables, redimensionnables, orientables, alignables, déplaçables ; tableaux ; alignement de paragraphes ; copier/coller conservé) ; **bibliothèque multi-documents** et délibérations non archivées régénérées au gabarit ; **« Mes actes »** (rubrique « plus à vous », vue par conseil, DIRECTION / Service, pastille « Inscrit au conseil » et fond vert) ; **séances clôturées / non clôturées** et séances reprises d'AIRS « tenue » non closes ; **champ libre service / chargé de mission** à la création ; **journal des versions (what's new)** au pied de page |
 | **1.43** | 2026-09-21 | **D112** : portefeuille « Mes actes » (action attendue, rédaction/validation de l'équipe, actes validés en circuit, inscrits au conseil) et vue « Tous les actes » (administrateur/SCC) avec rupture par étape du circuit ou par conseil pressenti ; bibliothèque (filtre d'état, origine AIRS en violet, compteur d'annexes dont non publiables, PDF d'import pour exposé/extrait) ; annexes Word + PDF associé ; import AIRS des conseils récents et origine des actes ; mots-clés et reprise d'un modèle ; rappel ciblé et réouverture d'ordre du jour ; numéros de suivi robustes |
@@ -2030,3 +2031,123 @@ Gabarits Word et documents produits, éditeur enrichi, bibliothèque multi-docum
 
 ### Pied de page
 - Le **numéro de version** du pied de page est **cliquable** : il ouvre le **« Nouveautés de VibeDélib »** (what's new), **journal des versions paginé** — une version par page, navigation « Plus récent / Plus ancien ». (`frontend/src/NouveautesModal.tsx`, `nouveautes.ts`.)
+
+## 35. Bureau en ligne — édition Word / Excel dans le navigateur (D39)
+
+Éditer une annexe sans Word sur le poste : l'agent ouvre le document dans le navigateur, il enregistre (Ctrl+S), et
+l'annexe est **remplacée** dans le dossier avec sa version, son PDF, son audit. Aucun plugin, aucune macro, rien à
+installer.
+
+### Principe : le moteur ne connaît que le backend
+
+Le moteur est un service séparé (`onlyoffice/documentserver`) qui **ne voit jamais Alfresco** : il lit et rend des
+fichiers que le backend lui sert, et renvoie ce que l'agent a écrit. Les identifiants Alfresco, les droits et
+l'historique restent chez nous.
+
+```
+navigateur ──▶ moteur  (éditeur, WebSocket ; origine propre : http://<hôte>:9980)
+moteur      ──▶ /api/v1/public/bureau/…   ──▶ backend (téléchargement de la source, sauvegarde)
+backend     ──▶ /converter                ──▶ moteur  (conversion PDF mutualisée)
+```
+
+Trois adresses, trois sens de circulation, **aucune en dur** (`.env`) :
+
+| Variable | Vue par | Rôle | Valeur type en Docker |
+|---|---|---|---|
+| `BUREAU_URL` | le backend | conversion PDF | `http://documentserver:80` (réseau Docker) ou `http://<hôte>:9980` |
+| `BUREAU_URL_NAVIGATEUR` | le navigateur | chargement de l'éditeur | `http://<hôte>:9980` — **absolue, obligatoire** |
+| `BUREAU_URL_RAPPEL` | le moteur | source à ouvrir, sauvegardes | `http://backend:3021` (réseau Docker) |
+
+**Le moteur occupe sa propre origine, jamais un sous-chemin.** C'est une contrainte d'ONLYOFFICE, pas un choix : relayé
+sous `/office/`, il construit certaines URL internes sans le préfixe et l'éditeur finit par ouvrir autre chose que le
+document (« le contenu du fichier ne correspond pas à l'extension du fichier »). Son port est donc publié, et
+`BUREAU_URL_NAVIGATEUR` porte toujours `http://…` (une valeur relative est un défaut de configuration).
+
+`BUREAU_MOTEUR=simulateur` (défaut) = aucun moteur : tout fonctionne, le bouton « Modifier » reste masqué et le dépôt
+manuel prend le relais. `BUREAU_MOTEUR=onlyoffice` sans les trois adresses = **refus de démarrer** (erreur de
+configuration explicite, pas un mode dégradé silencieux).
+
+### Ce que garantit l'ouverture d'une session
+
+- Formats **Word** (`.doc .docx .odt .rtf .txt .html`) et **Excel** (`.xls .xlsx .xlsm .ods .csv`) ; `documentType`
+  OnlyOffice = `word` / `cell` (`type: 'mobile'` sur téléphone).
+- Le bouton n'apparaît que si **le moteur est déployé**, le format est éditable, l'acte est **modifiable par l'agent** et
+  l'annexe est **modifiable à cette étape du circuit** (le gel après transmission reste respecté).
+- **Activation par organisme** : Paramétrages › Pièces jointes › « Édition en ligne des documents » (réglages du moteur).
+- Le dépôt remis au moteur est **à usage unique** et **expire** (`shared/transitoire.js`) ; il ne contient que le
+  document, jamais de jeton de session.
+- **Chaque sauvegarde repasse par le pipeline ordinaire des annexes** : version, PDF, audit, événements, recherche —
+  l'édition en ligne n'est pas un chemin parallèle qui contournerait l'historique.
+
+### Sécurité
+
+- Tous les échanges sont signés **HS256** avec `BUREAU_JWT_SECRET` (≥ 32 caractères, `openssl rand -hex 32`) : le
+  rappel est **anonyme du point de vue applicatif**, c'est sa signature qui l'authentifie ; un jeton absent, expiré ou
+  mal signé = `{"error": 1}`.
+- Le jeton voyage en en-tête `Authorization` **et** dans le corps (`JWT_IN_BODY=true`) ; la relecture du document et le
+  téléchargement du PDF converti renvoient le jeton correspondant, faute de quoi le moteur répond 401.
+- Le moteur est **publié sur son propre port** (jamais relayé sous un sous-chemin, cf. plus haut). Il reste protégé par
+  le jeton partagé : sans signature valide, ni configuration d'éditeur, ni conversion, ni rappel ne sont acceptés.
+- `ALLOW_PRIVATE_IP_ADDRESS=true` est nécessaire (le moteur rappelle le backend en 10.x / 172.x) et constitue une
+  relaxation assumée : le moteur peut télécharger une URL privée, mais il ne connaît que les adresses qu'on lui donne.
+  `ALLOW_META_IP_ADDRESS=false` reste en place (pas d'accès aux métadonnées d'instance).
+- Toute URL renvoyée par le moteur est **filtrée sur son hôte** avant téléchargement (anti-SSRF), et la taille est
+  bornée à 64 Mio.
+- La clé de session applicative de l'auteur est **rechargée à chaque sauvegarde** : un agent révoqué entre-temps voit
+  son écriture refusée au rappel suivant.
+
+### Mise en production (Docker)
+
+1. **Ressources** : prévoir **~2 Go de RAM** supplémentaires et un CPU de plus que l'application seule.
+2. **Secret partagé** dans le `.env` racine (jamais versionné) :
+   ```bash
+   openssl rand -hex 32     # → BUREAU_JWT_SECRET
+   ```
+3. **Variables** (`.env` racine, lu par le backend *et* par le compose) :
+   ```ini
+   BUREAU_MOTEUR=onlyoffice
+   BUREAU_URL=http://documentserver:80
+   BUREAU_URL_NAVIGATEUR=http://<hôte ou IP du serveur>:9980   # ABSOLUE : voir l'avertissement plus haut
+   BUREAU_URL_RAPPEL=http://backend:3021
+   BUREAU_JWT_SECRET=<le secret ci-dessus>
+   ```
+4. **Démarrage** :
+   ```bash
+   docker compose --profile bureau up -d --build
+   docker compose logs -f documentserver      # premier démarrage : migration interne, comptez quelques minutes
+   ```
+5. **Vérification** : `GET /api/v1/organismes/:id/bureau` doit répondre `enabled: true` (le bouton « Modifier »
+   apparaît alors dans le dossier) ; ouvrir une annexe `.docx`, enregistrer, vérifier la nouvelle version et le PDF
+   régénéré. Le conteneur doit répondre `true` sur `http://<hôte>:9980/healthcheck`.
+6. **Activation** : Paramétrages › Pièces jointes › activer l'édition en ligne pour l'organisme.
+
+Le profil `bureau` est **facultatif** : sans lui, l'application démarre normalement et le bouton « Modifier » reste
+masqué (aucun moteur configuré). L'image est épinglée sur `9.4` (branche de versions maintenue, correctifs de sécurité
+inclus) plutôt que `latest`, qui ferait monter une version majeure sans contrôle.
+
+### Plusieurs postes, un moteur partagé (développement)
+
+Un même moteur peut servir plusieurs postes : **c'est le backend qui décide de l'adresse du rappel**, à chaque ouverture
+de document, et le moteur appelle simplement celle qu'on lui donne. Rien n'est donc figé dans le dépôt :
+
+- `BUREAU_URL_RAPPEL` désigne le **backend**, pas le moteur : en production c'est le nom du service (`http://backend:3021`),
+  **identique pour tout le monde** ; quand l'application tourne sur un poste et le moteur sur un serveur, c'est l'adresse
+  de **ce poste-là** sur le réseau que le serveur sait joindre (variable selon le poste : la garder dans le `.env` local,
+  jamais versionné).
+- Chaque poste doit donc : (1) joindre le moteur (`BUREAU_URL`, `BUREAU_URL_NAVIGATEUR`), (2) être **joignable par le
+  moteur** sur ce port (routage + pare-feu entrant depuis l'hôte du moteur).
+- `BUREAU_JWT_SECRET` doit être **le même** dans tous les `.env` qui partagent un moteur : c'est le secret qui
+  authentifie les deux sens.
+- Un poste mal configuré ne casse rien pour les autres : le moteur refuse simplement ses rappels (aucune sauvegarde
+  n'aboutit pour lui), les autres continuent de fonctionner.
+
+### Licence et limites connues
+
+- **OnlyOffice Community est sous AGPL-3.0 et limité en connexions simultanées** : au-delà, il faut une licence
+  OnlyOffice Server (commerciale). Le choix du moteur reste ouvert par le port `BureauPort` (Collabora, etc.).
+- Un **seul auteur à la fois** par annexe (session d'édition verrouillée par annexe) : le second agent obtient « déjà
+  en cours d'édition ». À l'intérieur d'une session, le moteur reste collaboratif (curseurs, présence).
+- La relecture est faite **par le backend** : au-delà d'un fichier de plusieurs dizaines de Mo, la sauvegarde peut
+  dépasser le délai du rappel. Le PDF reste produit par la même voie (moteur), avec repli LibreOffice/Office.
+- Le PDF des annexes éditées est donc **rendu par le même moteur** que l'écran de l'agent : pas d'écart de rendu
+  Word/LibreOffice.

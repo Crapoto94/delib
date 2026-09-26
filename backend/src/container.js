@@ -2,7 +2,7 @@
  * Composition de l'application : assemble adaptateurs (ports), services et routes.
  * Les adaptateurs sont injectés : production = APM + Hub DSI ; tests = faux adaptateurs (aucun réseau).
  */
-const { assertAuthPort, assertDirectoryPort, assertMailPort, assertAiPort, assertMeetingPort } = require('./ports');
+const { assertAuthPort, assertDirectoryPort, assertMailPort, assertAiPort, assertMeetingPort, assertBureauPort } = require('./ports');
 const { createAudit } = require('./modules/audit/audit.service');
 const { createAccess } = require('./modules/auth/access');
 const { createSessions } = require('./modules/auth/sessions.repository');
@@ -76,8 +76,12 @@ const { createPrompts } = require('./modules/ai/prompts');
 const { createAiQueue } = require('./modules/ai/queue');
 const { createVisas } = require('./modules/ai/visas.service');
 const { createAirs } = require('./modules/import-airs/airs.service');
+const { createBureau } = require('./modules/bureau/bureau.service');
+const { createTransitoire } = require('./shared/transitoire');
+const { createBureauOnlyOffice } = require('./adapters/bureau-onlyoffice');
+const { createBureauSimulateur } = require('./adapters/bureau-simulateur');
 
-function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard, airsSource, parapheurAdapters }) {
+function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard, airsSource, parapheurAdapters, bureauAdapters }) {
   assertAuthPort(ad);
   assertMailPort(mail);
   assertAiPort(aiAdapter);
@@ -94,6 +98,13 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const onboarding = createOnboarding(db);
   const auth = createAuthService({ db, config, log, ad, dir, sessions, audit, guard: guard || createLoginGuard() });
   const bus = createBus(log);
+  const transitoire = createTransitoire();
+  // Bureau en ligne : serveur de documents en conteneur séparé. Moteur = choix de plateforme (`.env`) ; l'activation
+  // par organisme est un réglage (`bureau.edition_documents`). Sans moteur, l'adaptateur simulateur garde le comportement
+  // d'aujourd'hui : dépôt manuel et conversion locale.
+  const bureauPort = assertBureauPort(bureauAdapters || (config.bureau.moteur === 'onlyoffice'
+    ? createBureauOnlyOffice({ ...config.bureau, log, sources: (buffer, meta) => transitoire.mettre(buffer, meta) })
+    : createBureauSimulateur()));
   const late = {}; // services liés après coup pour éviter les dépendances circulaires (textes suivis, circuit…)
   const elus = createElus({ db, audit, directoryAdapter, log });
   late.elus = elus;
@@ -106,8 +117,9 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const redaction = createRedaction({ db, audit, access, titulaires, settings, bus });
   const acl = createActeAcl({ db, access, titulaires, settings });
   const actes = createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings });
-  const annexes = createAnnexes({ db, audit, storage, refs, actes, config, bus, uploadLimit });
+  const annexes = createAnnexes({ db, audit, storage, refs, actes, config, bus, uploadLimit, bureau: bureauPort });
   bus.on('circuit.completed', (p) => annexes.finaliser(p.organismeId, p.acteId)); // validation finale : PDF des annexes Word/Excel
+  const bureau = createBureau({ db, audit, actes, annexes, access, settings, port: bureauPort, config, transitoire, log });
   const comments = createComments({ db, audit, actes, acl, bus });
   const textes = createTextes({ db, audit, actes, acl, bus });
   late.texts = textes;
@@ -189,7 +201,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('collecteurs', (orgId) => collecteurs.runDt(orgId)); // collecteurs d'arrêtés : passages selon leur intervalle (1h/4h/24h)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, uploadLimit, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs };
+  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, uploadLimit, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, bureau, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs };
 }
 
 module.exports = { buildContainer };

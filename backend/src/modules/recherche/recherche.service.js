@@ -103,12 +103,14 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
     } finally { await doc.destroy(); }
   }
 
-  /** Texte d'un fichier PDF, lu une seule fois (cache par fichier). */
+  /** Texte d'un fichier PDF, lu une seule fois (cache par fichier). Un fichier qui n'est pas un PDF n'est pas
+   *  enregistré : un .docx n'a pas de couche texte, et son PDF converti sera indexé à sa place (dès qu'il existe). */
   async function texteDuFichier(fileId) {
     const dejaLu = await db.get('SELECT 1 AS x FROM search_annexes WHERE file_id = $1', [fileId]);
     if (dejaLu) return false;
-    const f = await db.get('SELECT storage_key FROM files WHERE id = $1', [fileId]);
+    const f = await db.get('SELECT storage_key, mime FROM files WHERE id = $1', [fileId]);
     if (!f) return false;
+    if (f.mime !== 'application/pdf') return false;
     let texte = ''; let erreur = null;
     try { texte = coupe(await lirePdf(await storage.get(f.storage_key)), MAX_ANNEXE); } catch (e) { erreur = String(e.message || e).slice(0, 300); log?.warn?.({ fileId, err: erreur }, 'extraction du texte du PDF impossible'); }
     await db.run('INSERT INTO search_annexes (file_id, texte, sans_texte, erreur) VALUES ($1,$2,$3,$4) ON CONFLICT (file_id) DO NOTHING', [fileId, texte, texte.length < 20, erreur]);
@@ -128,8 +130,10 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
     const avis = await db.all("SELECT avis, avis_commentaire FROM acte_commissions WHERE acte_id = $1 AND retiree_at IS NULL AND avis IS NOT NULL", [acteId]);
     const points = await db.all(
       `SELECT it.numero, sp.resultat FROM seance_items it LEFT JOIN seance_points sp ON sp.item_id = it.id WHERE it.acte_id = $1 AND it.statut = 'a_traiter'`, [acteId]);
+    // Le texte d'une annexe est pris sur son PDF converti quand il existe : un .docx n'a pas de couche texte,
+    // l'annexe serait indexée « sans texte » alors que le dossier consulté, lui, est bien lisible.
     const annexes = await db.all(
-      `SELECT an.titre, sa.texte FROM annexes an LEFT JOIN search_annexes sa ON sa.file_id = an.file_id WHERE an.acte_id = $1 ORDER BY an.ordre, an.id`, [acteId]);
+      `SELECT an.titre, sa.texte FROM annexes an LEFT JOIN search_annexes sa ON sa.file_id = COALESCE(an.pdf_file_id, an.file_id) WHERE an.acte_id = $1 ORDER BY an.ordre, an.id`, [acteId]);
 
     const txt = (k) => textes.filter((t) => t.kind === k).map((t) => brut(t.markdown)).join(' ');
     const objet = brut(a.commentaire_initial);
@@ -154,7 +158,7 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
 
   /** Lit le texte des annexes d'un acte qui n'ont pas encore été lues, puis reconstruit l'entrée. */
   async function traiterActe(acteId) {
-    for (const f of await db.all('SELECT DISTINCT file_id FROM annexes WHERE acte_id = $1', [acteId])) await texteDuFichier(f.file_id);
+    for (const f of await db.all('SELECT DISTINCT COALESCE(pdf_file_id, file_id) AS file_id FROM annexes WHERE acte_id = $1', [acteId])) await texteDuFichier(f.file_id);
     return reindexerActe(acteId);
   }
 

@@ -51,4 +51,19 @@ describe('configuration', () => {
     expect(parseDuration('90')).toBe(90);
     expect(() => parseDuration('bientôt')).toThrow();
   });
+
+  it('bureau en ligne : aucun moteur par défaut, le dépôt manuel reste le seul chemin', () => {
+    expect(buildConfig(OK).bureau).toMatchObject({ moteur: 'simulateur', url: null, urlNavigateur: null, urlRappel: null });
+  });
+
+  it('bureau en ligne : un moteur à moitié configuré fait échouer le démarrage, pas le premier enregistrement', () => {
+    expect(() => buildConfig({ ...OK, BUREAU_MOTEUR: 'onlyoffice' })).toThrow(/BUREAU_URL/);
+    expect(() => buildConfig({ ...OK, BUREAU_MOTEUR: 'onlyoffice', BUREAU_URL: 'http://m:8080' })).toThrow(/BUREAU_JWT_SECRET/);
+    expect(() => buildConfig({ ...OK, BUREAU_MOTEUR: 'seulementoffice' })).toThrow(/BUREAU_MOTEUR/);
+  });
+
+  it('bureau en ligne : configuration complète, les trois sens de circulation sont conservés', () => {
+    const c = buildConfig({ ...OK, BUREAU_MOTEUR: 'onlyoffice', BUREAU_URL: 'http://moteur:8080', BUREAU_URL_NAVIGATEUR: '/office', BUREAU_URL_RAPPEL: 'https://delib.ville.fr', BUREAU_JWT_SECRET: 'b'.repeat(32) });
+    expect(c.bureau).toMatchObject({ moteur: 'onlyoffice', url: 'http://moteur:8080', urlNavigateur: '/office', urlRappel: 'https://delib.ville.fr', langue: 'fr-FR' });
+  });
 });

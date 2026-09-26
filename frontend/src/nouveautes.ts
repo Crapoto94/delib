@@ -11,9 +11,21 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.47.0';
+export const VERSION = '0.48.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.48.0', type: 'minor', titre: 'Bureau en ligne : éditer une annexe Word ou Excel dans le navigateur',
+    items: [
+      "Bouton Modifier sur une annexe Word ou Excel : le document s'ouvre dans le navigateur, sans Word sur le poste, sans plugin ni macro.",
+      "Chaque enregistrement remplace l'annexe en passant par le circuit habituel : nouvelle version, PDF régénéré, audit et historique. Le gel après transmission reste respecté.",
+      "Un serveur de documents unique, déployé côté serveur, assure le rendu et la conversion en PDF : ce qu'on lit à l'écran et ce qu'on imprime ne peuvent plus diverger.",
+      "Sans moteur déployé, le bouton n'apparaît pas et l'application fonctionne exactement comme avant (dépôt manuel des annexes).",
+      "Activation par organisme : Paramétrages > Pièces jointes > Édition en ligne des documents.",
+      "Sécurité : échanges signés avec le moteur, moteur non exposé sur un port, fichier servi au moteur à usage unique et expirant, URL renvoyées par le moteur filtrées.",
+      "Mise en production : docker compose --profile bureau up -d --build (prévoir environ 2 Go de RAM en plus). L'édition communautaire d'OnlyOffice est AGPL-3.0 et limitée en connexions simultanées.",
+    ],
+  },
   {
     version: '0.47.0', type: 'minor', titre: 'Pièces jointes à chaque étape, rapporteur sans délégation, étape SCC garantie et stockage GED classé',
     items: [

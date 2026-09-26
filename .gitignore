@@ -21,3 +21,4 @@ dist-elus/
 # accès serveur : jamais versionnés
 SSH.txt
 pulldocker.ini
+pulldocker-*.ini

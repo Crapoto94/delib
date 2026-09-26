@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Check, CheckCircle2, Download, Eye, FileText, Copy, Paperclip, Pencil, RotateCcw, Send, Sparkles, Trash2, Undo2, Upload } from 'lucide-react';
+import { Check, CheckCircle2, Download, Eye, FileText, Copy, History, Paperclip, Pencil, RotateCcw, Send, Sparkles, Trash2, Undo2, Upload } from 'lucide-react';
 import TexteModal, { KIND_LABEL } from '../TexteModal';
 import { MentionTextarea } from '../AgentPicker';
 import { Progress, useAiJobs } from '../AiStatus';
@@ -18,6 +18,7 @@ import { MatiereTree } from '../MatiereTree';
 import DossierAssiste, { ActiverAssiste } from '../DossierAssiste';
 import EnvoiBravo from '../EnvoiBravo';
 import SignaturePlacement from '../SignaturePlacement';
+import Bureau, { useBureau, peutEditer } from '../Bureau';
 
 /* ------------------------------------------------------------------------------------------------ frise du circuit */
 const IGNOREE: Record<string, string> = {
@@ -344,6 +345,9 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
 function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth(); const o = org!.id;
   const { tailleMaxMo } = useLimitePJ();
+  const capa = useBureau(o);
+  const [bureau, setBureau] = useState<any>(null);
+  const [historique, setHistorique] = useState<any>(null);   // annexe dont on regarde les versions
   const list = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/annexes`))).data.items as any[], [acte.id]);
   const [busy, setBusy] = useState(false); const input = useRef<HTMLInputElement>(null);
   const [comm, setComm] = useState(true);
@@ -388,10 +392,55 @@ function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toas
             ) : (
               <button className="text-slate-600 hover:text-head" aria-label="Télécharger" onClick={() => telecharger(a)}><Download className="h-5 w-5" /></button>
             )}
+            {editable && peutEditer(capa, a) && (
+              <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => setBureau(a)} title={`Ouvrir « ${a.titre} » dans le navigateur (version ${a.version})`}>
+                <Pencil className="h-4 w-4" /> Modifier
+              </button>
+            )}
+            {a.version > 1 && (
+              <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => setHistorique(a)} title={`Voir les ${a.version} versions de « ${a.titre} »`}>
+                <History className="h-4 w-4" /> Versions ({a.version})
+              </button>
+            )}
             {editable && <button className="text-slate-600 hover:text-ko" aria-label="Supprimer" onClick={async () => { if (confirm(`Supprimer « ${a.titre} » ?`)) { await api.delete(orgPath(o, `/actes/${acte.id}/annexes/${a.id}`)); list.reload(); } }}><Trash2 className="h-5 w-5" /></button>}
           </li>))}</ul>
       )}
+      {bureau && <Bureau acteId={acte.id} annexe={bureau} onClose={() => setBureau(null)} onEnregistre={() => list.reload()} avertir={(m) => toast(m, 'ko')} />}
+      {historique && <VersionsAnnexe acte={acte} annexe={historique} onClose={() => setHistorique(null)} toast={toast} />}
     </section>
+  );
+}
+
+/**
+ * Historique d'une annexe : chaque dépôt, remplacement ou enregistrement depuis le bureau en ligne a laissé une
+ * version, dont l'original reste téléchargeable. Seule la version courante a un PDF associé (le rendu suit le fichier).
+ */
+function VersionsAnnexe({ acte, annexe, onClose, toast }: { acte: any; annexe: any; onClose: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
+  const { org } = useAuth(); const o = org!.id;
+  const list = useLoad(async () => (await api.get(orgPath(o, `/actes/${acte.id}/annexes/${annexe.id}/versions`))).data.items as any[], [annexe.id]);
+  const telecharger = async (v: any) => {
+    try {
+      const r = await api.get(orgPath(o, `/actes/${acte.id}/annexes/${annexe.id}/file`), { params: { version: v.version }, responseType: 'blob' });
+      const url = URL.createObjectURL(r.data); const link = document.createElement('a'); link.href = url; link.download = v.fichier.nom; link.click(); URL.revokeObjectURL(url);
+    } catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  return (
+    <Modal title={`Versions de « ${annexe.titre} »`} onClose={onClose} wide>
+      {list.loading ? <Loading /> : !list.data?.length ? <p className="text-mute">Aucune version.</p> : (
+        <ul className="divide-y divide-line">
+          {list.data.map((v) => (
+            <li key={v.version} className="flex items-center gap-3 py-2">
+              <Badge tone={v.version === annexe.version ? 'ok' : 'gray'}>v{v.version}</Badge>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold">{v.fichier.nom}{v.version === annexe.version && <span className="ml-2 text-[12px] font-normal text-mute">version actuelle</span>}</div>
+                <div className="text-[12px] text-mute">{dt(v.at)} · {v.by || '—'} · {(v.fichier.taille / 1048576).toFixed(1)} Mo</div>
+              </div>
+              <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => telecharger(v)} title={`Télécharger la version ${v.version}`}><Download className="h-4 w-4" /> Télécharger</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
   );
 }
 

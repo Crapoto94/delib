@@ -5,7 +5,7 @@
  */
 const { E } = require('../../shared/errors');
 const { inspectPdf } = require('../../shared/infra');
-const { convertirEnPdf } = require('../../shared/convert');
+const { convertirEnPdfTrace } = require('../../shared/convert');
 
 const ZIP = [0x50, 0x4b]; const OLE = [0xd0, 0xcf, 0x11, 0xe0];
 const MIMES = {
@@ -30,9 +30,12 @@ const SELECT = `SELECT a.*, f.original_name, f.mime, f.size, f.pages, f.sha256,
     pf.original_name AS pdf_name, pf.mime AS pdf_mime, pf.size AS pdf_size, pf.pages AS pdf_pages, pf.sha256 AS pdf_sha
   FROM annexes a JOIN files f ON f.id = a.file_id LEFT JOIN files pf ON pf.id = a.pdf_file_id`;
 
-function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
+function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bureau }) {
   const svc = {
-    async store(ctx, organismeId, file) {
+    /** Enregistre un fichier : il part dans le stockage configuré pour l'organisme (disque local OU ALFRESCO — c'est
+     *  `storage` qui décide, GED-09). `description` n'est utile que pour Alfresco (cm:description) : elle dit d'où vient
+     *  le fichier, ce qui reste lisible par quiconque ouvre le dépôt hors de l'application. */
+    async store(ctx, organismeId, file, { description } = {}) {
       if (!file?.buffer) throw E.badRequest('Fichier manquant (champ « file »)');
       const maxMo = await uploadLimit.mb(organismeId);
       if (file.size > maxMo * 1048576) throw E.badRequest(`Fichier trop volumineux (maximum ${maxMo} Mo)`);
@@ -43,26 +46,29 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
       let pages = null;
       if (ext === 'pdf') pages = (await inspectPdf(file.buffer)).pages;
       else if (!(startsWith(file.buffer, ZIP) || startsWith(file.buffer, OLE))) throw E.badRequest('Le contenu du fichier ne correspond pas à son extension');
-      const put = await storage.put(file.buffer, { organismeId, ext, categorie: 'annexes', nom: name, auteur: ctx.username });
+      const put = await storage.put(file.buffer, { organismeId, ext, categorie: 'annexes', nom: name, description, auteur: ctx.username });
       return db.get(
         `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by, categorie) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
         [organismeId, put.key, name, mime, put.size, pages, put.sha256, ctx.username, 'annexes']);
     },
 
-    /** PDF associé d'une annexe : le fichier lui-même s'il est déjà PDF, sinon conversion Word/Excel (mise en cache). */
-    async ensurePdf(organismeId, annexeId) {
+    /** PDF associé d'une annexe : le fichier lui-même s'il est déjà PDF, sinon conversion Word/Excel (mise en cache).
+     *  `force` régénère un PDF déjà présent — indispensable après une modification du fichier d'origine, sans quoi le
+     *  dossier continuerait de contenir l'ancien rendu. */
+    async ensurePdf(organismeId, annexeId, { force = false } = {}) {
       const row = await db.get(`SELECT x.id, x.file_id, x.pdf_file_id, f.storage_key, f.mime, f.original_name FROM annexes x JOIN files f ON f.id = x.file_id WHERE x.id = $1`, [annexeId]);
       if (!row) throw E.notFound('Annexe introuvable');
-      if (row.pdf_file_id) return row.pdf_file_id;
-      if (row.mime === 'application/pdf') { await db.run('UPDATE annexes SET pdf_file_id = file_id WHERE id = $1', [annexeId]); return row.file_id; }
-      const pdf = await convertirEnPdf(await storage.get(row.storage_key), extOf(row.original_name));
-      if (!pdf) throw E.incomplete('Conversion en PDF indisponible sur le serveur (Word/Excel/LibreOffice requis)');
+      if (row.pdf_file_id && !force) return row.pdf_file_id;
+      if (row.mime === 'application/pdf' && !force) { await db.run('UPDATE annexes SET pdf_file_id = file_id WHERE id = $1', [annexeId]); return row.file_id; }
+      const r = await convertirEnPdfTrace(await storage.get(row.storage_key), extOf(row.original_name), { moteur: bureau });
+      if (!r) throw E.incomplete('Conversion en PDF indisponible sur le serveur (moteur de document ou LibreOffice requis)');
+      const pdf = r.buffer;
       const info = await inspectPdf(pdf);
       const nomPdf = String(row.original_name).replace(/\.[^.]+$/, '') + '.pdf';
       const put = await storage.put(pdf, { organismeId, ext: 'pdf', categorie: 'annexes-pdf', nom: nomPdf });
       const pf = await db.get(
-        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by, categorie) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,'system',$7) RETURNING *`,
-        [organismeId, put.key, nomPdf, put.size, info.pages, put.sha256, 'annexes-pdf']);
+        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by, categorie, moteur) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6,'system',$7,$8) RETURNING *`,
+        [organismeId, put.key, nomPdf, put.size, info.pages, put.sha256, 'annexes-pdf', r.moteur]);
       await db.run('UPDATE annexes SET pdf_file_id = $2 WHERE id = $1', [annexeId, pf.id]);
       return pf.id;
     },
@@ -86,15 +92,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
       const same = await db.get(
         `SELECT x.id, x.version FROM annexes x JOIN files fx ON fx.id = x.file_id WHERE x.acte_id = $1 AND lower(fx.original_name) = lower($2) ORDER BY x.id DESC LIMIT 1`,
         [a.id, f.original_name]);
-      if (same) {
-        const version = same.version + 1;
-        await db.run('UPDATE annexes SET file_id = $2, version = $3 WHERE id = $1', [same.id, f.id, version]);
-        await db.run('INSERT INTO annexe_versions (annexe_id, version, file_id, replaced_by) VALUES ($1,$2,$3,$4)', [same.id, version, f.id, ctx.username]);
-        const maj = toAnnexe(await db.get(`${SELECT} WHERE a.id = $1`, [same.id]));
-        await audit.log(ctx, { organismeId: a.organisme_id, action: 'annexe.replace', entity: 'annexes', entityId: same.id, after: { titre: maj.titre, version, sha256: f.sha256 } });
-        await bus.emit('annexe.replaced', { organismeId: a.organisme_id, acteId: a.id, annexeId: same.id, version, ctx });
-        return maj;
-      }
+      if (same) return svc.poserVersion({ a, id: same.id, versionAvant: same.version, f, username: ctx.username, ctx, force: false });
       const ordre = meta.ordre ?? (await db.get('SELECT COALESCE(MAX(ordre), 0) + 1 AS n FROM annexes WHERE acte_id = $1', [a.id])).n;
       const r = await db.get(
         `INSERT INTO annexes (acte_id, titre, type_id, ordre, file_id, communicable, publiable, transmissible, created_by)
@@ -119,18 +117,54 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
       return toAnnexe(await db.get(`${SELECT} WHERE a.id = $1`, [id]));
     },
 
-    /** Remplace le fichier : nouvelle version, l'ancienne reste consultable (ANN-04). */
-    async replaceFile(ctx, organismeId, acteId, id, file) {
+    /** Remplace le fichier : nouvelle version, l'ancienne reste consultable (ANN-04).
+     *  Le PDF converti est remis à zéro : sans cela, le nouveau Word hériterait de l'ancien rendu et le dossier
+     *  continuerait de montrer la version précédente. `force` régénère immédiatement le PDF au lieu d'attendre la
+     *  validation finale (cas du bureau en ligne, où l'agent veut voir son texte dans l'aperçu tout de suite). */
+    async replaceFile(ctx, organismeId, acteId, id, file, { force = false } = {}) {
       const a = await actes.load(ctx, organismeId, acteId, { attach: true });
       const cur = await db.get('SELECT * FROM annexes WHERE id = $1 AND acte_id = $2', [id, a.id]);
       if (!cur) throw E.notFound('Annexe introuvable');
       const f = await svc.store(ctx, a.organisme_id, file);
-      const version = cur.version + 1;
-      await db.run('UPDATE annexes SET file_id = $2, version = $3 WHERE id = $1', [id, f.id, version]);
-      await db.run('INSERT INTO annexe_versions (annexe_id, version, file_id, replaced_by) VALUES ($1,$2,$3,$4)', [id, version, f.id, ctx.username]);
-      await audit.log(ctx, { organismeId: a.organisme_id, action: 'annexe.replace', entity: 'annexes', entityId: id, before: { version: cur.version }, after: { version, sha256: f.sha256 } });
-      await bus.emit('annexe.replaced', { organismeId: a.organisme_id, acteId: a.id, annexeId: id, version, ctx });
+      return svc.poserVersion({ a, id, versionAvant: cur.version, f, username: ctx.username, ctx, force });
+    },
+
+    /** Écrit la nouvelle version : l'annexe pointe sur le nouveau fichier, l'ancien reste dans l'historique (ANN-04). */
+    async poserVersion({ a, id, versionAvant, f, username, ctx, force = false }) {
+      const version = versionAvant + 1;
+      // `pdf_file_id = NULL` : le rendu précédent ne vaut plus rien pour ce fichier. Le PDF est régénéré (`force`)
+      // ou lors de la validation finale ; l'ancien PDF reste consultable dans l'historique.
+      await db.run('UPDATE annexes SET file_id = $2, version = $3, pdf_file_id = NULL WHERE id = $1', [id, f.id, version]);
+      await db.run('INSERT INTO annexe_versions (annexe_id, version, file_id, replaced_by) VALUES ($1,$2,$3,$4)', [id, version, f.id, username]);
+      await audit.log(ctx || { username }, { organismeId: a.organisme_id, action: 'annexe.replace', entity: 'annexes', entityId: id, before: { version: versionAvant }, after: { version, sha256: f.sha256 } });
+      await bus.emit('annexe.replaced', { organismeId: a.organisme_id, acteId: a.id, annexeId: id, version, ctx: ctx || { username } });
+      if (force) { try { await svc.ensurePdf(a.organisme_id, id); } catch { /* le PDF sera produit plus tard : l'original reste consultable */ } }
       return toAnnexe(await db.get(`${SELECT} WHERE a.id = $1`, [id]));
+    },
+
+    /**
+     * Remplacement déclenché par le rappel du serveur de documents. Le rappel est anonyme : le contrôle d'accès n'est
+     * pas refait « à la main », on recharge le contexte de l'auteur (rôles, agent, sa session) et on repasse par le
+     * même chemin qu'un dépôt manuel — droit `canAttach` compris, donc le gel après transmission reste respecté.
+     * On ajoute un contrôle de concurrence optimiste : un re-dépôt pendant l'édition n'est pas écrasé.
+     * Renvoie `{ version }` ou `{ refuse: … }`.
+     */
+    async remplacerDepuisBureau({ organismeId, acteId, annexeId, ctx, username, versionAttendue, buffer, nom, sha256 }) {
+      const auteur = ctx || { username };   // sans contexte (tests), on retombe sur le seul contrôle d'état
+      const a = await actes.load(auteur, organismeId, acteId, { attach: true });
+      const cur = await db.get('SELECT x.*, f.sha256 AS sha256_courant FROM annexes x JOIN files f ON f.id = x.file_id WHERE x.id = $1 AND x.acte_id = $2', [annexeId, a.id]);
+      if (!cur) throw E.notFound('Annexe introuvable');
+      // Le CONTENU d'abord : le moteur émet parfois deux rappels pour un même enregistrement (sauvegarde puis
+      // opération forcée). Le second porte exactement le fichier déjà enregistré : ce n'est pas un conflit, c'est la
+      // même version. Le refuser ferait afficher à l'agent « une erreur est survenue lors de l'enregistrement » alors
+      // que tout a été conservé.
+      if (sha256 && sha256 === cur.sha256_courant) return { version: cur.version, inchange: true };
+      if (cur.version !== versionAttendue) return { refuse: 'version' };
+      const f = await svc.store({ username }, a.organisme_id, { buffer, originalname: nom, size: buffer.length },
+        { description: `Version ${cur.version + 1} modifiée depuis le bureau en ligne (${username})` });
+      if (sha256 && f.sha256 !== sha256) return { refuse: 'empreinte' };   // le moteur a renvoyé autre chose que ce qu'il a annoncé
+      const sortie = await svc.poserVersion({ a, id: annexeId, versionAvant: cur.version, f, username, ctx: null, force: true });
+      return { version: sortie.version };
     },
 
     async versions(ctx, organismeId, acteId, id) {
@@ -155,6 +189,16 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit }) {
       if (ids.length !== cur.length || !ids.every((i) => cur.includes(i))) throw E.badRequest("La liste doit contenir exactement les annexes de l'acte");
       await db.tx(async (q) => { for (const [i, id] of ids.entries()) await q.run('UPDATE annexes SET ordre = $2 WHERE id = $1', [id, i + 1]); });
       return svc.list(ctx, organismeId, acteId);
+    },
+
+    /**
+     * Fichier d'origine d'une annexe, par identifiant, sans passer par le contrôle de visibilité de l'acte : réservé au
+     * rappel du serveur de documents, dont l'adresse est une clé de session déjà autorisée (droit vérifié à l'ouverture).
+     */
+    async contenuParId(annexeId) {
+      const row = await db.get(`SELECT f.storage_key, f.original_name, f.mime, f.sha256 FROM annexes x JOIN files f ON f.id = x.file_id WHERE x.id = $1`, [annexeId]);
+      if (!row) throw E.notFound('Annexe introuvable');
+      return { buffer: await storage.get(row.storage_key), name: row.original_name, mime: row.mime || 'application/octet-stream', sha256: row.sha256 };
     },
 
     /** Contenu d'un fichier d'annexe : original (défaut), sa version, ou le PDF associé (`format = 'pdf'`) ; contrôle de visibilité de l'acte. */

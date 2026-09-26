@@ -67,6 +67,15 @@ const EnvSchema = z.object({
   AIRS_ORACLE_SERVICE: z.string().optional(),
   AIRS_ORACLE_USER: z.string().optional(),
   AIRS_ORACLE_PASSWORD: z.string().optional(),
+  // Bureau en ligne (D39) : serveur de documents, en conteneur séparé. `simulateur` = aucun moteur déployé,
+  // tout se passe comme avant (dépôt manuel, conversion LibreOffice / Office).
+  BUREAU_MOTEUR: z.enum(['simulateur', 'onlyoffice']).default('simulateur'),
+  BUREAU_URL: z.string().optional(),                 // backend          -> moteur (conversion)
+  BUREAU_URL_NAVIGATEUR: z.string().optional(),     // navigateur       -> moteur (sdk de l'éditeur)
+  BUREAU_URL_RAPPEL: z.string().optional(),          // moteur           -> backend (source + rappel)
+  BUREAU_JWT_SECRET: z.string().min(24, 'BUREAU_JWT_SECRET doit faire au moins 24 caractères').optional(),
+  BUREAU_LANGUE: z.string().default('fr-FR'),
+  BUREAU_DELAI_MS: z.coerce.number().int().min(1000).default(60000),
 });
 
 function loadEnvFile() {
@@ -90,6 +99,12 @@ function buildConfig(env = process.env) {
   const prod = e.NODE_ENV === 'production';
   if (prod && e.DEV_LOGIN_PASSWORD) throw new Error('DEV_LOGIN_PASSWORD (connexion de développement sans AD) est interdit en production.');
   if (prod && !e.CORS_ORIGINS) throw new Error('CORS_ORIGINS est obligatoire en production (jamais « * »).');
+  // Un moteur de documents n'est utile que si les trois adresses et le secret partagé sont là : on le dit au démarrage
+  // plutôt que de laisser une configuration à moitié faite échouer au premier enregistrement.
+  if (e.BUREAU_MOTEUR === 'onlyoffice') {
+    const manquants = ['BUREAU_URL', 'BUREAU_URL_NAVIGATEUR', 'BUREAU_URL_RAPPEL', 'BUREAU_JWT_SECRET'].filter((k) => !e[k]);
+    if (manquants.length) throw new Error(`BUREAU_MOTEUR=onlyoffice exige : ${manquants.join(', ')}`);
+  }
   return Object.freeze({
     env: e.NODE_ENV,
     isProd: prod,
@@ -133,6 +148,16 @@ function buildConfig(env = process.env) {
       user: e.AIRS_ORACLE_USER || null,
       password: e.AIRS_ORACLE_PASSWORD || null,
       connectString: e.AIRS_ORACLE_HOST ? `${e.AIRS_ORACLE_HOST}:${e.AIRS_ORACLE_PORT}/${e.AIRS_ORACLE_SERVICE}` : null,
+    }),
+    // `moteur: 'simulateur'` : aucun serveur de documents, le dépôt manuel et la conversion locale restent le seul chemin.
+    bureau: Object.freeze({
+      moteur: e.BUREAU_MOTEUR,
+      url: e.BUREAU_URL || null,
+      urlNavigateur: e.BUREAU_URL_NAVIGATEUR || null,
+      urlRappel: e.BUREAU_URL_RAPPEL || null,
+      jwtSecret: e.BUREAU_JWT_SECRET || null,
+      langue: e.BUREAU_LANGUE,
+      delaiMs: e.BUREAU_DELAI_MS,
     }),
   });
 }

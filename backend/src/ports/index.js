@@ -14,6 +14,17 @@
  *   searchAgents(q)         -> [{ username, displayName, email, service, direction, poste, matricule, hasAd }]
  *   getAgentByEmail(email)  -> { nom, prenom, email, matricule, service, direction, fonction, present } | null
  *   ping()                  -> millisecondes
+ *
+ * BureauPort (« bureau en ligne » : éditer un document Office dans le navigateur, sans Word sur le poste) :
+ *   capabilities()                    -> { enabled, formats: ['docx', 'xlsx', …], mobile, moteur }
+ *   open({ cle, nom, mime, url, user, mobile }) -> { sdk?, src?, config? }   // ce que le navigateur charge
+ *   verifyCallback(req)              -> { ok, payload, jeton }             // authentifie le rappel du moteur
+ *   readBack({ url, filetype, jeton })-> { buffer, ext } | null            // relit le document renvoyé
+ *   forcerSauvegarde(cle)            -> bool                               // demande au moteur d'enregistrer maintenant
+ *   versPdf({ buffer, ext })         -> { buffer, moteur } | null           // conversion PDF mutualisée
+ * La `cle` est l'identité du aller-retour (`annexe:<id>:v<version>:<auteur>:<nonce>`) : elle porte l'auteur, la version
+ * attendue et la clé de session du moteur. Le port ne fait que le transport ; les droits, la version, l'audit et le PDF
+ * restent dans le module `bureau` et le module `annexes`.
  */
 const AUTH_METHODS = ['authenticate', 'getUser', 'searchUsers', 'ping'];
 const DIRECTORY_METHODS = ['listDirections', 'getOrganisationChart', 'searchAgents', 'getAgentByEmail', 'ping'];
@@ -21,6 +32,7 @@ const DIRECTORY_METHODS = ['listDirections', 'getOrganisationChart', 'searchAgen
 const MAIL_METHODS = ['send'];
 const AI_METHODS = ['query'];
 const MEETING_METHODS = ['available', 'create', 'update', 'cancel'];
+const BUREAU_METHODS = ['capabilities', 'open', 'verifyCallback', 'readBack', 'forcerSauvegarde', 'versPdf'];
 
 function assertPort(name, impl, methods) {
   const missing = methods.filter((m) => typeof impl?.[m] !== 'function');
@@ -34,4 +46,5 @@ module.exports = {
   assertMeetingPort: (impl) => assertPort('MeetingPort', impl, MEETING_METHODS),
   assertAiPort: (impl) => assertPort('AiPort', impl, AI_METHODS),
   assertMailPort: (impl) => assertPort('MailPort', impl, MAIL_METHODS),
+  assertBureauPort: (impl) => assertPort('BureauPort', impl, BUREAU_METHODS),
 };
