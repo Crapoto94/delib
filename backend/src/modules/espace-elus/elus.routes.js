@@ -5,17 +5,17 @@ const T = ['espace élus'];
 const Email = z.string().trim().toLowerCase().email().max(200);
 const Appareil = z.string().trim().min(8).max(200).optional().describe('Identifiant aléatoire de l’appareil (généré une fois par l’application), sert à mémoriser un appareil de confiance');
 
-const Invitation = z.object({ motDePasse: z.string().min(12).max(200) });
-const Oubli = z.object({ email: Email, organismeId: Id.optional() });
-const Connexion = z.object({ email: Email, motDePasse: z.string().min(1).max(200), appareil: Appareil, organismeId: Id.optional() });
+const IdentifiantVille = z.string().trim().min(1).max(200).describe('Adresse e-mail de l’élu ou identifiant de connexion Ville');
+const Connexion = z.object({ identifiant: IdentifiantVille, motDePasse: z.string().min(1).max(200), appareil: Appareil, organismeId: Id.optional() });
 const OubliSms = z.object({ email: Email, organismeId: Id.optional() });
 const OubliSmsCode = z.object({ challenge: z.string().uuid(), code: z.string().regex(/^\d{6}$/), appareil: Appareil });
-const Code = z.object({ challenge: z.string().uuid(), code: z.string().regex(/^\d{6}$/), faireConfiance: z.boolean().optional(), appareil: Appareil });
 const SeanceP = z.object({ id: Id });
 const KeyP = z.object({ key: z.string().min(3).max(80).regex(/^[a-z]:\d+(:(\d+|expose|projet))?$/) });
 const ItemP = z.object({ itemId: Id });
 const NoteP = z.object({ id: Id });
 const DocQ = z.object({ lecture: z.enum(['0', '1']).default('0').describe('1 : enregistre la consultation (par défaut non : le téléchargement en arrière-plan n’est pas une lecture)') });
+const Telephone = z.string().trim().regex(/^[0-9 +().-]{6,20}$/, 'Numéro de téléphone invalide').nullable();
+const Preferences = z.object({ telephone: Telephone.optional(), notifMail: z.object({ parapheurRetour: z.boolean().optional() }).partial().optional() });
 const Lectures = z.object({ items: z.array(z.object({ key: z.string().min(3).max(80), version: z.string().min(1).max(80), at: z.iso.datetime().optional() })).min(1).max(500) });
 const Etat = z.object({ lu: z.boolean().optional(), favori: z.boolean().optional() }).refine((d) => d.lu !== undefined || d.favori !== undefined, { message: 'Rien à modifier' });
 const Note = z.object({ id: Id.optional(), itemId: Id.optional(), texte: z.string().trim().min(1).max(10000), partage: z.enum(['prive', 'groupe', 'elus']).default('prive'), avec: z.array(Id).max(60).default([]) });
@@ -44,21 +44,15 @@ const ExportQ = z.object({ partagees: z.enum(['0', '1']).default('0') });
 module.exports = ({ makeRouter, limiter, eluAuth, espace, recherche, annotations }) => {
   // ------------------------------------------------------------------------------------------------ authentification (publique)
   const a = makeRouter('/api/v1/elus-auth');
-  a.post('/invitation/:token', { summary: 'Accepte l’invitation : choisit son mot de passe (lien reçu par mail, à usage unique)', tags: T, auth: false, limiter, params: z.object({ token: z.string().min(20).max(100) }), body: Invitation },
-    async (req, res) => res.json(await eluAuth.accepterInvitation(req.valid.params.token, req.valid.body.motDePasse)));
-  a.post('/oubli', { summary: 'Mot de passe oublié : envoie un nouveau lien (réponse toujours identique)', tags: T, auth: false, limiter, body: Oubli },
-    async (req, res) => res.status(202).json(await eluAuth.oubli(req.valid.body.email, req.valid.body.organismeId)));
-  a.post('/oubli-sms', { summary: 'Mot de passe oublié : envoie un code à 6 chiffres par SMS sur le mobile de l’élu (5 minutes)', tags: T, auth: false, limiter, body: OubliSms,
-    description: 'La réponse est toujours la même (identifiant de défi et durée), que le compte existe ou non. Au plus 5 demandes par quart d’heure et par adresse ou par IP. Chaque demande est journalisée pour l’administration.' },
-  async (req, res) => res.json(await eluAuth.oubliSms({ ...req.valid.body, ip: req.ip })));
-  a.post('/oubli-sms/code', { summary: 'Mot de passe oublié : le code SMS correct (5 minutes, 3 essais) connecte l’élu avec un jeton de 12 heures', tags: T, auth: false, limiter, body: OubliSmsCode,
-    description: 'Le jeton dure exactement 12 heures ; aucun appareil de confiance n’est mémorisé. Un e-mail d’alerte est envoyé à l’élu.' },
-  async (req, res) => res.json(await eluAuth.oubliSmsCode({ ...req.valid.body, ip: req.ip })));
-  a.post('/connexion', { summary: 'Connexion, étape 1 : mot de passe. Renvoie un défi (code par mail) ou, pour un appareil de confiance, la session', tags: T, auth: false, limiter, body: Connexion,
-    description: 'Cinq échecs verrouillent le compte 15 minutes. Le code à 6 chiffres est valable 10 minutes.' },
+  a.post('/invitation/:token', { summary: 'Accepte l’invitation et active l’accès élu (lien reçu par mail, à usage unique)', tags: T, auth: false, limiter, params: z.object({ token: z.string().min(20).max(100) }) },
+    async (req, res) => res.json(await eluAuth.accepterInvitation(req.valid.params.token)));
+  a.post('/connexion', { summary: 'Connexion avec identifiant et mot de passe Ville', tags: T, auth: false, limiter, body: Connexion,
+    description: 'Le mot de passe Ville est vérifié auprès de l’AD par l’APM et n’est jamais stocké. Cinq échecs verrouillent le compte 15 minutes.' },
   async (req, res) => res.json(await eluAuth.connexion({ ...req.valid.body, ip: req.ip })));
-  a.post('/code', { summary: 'Connexion, étape 2 : code à usage unique reçu par mail (5 essais)', tags: T, auth: false, limiter, body: Code },
-    async (req, res) => res.json(await eluAuth.code({ ...req.valid.body, ip: req.ip })));
+  a.post('/oubli-sms', { summary: 'Demande un code de récupération par SMS', tags: T, auth: false, limiter, body: OubliSms },
+    async (req, res) => res.json(await eluAuth.oubliSms({ ...req.valid.body, ip: req.ip })));
+  a.post('/oubli-sms/code', { summary: 'Vérifie le code SMS de récupération et ouvre une session', tags: T, auth: false, limiter, body: OubliSmsCode },
+    async (req, res) => res.json(await eluAuth.oubliSmsCode({ ...req.valid.body, ip: req.ip })));
   a.post('/deconnexion', { summary: 'Déconnexion : la session est révoquée', tags: T, elu: true },
     async (req, res) => res.json(await eluAuth.deconnexion(req.elu.jti)));
   a.get('/etat', { summary: 'Disponibilité minimale du backend (aucune donnée sensible) : utilisé par le front DMZ pour signaler une coupure sans bloquer la lecture hors ligne', tags: T, auth: false },
@@ -88,6 +82,14 @@ module.exports = ({ makeRouter, limiter, eluAuth, espace, recherche, annotations
     async (req, res) => res.json(await espace.lectures(req.elu, req.valid.params.id, req.valid.body.items)));
   r.put('/points/:itemId/etat', { summary: 'Marque un point comme lu et / ou favori', tags: T, elu: true, params: ItemP, body: Etat },
     async (req, res) => res.json(await espace.marquer(req.elu, req.valid.params.itemId, req.valid.body)));
+
+  r.post('/parapheur/acces', { summary: 'Lien vers mon parapheur (Hub DSI), déjà authentifié', tags: T, elu: true },
+    async (req, res) => res.json(await espace.monParapheur(req.elu)));
+
+  r.get('/preferences', { summary: 'Mes préférences : téléphone (SMS), notifications par mail', tags: T, elu: true },
+    async (req, res) => res.json(await espace.preferences(req.elu)));
+  r.put('/preferences', { summary: 'Modifie mes préférences (téléphone et/ou notifications par mail)', tags: T, elu: true, body: Preferences },
+    async (req, res) => res.json(await espace.majPreferences(req.elu, req.valid.body)));
 
   r.get('/recherche', { summary: 'Recherche dans les délibérations adoptées de mes séances (titre, objet, dispositif) : ni brouillon, ni annexe, ni note', tags: T, elu: true, query: Recherche },
     async (req, res) => {
