@@ -11,6 +11,7 @@ const { resolveConfig, DEFAULTS } = require('./defaults');
 const { convertirEnPdf } = require('../../shared/convert');
 const D = require('./docx.service');
 const T = require('./typeset');
+const { embedFamily } = require('./fonts');
 const { numeroAffiche, odjContent, odjMarkdown, odjInterneContent } = require('../seances/odj.service');
 
 const DOC_TYPES = Object.keys(DEFAULTS);
@@ -179,9 +180,11 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
       const tpl = await svc.getTemplate(org, docType || 'deliberation');
       const cfg = tpl.cfg; const vars = await svc.varsFor(a, null);
       const doc = await PDFDocument.load(buffer, { updateMetadata: false });
-      const times = (cfg.police?.famille === 'times');
-      const font = await doc.embedFont(times ? StandardFonts.TimesRoman : StandardFonts.Helvetica);
-      const bold = await doc.embedFont(times ? StandardFonts.TimesRomanBold : StandardFonts.HelveticaBold);
+      // Polices EMBARQUÉES (voir `fonts.js`) : les polices « standard PDF » ne sont pas incluses dans le fichier, et
+      // une visionneuse qui n'a pas leurs données n'affiche alors aucun texte — c'est ce qui se passait dans le
+      // parapheur du Hub pour la trame. `embedFamily` embarque un vrai fichier dès qu'il en trouve un.
+      const polices = await embedFamily(doc, cfg.police?.famille || 'helvetica', process.env.FONTS_DIR || undefined);
+      const font = polices.text; const bold = polices.bold;
       const M = cfg.marges || {}; const mm = (v, d) => (v ?? d) * T.MM;
       const remplace = (s) => String(s ?? '').replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
       const pages = doc.getPages();
