@@ -28,7 +28,7 @@ services:
     ports: ["3021:3021"]
 
   frontend:
-    build: { context: ./frontend }
+    build: { context: ., dockerfile: frontend/Dockerfile }
     restart: always
     depends_on: [backend]
     ports: ["5160:80"]

@@ -94,7 +94,6 @@ export function Connexion() {
           <label className="flex items-center gap-2 text-[14px]"><input type="checkbox" checked={souvenir} onChange={(e) => setSouvenir(e.target.checked)} /> Se souvenir de moi sur ce navigateur <span className="text-[12px] text-mute">(adresse e-mail seulement)</span></label>
           <button className="btn-primary w-full !py-3 !text-[16px]" disabled={busy}>Continuer</button>
           <button type="button" className="w-full text-center text-[14px] font-semibold text-action" onClick={() => setOubliSms(true)}>Mot de passe oublié ?</button>
-          <button type="button" className="w-full text-center text-[12px] text-mute" onClick={oubliMail}>Recevoir plutôt un lien par e-mail pour le changer</button>
         </form>
       ) : (
         <form onSubmit={etape2} className="space-y-3">
