@@ -15,7 +15,30 @@ const { E } = require('../shared/errors');
 
 function createDsihubParapheur({ tls, http: injected } = {}) {
   const clientOf = (cfg) => injected || createHttpClient({ baseURL: String(cfg.url || '').replace(/\/+$/, ''), tls, timeoutMs: 30000, headers: { Accept: 'application/json' } });
-  const failNet = (e) => E.upstream(`Hub DSI injoignable : ${e.code || e.message}`);
+
+  /** Message renvoyé par le Hub, quel que soit son format : texte, HTML, { error }, { message }, { errors[] }… */
+  const messageDuHub = (data) => {
+    if (!data) return '';
+    if (typeof data === 'string') return data.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+    const v = data.error || data.message || data.detail || data.errors;
+    if (Array.isArray(v)) return v.map((x) => (typeof x === 'string' ? x : x?.message || JSON.stringify(x))).join(' ; ').slice(0, 300);
+    if (v && typeof v === 'object') return JSON.stringify(v).slice(0, 300);
+    return v ? String(v).slice(0, 300) : '';
+  };
+
+  /**
+   * Le Hub a répondu (HTTP non 2xx), ou il est réellement injoignable : deux situations très différentes, qu'il ne
+   * faut pas confondre. Un refus (400, 401, 500…) est affiché avec son code ET le message du Hub — sans quoi
+   * l'administration ne voit qu'« injoignable » alors que le serveur a bel et bien répondu pourquoi.
+   */
+  const failNet = (e) => {
+    const r = e?.response;
+    if (r) {
+      const m = messageDuHub(r.data);
+      return E.upstream(`Le parapheur DSIHUB a répondu HTTP ${r.status}${m ? ` : ${m}` : ''}`);
+    }
+    return E.upstream(`Hub DSI injoignable : ${e.code || e.message}`);
+  };
 
   /** Obtient un jeton de session (compte technique) : POST /api/login. */
   async function jeton(client, cfg) {
