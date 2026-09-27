@@ -498,8 +498,29 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
      * Aperçu d'un acte : exposé, une délibération, ou dossier complet (exposé + délibérations + annexes, avec sommaire).
      * mode : 'propre' | 'suivi' ; brouillon : utilise mon brouillon non enregistré (PRE-02).
      */
+    /**
+     * Document **officiel** d'un acte signé : le PDF revenu du parapheur (signatures, mention, QR de vérification).
+     * C'est lui qui fait foi : VibeDélib ne doit plus présenter une recomposition une fois l'acte signé. `null` tant
+     * que le parapheur n'a rien renvoyé.
+     */
+    async documentSigne(organismeId, acteId) {
+      const f = await db.get(
+        `SELECT f.storage_key, f.original_name FROM parapheur_envois pe JOIN files f ON f.id = pe.document_signe_file_id
+         WHERE pe.acte_id = $1 AND pe.organisme_id = $2 AND pe.document_signe_file_id IS NOT NULL
+         ORDER BY pe.id DESC LIMIT 1`, [acteId, requireOrg(organismeId)]).catch(() => null);
+      if (!f?.storage_key) return null;
+      return { buffer: await storage.get(f.storage_key), name: f.original_name };
+    },
+
     async renderActe(ctx, organismeId, acteId, { cible = 'expose', deliberationId, mode = 'propre', brouillon = false, watermark: wmOverride, avecAnnexes = true, docType: docTypeForce }) {
       const acte = await actes.load(ctx, organismeId, acteId);
+      // Acte signé : le document officiel est celui revenu du parapheur (signature + QR). On le sert tel quel,
+      // quelle que soit la cible représentant l'acte — recomposer un PDF après signature donnerait un document
+      // non signé qui ne fait pas foi.
+      if (['deliberation', 'extrait', 'dossier'].includes(cible)) {
+        const signe = await svc.documentSigne(organismeId, acteId).catch(() => null);
+        if (signe) return signe;
+      }
       // Acte rédigé hors application : le document joint tient lieu de texte (aucune recomposition).
       const source = acte.document_source_pdf_file_id ? await svc.sourcePdf(acte) : null;
       const { pick, delibs } = await svc.textsFor(ctx, acte, cible, deliberationId);

@@ -36,6 +36,7 @@ export const VERSIONS: Version[] = [
       "Directions : les dossiers affichent le nom complet de la direction (« DIRECTION DES SYSTEMES D'INFORMATION ») et non son code (« BF »).",
       "Bibliothèque : les arrêtés et décisions signés par le maire y entrent dès la signature (date et mention « Signé par le maire »), en plus des délibérations adoptées ; un filtre par type d'acte (délibération, vœu, décision, arrêté) complète la recherche avancée.",
       "Un acte signé reste 15 jours dans « Tous les actes » et « Mes actes », puis n'est consultable que dans la bibliothèque.",
+      "Une fois signé par le parapheur, l'acte présenté par l'application est le document officiel revenu du parapheur (signatures et QR de vérification), et non plus un PDF recomposé.",
     ],
   },
   {

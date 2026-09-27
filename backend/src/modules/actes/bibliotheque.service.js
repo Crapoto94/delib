@@ -183,6 +183,12 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
       if (!a) throw E.notFound("Cet acte n'est pas dans la bibliothèque");
       const s = sys(ctx);
       await audit.log(ctx, { organismeId: org, action: 'bibliotheque.pdf', entity: 'actes', entityId: a.id, after: { cible } });
+      // Acte signé : le document officiel est celui revenu du parapheur (signé, avec le QR de vérification). Il est
+      // servi tel quel, avant toute autre source : c'est lui qui fait foi dans la bibliothèque.
+      if (cible === 'extrait' || cible === 'deliberation') {
+        const signe = await render.documentSigne(org, a.id).catch(() => null);
+        if (signe) return { buffer: signe.buffer, name: signe.name };
+      }
       // Document d'origine importé (AIRS) : on sert le PDF de l'import plutôt que la recréation.
       // « Exposé des motifs » → rapport (r… / rap_) ; « Extrait du registre » → délibération (d… / del_).
       // On préfère le PDF associé (annexe Word convertie), sinon le fichier lui-même s'il est déjà PDF.
