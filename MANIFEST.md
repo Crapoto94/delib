@@ -953,6 +953,14 @@ DMZ ─────────────────── firewall : un seul
 - **ELU-52** — **Journal d'accès** complet (connexion, consultation, téléchargement, partage) ; audit de sécurité / test d'intrusion avant mise en production.
 - **ELU-53** — Ergonomie **tablette d'abord**, grands caractères, thème clair/sombre, conformité **RGAA**.
 
+### 18.7 Mise en ligne (première version, 0.50.0)
+
+L'espace des élus est **en ligne** sur **`https://vibedelib.ivry94.fr`** : le front est servi par le conteneur `elus-dmz` de **l'hôte DMZ** (`172.17.1.3`, dossier `/opt/docker/marc/elus-dmz`, déploiement par `pulldmz.bat` qui copie **les seuls fichiers suivis par git** puis reconstruit), derrière le reverse proxy public. Côté backend, le réglage `elus.url_base` (organisme) vaut `https://vibedelib.ivry94.fr` : les invitations envoyées aux élus pointent donc vers cette adresse.
+
+- **Le pare-feu DMZ → LAN doit ouvrir le port du backend.** Depuis l'hôte DMZ, `10.103.130.106:3021` **ne répond pas** (3001, 80 et 443 répondent) : sans cette ouverture, le front se charge mais **tout appel d'API reste en attente** (vérifié : `/api/v1/public/branding` et `/api/v1/elus-auth/…` expirent, alors qu'ils répondent en 2 ms depuis le LAN). La règle à demander est la même que celle qui existe déjà pour le parapheur (`3001`) : **DMZ → 10.103.130.106:3021**.
+- Variables du conteneur DMZ : `ELUS_BACKEND_HOST` (adresse LAN du backend), `ELUS_BACKEND_PORT` (le seul port ouvert par le pare-feu), `ELUS_DMZ_PORT` (port publié, 5161). Rien n'est écrit en dur.
+- Le relais nginx ne laisse passer que `/api/v1/elus/`, `/api/v1/elus-auth/`, `/api/v1/public/branding` et un `/api/status` synthétique ; tout le reste est refusé.
+
 ---
 
 ## 19. Après le conseil : votes, texte adopté, registre, contrôle de légalité

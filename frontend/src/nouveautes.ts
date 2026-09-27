@@ -11,9 +11,18 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.49.0';
+export const VERSION = '0.50.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.50.0', type: 'minor', titre: "L'espace des élus ouvre en ligne",
+    items: [
+      "Les élus disposent de leur propre espace en ligne, à une adresse publique (hors du réseau de la collectivité) : connexion par lien personnel, ordre du jour, dossier de séance, pièces à lire et à annoter, recherche dans les actes.",
+      "Un hébergement séparé de l'application de saisie : le front des élus ne contient ni base de données ni secret, et le jeton d'un élu est signé avec un secret et une audience qui lui sont propres — il est refusé par l'API des agents.",
+      "Le relais de la zone démilitarisée ne laisse passer que deux préfixes d'API (élus et élus-auth) et l'identité de la collectivité : tout le reste est refusé, débit et tailles limités.",
+      "Les invitations envoyées aux élus pointent désormais vers l'adresse publique de leur espace (réglage par organisme).",
+    ],
+  },
   {
     version: '0.49.0', type: 'minor', titre: 'Deux serveurs de documents au choix, organisme par organisme',
     items: [
