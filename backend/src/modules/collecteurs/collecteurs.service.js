@@ -118,7 +118,7 @@ function eluCorrespond(elu, indice) {
   return [elu.nomComplet, `${elu.prenom} ${elu.nom}`, elu.email, elu.prenom, elu.nom].filter(Boolean).some((x) => x !== undefined && nettoyerNom(x) === cle);
 }
 
-function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts, refs, storage, elus, parapheur, render, o365, engine }) {
+function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts, refs, storage, elus, parapheur, render, o365, engine, dir }) {
   const box = createSecretBox(config.jwt?.secret || '', 'collecteurs');
   const chiffre = (s) => box.chiffre(s);
   const dechiffre = (s) => box.dechiffre(s);
@@ -257,14 +257,22 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
     // proposition de l'IA, sinon le réglage de l'organisme, sinon la première direction de l'organigramme.
     let directionCode = String(reglages.directionCode || '').trim() || null;
     if (!directionCode && ia?.direction) {
-      const dirs = await db.all("SELECT code FROM organisation_entites WHERE organisme_id = $1 AND type = 'direction'", [org]).catch(() => []);
-      directionCode = dirs.find((d) => nettoyerNom(d.code) === nettoyerNom(ia.direction))?.code || null;
+      // L'IA renvoie un LIBELLÉ (« DIRECTION DES SYSTEMES D'INFORMATION ») : on le rapproche des libellés et des
+      // codes de l'organigramme — comparer le libellé au seul code ne trouvait jamais rien.
+      const annuaire = await dir?.directions().catch(() => []) ?? [];
+      const v = nettoyerNom(ia.direction);
+      directionCode = annuaire.find((d) => nettoyerNom(d.label) === v || nettoyerNom(d.code) === v)?.code || null;
     }
     if (!directionCode) directionCode = cfg['organisation.direction_generale']?.value || null;
     let directionLabel = String(reglages.directionLabel || '').trim() || null;
     if (directionCode && !directionLabel) {
-      // Le libellé complet est cherché dans l'organigramme ; à défaut seulement, on affiche le code.
-      directionLabel = (await db.get("SELECT label FROM organisation_entites WHERE organisme_id = $1 AND type = 'direction' AND code = $2", [org, directionCode]).catch(() => null))?.label || directionCode;
+      // Le libellé vient de l'organigramme de l'annuaire (le référentiel des directions), puis de l'organigramme
+      // local ; le code ne sert de libellé qu'en dernier recours — sinon le dossier affiche « BF » au lieu de
+      // « DIRECTION DES SYSTEMES D'INFORMATION ».
+      const annuaire = await dir?.directions().catch(() => []) ?? [];
+      directionLabel = annuaire.find((d) => d.code === directionCode)?.label
+        || (await db.get("SELECT label FROM organisation_entites WHERE organisme_id = $1 AND type = 'direction' AND code = $2", [org, directionCode]).catch(() => null))?.label
+        || directionCode;
     } else {
       const d = await db.get("SELECT code, label FROM organisation_entites WHERE organisme_id = $1 AND type = 'direction' ORDER BY ordre, id LIMIT 1", [org]).catch(() => null);
       directionCode = d?.code || 'COLLECTEUR';

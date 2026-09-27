@@ -11,71 +11,104 @@ const { requireOrg } = require('../../db/pool');
 const { analyser } = require('../recherche/recherche.service');
 
 const CLOSES = "s.statut IN ('close', 'tenue') AND EXISTS (SELECT 1 FROM seance_tenue t WHERE t.seance_id = s.id AND t.statut = 'close')";
-const RESULTATS = { adopte_unanimite: 'Adoptée à l’unanimité', adopte_majorite: 'Adoptée à la majorité', adopte_preponderante: 'Adoptée (voix prépondérante)', rejete: 'Rejetée', rejete_preponderante: 'Rejetée (voix prépondérante)' };
+const RESULTATS = { adopte_unanimite: 'Adoptée à l’unanimité', adopte_majorite: 'Adoptée à la majorité', adopte_preponderante: 'Adoptée (voix prépondérante)', rejete: 'Rejetée', rejete_preponderante: 'Rejetée (voix prépondérante)', signe: 'Signé par le maire' };
 
 function createBibliotheque({ db, audit, render, pv, textes, storage }) {
   /** Contexte technique : la bibliothèque ouvre des actes que la personne ne peut pas voir autrement ; l'accès est contrôlé ici, et journalisé au nom de la personne. */
   const sys = (ctx) => ({ ...ctx, isPlatformAdmin: true });
 
-  /** Délibération adoptée, séance close, non confidentielle : la seule qui entre dans la bibliothèque. */
+  /**
+   * Acte de la bibliothèque, non confidentiel : une **délibération adoptée** (séance close, point traité, résultat
+   * positif) ou un **acte signé par le maire** (arrêté, décision), qui n'a pas de séance et entre dès la signature.
+   */
   const eligible = (org, acteId) => db.get(`
     SELECT a.id, a.numero_suivi, a.titre, a.statut, a.type_id, a.matiere_id, a.direction_label, a.direction_code, a.confidentialite, a.montant, a.incidence_financiere,
            (CASE WHEN a.custom->'airs'->>'origine' IS NOT NULL THEN a.custom->'airs'->>'origine' = 'archive' ELSE a.statut = 'archive' END) AS est_archive,
            (a.custom->'airs'->>'origine' = 'courant') AS airs_courant,
-           it.id AS item_id, it.numero, it.deliberation_id, s.id AS seance_id, s.date_seance, i.nom AS instance, sp.resultat
-    FROM actes a JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
-    JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
-    JOIN instances i ON i.id = s.instance_id
-    JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite' AND sp.resultat LIKE 'adopte%'
+           it.id AS item_id, it.numero, it.deliberation_id, s.id AS seance_id,
+           COALESCE(s.date_seance, a.signe_at) AS date_seance, i.nom AS instance,
+           COALESCE(sp.resultat, CASE WHEN a.statut = 'signe' THEN 'signe' END) AS resultat
+    FROM actes a
+    LEFT JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
+    LEFT JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
+    LEFT JOIN instances i ON i.id = s.instance_id
+    LEFT JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite'
+    LEFT JOIN ref_items t ON t.id = a.type_id
     WHERE a.organisme_id = $1 AND a.id = $2 AND a.confidentialite = 'normale' AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu')
-    ORDER BY s.date_seance DESC LIMIT 1`, [org, acteId]);
+      AND ((sp.resultat LIKE 'adopte%') OR ((t.meta->>'signature')::boolean AND a.statut = 'signe'))
+    ORDER BY s.date_seance DESC NULLS LAST LIMIT 1`, [org, acteId]);
 
   const svc = {
     RESULTATS,
 
     // ---------------------------------------------------------------------------------------------------------- 1. bibliothèque
-    async chercher(ctx, organismeId, { q = '', annee, matiereId, natureId, rubriqueId, instanceId, rapporteurId, directionCode, du, au, etat = 'tous', limit = 20, offset = 0 } = {}) {
+    async chercher(ctx, organismeId, { q = '', annee, matiereId, natureId, rubriqueId, instanceId, rapporteurId, typeId, directionCode, du, au, etat = 'tous', limit = 20, offset = 0 } = {}) {
       const org = requireOrg(organismeId); const p = [org]; const add = (v) => { p.push(v); return `$${p.length}`; };
-      const w = ['a.organisme_id = $1', "a.confidentialite = 'normale'", "a.statut NOT IN ('abandonne', 'retire')", "NOT (a.custom ? 'biblio_exclu')", "sp.resultat LIKE 'adopte%'"];
+      // Deux origines à égalité dans la bibliothèque :
+      //   - les DÉLIBÉRATIONS adoptées en séance close (cas historique) ;
+      //   - les actes SIGNÉS par le maire (arrêtés, décisions), qui n'ont pas de séance et y entrent dès la signature.
+      const commun = ['a.organisme_id = $1', "a.confidentialite = 'normale'", "a.statut NOT IN ('abandonne', 'retire')", "NOT (a.custom ? 'biblio_exclu')"];
+      const wSeance = [];        // propres à la branche « délibération adoptée »
+      const wSigne = [`(t.meta->>'signature')::boolean`, "a.statut = 'signe'"];
+      const communFiltres = [];  // filtres appliqués aux deux branches
       // « Archivé » suit l'origine AIRS quand elle est connue (un acte importé d'AIRS « courant » n'est pas archivé),
       // sinon le statut local.
       const EST_ARCHIVE = `(CASE WHEN a.custom->'airs'->>'origine' IS NOT NULL THEN a.custom->'airs'->>'origine' = 'archive' ELSE a.statut = 'archive' END)`;
-      if (etat === 'archive') w.push(EST_ARCHIVE);
-      else if (etat === 'en_cours') w.push(`NOT ${EST_ARCHIVE}`);
+      if (etat === 'archive') communFiltres.push(EST_ARCHIVE);
+      else if (etat === 'en_cours') communFiltres.push(`NOT ${EST_ARCHIVE}`);
       let rang = '0::float4';
       const an = analyser(q, { poids: 'ABC' }); // titre, objet, matière, dispositif, exposé, visas : jamais les annexes
-      if (an.numero) { if (an.numero.suivi !== null) w.push(`a.numero_suivi = ${add(an.numero.suivi)}`); else w.push(`upper(it.numero) = ${add(an.numero.ref.toUpperCase())}`); }
-      else if (an.tsq) { const t = add(an.tsq); const raw = add(`%${String(q).trim().replace(/[%_]/g, '')}%`); w.push(`(si.tsv @@ to_tsquery('fr_unaccent', ${t}) OR a.titre ILIKE ${raw})`); rang = `ts_rank(si.tsv, to_tsquery('fr_unaccent', ${t}))`; }
-      if (annee) w.push(`EXTRACT(year FROM s.date_seance AT TIME ZONE 'Europe/Paris') = ${add(Number(annee))}`);
-      if (matiereId) w.push(`a.matiere_id = ${add(Number(matiereId))}`);
-      if (natureId) w.push(`a.nature_id = ${add(Number(natureId))}`);
-      if (rubriqueId) w.push(`a.rubrique_id = ${add(Number(rubriqueId))}`);
-      if (rapporteurId) w.push(`a.rapporteur_id = ${add(Number(rapporteurId))}`);
-      if (directionCode) w.push(`a.direction_code = ${add(directionCode)}`);
-      if (instanceId) w.push(`s.instance_id = ${add(Number(instanceId))}`);
-      if (du) w.push(`s.date_seance >= ${add(du)}`);
-      if (au) w.push(`s.date_seance < (${add(au)}::date + interval '1 day')`);
-      const from = `FROM actes a JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
-        JOIN seances s ON s.id = it.seance_id AND ${CLOSES} JOIN instances i ON i.id = s.instance_id
-        JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite' LEFT JOIN search_index si ON si.acte_id = a.id
-        LEFT JOIN ref_items m ON m.id = a.matiere_id LEFT JOIN elus ra ON ra.id = a.rapporteur_id WHERE ${w.join(' AND ')}`;
+      if (an.numero) {
+        if (an.numero.suivi !== null) communFiltres.push(`a.numero_suivi = ${add(an.numero.suivi)}`);
+        else wSeance.push(`upper(it.numero) = ${add(an.numero.ref.toUpperCase())}`);  // le n° de délibération n'existe pas pour un arrêté
+      } else if (an.tsq) { const t = add(an.tsq); const raw = add(`%${String(q).trim().replace(/[%_]/g, '')}%`); communFiltres.push(`(si.tsv @@ to_tsquery('fr_unaccent', ${t}) OR a.titre ILIKE ${raw})`); rang = `ts_rank(si.tsv, to_tsquery('fr_unaccent', ${t}))`; }
+      if (annee) { wSeance.push(`EXTRACT(year FROM s.date_seance AT TIME ZONE 'Europe/Paris') = ${add(Number(annee))}`); wSigne.push(`EXTRACT(year FROM a.signe_at AT TIME ZONE 'Europe/Paris') = ${add(Number(annee))}`); }
+      if (matiereId) communFiltres.push(`a.matiere_id = ${add(Number(matiereId))}`);
+      if (natureId) communFiltres.push(`a.nature_id = ${add(Number(natureId))}`);
+      if (rubriqueId) communFiltres.push(`a.rubrique_id = ${add(Number(rubriqueId))}`);
+      if (typeId) communFiltres.push(`a.type_id = ${add(Number(typeId))}`);
+      if (rapporteurId) communFiltres.push(`a.rapporteur_id = ${add(Number(rapporteurId))}`);
+      if (directionCode) communFiltres.push(`a.direction_code = ${add(directionCode)}`);
+      if (instanceId) wSeance.push(`s.instance_id = ${add(Number(instanceId))}`);
+      if (du) { wSeance.push(`s.date_seance >= ${add(du)}`); wSigne.push(`a.signe_at >= ${add(du)}`); }
+      if (au) { wSeance.push(`s.date_seance < (${add(au)}::date + interval '1 day')`); wSigne.push(`a.signe_at < (${add(au)}::date + interval '1 day')`); }
+      // Une délibération : inscrite à une séance close, point traité et résultat positif. Un arrêté signé : pas de
+      // séance, il entre dès que le maire a signé.
+      const brancheSeance = [...wSeance, "sp.resultat LIKE 'adopte%'", ...communFiltres];
+      const brancheSigne = [...wSigne, ...communFiltres];
+      const where = `${commun.join(' AND ')} AND ((${brancheSeance.join(' AND ')}) OR (${brancheSigne.join(' AND ')}))`;
+      const from = `FROM actes a
+        LEFT JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
+        LEFT JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
+        LEFT JOIN instances i ON i.id = s.instance_id
+        LEFT JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite'
+        LEFT JOIN search_index si ON si.acte_id = a.id
+        LEFT JOIN ref_items t ON t.id = a.type_id
+        LEFT JOIN ref_items m ON m.id = a.matiere_id LEFT JOIN elus ra ON ra.id = a.rapporteur_id WHERE ${where}`;
       const total = (await db.get(`SELECT count(DISTINCT a.id)::int AS n ${from}`, p)).n;
-      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.statut, ${EST_ARCHIVE} AS est_archive, (a.custom ? 'airs') AS airs_imp, (a.custom->'airs'->>'origine' = 'courant') AS airs_courant, a.direction_label, a.direction_code, m.libelle AS matiere, it.numero, s.date_seance, i.nom AS instance, sp.resultat, NULLIF(trim(ra.prenom || ' ' || ra.nom), '') AS rapporteur,
+      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.statut, a.type_id, t.code AS type_code, t.libelle AS type_libelle,
+          ${EST_ARCHIVE} AS est_archive, (a.custom ? 'airs') AS airs_imp, (a.custom->'airs'->>'origine' = 'courant') AS airs_courant, a.direction_label, a.direction_code, m.libelle AS matiere, it.numero,
+          COALESCE(s.date_seance, a.signe_at) AS date_seance, i.nom AS instance, COALESCE(sp.resultat, CASE WHEN a.statut = 'signe' THEN 'signe' END) AS resultat, NULLIF(trim(ra.prenom || ' ' || ra.nom), '') AS rapporteur,
           (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id AND an.titre NOT LIKE '%document d''origine%') AS annexes_n,
           (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id AND NOT an.publiable AND an.titre NOT LIKE '%document d''origine%') AS annexes_np,
           ${rang} AS rang ${from}
-        ORDER BY a.id, s.date_seance DESC`, p);
+        ORDER BY a.id, s.date_seance DESC NULLS LAST`, p);
       rows.sort((x, y) => (Number(y.rang) - Number(x.rang)) || (new Date(y.date_seance) - new Date(x.date_seance)));
       // Années réellement présentes dans la bibliothèque (pour le filtre « Année »).
-      const annees = (await db.all(`SELECT DISTINCT EXTRACT(year FROM s.date_seance AT TIME ZONE 'Europe/Paris')::int AS a
-        FROM actes a JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
-        JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
-        JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite'
-        WHERE a.organisme_id = $1 AND a.confidentialite = 'normale' AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu') AND sp.resultat LIKE 'adopte%'
-        ORDER BY a DESC`, [org])).map((r) => r.a);
+      const annees = (await db.all(`SELECT DISTINCT y FROM (
+          SELECT EXTRACT(year FROM s.date_seance AT TIME ZONE 'Europe/Paris')::int AS y
+            FROM actes a JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
+            JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
+            JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite'
+            WHERE a.organisme_id = $1 AND a.confidentialite = 'normale' AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu') AND sp.resultat LIKE 'adopte%'
+          UNION
+          SELECT EXTRACT(year FROM a.signe_at AT TIME ZONE 'Europe/Paris')::int AS y
+            FROM actes a JOIN ref_items t ON t.id = a.type_id
+            WHERE a.organisme_id = $1 AND a.confidentialite = 'normale' AND a.statut = 'signe' AND (t.meta->>'signature')::boolean AND NOT (a.custom ? 'biblio_exclu')
+        ) q WHERE y IS NOT NULL ORDER BY y DESC`, [org])).map((r) => r.y);
       return {
         total, annees, items: rows.slice(Number(offset), Number(offset) + Number(limit)).map((r) => ({
-          acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, numero: r.numero, direction: r.direction_label, directionCode: r.direction_code, matiere: r.matiere, rapporteur: r.rapporteur, dateSeance: r.date_seance, instance: r.instance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null, annexesCount: r.annexes_n, annexesNonPubliables: r.annexes_np, archive: !!r.est_archive, courant: !!r.airs_courant, airs: !!r.airs_imp,
+          acteId: r.id, numeroSuivi: r.numero_suivi, titre: r.titre, numero: r.numero, typeCode: r.type_code, typeLibelle: r.type_libelle, direction: r.direction_label, directionCode: r.direction_code, matiere: r.matiere, rapporteur: r.rapporteur, dateSeance: r.date_seance, instance: r.instance, resultat: r.resultat, resultatLabel: RESULTATS[r.resultat] || null, annexesCount: r.annexes_n, annexesNonPubliables: r.annexes_np, archive: !!r.est_archive, courant: !!r.airs_courant, airs: !!r.airs_imp,
         })),
       };
     },
@@ -211,6 +244,8 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
       if (annee) w.push(`EXTRACT(year FROM a.created_at) = ${add(Number(annee))}`);
       if (statut) w.push(`a.statut = ${add(statut)}`);
       if (hors) w.push(`a.statut <> ${add(hors)}`);
+      // Un acte signé entre aussitôt dans la bibliothèque : il ne reste que 15 jours dans « Mes actes ».
+      w.push("NOT (a.statut = 'signe' AND a.signe_at < now() - interval '15 days')");
       const rows = await db.all(`SELECT a.id, a.numero_suivi, a.titre, a.statut, a.created_at, a.redacteur, t.code AS type_code, t.libelle AS type_libelle,
           (SELECT s.date_seance FROM seance_items it JOIN seances s ON s.id = it.seance_id WHERE it.acte_id = a.id AND it.statut = 'a_traiter' ORDER BY s.date_seance DESC LIMIT 1) AS date_seance,
           (SELECT sp.resultat FROM seance_items it JOIN seance_points sp ON sp.item_id = it.id WHERE it.acte_id = a.id ORDER BY it.id DESC LIMIT 1) AS resultat

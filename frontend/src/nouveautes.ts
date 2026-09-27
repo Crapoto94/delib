@@ -33,6 +33,9 @@ export const VERSIONS: Version[] = [
       "Parapheur : un refus n'est plus annoncé comme une injoignabilité — le message reprend le code HTTP et la réponse du serveur (« a répondu HTTP 500 : … »), au lieu du seul ERR_BAD_RESPONSE qui faisait chercher une panne réseau.",
       "Parapheur en mode dev : l'adresse d'essai est bien la seule utilisée pour tous les envois, y compris les arrêtés collectés (auparavant, le signataire repéré dans le document pouvait partir à sa vraie adresse).",
       "Collecteur d'arrêtés : le type de signature (P12 ou manuscrite) se règle sur le collecteur ; sinon celui du paramétrage du parapheur s'applique.",
+      "Directions : les dossiers affichent le nom complet de la direction (« DIRECTION DES SYSTEMES D'INFORMATION ») et non son code (« BF »).",
+      "Bibliothèque : les arrêtés et décisions signés par le maire y entrent dès la signature (date et mention « Signé par le maire »), en plus des délibérations adoptées ; un filtre par type d'acte (délibération, vœu, décision, arrêté) complète la recherche avancée.",
+      "Un acte signé reste 15 jours dans « Tous les actes » et « Mes actes », puis n'est consultable que dans la bibliothèque.",
     ],
   },
   {

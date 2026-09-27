@@ -5,7 +5,7 @@ const P = z.object({ orgId: Id });
 const PA = P.extend({ id: Id });
 const T = ['bibliothèque et trajet'];
 const Chercher = z.object({ q: z.string().trim().max(300).optional().describe('Mots, « expression exacte », OR, -exclusion, n° de suivi ou de délibération'), annee: z.coerce.number().int().min(1900).max(2200).optional(), matiereId: Id.optional(),
-  natureId: Id.optional(), rubriqueId: Id.optional(), instanceId: Id.optional(), rapporteurId: Id.optional(),
+  natureId: Id.optional(), rubriqueId: Id.optional(), instanceId: Id.optional(), rapporteurId: Id.optional(), typeId: Id.optional(),
   directionCode: z.string().trim().max(40).optional(), du: z.iso.date().optional(), au: z.iso.date().optional(),
   etat: z.enum(['tous', 'archive', 'en_cours']).default('tous').describe('État : délibérations archivées, en cours, ou les deux'),
   limit: z.coerce.number().int().min(1).max(100).default(20), offset: z.coerce.number().int().min(0).default(0) });

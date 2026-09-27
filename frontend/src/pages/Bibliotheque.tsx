@@ -4,7 +4,7 @@ import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { showDocs } from '../PdfViewer';
 import { useAuth } from '../auth';
 import { dt } from '../format';
-import { Badge, Empty, ErrorBox, Field, Loading, Modal, Pagination, PageTitle, useLoad, useToast } from '../ui';
+import { Badge, Empty, ErrorBox, Field, Loading, Modal, Pagination, PageTitle, TypeBadge, useLoad, useToast } from '../ui';
 import { Select } from '../Select';
 
 /** Fiche de consultation d'une délibération adoptée : exposé des motifs, visas, dispositif, annexes, et les PDF (visionneuse). */
@@ -21,7 +21,7 @@ function Fiche({ acteId, onClose, onDone }: { acteId: number; onClose: () => voi
       {d.loading ? <Loading /> : !f ? <ErrorBox msg={d.error} /> : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
-            <Badge tone="ok">{f.resultatLabel}</Badge><span className="text-mute">Séance du {dt(f.seance.dateSeance, { dateStyle: 'long' })} · {f.seance.instance}{f.matiere ? ` · ${f.matiere}` : ''}{f.direction ? ` · ${f.direction}` : ''}</span>
+            <Badge tone="ok">{f.resultatLabel}</Badge><span className="text-mute">{f.seance?.instance ? `Séance du ${dt(f.seance.dateSeance, { dateStyle: 'long' })} · ${f.seance.instance}` : `Signé le ${dt(f.seance?.dateSeance, { dateStyle: 'long' })}`}{f.matiere ? ` · ${f.matiere}` : ''}{f.direction ? ` · ${f.direction}` : ''}</span>
           </div>
           <div className="flex flex-wrap gap-2">{f.documents.map((x: any) => <button key={x.cible} className="btn-secondary" onClick={() => pdf(x.cible, `${x.label} — ${f.titre}`)}><FileText className="h-4 w-4" /> {x.label}</button>)}</div>
           {f.informations?.filter((x: any) => x.valeur !== null && x.valeur !== undefined && String(x.valeur).trim() !== '').length > 0 && (
@@ -49,8 +49,8 @@ function Fiche({ acteId, onClose, onDone }: { acteId: number; onClose: () => voi
   );
 }
 
-type Filtres = { q: string; etat: string; annee: string; matiereId: string; natureId: string; rubriqueId: string; directionCode: string; rapporteurId: string; instanceId: string; du: string; au: string };
-const VIDES: Filtres = { q: '', etat: '', annee: '', matiereId: '', natureId: '', rubriqueId: '', directionCode: '', rapporteurId: '', instanceId: '', du: '', au: '' };
+type Filtres = { q: string; etat: string; annee: string; matiereId: string; natureId: string; rubriqueId: string; typeId: string; directionCode: string; rapporteurId: string; instanceId: string; du: string; au: string };
+const VIDES: Filtres = { q: '', etat: '', annee: '', matiereId: '', natureId: '', rubriqueId: '', typeId: '', directionCode: '', rapporteurId: '', instanceId: '', du: '', au: '' };
 
 /** Bibliothèque des actes de la collectivité (REC-30) : recherche simple (mots, année) et recherche avancée (thématique, nature, rubrique, direction, rapporteur, instance, période). */
 export default function Bibliotheque() {
@@ -61,13 +61,14 @@ export default function Bibliotheque() {
   const matieres = useLoad(async () => (await api.get(orgPath(o, '/referentiels/matiere'))).data.items as any[], [o]);
   const natures = useLoad(async () => (await api.get(orgPath(o, '/referentiels/nature'))).data.items as any[], [o]);
   const rubriques = useLoad(async () => (await api.get(orgPath(o, '/referentiels/rubrique'))).data.items as any[], [o]);
+  const typesActe = useLoad(async () => (await api.get(orgPath(o, '/referentiels/type_acte'))).data.items as any[], [o]);
   const directions = useLoad(async () => (await api.get('/directory/directions')).data.items as any[], []);
   const elus = useLoad(async () => (await api.get(orgPath(o, '/elus'))).data.items as any[], [o]);
   const instances = useLoad(async () => (await api.get(orgPath(o, '/instances'))).data.items as any[], [o]);
   const d = useLoad(async () => (await api.get(orgPath(o, '/bibliotheque'), {
     params: {
       q: applique.q || undefined, etat: applique.etat || undefined, annee: applique.annee || undefined, matiereId: applique.matiereId || undefined, natureId: applique.natureId || undefined,
-      rubriqueId: applique.rubriqueId || undefined, directionCode: applique.directionCode || undefined, rapporteurId: applique.rapporteurId || undefined,
+      rubriqueId: applique.rubriqueId || undefined, typeId: applique.typeId || undefined, directionCode: applique.directionCode || undefined, rapporteurId: applique.rapporteurId || undefined,
       instanceId: applique.instanceId || undefined, du: applique.du || undefined, au: applique.au || undefined, limit: LIMIT, offset: (page - 1) * LIMIT,
     },
   })).data, [o, applique, page]);
@@ -90,7 +91,7 @@ export default function Bibliotheque() {
   };
   return (
     <div>
-      <PageTitle title="Bibliothèque des actes" sub="Les délibérations adoptées de la collectivité (séances closes) : texte, exposé des motifs, extrait du registre. Consultation ouverte à tous les agents." />
+      <PageTitle title="Bibliothèque des actes" sub="Les délibérations adoptées (séances closes) et les actes signés par le maire (arrêtés, décisions) : texte, exposé des motifs, extrait du registre. Consultation ouverte à tous les agents." />
       <form onSubmit={chercher} className="card mb-4 space-y-3 p-3">
         <div className="flex flex-wrap items-center gap-2">
           <div role="tablist" aria-label="État des délibérations" className="flex rounded bg-surface p-1 shadow-card">
@@ -107,8 +108,9 @@ export default function Bibliotheque() {
           {(actifs > 0 || f.q) && <button type="button" className="btn-secondary" onClick={reinit}>Réinitialiser</button>}
         </div>
         {avance && (
-          <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Thématique (matière)"><Select className="input" value={f.matiereId} onChange={appliquer('matiereId')}><option value="">Toutes</option>{(matieres.data ?? []).map((x: any) => <option key={x.id} value={x.id}>{x.libelle}</option>)}</Select></Field>
+            <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Type d'acte"><Select className="input" value={f.typeId} onChange={appliquer('typeId')}><option value="">Tous</option>{(typesActe.data ?? []).map((x: any) => <option key={x.id} value={x.id}>{x.libelle}</option>)}</Select></Field>
+              <Field label="Thématique (matière)"><Select className="input" value={f.matiereId} onChange={appliquer('matiereId')}><option value="">Toutes</option>{(matieres.data ?? []).map((x: any) => <option key={x.id} value={x.id}>{x.libelle}</option>)}</Select></Field>
             <Field label="Nature"><Select className="input" value={f.natureId} onChange={appliquer('natureId')}><option value="">Toutes</option>{(natures.data ?? []).map((x: any) => <option key={x.id} value={x.id}>{x.libelle}</option>)}</Select></Field>
             <Field label="Rubrique"><Select className="input" value={f.rubriqueId} onChange={appliquer('rubriqueId')}><option value="">Toutes</option>{(rubriques.data ?? []).map((x: any) => <option key={x.id} value={x.id}>{x.libelle}</option>)}</Select></Field>
             <Field label="Direction"><Select className="input" value={f.directionCode} onChange={appliquer('directionCode')}><option value="">Toutes</option>{(directions.data ?? []).map((x: any) => <option key={x.code} value={x.code}>{x.label}</option>)}</Select></Field>
@@ -119,9 +121,9 @@ export default function Bibliotheque() {
           </div>
         )}
       </form>
-      {d.loading && !d.data ? <Loading /> : !d.data ? <ErrorBox msg={d.error} /> : !d.data.items.length ? <div className="card"><Empty>Aucune délibération adoptée ne correspond.</Empty></div> : (
-        <div className="card overflow-x-auto"><table className="w-full"><thead><tr><th>N°</th><th>Délibération</th><th>Rapporteur</th><th>Séance</th><th>Résultat</th><th /></tr></thead><tbody>{d.data.items.map((r: any) => (
-          <tr key={r.acteId}><td className="font-mono text-[12px]"><span title={r.archive ? 'Archivée' : 'En cours'} className={`mr-1 inline-block h-2.5 w-2.5 rounded-full align-middle ${r.archive ? 'bg-slate-400' : 'bg-action-solid'}`} />{r.numero ?? '—'}</td><td><button type="button" className={`text-left font-bold hover:underline ${r.airs ? 'text-purple-700' : 'text-head'}`} title="Consulter la fiche" onClick={() => setOuvert(r.acteId)}>{r.titre}</button><div className="text-[12px] text-mute">{[r.matiere, r.direction].filter(Boolean).join(' · ')}</div></td>
+      {d.loading && !d.data ? <Loading /> : !d.data ? <ErrorBox msg={d.error} /> : !d.data.items.length ? <div className="card"><Empty>Aucun acte ne correspond.</Empty></div> : (
+        <div className="card overflow-x-auto"><table className="w-full"><thead><tr><th>N°</th><th>Acte</th><th>Rapporteur</th><th>Date</th><th>Résultat</th><th /></tr></thead><tbody>{d.data.items.map((r: any) => (
+          <tr key={r.acteId}><td className="font-mono text-[12px]"><span title={r.archive ? 'Archivée' : 'En cours'} className={`mr-1 inline-block h-2.5 w-2.5 rounded-full align-middle ${r.archive ? 'bg-slate-400' : 'bg-action-solid'}`} />{r.numero ?? r.numeroSuivi ?? '—'}</td><td><button type="button" className={`text-left font-bold hover:underline ${r.airs ? 'text-purple-700' : 'text-head'}`} title="Consulter la fiche" onClick={() => setOuvert(r.acteId)}>{r.titre}</button> <TypeBadge acte={r} /><div className="text-[12px] text-mute">{[r.matiere, r.direction].filter(Boolean).join(' · ')}</div></td>
             <td className="text-[12px]">{r.rapporteur ?? '—'}</td>
             <td className="text-[12px]">{dt(r.dateSeance, { dateStyle: 'medium' })}<div className="text-mute">{r.instance}</div></td><td><Badge tone="ok">{r.resultatLabel}</Badge></td>
             <td className="whitespace-nowrap text-right">

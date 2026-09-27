@@ -650,6 +650,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
          WHERE a.organisme_id = $1 AND (${or.join(' OR ')})
            AND ((a.statut = ANY($${p.length - 1}::text[]) AND a.current_step_key IS NOT NULL)
              OR (a.statut = ANY($${p.length}::text[]) AND a.current_step_key IS NULL))
+           -- Un acte signé entre aussitôt dans la bibliothèque : il ne reste ici que 15 jours.
+           AND NOT (a.statut = 'signe' AND a.signe_at < now() - interval '15 days')
            AND NOT (COALESCE(i.holders, '[]'::jsonb) ? $2)`, p);
       for (const r of poursuite) {
         const step = r.current_step_key
@@ -675,6 +677,9 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
          FROM actes a LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
          LEFT JOIN ref_items t ON t.id = a.type_id
          WHERE a.organisme_id = $1 AND a.statut = ANY($2::text[])
+           -- Un acte signé (arrêté, décision) entre aussitôt dans la bibliothèque : il ne reste ici que
+           -- 15 jours, le temps que l'administration le voie passer.
+           AND (a.statut <> 'signe' OR a.signe_at > now() - interval '15 days')
          ORDER BY a.updated_at DESC LIMIT 1000`, [org, EN_COURS_ACTIFS]);
       const items = rows.map((r) => {
         const etape = r.statut === 'brouillon' ? { key: 'redaction', label: 'Rédaction' }
