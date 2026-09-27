@@ -30,6 +30,7 @@ export const VERSIONS: Version[] = [
       "Collecteurs d'arrêtés : chaque collecteur précise la nature, la matière, la rubrique, la direction porteuse (nom complet), la communicabilité (certains arrêtés ne sont pas publics) et la suite donnée — envoi direct en signature ou circuit choisi. Ce qui est laissé vide est proposé par l'IA.",
       "Arrêtés et décisions signés par le maire : la fiche ne demande plus de commission pour avis (elle bloquait à tort l'envoi en signature).",
       "Emplacement de la signature : le collecteur peut définir un cadre (page, position, dimensions) ou un repère dans le document (par exemple [SIGNATURE]) que l'application retrouve pour y poser la signature.",
+      "Parapheur : un refus n'est plus annoncé comme une injoignabilité — le message reprend le code HTTP et la réponse du serveur (« a répondu HTTP 500 : … »), au lieu du seul ERR_BAD_RESPONSE qui faisait chercher une panne réseau.",
     ],
   },
   {
