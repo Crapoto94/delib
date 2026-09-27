@@ -80,6 +80,7 @@ const { createBureau } = require('./modules/bureau/bureau.service');
 const { createTransitoire } = require('./shared/transitoire');
 const { createBureauOnlyOffice } = require('./adapters/bureau-onlyoffice');
 const { createBureauSimulateur } = require('./adapters/bureau-simulateur');
+const { createBureauCollabora } = require('./adapters/bureau-collabora');
 
 function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAdapter, meeting, teletransmission, gedAdapters, smsHttp, sauvegardeTransport, guard, airsSource, parapheurAdapters, bureauAdapters }) {
   assertAuthPort(ad);
@@ -99,12 +100,34 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const auth = createAuthService({ db, config, log, ad, dir, sessions, audit, guard: guard || createLoginGuard() });
   const bus = createBus(log);
   const transitoire = createTransitoire();
-  // Bureau en ligne : serveur de documents en conteneur séparé. Moteur = choix de plateforme (`.env`) ; l'activation
-  // par organisme est un réglage (`bureau.edition_documents`). Sans moteur, l'adaptateur simulateur garde le comportement
-  // d'aujourd'hui : dépôt manuel et conversion locale.
-  const bureauPort = assertBureauPort(bureauAdapters || (config.bureau.moteur === 'onlyoffice'
-          ? createBureauOnlyOffice({ ...config.bureau, publicBaseUrl: config.publicBaseUrl, log, sources: (buffer, meta) => transitoire.mettre(buffer, meta) })
-    : createBureauSimulateur()));
+  // Bureau en ligne : un ou deux serveurs de documents, en services séparés. Le moteur par défaut est celui du `.env`
+  // (BUREAU_MOTEUR) ; l'activation par organisme est un réglage (`bureau.edition_documents`), et le moteur qui ouvre
+  // les documents en est un autre (`bureau.moteur`, choisi par l'administration). Sans moteur, l'adaptateur simulateur
+  // garde le comportement d'aujourd'hui : dépôt manuel et conversion locale.
+  const bureauPorts = bureauAdapters || {};
+  if (!bureauAdapters) {
+    bureauPorts.simulateur = createBureauSimulateur();
+    if (config.bureau.url || config.bureau.moteur === 'onlyoffice') {
+      bureauPorts.onlyoffice = createBureauOnlyOffice({ ...config.bureau, publicBaseUrl: config.publicBaseUrl, log, sources: (buffer, meta) => transitoire.mettre(buffer, meta) });
+    }
+    // Collabora n'existe que si son adresse navigateur est configurée : sinon il n'est pas proposé par l'administration.
+    if (config.bureau.collaboraUrlNavigateur) {
+      bureauPorts.collabora = createBureauCollabora({
+        url: config.bureau.collaboraUrl, urlNavigateur: config.bureau.collaboraUrlNavigateur,
+        publicBaseUrl: config.publicBaseUrl, langue: config.bureau.langue,
+      });
+    }
+  }
+  for (const impl of Object.values(bureauPorts)) assertBureauPort(impl);
+  /** Moteur d'un organisme : son réglage s'il est déployé, sinon le moteur général du `.env`. */
+  const portBureau = async (organismeId) => {
+    const general = bureauPorts[config.bureau.moteur] || bureauPorts.simulateur;
+    const nom = (await settings.resolve(organismeId))['bureau.moteur']?.value;
+    return (nom && nom !== 'simulateur' && bureauPorts[nom]) || general;
+  };
+  // La conversion PDF emprunte le moteur de l'organisme : ONLYOFFICE rend le PDF au même titre qu'il édite, Collabora
+  // n'ayant pas de convertisseur, c'est alors le repli LibreOffice qui produit le PDF (shared/convert.js).
+  const bureauConversion = { versPdf: async (o) => (await portBureau(o.organismeId)).versPdf(o) };
   const late = {}; // services liés après coup pour éviter les dépendances circulaires (textes suivis, circuit…)
   const elus = createElus({ db, audit, directoryAdapter, log });
   late.elus = elus;
@@ -117,9 +140,9 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const redaction = createRedaction({ db, audit, access, titulaires, settings, bus });
   const acl = createActeAcl({ db, access, titulaires, settings });
   const actes = createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings });
-  const annexes = createAnnexes({ db, audit, storage, refs, actes, config, bus, uploadLimit, bureau: bureauPort });
+  const annexes = createAnnexes({ db, audit, storage, refs, actes, config, bus, uploadLimit, bureau: bureauConversion });
   bus.on('circuit.completed', (p) => annexes.finaliser(p.organismeId, p.acteId)); // validation finale : PDF des annexes Word/Excel
-  const bureau = createBureau({ db, audit, actes, annexes, access, settings, port: bureauPort, config, transitoire, log });
+  const bureau = createBureau({ db, audit, actes, annexes, access, settings, ports: bureauPorts, config, transitoire, log });
   const comments = createComments({ db, audit, actes, acl, bus });
   const textes = createTextes({ db, audit, actes, acl, bus });
   late.texts = textes;
@@ -201,7 +224,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('collecteurs', (orgId) => collecteurs.runDt(orgId)); // collecteurs d'arrêtés : passages selon leur intervalle (1h/4h/24h)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, uploadLimit, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, bureau, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs };
+  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, uploadLimit, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, bureau, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs, bureauPorts };
 }
 
 module.exports = { buildContainer };

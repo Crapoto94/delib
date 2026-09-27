@@ -9,6 +9,12 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.49.0 — Second moteur de documents : Collabora Online, au choix par organisme
+
+- **Deux moteurs, une seule traçabilité.** L'administration peut désormais choisir, **organisme par organisme**, le serveur de documents qui ouvre les annexes : **ONLYOFFICE Docs** ou **Collabora Online** (Paramétrages › Pièces jointes › *Serveur de documents*). Le sélecteur n'apparaît que si les deux sont déployés. Quel que soit le moteur, une sauvegarde reste **une version d'annexe** : même PDF, même audit, même recherche, même respect du gel après transmission. (`backend/src/adapters/bureau-collabora.js`, `backend/src/modules/bureau/wopi.js`, `frontend/src/pages/AdminPieces.tsx`.)
+- **Les deux sont déployables côte à côte** : service `collabora` du profil `bureau` et relais `/collabora-delib/` dans le frontal, comme `/office-delib/`. L'adresse publique reste unique (HTTPS, aucun certificat supplémentaire, aucun port exposé).
+- **Les différences sont assumées et documentées** (MANIFEST §36) : Collabora enregistre de lui-même et à la fin de la session — « Sauvegarder et fermer » ferme donc l'éditeur puis attend l'écriture — et ne sait pas convertir en PDF : le PDF du dossier est alors produit par LibreOffice, avec un rendu possiblement différent de celui de l'écran.
+
 ## 0.48.0 — Bureau en ligne : éditer une annexe Word, Excel ou présentation dans le navigateur
 
 - **Édition en ligne des documents (D39)** : un bouton **« Modifier »** ouvre l'annexe Word, Excel **ou présentation** dans le navigateur — plus rien à installer sur le poste, ni Word, ni plugin, ni macro. Les annexes acceptent désormais aussi les **présentations** (`.pptx`, `.ppt`, `.odp`), converties en PDF comme les autres. Chaque enregistrement (Ctrl+S) **remplace l'annexe** en passant par le circuit habituel : **nouvelle version**, **PDF régénéré**, **audit**, recherche et historique. Le gel après transmission reste respecté : l'agent qui n'a plus le droit d'ajouter de pièce ne peut pas enregistrer non plus. (`backend/src/modules/bureau/`, `frontend/src/Bureau.tsx`, `frontend/src/pages/Dossier.tsx`.)

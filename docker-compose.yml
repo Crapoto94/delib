@@ -69,6 +69,33 @@ services:
     ports: ["9980:80"]
     # Démarrage lent (migration de base interne au premier lancement) : prévoyez quelques minutes avant la première édition.
 
+  # Second moteur, au choix de l'administration (réglage « Serveur de documents », par organisme). Collabora parle WOPI
+  # (le backend est son hôte) au lieu de l'API d'ONLYOFFICE : même édition dans le navigateur, mêmes versions, mais pas
+  # de commande d'enregistrement ni de conversion PDF — le PDF passe alors par le repli LibreOffice du backend.
+  # ATTENTION : l'édition de développement (Collabora Online Development Edition, image `collabora/code`) est gratuite
+  # pour l'évaluation ; un usage en production suppose un abonnement Collabora. Le nombre de connexions simultanées est
+  # également borné. Voir MANIFEST §36.
+  collabora:
+    profiles: ["bureau"]
+    image: collabora/code:latest
+    restart: always
+    cap_add: ["MKNOD"]             # demandé par Collabora (proxies d'E/S pour l'accès direct aux fichiers)
+    environment:
+      # Hôtes acceptés par le moteur : le navigateur arrive par notre frontal, sous le même nom d'hôte que l'application.
+      # (Collabora n'a pas d'équivalent de `alias_name1` chez ONLYOFFICE : le préfixe /collabora-delib est celui de la
+      # requête, transmis par le frontal via X-Forwarded-Host — voir frontend/nginx.conf.)
+      - domain=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public de l'application requis (ex. vibedelib.ivry.local)}$
+      # Le TLS est terminé par le proxy en amont : le moteur parle HTTP en interne, et annonce des URL en https.
+      - extra_params1=--o:ssl.enable=false
+      - username=${COLLABORA_ADMIN_USER:-admin}
+      - password=${COLLABORA_ADMIN_PASSWORD:?mot de passe d'administration Collabora requis}
+      - TZ=Europe/Paris
+    volumes: ["collaboradata:/opt/cool/var/lib/cool", "collaboralogs:/var/log/collabora"]
+    depends_on: [backend]
+    # Port publié UNIQUEMENT pour le développement local (comme documentserver) ; la production passe par le frontal.
+    ports: ["9981:9980"]
+    # Démarrage lent (premier lancement) : prévoyez quelques minutes avant la première édition.
+
   # PostgreSQL local : uniquement avec --profile local-db (en production on utilise le serveur partagé du .env).
   postgres:
     profiles: ["local-db"]
@@ -87,3 +114,5 @@ volumes:
   pgdata:
   officecache:
   officelogs:
+  collaboradata:
+  collaboralogs:

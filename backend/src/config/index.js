@@ -67,12 +67,15 @@ const EnvSchema = z.object({
   AIRS_ORACLE_SERVICE: z.string().optional(),
   AIRS_ORACLE_USER: z.string().optional(),
   AIRS_ORACLE_PASSWORD: z.string().optional(),
-  // Bureau en ligne (D39) : serveur de documents, en conteneur séparé. `simulateur` = aucun moteur déployé,
-  // tout se passe comme avant (dépôt manuel, conversion LibreOffice / Office).
-  BUREAU_MOTEUR: z.enum(['simulateur', 'onlyoffice']).default('simulateur'),
-  BUREAU_URL: z.string().optional(),                 // backend          -> moteur (conversion)
-  BUREAU_URL_NAVIGATEUR: z.string().optional(),     // navigateur       -> moteur (sdk de l'éditeur)
-  BUREAU_URL_RAPPEL: z.string().optional(),          // moteur           -> backend (source + rappel)
+  // Bureau en ligne (D39) : serveur de documents, en service séparé. `simulateur` = aucun moteur déployé,
+  // tout se passe comme avant (dépôt manuel, conversion LibreOffice / Office). Deux moteurs peuvent être déployés côte à
+  // côte — le choix de celui qui ouvre les documents se fait ensuite par organisme (réglage `bureau.moteur`).
+  BUREAU_MOTEUR: z.enum(['simulateur', 'onlyoffice', 'collabora']).default('simulateur'),
+  BUREAU_URL: z.string().optional(),                 // backend          -> ONLYOFFICE (conversion)
+  BUREAU_URL_NAVIGATEUR: z.string().optional(),     // navigateur       -> ONLYOFFICE (sdk de l'éditeur)
+  BUREAU_COLLABORA_URL: z.string().optional(),      // backend          -> Collabora (diagnostic)
+  BUREAU_COLLABORA_URL_NAVIGATEUR: z.string().optional(),   // navigateur -> Collabora (iframe) ; absent = moteur non déployé
+  BUREAU_URL_RAPPEL: z.string().optional(),          // moteur           -> backend (source + rappel / WOPI)
   BUREAU_JWT_SECRET: z.string().min(24, 'BUREAU_JWT_SECRET doit faire au moins 24 caractères').optional(),
   BUREAU_LANGUE: z.string().default('fr-FR'),
   BUREAU_DELAI_MS: z.coerce.number().int().min(1000).default(60000),
@@ -100,10 +103,15 @@ function buildConfig(env = process.env) {
   if (prod && e.DEV_LOGIN_PASSWORD) throw new Error('DEV_LOGIN_PASSWORD (connexion de développement sans AD) est interdit en production.');
   if (prod && !e.CORS_ORIGINS) throw new Error('CORS_ORIGINS est obligatoire en production (jamais « * »).');
   // Un moteur de documents n'est utile que si les trois adresses et le secret partagé sont là : on le dit au démarrage
-  // plutôt que de laisser une configuration à moitié faite échouer au premier enregistrement.
+  // plutôt que de laisser une configuration à moitié faite échouer au premier enregistrement. Un moteur secondaire
+  // (Collabora) n'est simplement pas construit si son adresse navigateur manque : le réglage par organisme ne pourra
+  // alors pas le proposer, sans que ce soit une erreur de configuration.
   if (e.BUREAU_MOTEUR === 'onlyoffice') {
     const manquants = ['BUREAU_URL', 'BUREAU_URL_NAVIGATEUR', 'BUREAU_URL_RAPPEL', 'BUREAU_JWT_SECRET'].filter((k) => !e[k]);
     if (manquants.length) throw new Error(`BUREAU_MOTEUR=onlyoffice exige : ${manquants.join(', ')}`);
+  }
+  if (e.BUREAU_MOTEUR === 'collabora' && !e.BUREAU_COLLABORA_URL_NAVIGATEUR) {
+    throw new Error('BUREAU_MOTEUR=collabora exige : BUREAU_COLLABORA_URL_NAVIGATEUR');
   }
   return Object.freeze({
     env: e.NODE_ENV,
@@ -150,10 +158,14 @@ function buildConfig(env = process.env) {
       connectString: e.AIRS_ORACLE_HOST ? `${e.AIRS_ORACLE_HOST}:${e.AIRS_ORACLE_PORT}/${e.AIRS_ORACLE_SERVICE}` : null,
     }),
     // `moteur: 'simulateur'` : aucun serveur de documents, le dépôt manuel et la conversion locale restent le seul chemin.
+    // `collabora` est proposé en plus s'il est configuré (`BUREAU_COLLABORA_URL_NAVIGATEUR`) : les deux moteurs peuvent
+    // être déployés ensemble, le choix se fait ensuite par organisme.
     bureau: Object.freeze({
       moteur: e.BUREAU_MOTEUR,
       url: e.BUREAU_URL || null,
       urlNavigateur: e.BUREAU_URL_NAVIGATEUR || null,
+      collaboraUrl: e.BUREAU_COLLABORA_URL || null,
+      collaboraUrlNavigateur: e.BUREAU_COLLABORA_URL_NAVIGATEUR || null,
       urlRappel: e.BUREAU_URL_RAPPEL || null,
       jwtSecret: e.BUREAU_JWT_SECRET || null,
       langue: e.BUREAU_LANGUE,

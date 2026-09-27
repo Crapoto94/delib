@@ -2032,7 +2032,7 @@ Gabarits Word et documents produits, éditeur enrichi, bibliothèque multi-docum
 ### Pied de page
 - Le **numéro de version** du pied de page est **cliquable** : il ouvre le **« Nouveautés de VibeDélib »** (what's new), **journal des versions paginé** — une version par page, navigation « Plus récent / Plus ancien ». (`frontend/src/NouveautesModal.tsx`, `nouveautes.ts`.)
 
-## 35. Bureau en ligne — édition Word / Excel dans le navigateur (D39)
+## 35. Bureau en ligne — édition Word / Excel / présentation dans le navigateur (D39)
 
 Éditer une annexe sans Word sur le poste : l'agent ouvre le document dans le navigateur, il enregistre (Ctrl+S), et
 l'annexe est **remplacée** dans le dossier avec sa version, son PDF, son audit. Aucun plugin, aucune macro, rien à
@@ -2179,10 +2179,118 @@ de document, et le moteur appelle simplement celle qu'on lui donne. Rien n'est d
 ### Licence et limites connues
 
 - **OnlyOffice Community est sous AGPL-3.0 et limité en connexions simultanées** : au-delà, il faut une licence
-  OnlyOffice Server (commerciale). Le choix du moteur reste ouvert par le port `BureauPort` (Collabora, etc.).
+  OnlyOffice Server (commerciale). Le choix du moteur reste ouvert : **Collabora Online est aussi implémenté** (§36).
 - Un **seul auteur à la fois** par annexe (session d'édition verrouillée par annexe) : le second agent obtient « déjà
   en cours d'édition ». À l'intérieur d'une session, le moteur reste collaboratif (curseurs, présence).
 - La relecture est faite **par le backend** : au-delà d'un fichier de plusieurs dizaines de Mo, la sauvegarde peut
   dépasser le délai du rappel. Le PDF reste produit par la même voie (moteur), avec repli LibreOffice/Office.
 - Le PDF des annexes éditées est donc **rendu par le même moteur** que l'écran de l'agent : pas d'écart de rendu
-  Word/LibreOffice.
+  Word/LibreOffice — sauf si l'organisme a choisi Collabora (§36), qui ne convertit pas.
+
+## 36. Second moteur : Collabora Online (WOPI), au choix par organisme
+
+Deux moteurs de documents sont implémentés derrière le **même port** `BureauPort` et **la même traçabilité** : l'écriture
+passe toujours par `remplacerDepuisBureau` (version, PDF, audit, recherche, gel après transmission). Ce qui change, c'est
+le **transport**, parce que les deux produits n'ont pas la même architecture.
+
+| | ONLYOFFICE Docs | Collabora Online |
+|---|---|---|
+| Protocole | API REST + SDK JavaScript | **WOPI** (le moteur est client, nous sommes l'hôte) |
+| Intégration page | `DocsAPI.DocEditor` dans un conteneur | une **iframe** (`cool.html?WOPISrc=…`) |
+| Récupération du fichier | le moteur appelle notre route | `GET /wopi/:cle/contents` (GetFile) |
+| Enregistrement | **rappel** à chaque sauvegarde (jeton HS256) | **PutFile** : le moteur nous rapporte le fichier |
+| « Enregistrer maintenant » | commande serveur (`POST /command`) | **n'existe pas** → c'est la **fin de session** qui écrit |
+| Conversion PDF | `/converter` (même rendu que l'écran) | **n'existe pas** → repli **LibreOffice** du backend |
+| Format | docx/xlsx/pptx, odt/ods/odp, rtf, txt, csv… | idem (LibreOffice) |
+
+### Ce que l'interface sait faire des deux
+
+Le backend renvoie soit `{ sdk, config }` (un script + une configuration signée), soit `{ src }` (l'adresse d'une
+iframe) : `frontend/src/Bureau.tsx` traite les deux, sans rien savoir du moteur. Il n'y a **aucune URL, aucun secret et
+aucun nom de moteur dans le front**. `capabilities()` renvoie en plus `moteur` et `moteurs` (ce qui est réellement
+déployé), et l'administration s'en sert pour proposer un sélecteur.
+
+### Ce qui change pour « Sauvegarder et fermer »
+
+- ONLYOFFICE : le serveur ordonne l'enregistrement, puis **attend** la version créée.
+- Collabora : aucun équivalent. Le front **retire d'abord l'iframe** — mettre fin à la session fait écrire le document
+  par le moteur — puis demande la version au backend, qui attend l'écriture (12 s) et, si rien n'arrive, répond
+  « rien à enregistrer » (l'agent avait déjà enregistré, ou n'avait rien modifié). C'est un résultat **positif** :
+  Collabora enregistre aussi tout seul, à intervalle régulier.
+
+### Hôte WOPI (`backend/src/modules/bureau/wopi.js`)
+
+Cinq points d'entrée, tous publics, tous protégés par la **clé de session qui est aussi le jeton d'accès** :
+
+```
+GET  /api/v1/public/bureau/wopi/:cle            CheckFileInfo
+GET  /api/v1/public/bureau/wopi/:cle/contents   GetFile
+POST /api/v1/public/bureau/wopi/:cle/contents   PutFile      (X-WOPI-Override: PUT)
+POST /api/v1/public/bureau/wopi/:cle            LOCK / UNLOCK / REFRESH_LOCK / GET_LOCK
+GET  /api/v1/public/bureau/wopi/:cle/verrou-utilisateur   GET_RANDOM_USER_ID
+```
+
+Points à ne pas manquer :
+
+1. **La clé de session EST le jeton d'accès** (128 bits, en base, expirante). Pas de secret WOPI supplémentaire à
+   partager, et `moteur = 'collabora'` sur la ligne de session est ce qui autorise Collabora à agir : une clé d'une
+   session ouverte par un autre moteur, ou devinée, ne trouve rien à servir.
+2. **PutFile est binaire** : `express.raw` est monté sur `/api/v1/public/bureau/wopi` (`app.js`), sinon l'analyseur JSON
+   global ignore le corps et le document arrive vide.
+3. **Le verrou d'écriture** est exigé : sans `X-WOPI-Lock` correspondant à celui rendu par LOCK, la réponse est
+   **409** (protocole), pas une écriture.
+4. Un refus métier (droit, gel après transmission) répond `{"Status": 1}` : **200 + refus**, sinon Collabora réessaie en
+   boucle.
+
+### Choix du moteur par organisme
+
+- Réglage **`bureau.moteur`**, portée organisme (paramètre hiérarchique) : `onlyoffice` | `collabora` | *héritage du
+  `.env`*. Only **Administration › Pièces jointes › Serveur de documents**, et seulement si les deux moteurs sont
+  déployés (le sélecteur n'apparaît pas sinon).
+- Le backend construit **tous** les moteurs configurés au démarrage ; `bureau.service` choisit par organisme à chaque
+  ouverture. `BUREAU_COLLABORA_URL_NAVIGATEUR` absent = Collabora non déployé = jamais proposé.
+- Le **moteur de l'organisme rend aussi le PDF** : avec Collabora, la conversion passe par LibreOffice, donc le PDF peut
+  différer de ce que l'agent voit à l'écran (Word en compatibilité, polices, pagination). C'est le compromis assumé de ce
+  moteur.
+
+### Mise en production (Docker)
+
+```bash
+# .env racine
+BUREAU_COLLABORA_URL=http://collabora:9980
+BUREAU_COLLABORA_URL_NAVIGATEUR=/collabora-delib        # relais du frontal, comme /office-delib
+BUREAU_HOTE_PUBLIQUE=vibedelib.ivry.local              # liste des hôtes acceptés par Collabora (compose)
+COLLABORA_ADMIN_PASSWORD=<mot de passe>                 # administration du moteur
+```
+
+```bash
+docker compose --profile bureau up -d
+docker compose logs -f collabora                        # premier démarrage : quelques minutes
+```
+
+Quatre points spécifiques, tous dans le compose ou le frontal :
+
+1. **Le relais nginx duplique celui d'ONLYOFFICE`** (`/collabora-delib/`, `X-Forwarded-Proto https`,
+   `X-Forwarded-Host $host/collabora-delib`, `X-Forwarded-Prefix ""`, `rewrite` du préfixe) : sans ces en-têtes
+   Collabora construit ses URL en `http://…` et l'iframe est bloquée en page HTTPS. Collabora n'a pas d'équivalent de
+   `alias_name1` chez ONLYOFFICE : le préfixe `/collabora-delib` est celui de la requête, que le frontal transmet.
+2. **`domain=${BUREAU_HOTE_PUBLIQUE}$`** : Collabora n'accepte que les hôtes autorisés, et le sien est le nôtre
+   (le navigateur passe par le frontal).
+3. **`cap_add: MKNOD`** est requis par Collabora.
+4. `extra_params1=--o:ssl.enable=false` : le TLS est terminé en amont.
+
+**Licence — à trancher avant un usage réel** : l'image `collabora/code` est l'édition de **développement** (gratuite pour
+l'évaluation) ; un usage en production suppose un **abonnement Collabora**, et les connexions simultanées y sont
+bornées — comme pour OnlyOffice Community. Le port `BureauPort` permet de changer d'édition (et de moteur) sans
+toucher au code.
+
+### Vérification
+
+```bash
+curl https://<app>/collabora-delib/hosting/discovery   # le moteur répond
+curl -H "X-WOPI-Override: CHECK_FILE_INFO" \
+     "https://<app>/api/v1/public/bureau/wopi/<cle>?access_token=<cle>" -i   # 200 + l'état du document
+```
+
+Une annexe ouverte avec Collabora doit produire, dans les logs du backend, `annexe enregistrée depuis le bureau en ligne`
+avec `moteur: collabora`.

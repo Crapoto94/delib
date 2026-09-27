@@ -5,18 +5,22 @@ import { useAuth } from './auth';
 import { Spinner } from './ui';
 
 /**
- * Bureau en ligne — édition d'une annexe Word / Excel dans le navigateur (D39).
+ * Bureau en ligne — édition d'une annexe Word / Excel / présentation dans le navigateur (D39).
  *
  * Rien à installer sur le poste : le moteur de documents est un service du serveur, et l'agent travaille dans cette
- * fenêtre. Chaque enregistrement (Ctrl+S ou bouton de l'éditeur) remonte au backend, qui en fait une version de
- * l'annexe, régénère le PDF du dossier et réindexe la recherche. Fermer la fenêtre ne perd donc rien : c'est
- * voluntarily l'inverse du traitement de texte classique où il faut « enregistrer puis fermer ».
+ * fenêtre. Chaque enregistrement remonte au backend, qui en fait une version de l'annexe, régénère le PDF du dossier et
+ * réindexe la recherche. Fermer la fenêtre ne perd donc rien : c'est volontairement l'inverse du traitement de texte
+ * classique où il faut « enregistrer puis fermer ».
  *
- * L'interface ne parle JAMAIS directement au moteur : elle charge le SDK (servi par le frontal, sous /office/) et lui
- * passe la configuration signée préparée par le backend. Aucune URL, aucun secret dans le code du front.
+ * L'interface ne parle JAMAIS directement au moteur : le backend lui renvoie soit le SDK d'ONLYOFFICE (un script + une
+ * configuration signée), soit l'adresse d'une iframe Collabora. Aucune URL, aucun secret dans le code du front.
+ *
+ * Les deux moteurs n'ont pas la même notion de « sauvegarder maintenant » : ONLYOFFICE accepte une commande du serveur,
+ * Collabora enregistre à intervalle régulier et **à la fermeture de la session**. « Sauvegarder et fermer » ferme donc la
+ * fenêtre d'édition avant de demander la version au backend (voir `fermer`).
  */
 
-type Capa = { enabled: boolean; formats: string[]; raison?: string };
+type Capa = { enabled: boolean; formats: string[]; moteur?: string; moteurs?: string[]; raison?: string };
 
 /** Le SDK du moteur est un script unique : on ne l'injecte qu'une fois par session du navigateur. */
 let sdkCharge: Promise<void> | null = null;
@@ -55,22 +59,55 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
   const zone = useRef<HTMLDivElement>(null);
   const editeur = useRef<any>(null);
   const cle = useRef<string | null>(null);   // clé de session remise par le backend à l'ouverture
+  const moteur = useRef<string>('');          // 'onlyoffice' ou 'collabora' : la fermeture ne se fait pas de la même façon
   const modifie = useRef(false);             // au moins une modification depuis l'ouverture
   const fermeApres = useRef(false);          // l'agent a demandé « Sauvegarder et fermer »
   const [erreur, setErreur] = useState<string | null>(null);
   const [etat, setEtat] = useState<'chargement' | 'enregistrement' | 'pret' | 'enregistre'>('chargement');
   const { org } = useAuth();
   const o = org!.id;
+  // `fermer` est défini plus bas : les messages reçus de Collabora y accèdent par cette référence.
+  const fermerRef = useRef<(() => void) | null>(null);
+
+  /** Retire la fenêtre d'édition : c'est ce qui, chez Collabora, fait écrire le document par le moteur. */
+  const terminer = () => {
+    try { editeur.current?.destroyEditor(); } catch { /* déjà détruit */ }
+    editeur.current = null;
+    if (zone.current) zone.current.replaceChildren();
+  };
 
   useEffect(() => {
     let vivant = true;
     (async () => {
       try {
-        // 1. le backend prépare la session d'édition et renvoie la configuration signée
+        // 1. le backend prépare la session d'édition et renvoie soit la configuration signée (ONLYOFFICE), soit
+        //    l'adresse de l'iframe (Collabora)
         const r = await api.post(orgPath(o, `/actes/${acteId}/annexes/${annexe.id}/ouvrir`), {});
         if (!vivant) return;
         cle.current = r.data.cle;
-        // 2. le SDK du moteur (servi sur sa propre origine)
+        moteur.current = String(r.data.moteur || 'onlyoffice');
+        if (!zone.current) return;
+        if (r.data.src) {
+          // ---- Collabora : une iframe. Elle REMPLACE elle aussi le contenu de la zone, et sa fin de session est ce
+          // qui déclenche l'enregistrement : on la supprime au moment de fermer (voir `fermer`), pas après.
+          const cadre = document.createElement('iframe');
+          cadre.id = `bureau-${Math.random().toString(36).slice(2)}`;
+          cadre.src = r.data.src;
+          cadre.title = `Édition de ${annexe.titre || annexe.fichier?.nom}`;
+          cadre.style.width = '100%'; cadre.style.height = '100%'; cadre.style.border = '0';
+          cadre.allow = 'clipboard-read; clipboard-write';
+          zone.current.appendChild(cadre);
+          // L'éditeur peut nous demander de fermer (Cmd/Ctrl+W) : c'est une fermeture « sauvegarder et fermer ».
+          const ecouteur = (e: MessageEvent) => {
+            if (e.origin !== window.location.origin) return;      // seul notre propre moteur nous parle
+            if (e.data?.MessageId === 'App_Close') fermerRef.current?.();
+            if (e.data?.MessageId === 'App_Error') setErreur("Le module d'édition a rencontré une erreur.");
+          };
+          window.addEventListener('message', ecouteur);
+          setEtat('pret');
+          return () => window.removeEventListener('message', ecouteur);
+        }
+        // 2. ONLYOFFICE : le SDK du moteur (servi sur sa propre origine)
         await chargeSdk(r.data.sdk);
         if (!vivant || !zone.current) return;
         // 3. l'éditeur prend la main. Le SDK REMPLACE l'élément qu'on lui donne : on lui confie donc un enfant créé
@@ -106,16 +143,19 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
   }, [acteId, annexe.id]);
 
   /**
-   * « Sauvegarder et fermer ». En mode strict (ONLYOFFICE sans enregistrement automatique), les modifications de
-   * l'agent ne sont intégrées au document QUE lorsqu'un enregistrement est déclenché dans l'éditeur : c'est donc lui
-   * qui enregistre, et le backend attend ensuite la version réellement créée (voir `POST …/enregistrer`). Sans cela,
-   * fermer l'onglet perdrait les dernières frappes — c'était le défaut d'un simple « Fermer ».
+   * « Sauvegarder et fermer ».
+   *  - ONLYOFFICE : la commande part du serveur, qui attend la version réellement créée (voir `POST …/enregistrer`).
+   *    Fermer l'onglet ensuite n'annule rien.
+   *  - Collabora : on retire d'abord la fenêtre d'édition — c'est ce qui fait écrire le document par le moteur — puis on
+   *    demande au backend la version, qui attend cette écriture.
+   * Sans cela, chez Collabora, fermer l'onglet perdrait les dernières frappes.
    */
   const fermer = () => {
     if (fermeApres.current) return;                        // clic déjà pris en compte
     if (!cle.current) { onEnregistre(); onClose(); return; }
     fermeApres.current = true;
     setEtat('enregistrement');
+    if (moteur.current === 'collabora') terminer();
     api.post(orgPath(o, `/actes/${acteId}/annexes/${annexe.id}/enregistrer`), { cle: cle.current })
       .then((r) => { if (r.data && r.data.enregistre === false && r.data.raison) avertir(r.data.raison); })
       .catch((e) => avertir(errMsg(e)))
@@ -127,6 +167,7 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
         setTimeout(onEnregistre, 5000);
       });
   };
+  fermerRef.current = fermer;   // Collabora peut demander la fermeture (Cmd/Ctrl+W) : il passe par ici.
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={`Édition de ${annexe.titre}`}>

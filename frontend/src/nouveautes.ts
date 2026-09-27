@@ -11,9 +11,18 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.48.0';
+export const VERSION = '0.49.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.49.0', type: 'minor', titre: 'Deux serveurs de documents au choix, organisme par organisme',
+    items: [
+      "L'administration choisit, pour chaque organisme, le serveur de documents qui ouvre les annexes : ONLYOFFICE Docs ou Collabora Online (Paramétrages, Pièces jointes).",
+      "Les deux peuvent être déployés ensemble ; le sélecteur n'apparaît que si les deux le sont.",
+      "Quelle que soit l'option, un enregistrement reste une version d'annexe : même PDF, même audit, même recherche, même gel après transmission.",
+      "Collabora enregistre de lui-même (et à la fermeture de l'éditeur) ; son PDF est produit par LibreOffice, il peut donc différer légèrement de l'écran.",
+    ],
+  },
   {
     version: '0.48.0', type: 'minor', titre: 'Bureau en ligne : éditer une annexe Word, Excel ou présentation dans le navigateur',
     items: [

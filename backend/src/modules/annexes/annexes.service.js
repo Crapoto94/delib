@@ -64,7 +64,10 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bure
       if (!row) throw E.notFound('Annexe introuvable');
       if (row.pdf_file_id && !force) return row.pdf_file_id;
       if (row.mime === 'application/pdf' && !force) { await db.run('UPDATE annexes SET pdf_file_id = file_id WHERE id = $1', [annexeId]); return row.file_id; }
-      const r = await convertirEnPdfTrace(await storage.get(row.storage_key), extOf(row.original_name), { moteur: bureau });
+      // Le moteur est celui de l'organisme (`bureau.versPdf({ buffer, ext, organismeId })`) : s'il sait rendre le PDF,
+      // c'est lui qui le fait, sinon convert.js passe au repli LibreOffice / Office.
+      const r = await convertirEnPdfTrace(await storage.get(row.storage_key), extOf(row.original_name),
+        { moteur: { versPdf: (o) => bureau.versPdf({ ...o, organismeId }) } });
       if (!r) throw E.incomplete('Conversion en PDF indisponible sur le serveur (moteur de document ou LibreOffice requis)');
       const pdf = r.buffer;
       const info = await inspectPdf(pdf);

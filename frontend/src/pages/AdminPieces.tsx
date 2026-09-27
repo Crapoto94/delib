@@ -8,8 +8,15 @@ import { useBureau } from '../Bureau';
 /**
  * Paramétrage « Pièces jointes » : taille maximale d'un fichier joint à un dossier (annexes PDF) ou à un
  * dossier simple de l'ordre du jour. Défaut 30 Mo, borné par le plafond technique du serveur (`MAX_UPLOAD_MB`),
- * et édition en ligne des annexes Word/Excel dans le navigateur (bureau en ligne).
+ * et édition en ligne des annexes Word / Excel / présentation dans le navigateur (bureau en ligne), avec le choix
+ * du moteur de documents — ONLYOFFICE ou Collabora — pour l'organisme.
  */
+
+const LIBELLES_MOTEURS: Record<string, string> = {
+  onlyoffice: 'ONLYOFFICE Docs',
+  collabora: 'Collabora Online',
+};
+
 export default function AdminPieces() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const d = useLoad(async () => (await api.get(orgPath(o, '/fichiers/limite'))).data as { tailleMaxMo: number; defautMo: number; maximumMo: number }, [o]);
@@ -23,6 +30,18 @@ export default function AdminPieces() {
   const basculerBureau = async (v: boolean) => {
     try { await api.put(orgPath(o, '/settings/bureau.edition_documents'), { value: v, scope: 'organisme' }); reglage.reload(); toast(v ? 'Édition en ligne activée' : 'Édition en ligne désactivée (dépôt manuel conservé)'); }
     catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  // Moteur du `.env` tant qu'aucun choix n'est fait pour l'organisme : « inheritant » = moteur général de l'instance.
+  const INHERITANT = 'auto';
+  const moteurChoisi = String(reglage.data?.['bureau.moteur']?.value || INHERITANT);
+  const moteursDeployes = bureau?.moteurs?.length ? bureau.moteurs : (bureau?.moteur ? [bureau.moteur] : []);
+  const changerMoteur = async (v: string) => {
+    try {
+      if (v === INHERITANT) await api.delete(orgPath(o, '/settings/bureau.moteur'), { params: { scope: 'organisme' } });
+      else await api.put(orgPath(o, '/settings/bureau.moteur'), { value: v, scope: 'organisme' });
+      reglage.reload();
+      toast('Moteur d’édition enregistré');
+    } catch (e) { toast(errMsg(e), 'ko'); }
   };
   const save = async () => {
     setBusy(true);
@@ -57,6 +76,17 @@ export default function AdminPieces() {
               <input type="checkbox" className="mt-1" checked={bureauOn} onChange={(e) => basculerBureau(e.target.checked)} />
               <span>Autoriser l'édition en ligne pour cet organisme{!bureauOn && <em className="block text-[12px] text-mute">Les agents continueront de déposer leurs fichiers ; rien n'est perdu à la désactivation.</em>}</span>
             </label>
+            {moteursDeployes.length > 1 && (
+              <div className="mt-4 border-t border-line pt-4">
+                <Field label="Serveur de documents" hint="Les deux moteurs savent éditer les mêmes formats et produisent le même circuit de version. Ils diffèrent sur le rendu : ONLYOFFICE convertit aussi en PDF, Collabora s'appuie sur LibreOffice. Le choix ne concerne que cet organisme.">
+                  <select className="input w-72" value={moteurChoisi} onChange={(e) => changerMoteur(e.target.value)}>
+                    <option value={INHERITANT}>Moteur de l’instance ({LIBELLES_MOTEURS[bureau.moteur || ''] || bureau.moteur})</option>
+                    {moteursDeployes.map((m) => <option key={m} value={m}>{LIBELLES_MOTEURS[m] || m}</option>)}
+                  </select>
+                </Field>
+                <p className="text-[12px] text-mute">Moteur actuellement utilisé par cet organisme : <strong>{LIBELLES_MOTEURS[moteurChoisi === INHERITANT ? (bureau.moteur || '') : moteurChoisi] || moteurChoisi}</strong>.</p>
+              </div>
+            )}
           </>
         ) : (
           <p className="text-[13px] text-mute">Aucun serveur de documents n'est déployé sur cette instance : le dépôt de fichiers et la conversion en PDF fonctionnent comme d'habitude.{bureau?.raison ? ` (${bureau.raison})` : ''}</p>

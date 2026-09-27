@@ -17,14 +17,24 @@
  *
  * BureauPort (« bureau en ligne » : éditer un document Office dans le navigateur, sans Word sur le poste) :
  *   capabilities()                    -> { enabled, formats: ['docx', 'xlsx', …], mobile, moteur }
- *   open({ cle, nom, mime, url, user, mobile }) -> { sdk?, src?, config? }   // ce que le navigateur charge
+ *   open({ cle, nom, mime, url, urlRappel, user, mobile }) -> { sdk?, src?, config? }  // ce que le navigateur charge
  *   verifyCallback(req)              -> { ok, payload, jeton }             // authentifie le rappel du moteur
  *   readBack({ url, filetype, jeton })-> { buffer, ext } | null            // relit le document renvoyé
- *   forcerSauvegarde(cle)            -> bool                               // demande au moteur d'enregistrer maintenant
+ *   forcerSauvegarde(cle)            -> { ok, inchange?, fermeture? }      // enregistre maintenant, ou à la fermeture
  *   versPdf({ buffer, ext })         -> { buffer, moteur } | null           // conversion PDF mutualisée
  * La `cle` est l'identité du aller-retour (`annexe:<id>:v<version>:<auteur>:<nonce>`) : elle porte l'auteur, la version
  * attendue et la clé de session du moteur. Le port ne fait que le transport ; les droits, la version, l'audit et le PDF
  * restent dans le module `bureau` et le module `annexes`.
+ *
+ * Deux moteurs implémentent ce contrat, et le module `bureau` construit les DEUX pour qu'une administration puisse
+ * choisir, par organisme, lequel ouvre les documents :
+ *   - ONLYOFFICE Docs : `open()` renvoie un `sdk` (script) + `config` signée, le moteur nous RAPPELLE à chaque
+ *     enregistrement (`verifyCallback`, `readBack`) et accepte une commande d'enregistrement (`forcerSauvegarde`) ;
+ *   - Collabora Online : `open()` renvoie une `src` d'iframe, le moteur tire le document et le rapporte selon le
+ *     protocole WOPI (routes `/public/bureau/wopi/*`), sans commande d'enregistrement ni conversion. Ces deux
+ *     différences sont facultatives côté port : `open` renvoie `{ src }` au lieu de `{ sdk, config }`, et
+ *     `forcerSauvegarde` renvoie `{ fermeture: true }` (c'est la fin de session qui écrit le document), `versPdf`
+ *     renvoie `null` (le repli LibreOffice produit alors le PDF).
  */
 const AUTH_METHODS = ['authenticate', 'getUser', 'searchUsers', 'ping'];
 const DIRECTORY_METHODS = ['listDirections', 'getOrganisationChart', 'searchAgents', 'getAgentByEmail', 'ping'];

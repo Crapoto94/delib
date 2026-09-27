@@ -89,6 +89,11 @@ function createApp(c) {
   });
   // 20 Mo : les textes peuvent contenir des images (data-URL) collées dans l'éditeur.
   app.use(express.json({ limit: '20mb' }));
+  // WOPI (Collabora) : le moteur nous RAPPORTE le document en binaire (PutFile, `Content-Type: application/octet-stream`).
+  // L'analyseur JSON ci-dessus ignore un corps qui n'est pas du JSON — le document arriverait donc vide. Celui-ci le prend
+  // tel quel ; il est posé APRÈS, donc seulement pour ce chemin, et le format du protocole garantit qu'il n'y a rien à
+  // désamorcer (PutFile est le seul appel WOPI avec un corps, et il est binaire).
+  app.use('/api/v1/public/bureau/wopi', express.raw({ type: '*/*', limit: '64mb' }));
 
   const mw = createAuthMiddleware({ config, sessions: c.sessions, access: c.access, organismes: c.organismes });
   mw.authenticateElu = c.eluAuth.authenticate;

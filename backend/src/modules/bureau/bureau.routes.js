@@ -7,6 +7,7 @@
  *     clé opaque (source de la session) ou le jeton HS256 partagé (rappel de sauvegarde).
  */
 const { z } = require('zod');
+const creerWopi = require('./wopi');
 
 const Id = z.coerce.number().int().positive();
 const Org = z.object({ orgId: Id });
@@ -16,7 +17,7 @@ const Cle = z.object({ cle: z.string().regex(/^[0-9a-f]{32}$/, 'clé invalide') 
 const CleSession = z.object({ cle: z.string().regex(/^[0-9a-f]{32}$/, 'clé de session invalide') });
 const T = ['bureau'];
 
-module.exports = ({ makeRouter, bureau }) => {
+module.exports = ({ makeRouter, bureau, bureauPorts }) => {
   const org = makeRouter('/api/v1/organismes/:orgId');
   org.get('/bureau', { summary: 'Bureau en ligne : disponibilité et formats éditables', tags: T, org: true, params: Org },
     async (req, res) => res.json(await bureau.capabilities(req.ctx, req.org.id)));
@@ -63,5 +64,28 @@ module.exports = ({ makeRouter, bureau }) => {
       res.set({ 'Content-Type': c.mime, 'Content-Disposition': `attachment; filename="${encodeURIComponent(c.nom)}"`, 'Cache-Control': 'private, no-store' }).send(c.buffer);
     });
 
-  return [org, r, pub];
+  // ---- hôte WOPI (Collabora). Mêmes précautions que ci-dessus : pas de limiteur (le moteur appelle en boucle pendant
+  // une session) et pas de session applicative (c'est Collabora qui appelle). La clé de session EST son jeton d'accès.
+  const wopiPort = bureauPorts?.collabora;
+  const wopi = wopiPort ? creerWopi({ bureau, port: wopiPort }) : null;
+  let w = null;
+  if (wopi) {
+    w = makeRouter('/api/v1/public/bureau/wopi');
+    w.get('/:cle', { summary: 'WOPI : état du document (CheckFileInfo)', tags: T, auth: false, params: Cle },
+      async (req, res) => wopi.checkFileInfo(req, res));
+    w.get('/:cle/contents', { summary: 'WOPI : document à éditer (GetFile)', tags: T, auth: false, params: Cle, responses: { 200: 'Fichier' } },
+      async (req, res) => wopi.getFile(req, res));
+    w.post('/:cle/contents', { summary: 'WOPI : document enregistré (PutFile)', tags: T, auth: false, params: Cle },
+      async (req, res) => wopi.putFile(req, res));
+    w.post('/:cle', { summary: 'WOPI : verrou d’écriture (LOCK / UNLOCK / REFRESH_LOCK / GET_LOCK)', tags: T, auth: false, params: Cle },
+      async (req, res) => wopi.verrou(req, res));
+    w.get('/:cle/verrou-utilisateur', { summary: 'WOPI : identifiant d’utilisateur (GET_RANDOM_USER_ID)', tags: T, auth: false, params: Cle },
+      async (req, res) => wopi.randomUserId(req, res));
+    for (const action of ['renommer', 'lien-partage', 'cobalt']) {
+      w.post(`/:cle/${action}`, { summary: `WOPI : ${action} (non pris en charge)`, tags: T, auth: false, params: Cle },
+        async (req, res) => wopi.nonSoute(req, res));
+    }
+  }
+
+  return [org, r, pub, ...(w ? [w] : [])];
 };
