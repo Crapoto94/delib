@@ -14,11 +14,13 @@ const STATUTS: Record<string, { t: string; tone: 'ok' | 'warn' | 'ko' | 'gray' }
   erreur: { t: 'Erreur', tone: 'ko' }, doublon: { t: 'Doublon', tone: 'gray' }, recu: { t: 'Reçu', tone: 'gray' },
 };
 
-const vide = () => ({
-  id: null as number | null, nom: '', type: 'dossier' as 'mail' | 'dossier', actif: true, intervalle: '24h',
-  typeArreteId: '' as number | '', eluId: '' as number | '', emailRetour: '',
-  graphMailbox: '', retraitMail: true,
-  cible: '', utilisateur: '', motDePasse: '', sousDossiers: 'gauche', mouvement: 'deplacer', dossierSignes: '',
+  const vide = () => ({
+    id: null as number | null, nom: '', type: 'dossier' as 'mail' | 'dossier', actif: true, intervalle: '24h',
+    typeArreteId: '' as number | '', eluId: '' as number | '', emailRetour: '',
+    graphMailbox: '', retraitMail: true,
+    cible: '', utilisateur: '', motDePasse: '', sousDossiers: 'gauche', mouvement: 'deplacer', dossierSignes: '',
+    natureId: '' as number | '', matiereId: '' as number | '', rubriqueId: '' as number | '',
+    directionCode: '', directionLabel: '', confidentialite: 'normale', circuitId: '' as number | '',
 });
 
 /** Collecteurs d'arrêtés : moisson d'une boîte mail (Microsoft Graph) ou d'un dossier de partage, analyse IA et envoi en signature. */
@@ -27,6 +29,12 @@ export default function AdminCollecteurs() {
   const liste = useLoad(async () => (await api.get(orgPath(o, '/collecteurs'))).data.items as any[], [o]);
   const types = useLoad(async () => (await api.get(orgPath(o, '/collecteurs/types'))).data.items as any[], [o]);
   const elus = useLoad(async () => (await api.get(orgPath(o, '/elus'), { params: { actif: true } })).data.items as any[], [o]);
+  // Classement et suite donnée à l'arrêté : mêmes référentiels que la fiche d'un acte, plus les circuits publiés.
+  const natures = useLoad(async () => (await api.get(orgPath(o, '/referentiels/nature'))).data.items as any[], [o]);
+  const matieres = useLoad(async () => (await api.get(orgPath(o, '/referentiels/matiere'))).data.items as any[], [o]);
+  const rubriques = useLoad(async () => (await api.get(orgPath(o, '/referentiels/rubrique'))).data.items as any[], [o]);
+  const organigramme = useLoad(async () => (await api.get(orgPath(o, '/organigramme'))).data.items as any[], [o]);
+  const circuits = useLoad(async () => (await api.get(orgPath(o, '/circuits'))).data.items as any[], [o]);
   const [f, setF] = useState<any>(null); const [busy, setBusy] = useState<string | null>(null);
   const [journal, setJournal] = useState<any[] | null>(null); const [journalDe, setJournalDe] = useState<any>(null);
   const [nouveauType, setNouveauType] = useState('');
@@ -36,11 +44,22 @@ export default function AdminCollecteurs() {
     typeArreteId: c.typeArreteId ?? '', eluId: c.eluId ?? '', emailRetour: c.emailRetour || '',
     graphMailbox: c.mailbox || '', retraitMail: c.retraitMail !== false,
     cible: c.cible || '', utilisateur: c.utilisateur || '', motDePasse: '', sousDossiers: c.sousDossiers || 'gauche', mouvement: c.mouvement || 'deplacer', dossierSignes: c.dossierSignes || '',
+    natureId: c.natureId ?? '', matiereId: c.matiereId ?? '', rubriqueId: c.rubriqueId ?? '',
+    directionCode: c.directionCode || '', directionLabel: c.directionLabel || '', confidentialite: c.confidentialite || 'normale', circuitId: c.circuitId ?? '',
   } : vide());
 
   const corps = () => {
     const config: any = {};
     if (f.dossierSignes) config.dossierSignes = f.dossierSignes;
+    // Classement de l'arrêté fabriqué : identifiants des référentiels, direction, communicabilité et circuit.
+    // Vide = l'IA propose (ou l'arrêté reste à compléter) ; null explicite = on efface le réglage.
+    config.natureId = f.natureId || null; config.matiereId = f.matiereId || null; config.rubriqueId = f.rubriqueId || null;
+    config.directionCode = f.directionCode || null;
+    // Le libellé accompagne le code : l'arrêté porte ainsi le nom complet de la direction (et non son code) même si
+    // l'organigramme change ensuite.
+    config.directionLabel = f.directionLabel || null;
+    config.confidentialite = f.confidentialite === 'confidentiel' ? 'confidentiel' : 'normale';
+    config.circuitId = f.circuitId || null;
     if (f.type === 'mail') {
       if (f.graphMailbox.trim()) config.graphMailbox = f.graphMailbox.trim();
       config.retraitMail = !!f.retraitMail;
@@ -181,9 +200,44 @@ export default function AdminCollecteurs() {
               </Field>
             </div>
 
+            {/* Classement de l'arrêté produit : ce qui n'est pas fixé ici est proposé par l'IA au moment de la collecte
+                (si la consigne « collecteurs » est active), et reste modifiable dans le dossier. */}
+            <div className="grid gap-3 rounded border border-line p-3 md:grid-cols-2">
+              <p className="text-[12px] text-mute md:col-span-2">
+                Classement et suite donnée à l'arrêté fabriqué. <b>Chaque champ laissé vide est proposé par l'IA</b> (consigne
+                « Analyse des arrêtés collectés »), puis reste modifiable dans le dossier.
+              </p>
+              <Field label="Nature"><Select className="input" value={f.natureId} onChange={(e) => setF({ ...f, natureId: e.target.value ? Number(e.target.value) : '' })}>
+                <option value="">— selon l'IA —</option>{natures.data?.map((x) => <option key={x.id} value={x.id}>{x.libelle}</option>)}
+              </Select></Field>
+              <Field label="Matière (thématique)"><Select className="input" value={f.matiereId} onChange={(e) => setF({ ...f, matiereId: e.target.value ? Number(e.target.value) : '' })}>
+                <option value="">— selon l'IA —</option>{matieres.data?.map((x) => <option key={x.id} value={x.id}>{x.libelle}</option>)}
+              </Select></Field>
+              <Field label="Rubrique"><Select className="input" value={f.rubriqueId} onChange={(e) => setF({ ...f, rubriqueId: e.target.value ? Number(e.target.value) : '' })}>
+                <option value="">— selon l'IA —</option>{rubriques.data?.map((x) => <option key={x.id} value={x.id}>{x.libelle}</option>)}
+              </Select></Field>
+              <Field label="Direction porteuse" hint="La direction à laquelle l'arrêté est rattaché. Laissée vide, l'IA propose, sinon la direction générale.">
+                <Select className="input" value={f.directionCode} onChange={(e) => setF({ ...f, directionCode: e.target.value, directionLabel: organigramme.data?.find((d) => d.code === e.target.value)?.label || '' })}>
+                  <option value="">— selon l'IA / direction générale —</option>
+                  {organigramme.data?.map((d) => <option key={d.code} value={d.code}>{d.label}</option>)}
+                </Select>
+              </Field>
+              <Field label="Communicabilité" hint="Un arrêté non communicable (données personnelles, sécurité…) n'est pas publié.">
+                <Select className="input" value={f.confidentialite} onChange={(e) => setF({ ...f, confidentialite: e.target.value })}>
+                  <option value="normale">Communicable (public)</option><option value="confidentiel">Non communicable (confidentiel)</option>
+                </Select>
+              </Field>
+              <Field label="Suite donnée" hint="Avec un circuit, l'arrêté passe par ses valideurs puis part en signature à la fin du circuit. Sans circuit, il part directement en signature.">
+                <Select className="input" value={f.circuitId} onChange={(e) => setF({ ...f, circuitId: e.target.value ? Number(e.target.value) : '' })}>
+                  <option value="">Envoi direct en signature</option>
+                  {circuits.data?.filter((c) => c.activeVersionId).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                </Select>
+              </Field>
+            </div>
+
             {f.type === 'dossier' ? (
               <div className="grid gap-3 rounded border border-line p-3 md:grid-cols-2">
-                <div className="md:col-span-2"><Field label="Dossier source *" hint="Chemin local (D:\arrêtés\à_traiter) ou UNC (\\serveur\partage\arrêtés). Un chemin UNC n'est accessible que si le serveur VibeDélib tourne sous Windows."><input className="input font-mono" value={f.cible} placeholder="\\serveur\partage\arretes" onChange={(e) => setF({ ...f, cible: e.target.value })} /></Field></div>
+                <div className="md:col-span-2"><Field label="Dossier source *" hint="Chemin local (/mnt/arretes ou D:\arrêtés\à_traiter) ou partage réseau UNC (\\serveur\partage\arrêtés). Un partage réseau est lu directement par l'application — aucun montage préalable n'est nécessaire."><input className="input font-mono" value={f.cible} placeholder="\\serveur\partage\arretes" onChange={(e) => setF({ ...f, cible: e.target.value })} /></Field></div>
                 <Field label="Compte d'accès (facultatif)"><input className="input" autoComplete="off" value={f.utilisateur} placeholder="domaine\compte" onChange={(e) => setF({ ...f, utilisateur: e.target.value })} /></Field>
                 <Field label="Mot de passe" hint={f.id ? 'Enregistré (chiffré) : laissez vide pour le conserver.' : 'Chiffré au repos, jamais affiché.'}><input className="input" type="password" autoComplete="new-password" value={f.motDePasse} onChange={(e) => setF({ ...f, motDePasse: e.target.value })} /></Field>
                 <Field label="Organisation des pièces">

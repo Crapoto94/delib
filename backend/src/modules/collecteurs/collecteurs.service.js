@@ -82,7 +82,7 @@ function eluCorrespond(elu, indice) {
   return [elu.nomComplet, `${elu.prenom} ${elu.nom}`, elu.email, elu.prenom, elu.nom].filter(Boolean).some((x) => x !== undefined && nettoyerNom(x) === cle);
 }
 
-function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts, refs, storage, elus, parapheur, render, o365 }) {
+function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts, refs, storage, elus, parapheur, render, o365, engine }) {
   const box = createSecretBox(config.jwt?.secret || '', 'collecteurs');
   const chiffre = (s) => box.chiffre(s);
   const dechiffre = (s) => box.dechiffre(s);
@@ -105,6 +105,12 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
       dernierPassage: r.dernier_passage ?? null, prochainPassage: r.prochain_passage ?? null,
       dernierResultat: r.dernier_resultat ?? null, createdBy: r.created_by, createdAt: r.created_at,
       motDePasseConfigure: !!c.motDePasse,
+      // Classement et envoi de l'arrêté fabriqué (commun aux deux sources) : chaque champ laissé vide est proposé par l'IA.
+      natureId: c.natureId ?? null, matiereId: c.matiereId ?? null, rubriqueId: c.rubriqueId ?? null,
+      directionCode: c.directionCode || null,
+      directionLabel: c.directionLabel || null,
+      confidentialite: c.confidentialite === 'confidentiel' ? 'confidentiel' : 'normale',
+      circuitId: c.circuitId ?? null,
     };
     if (r.type === 'mail') {
       return { ...base, mailbox: c.graphMailbox || '', dossierSignes: c.dossierSignes || null, retraitMail: c.retraitMail !== false, essai: !!c.essai };
@@ -138,6 +144,30 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
     return d ? { id: d.id, meta: d.meta } : null;
   }
 
+  /**
+   * Identifiant d'un référentiel (`nature`, `matiere`, `rubrique`) : on accepte un identifiant (paramètre du
+   * collecteur) ou un libellé/code (proposition de l'IA). On passe par le service de référentiels pour respecter
+   * l'héritage : les valeurs communes (`organisme_id IS NULL`) sont héritées par chaque organisme, qui peut aussi
+   * avoir les siennes. `null` si rien ne correspond — le champ reste vide plutôt que d'être mal rangé.
+   */
+  async function refId(kind, valeur, org) {
+    const brut = valeur === null || valeur === undefined ? '' : String(valeur).trim();
+    if (!brut) return null;
+    const items = await refs.list(kind, org, { includeInactive: true }).catch(() => []);
+    if (/^\d+$/.test(brut)) {
+      const parId = items.find((i) => i.id === Number(brut));
+      if (parId) return parId.id;
+    }
+    const v = nettoyerNom(brut);
+    return items.find((i) => nettoyerNom(i.libelle) === v || nettoyerNom(i.code) === v)?.id ?? null;
+  }
+
+  /** Contexte système : le collecteur agit sans session humaine (création de l'arrêté, envoi au circuit). */
+  const contexteSysteme = (org, collecteur) => ({
+    username: collecteur.created_by || '@collecteur', kind: 'system', isPlatformAdmin: true,
+    organismes: [], roles: [], orgIds: [org], agent: null, displayName: `Collecteur ${collecteur.nom}`,
+  });
+
   // ---------------------------------------------------------------------------------------------------------- analyse IA
   /** Analyse d'une pièce par l'IA : la consigne est éditable dans Paramétrages / Assistant IA (code « collecteurs »). */
   async function analyseIa(org, collecteur, { texte, nom, origine }) {
@@ -145,11 +175,17 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
     if (!(await prompts.actif(org, 'collecteurs').catch(() => false))) return null;
     const typesArrête = await db.all('SELECT nom FROM collecteur_types_arretes WHERE organisme_id = $1 AND actif ORDER BY nom', [org]);
     const elusLocaux = (await elus.list(org, { actif: true })).map((e) => `${e.nomComplet}${e.email ? ` <${e.email}>` : ''}`).slice(0, 80);
+    // Référentiels de classement : l'IA choisit UNIQUEMENT dans ces listes (les mêmes que les listes déroulantes de
+    // l'application, héritage des valeurs communes compris) ; un libellé inventé est ignoré à l'enregistrement.
+    const [natures, matieres, rubriques] = await Promise.all(['nature', 'matiere', 'rubrique'].map((k) => refs.list(k, org).catch(() => [])));
+    const directions = await db.all("SELECT label FROM organisation_entites WHERE organisme_id = $1 AND type = 'direction' ORDER BY ordre, id", [org]).catch(() => []);
     const { system, modele } = await prompts.resolve(org, 'collecteurs');
+    const liste = (titre, rows) => rows.length ? `${titre} : ${rows.map((r) => `« ${r.libelle || r.label} »`).join(', ')}.` : `${titre} : aucun dans le référentiel.`;
     const prompt = [
       collecteur.type === 'mail' ? `Source : courriel de ${origine || '?'} reçu le ${new Date().toLocaleDateString('fr-FR')}.` : `Source : dossier « ${origine || 'racine'} ».`,
       `Fichier : ${nom}`,
       typesArrête.length ? `Types d'arrêté existants : ${typesArrête.map((t) => `« ${t.nom} »`).join(', ')}.` : 'Aucun type d’arrêté dans le catalogue : « type » sera null.',
+      liste('Natures', natures), liste('Matières', matieres), liste('Rubriques', rubriques), liste('Directions', directions),
       elusLocaux.length ? `Élus disponibles : ${elusLocaux.join(' ; ')}.` : 'Aucun élu.',
       '',
       `Début du document :\n${String(texte || '').slice(0, MAX_TEXTE_IA)}`,
@@ -172,20 +208,36 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
   };
 
   // ------------------------------------------------------------------------------------------------------ création acte
-  async function creerActe(org, collecteur, { origine, nom, buffer, ext, elu, typeNom, objet, trame, ok, ia, sha }) {
+  async function creerActe(org, collecteur, { origine, nom, buffer, ext, elu, typeNom, objet, trame, ok, ia, sha, circuitId = null }) {
     const arreteRef = await typeArreteRef(org);
     const cfg = await settings.resolve(org);
-    // Direction porteuse : celle de l'organisme, sinon la première de l'organigramme, sinon un code dédié.
-    let directionCode = cfg['organisation.direction_generale']?.value || null;
-    let directionLabel = null;
-    if (directionCode) {
+    const reglages = collecteur.config || {};
+    // Direction porteuse : le paramètre du collecteur d'abord (choix explicite de l'administration), sinon la
+    // proposition de l'IA, sinon le réglage de l'organisme, sinon la première direction de l'organigramme.
+    let directionCode = String(reglages.directionCode || '').trim() || null;
+    if (!directionCode && ia?.direction) {
+      const dirs = await db.all("SELECT code FROM organisation_entites WHERE organisme_id = $1 AND type = 'direction'", [org]).catch(() => []);
+      directionCode = dirs.find((d) => nettoyerNom(d.code) === nettoyerNom(ia.direction))?.code || null;
+    }
+    if (!directionCode) directionCode = cfg['organisation.direction_generale']?.value || null;
+    let directionLabel = String(reglages.directionLabel || '').trim() || null;
+    if (directionCode && !directionLabel) {
+      // Le libellé complet est cherché dans l'organigramme ; à défaut seulement, on affiche le code.
       directionLabel = (await db.get("SELECT label FROM organisation_entites WHERE organisme_id = $1 AND type = 'direction' AND code = $2", [org, directionCode]).catch(() => null))?.label || directionCode;
     } else {
       const d = await db.get("SELECT code, label FROM organisation_entites WHERE organisme_id = $1 AND type = 'direction' ORDER BY ordre, id LIMIT 1", [org]).catch(() => null);
       directionCode = d?.code || 'COLLECTEUR';
       directionLabel = d?.label || 'Arrêtés collectés';
     }
-    const natureId = arreteRef?.meta?.natureCode ? (await refs.byCode('nature', arreteRef.meta.natureCode, org).catch(() => null))?.id ?? null : null;
+    // Classement : le paramètre du collecteur prime, sinon la proposition de l'IA (libellé ou code du référentiel), et à
+    // défaut la nature inscrite dans le type d'acte « arrêté ».
+    const natureId = (await refId('nature', reglages.natureId || ia?.nature, org))
+      ?? (arreteRef?.meta?.natureCode ? (await refs.byCode('nature', arreteRef.meta.natureCode, org).catch(() => null))?.id ?? null : null);
+    const matiereId = await refId('matiere', reglages.matiereId || ia?.matiere, org);
+    const rubriqueId = await refId('rubrique', reglages.rubriqueId || ia?.rubrique, org);
+    // Communicabilité : certains arrêtés ne sont pas publics (données personnelles, sécurité…). Défaut : normale.
+    const confidentiel = reglages.confidentialite === 'confidentiel' || String(ia?.confidentialite || '').toLowerCase().startsWith('confid');
+    const confidentialite = confidentiel ? 'confidentiel' : 'normale';
     const trameFinale = trame === 'presente' ? 'presente' : 'a_ajouter';
     const titre = String(objet || nom.replace(/\.[a-z0-9]+$/i, '')).trim().slice(0, 250) || 'Arrêté (collecteur)';
     const posDefault = { page: 1, x: 75, y: 85, w: 150, h: 60 };
@@ -194,6 +246,7 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
         collecteurId: collecteur.id, collecteurNom: collecteur.nom, origine: origine || null, fichier: nom,
         eluId: elu?.id ?? null, eluNom: elu?.nomComplet ?? null,
         typeNom: typeNom || null, ia: ia || null, revue: !ok, sha256: sha, creerLe: new Date().toISOString(),
+        circuitId: circuitId || null, confidentialite,
       },
     };
 
@@ -201,13 +254,15 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
       const maxSuivi = (await q.get('SELECT COALESCE(max(numero_suivi), 0)::int AS m FROM actes WHERE organisme_id = $1', [org])).m;
       const numero = await nextCounter(q, org, 'acte', { plancher: maxSuivi });
       custom.collecteur.numeroSuivi = numero;
+      // Avec un circuit, l'acte reste un brouillon : c'est l'envoi au circuit qui le fait avancer (et, à la fin du
+      // circuit, le parapheur configuré l'envoie en signature). Sans circuit, il part directement en signature.
       const a = await q.get(
         `INSERT INTO actes (organisme_id, numero_suivi, type_id, titre, redacteur, direction_code, direction_label, service_code, service_label,
-           nature_id, incidence_financiere, urgence, confidentialite, commentaire_initial, custom, statut, document_source_trame, signature_position, source_collecteur)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,NULL,$8,$9,FALSE,'normale',$10,$11::jsonb,$12,$13,$14::jsonb,TRUE) RETURNING *`,
-        [org, numero, arreteRef.id, titre, collecteur.created_by || '@collecteur', directionCode, directionLabel, natureId,
-          false, `Collecté le ${new Date().toLocaleString('fr-FR')} par le collecteur « ${collecteur.nom} ».`, JSON.stringify(custom),
-          ok ? 'a_signer' : 'brouillon', trameFinale, JSON.stringify(posDefault)]);
+           nature_id, matiere_id, rubrique_id, incidence_financiere, urgence, confidentialite, commentaire_initial, custom, statut, document_source_trame, signature_position, source_collecteur)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,NULL,$8,$9,$10,FALSE,FALSE,$11,$12,$13::jsonb,$14,$15,$16::jsonb,TRUE) RETURNING *`,
+        [org, numero, arreteRef.id, titre, collecteur.created_by || '@collecteur', directionCode, directionLabel, natureId, matiereId, rubriqueId,
+          confidentialite, `Collecté le ${new Date().toLocaleString('fr-FR')} par le collecteur « ${collecteur.nom} ».`, JSON.stringify(custom),
+          ok && !circuitId ? 'a_signer' : 'brouillon', trameFinale, JSON.stringify(posDefault)]);
       await q.run('INSERT INTO deliberations (acte_id, ordre, titre) VALUES ($1, 1, $2)', [a.id, titre]);
       return a;
     });
@@ -314,8 +369,14 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
       }
     }
 
+    // — circuit : celui que l'administration a choisi pour ce collecteur (sinon envoi direct en signature).
+    const circuitId = collecteur.config?.circuitId ? Number(collecteur.config.circuitId) : null;
+
     const incertains = [];
-    if (elu) { /* destinataire connu */ }
+    // Sans circuit, il faut savoir qui signe. Avec un circuit, la signature est celle configurée pour le parapheur
+    // (l'acte est envoyé en signature à la fin du circuit) : l'élu n'est donc pas requis ici.
+    if (circuitId) { /* le circuit porte la suite ; l'IA et le sous-dossier restent utiles pour le classement */ }
+    else if (elu) { /* destinataire connu */ }
     else if (collecteur.elu_id) { const e = await elus.get(org, collecteur.elu_id).catch(() => null); if (e) elu = e; else incertains.push('l’élu paramétré est introuvable'); }
     else incertains.push('l’élu destinataire est inconnu (ni IA' + (origine ? ', ni sous-dossier' : '') + ')');
     if (!typeNom) incertains.push('le type d’arrêté est vide (catalogue du collecteur non renseigné)');
@@ -325,15 +386,26 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
     const trame = (ia?.trame === 'presente' ? 'presente' : (tramePresente(texte, orgRow?.nom) ? 'presente' : 'a_ajouter'));
     const ok = !incertains.length;
 
-    const acte = await creerActe(org, collecteur, { origine, nom, buffer, ext, elu, typeNom, objet, trame, ok, ia, sha });
+    const acte = await creerActe(org, collecteur, { origine, nom, buffer, ext, elu, typeNom, objet, trame, ok, ia, sha, circuitId });
     const detail = {
       sha256: sha, origine, statutAvant: 'recu',
-      analyse: ia ? { objet: ia.objet, destinataire: ia.destinataire, email: ia.email, type: ia.type, trame: ia.trame, confiance: ia.confiance, remarque: ia.remarque } : null,
-      incertains, envoye: false,
+      analyse: ia ? { objet: ia.objet, destinataire: ia.destinataire, email: ia.email, type: ia.type, trame: ia.trame, nature: ia.nature, matiere: ia.matiere, rubrique: ia.rubrique, direction: ia.direction, confidentialite: ia.confidentialite, confiance: ia.confiance, remarque: ia.remarque } : null,
+      incertains, envoye: false, circuitId: circuitId || null,
     };
 
     let statut = 'traite';
-    if (ok) {
+    if (ok && circuitId) {
+      // Suivi d'un circuit (choisi par l'administration) : l'acte y entre, et c'est la fin du circuit qui déclenche
+      // l'envoi en signature (parapheur), comme pour un acte rédigé à la main.
+      try {
+        await engine.submit(contexteSysteme(org, collecteur), org, acte.id, { circuitId });
+        detail.circuit = 'envoye';
+      } catch (e) {
+        statut = 'attente';
+        detail.envoyeErreur = e.message;
+        await alerter(org, acte, collecteur, [`l’envoi au circuit a échoué : ${e.message}`]);
+      }
+    } else if (ok) {
       const signataire = { nom: elu.nomComplet, email: elu.email, qualite: 'arrêté (collecteur)' };
       try {
         await parapheur.demanderEnvoi(null, org, acte.id, { auto: true, signataire });

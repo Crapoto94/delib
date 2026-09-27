@@ -243,7 +243,11 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       return rows[0] || null;
     },
 
-    async submit(ctx, organismeId, acteId) {
+    /**
+     * Envoi au circuit. `circuitId` permet d'imposer un circuit précis (collecteurs d'arrêtés : l'administration choisit
+     * le circuit du collecteur) au lieu du circuit applicable le plus spécifique ; il doit être publié.
+     */
+    async submit(ctx, organismeId, acteId, { circuitId = null } = {}) {
       const a0 = await actes.load(ctx, organismeId, acteId);
       if (!IS_DRAFTER(ctx, a0) && !acl.isAdmin(ctx, a0.organisme_id)) throw E.forbidden("Seul le rédacteur envoie l'acte au circuit");
       if (a0.custom?.entrainement) throw E.conflict('Ceci est un dossier d’entraînement : il ne s’envoie pas au circuit. Créez un vrai dossier pour envoyer.');
@@ -257,9 +261,15 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
 
       let versionId = a0.circuit_version_id;
       if (!returned) {
-        const c = await svc.selectCircuit(a0.organisme_id, a0.type_id, a0.direction_code);
-        if (!c) throw E.conflict("Aucun circuit publié pour ce type d'acte et cette direction : demandez à l'administrateur d'en publier un");
-        versionId = c.active_version_id;
+        if (circuitId) {
+          const c = await db.get('SELECT active_version_id FROM circuit_definitions WHERE id = $1 AND organisme_id = $2 AND active_version_id IS NOT NULL', [circuitId, organismeId]);
+          if (!c) throw E.conflict("Le circuit choisi pour ce collecteur n'existe pas ou n'est pas publié");
+          versionId = c.active_version_id;
+        } else {
+          const c = await svc.selectCircuit(a0.organisme_id, a0.type_id, a0.direction_code);
+          if (!c) throw E.conflict("Aucun circuit publié pour ce type d'acte et cette direction : demandez à l'administrateur d'en publier un");
+          versionId = c.active_version_id;
+        }
       }
       const graph = await graphOf(versionId);
       // étapes obligatoires sans titulaire : on refuse l'envoi plutôt que de bloquer l'acte (CIR-21)

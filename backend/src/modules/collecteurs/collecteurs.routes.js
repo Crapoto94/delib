@@ -19,6 +19,15 @@ const Conf = z.object({
   motDePasse: z.string().max(300).optional(),
   sousDossiers: z.enum(['gauche', 'elus']).optional(),
   mouvement: z.enum(['deplacer', 'supprimer']).optional(),
+  // Classement et suite donnée à l'arrêté fabriqué (laissé vide : l'IA propose, l'administration corrige ensuite).
+  natureId: z.number().int().positive().nullable().optional(),
+  matiereId: z.number().int().positive().nullable().optional(),
+  rubriqueId: z.number().int().positive().nullable().optional(),
+  directionCode: z.string().max(60).nullable().optional(),
+  directionLabel: z.string().max(120).nullable().optional(),
+  confidentialite: z.enum(['normale', 'confidentiel']).optional(),
+  // Circuit à faire suivre à l'arrêté (identifiant d'une définition publiée). Absent = envoi direct en signature.
+  circuitId: z.number().int().positive().nullable().optional(),
 }).partial();
 
 const Collecteur = z.object({

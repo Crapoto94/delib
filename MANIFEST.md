@@ -2434,3 +2434,29 @@ que `ps` montre) ; les lectures et écritures transitent par un fichier temporai
 mêle les messages de service au contenu) ; `mkdir` n'ayant pas d'équivalent `-p`, les dossiers intermédiaires
 (`_traites/<date>`) sont créés **segment par segment**. Testé de bout en bout contre un partage SMB réel : test d'accès,
 liste, lecture, écriture, déplacement, suppression.
+
+### Collecteurs d'arrêtés : classement, communicabilité et suite donnée
+
+Ce qui n'est pas réglé dans le collecteur est **proposé par l'IA** au moment de la collecte (consigne « Analyse des
+arrêtés collectés », éditable dans Paramétrages › Assistant IA), puis reste modifiable dans le dossier :
+
+| Réglage du collecteur | Rôle | Si laissé vide |
+|---|---|---|
+| **Nature**, **Matière**, **Rubrique** | Rattachement aux référentiels de l'organisme (les valeurs **communes** sont héritées) | proposition de l'IA, sinon la nature inscrite dans le type d'acte « arrêté » |
+| **Direction porteuse** | La direction à laquelle l'arrêté est rattaché ; le **libellé complet** est enregistré avec le code, pour que l'acte affiche le nom et non le code | proposition de l'IA, sinon le réglage `organisation.direction_generale`, sinon la première direction de l'organigramme |
+| **Communicabilité** | `normale` (public) ou `confidentiel` (données personnelles, sécurité…) : certains arrêtés ne sont pas publics | proposition de l'IA, sinon `normale` |
+| **Suite donnée** | **Envoi direct en signature** (comportement historique) ou **circuit** choisi parmi les circuits publiés | envoi direct en signature |
+
+Quelques points de conception :
+
+- **Les arrêtés ne passent pas par une commission** : le collecteur n'en demande pas, et n'en inscrit pas.
+- Un **circuit** fait entrer l'arrêté dans le circuit choisi (`engine.submit(..., { circuitId })` accepte désormais un
+  circuit explicite, au lieu du circuit applicable le plus spécifique). La fin du circuit déclenche l'envoi en signature
+  par le parapheur (mécanisme `circuit.completed`), exactement comme pour un acte rédigé à la main.
+- Quand un circuit est configuré, **l'élu signataire n'est plus exigé** : la signature est celle configurée pour le
+  parapheur, et non un élu repéré dans le document. Sans circuit, il reste nécessaire (l'IA, le sous-dossier, puis le
+  paramètre du collecteur).
+- Les référentiels de classement sont **communs** (`organisme_id IS NULL`) et résolus par le service de référentiels
+  (`refs.list`) : un identifiant d'une autre collectivité ne peut pas être accepté par erreur.
+- Le collecteur agit sans session humaine : la création et l'envoi au circuit passent par un **contexte système**
+  (`isPlatformAdmin`), ce qui reste tracé dans l'audit (`acte.collecte`, `circuit.submit`).
