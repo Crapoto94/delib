@@ -47,13 +47,16 @@ describe('bureau en ligne — adaptateur Collabora (WOPI)', () => {
     const p = createBureauCollabora(base());
     const o = p.open({ cle: CLE, nom: 'note.docx', urlRappel: 'http://10.0.0.4:3021', user: { username: 'jd' } });
     expect(o.src.startsWith('/collabora-delib/browser/')).toBe(true);
-    // Le WOPISrc est appelé par le NAVIGATEUR : c'est l'adresse publique du backend, jamais son adresse interne
-    // (BUREAU_URL_RAPPEL) que le navigateur ne peut pas joindre et que le mélange http/https bloquerait.
-    expect(o.src).toContain(encodeURIComponent(`https://delib.ville.fr/api/v1/public/bureau/wopi/${CLE}`));
-    expect(decodeURIComponent(o.src)).not.toContain('10.0.0.4');
+    // Le WOPISrc est appelé par le MOTEUR (CheckFileInfo, GetFile, PutFile) : c'est l'adresse de rappel, celle que
+    // le moteur peut joindre — jamais l'adresse publique, que les conteneurs ne joignent pas en production.
+    expect(o.src).toContain(encodeURIComponent(`http://10.0.0.4:3021/api/v1/public/bureau/wopi/${CLE}`));
+    expect(decodeURIComponent(o.src)).not.toContain('delib.ville.fr');
     expect(decodeURIComponent(o.src)).toContain(`access_token=${CLE}`);
     expect(decodeURIComponent(o.src)).toContain('lang=fr-FR');
-    // Sans adresse publique, pas d'iframe : on ne veut jamais d'éditeur qui ne pourra pas nous rapporter le document.
+    // Sans adresse de rappel, l'adresse publique sert de secours (moteur et backend sur le même hôte).
+    const sansRappel = p.open({ cle: CLE, nom: 'note.docx' });
+    expect(sansRappel.src).toContain(encodeURIComponent(`https://delib.ville.fr/api/v1/public/bureau/wopi/${CLE}`));
+    // Sans aucune des deux, pas d'iframe : on ne veut jamais d'éditeur qui ne pourra pas nous rapporter le document.
     expect(createBureauCollabora({ ...base(), publicBaseUrl: null }).open({ cle: CLE, nom: 'note.docx' })).toBeNull();
   });
 

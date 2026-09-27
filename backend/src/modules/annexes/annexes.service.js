@@ -35,6 +35,8 @@ const SELECT = `SELECT a.*, f.original_name, f.mime, f.size, f.pages, f.sha256,
   FROM annexes a JOIN files f ON f.id = a.file_id LEFT JOIN files pf ON pf.id = a.pdf_file_id`;
 
 function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bureau }) {
+  /** Conversions PDF en cours, par annexe : voir `pdfEnArrierePlan`. */
+  const pdfEnCours = new Set();
   const svc = {
     /** Enregistre un fichier : il part dans le stockage configuré pour l'organisme (disque local OU ALFRESCO — c'est
      *  `storage` qui décide, GED-09). `description` n'est utile que pour Alfresco (cm:description) : elle dit d'où vient
@@ -84,6 +86,25 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bure
     async finaliser(organismeId, acteId) {
       const rows = await db.all('SELECT id FROM annexes WHERE acte_id = $1', [acteId]);
       for (const r of rows) { try { await svc.ensurePdf(organismeId, r.id); } catch { /* conversion indisponible : l'annexe d'origine reste consultable */ } }
+    },
+
+    /**
+     * Produit le PDF d'une annexe SANS faire patienter l'enregistrement.
+     *
+     * La conversion (moteur de documents, ou repli LibreOffice) est la partie LENTE d'un enregistrement, et elle n'est
+     * pas nécessaire pour que la nouvelle version existe : l'agent n'a pas à l'attendre. La lecture, elle, sait
+     * produire le PDF à la demande (voir `file`) : si l'aperçu est ouvert avant la fin, il attend une fois — puis le
+     * PDF est en cache, comme avant. Une seule conversion à la fois par annexe : le moteur peut rappeler plusieurs fois.
+     */
+    pdfEnArrierePlan(organismeId, annexeId) {
+      const cle = `${organismeId}:${annexeId}`;
+      if (pdfEnCours.has(cle)) return;
+      pdfEnCours.add(cle);
+      setImmediate(() => {
+        svc.ensurePdf(organismeId, annexeId)
+          .catch(() => { /* produit à la première lecture : l'original reste consultable */ })
+          .finally(() => pdfEnCours.delete(cle));
+      });
     },
 
     async list(ctx, organismeId, acteId) {
@@ -145,7 +166,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bure
       await db.run('INSERT INTO annexe_versions (annexe_id, version, file_id, replaced_by) VALUES ($1,$2,$3,$4)', [id, version, f.id, username]);
       await audit.log(ctx || { username }, { organismeId: a.organisme_id, action: 'annexe.replace', entity: 'annexes', entityId: id, before: { version: versionAvant }, after: { version, sha256: f.sha256 } });
       await bus.emit('annexe.replaced', { organismeId: a.organisme_id, acteId: a.id, annexeId: id, version, ctx: ctx || { username } });
-      if (force) { try { await svc.ensurePdf(a.organisme_id, id); } catch { /* le PDF sera produit plus tard : l'original reste consultable */ } }
+      if (force) svc.pdfEnArrierePlan(a.organisme_id, id);   // en arrière-plan : l'enregistrement n'attend pas le PDF
       return toAnnexe(await db.get(`${SELECT} WHERE a.id = $1`, [id]));
     },
 

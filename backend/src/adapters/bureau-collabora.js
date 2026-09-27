@@ -30,14 +30,17 @@ function createBureauCollabora({ url, urlNavigateur, publicBaseUrl, langue = 'fr
   /**
    * Adresse du document pour Collabora (le `WOPISrc` de l'URL de l'éditeur).
    *
-   * CONTRAIREMENT au rappel d'ONLYOFFICE — que le MOTEUR appelle depuis le réseau Docker — les appels WOPI
-   * (CheckFileInfo, GetFile, PutFile) viennent du **navigateur** : c'est donc l'adresse **publique** du backend qui
-   * convient, jamais l'adresse interne. Une adresse `http://10.x.x.x:3021` serait refusée par le navigateur pour
-   * deux raisons: elle n'est pas joignable depuis le poste de l'agent, et le mélange http/https est bloqué.
+   * Les appels WOPI (CheckFileInfo, GetFile, PutFile) viennent du **MOTEUR**, jamais du navigateur : le WOPISrc doit
+   * donc être une adresse que le moteur joint depuis son propre réseau — `BUREAU_URL_RAPPEL`, la même que celle
+   * donnée à ONLYOFFICE pour son rappel. L'adresse PUBLIQUE ne conviendrait pas : en production les conteneurs ne
+   * joignent pas `https://vibedelib.ivry.local` (vérifié : « fetch failed »), et un mélange http/https échouerait de
+   * toute façon. `PostMessageOrigin`, lui, reste l'origine publique (voir le service) : c'est la seule valeur que le
+   * navigateur compare.
+   *
    * Le jeton d'accès est la clé de session elle-même (128 bits tirés au sort, en base, expirante) : Collabora l'exige
    * dans le WOPISrc et le renvoie ensuite sur chaque appel. Aucune clé secrète supplémentaire à partager.
    */
-  const urlWopi = (cle) => `${sansPointFinal(publicBaseUrl)}/api/v1/public/bureau/wopi/${cle}?access_token=${cle}`;
+  const urlWopi = (cle, base) => `${sansPointFinal(base)}/api/v1/public/bureau/wopi/${cle}?access_token=${cle}`;
 
   return {
     moteur: 'collabora',
@@ -50,16 +53,17 @@ function createBureauCollabora({ url, urlNavigateur, publicBaseUrl, langue = 'fr
      * notion d'historique que nous fournissons ailleurs (l'historique des versions d'une annexe).
      *
      * Le préfixe `/collabora-delib` est celui du relais, et Collabora n'annonce que des URL **sous ce préfixe**
-     * (`--o:net.service_root`) : c'est cohérent des deux côtés. Sans `PUBLIC_BASE_URL`, on ne peut pas servir de
-     * WOPISrc au navigateur : mieux vaut refuser d'ouvrir que servir une adresse que le navigateur ne peut pas
-     * appeler.
+     * (`--o:net.service_root`) : c'est cohérent des deux côtés. Le WOPISrc, lui, doit être joignable par le moteur :
+     * on prend `BUREAU_URL_RAPPEL`, et l'adresse publique seulement en secours (moteur et backend sur le même hôte).
+     * Si aucune des deux n'existe, mieux vaut refuser d'ouvrir que servir une adresse que le moteur n'atteindra pas.
      */
     open({ cle, nom, user, urlRappel }) {
-      if (!navigateur || !publicBaseUrl) {
-        if (navigateur && !publicBaseUrl) log?.warn?.({}, 'Collabora installé mais PUBLIC_BASE_URL absent : aucune adresse WOPI servable au navigateur');
+      const base = urlRappel || publicBaseUrl;
+      if (!navigateur || !base) {
+        if (navigateur) log?.warn?.({}, 'Collabora installé mais aucune adresse WOPI joignable par le moteur (ni BUREAU_URL_RAPPEL ni PUBLIC_BASE_URL) : aucune adresse servable');
         return null;
       }
-      const source = urlWopi(cle);
+      const source = urlWopi(cle, base);
       const params = new URLSearchParams({
         WOPISrc: source,
         access_token_t: cle,          // jeton aussi dans l'URL du navigateur : Collabora le relaie au WOPISrc

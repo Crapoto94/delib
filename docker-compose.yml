@@ -86,14 +86,13 @@ services:
     restart: always
     cap_add: ["MKNOD"]             # demandé par Collabora (proxies d'E/S pour l'accès direct aux fichiers)
     environment:
-      # Hôtes acceptés par le moteur : le navigateur arrive par notre frontal, sous le même nom d'hôte que l'application.
-      # (Collabora n'a pas d'équivalent de `alias_name1` chez ONLYOFFICE : le préfixe /collabora-delib est celui de la
-      # requête, transmis par le frontal via X-Forwarded-Host — voir frontend/nginx.conf.)
-      # BUREAU_HOTE_PUBLIQUE_DEV ajoute un hôte à la liste : c'est le poste de développeur qui atteint le moteur par le
-      # port publié (9981) au lieu du frontal. Sans lui, la découverte de développement est refusée par Collabora avec
-      # « Bad request » — l'éditeur ne s'ouvre pas, et le motif ne dit rien du sous-chemin.
-      # Pas de `${VAR:+…}` ici : cette forme n'est pas évaluée, le complément disparaît sans un mot.
-      - domain=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public de l'application requis (ex. vibedelib.ivry.local)},${BUREAU_HOTE_PUBLIQUE_DEV:-127.0.0.1}
+      # Hôtes acceptés par le moteur. Deux rôles distincts :
+      #   - le nom d'hôte de l'application : le navigateur arrive par notre frontal sous ce nom (X-Forwarded-Host) ;
+      #   - l'hôte du WOPISrc (BUREAU_HOTE_WOPI) : c'est l'adresse que le MOTEUR va appeler pour lire et rapporter le
+      #     document. Collabora refuse tout WOPISrc dont l'hôte n'est pas dans cette liste (« Access denied to
+      #     CheckFileInfo »). En production l'adresse de rappel est celle du serveur sur le réseau (10.x), pas le nom
+      #     public : les conteneurs ne joignent pas le nom public.
+      - domain=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public de l'application requis (ex. vibedelib.ivry.local)},${BUREAU_HOTE_WOPI:-127.0.0.1}
       # Le TLS est terminé par le proxy en amont : le moteur parle HTTP en interne, et annonce des URL en https.
       #   --o:ssl.enable=false        le moteur ne sert pas de TLS lui-même
       #   --o:ssl.termination=true    « un reverse proxy termine le TLS » : les URL annoncées deviennent https/wss
@@ -131,7 +130,9 @@ services:
     restart: always
     cap_add: ["MKNOD"]
     environment:
-      - domain=${BUREAU_HOTE_PUBLIQUE_DEV:-localhost:5160}
+      # server_name = l'origine du navigateur de développement (c'est elle que le moteur compare au WebSocket) ;
+      # domain = en plus, l'hôte du WOPISrc que ce moteur de développement va appeler (le poste, sur le réseau).
+      - domain=${BUREAU_HOTE_PUBLIQUE_DEV:-localhost:5160},${BUREAU_HOTE_WOPI_DEV:-127.0.0.1}
       - extra_params=--o:ssl.enable=false --o:ssl.termination=false --o:server_name=${BUREAU_HOTE_PUBLIQUE_DEV:-localhost:5160} --o:net.service_root=/collabora-delib
       - username=${COLLABORA_ADMIN_USER:-admin}
       - password=${COLLABORA_ADMIN_PASSWORD:?mot de passe d'administration Collabora requis}

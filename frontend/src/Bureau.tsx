@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, X } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { Spinner } from './ui';
@@ -146,24 +146,38 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
     };
   }, [acteId, annexe.id]);
 
+  /** Parle à l'iframe Collabora : elle est de même origine (le relais sert le moteur sous notre origine). */
+  const posterCollabora = (message: Record<string, unknown>) => {
+    const cadre = zone.current?.querySelector('iframe');
+    try { cadre?.contentWindow?.postMessage(message, '*'); } catch { /* cadre déjà retiré */ }
+  };
+
   /**
    * « Sauvegarder et fermer ».
    *  - ONLYOFFICE : la commande part du serveur, qui attend la version réellement créée (voir `POST …/enregistrer`).
    *    Fermer l'onglet ensuite n'annule rien.
-   *  - Collabora : on retire d'abord la fenêtre d'édition — c'est ce qui fait écrire le document par le moteur — puis on
-   *    demande au backend la version, qui attend cette écriture.
-   * Sans cela, chez Collabora, fermer l'onglet perdrait les dernières frappes.
+   *  - Collabora : il n'y a pas de commande d'enregistrement côté serveur — c'est l'ÉDITEUR qui enregistre, sur le
+   *    message `Action_Save`, et l'écriture remonte par WOPI. On arme donc l'attente du backend AVANT de demander
+   *    l'enregistrement : dans l'autre ordre, la version arriverait avant que quiconque l'attende, et il faudrait
+   *    patienter le délai complet pour rien — d'où la lenteur ressentie.
    */
   const fermer = () => {
     if (fermeApres.current) return;                        // clic déjà pris en compte
     if (!cle.current) { onEnregistre(); onClose(); return; }
     fermeApres.current = true;
     setEtat('enregistrement');
-    if (moteur.current === 'collabora') terminer();
-    api.post(orgPath(o, `/actes/${acteId}/annexes/${annexe.id}/enregistrer`), { cle: cle.current })
+    const enregistrement = api.post(orgPath(o, `/actes/${acteId}/annexes/${annexe.id}/enregistrer`), { cle: cle.current });
+    if (moteur.current === 'collabora') posterCollabora({ MessageId: 'Action_Save', Values: { DontTerminateEdit: true, Notify: true } });
+    enregistrement
       .then((r) => { if (r.data && r.data.enregistre === false && r.data.raison) avertir(r.data.raison); })
       .catch((e) => avertir(errMsg(e)))
       .finally(() => {
+        if (moteur.current === 'collabora') {
+          // Fin de session explicite (le moteur reçoit « closedocument ») : plus sûr que de retirer le cadre sans un
+          // mot. On lui laisse un court instant pour partir avant de démonter l'iframe.
+          posterCollabora({ MessageId: 'Close_Session' });
+          setTimeout(terminer, 400);
+        }
         onEnregistre();
         onClose();
         // Le moteur peut encore assembler une dernière version après la fermeture (session close) : on redemande la
@@ -185,7 +199,6 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
             : <span className="text-mute">Prêt</span>}
         </span>
         <button className="btn-primary" onClick={fermer} aria-label="Sauvegarder l'annexe et fermer l'éditeur">Sauvegarder et fermer</button>
-        <button className="text-mute hover:text-ink" onClick={fermer} aria-label="Sauvegarder et fermer"><X className="h-5 w-5" /></button>
       </div>
       {erreur && <div className="border-b border-ko/30 bg-ko-bg px-4 py-2 text-[13px] text-ko" role="alert">{erreur}</div>}
       <div ref={zone} className="min-h-0 flex-1" />

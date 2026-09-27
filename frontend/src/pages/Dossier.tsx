@@ -384,14 +384,11 @@ function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toas
             <span className="flex h-10 w-10 items-center justify-center rounded bg-ko-bg text-[9px] font-bold text-ko">{extDe(a)}</span>
             <div className="min-w-0 flex-1"><div className="truncate font-semibold">{a.titre}</div><div className="text-[12px] text-mute">{a.fichier.pages ? `${a.fichier.pages} p. · ` : ''}{(a.fichier.taille / 1048576).toFixed(1)} Mo · v{a.version} · {a.createdBy}</div></div>
             {editable ? <button type="button" onClick={() => toggle(a)} title="Basculer communicable / non communicable"><Badge tone={a.communicable ? 'ok' : 'warn'}>{a.communicable ? 'Communicable' : 'Non communicable'}</Badge></button> : <Badge tone={a.communicable ? 'ok' : 'warn'}>{a.communicable ? 'Communicable' : 'Non communicable'}</Badge>}
-            {a.pdf ? (
-              <>
-                <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => telecharger(a)} title={`Télécharger l'original (${extDe(a)})`}><Download className="h-4 w-4" /> {extDe(a)}</button>
-                <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => voirPdf(a)} title="Voir le PDF"><Eye className="h-4 w-4" /> PDF</button>
-              </>
-            ) : (
-              <button className="text-slate-600 hover:text-head" aria-label="Télécharger" onClick={() => telecharger(a)}><Download className="h-5 w-5" /></button>
-            )}
+            {/* Mêmes boutons pour toutes les pièces : l'aperçu est TOUJOURS proposé (le PDF est produit à la demande
+                s'il ne l'est pas déjà ; l'enregistrement, lui, le génère en arrière-plan), et le téléchargement porte
+                sur l'original sans afficher son extension. */}
+            <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => voirPdf(a)} title="Prévisualiser le document"><Eye className="h-4 w-4" /> Aperçu</button>
+            <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => telecharger(a)} title={`Télécharger le fichier (${extDe(a)})`} aria-label="Télécharger le fichier"><Download className="h-4 w-4" /></button>
             {editable && peutEditer(capa, a) && (
               <button className="btn-secondary !px-2 !py-1 !text-[12px]" onClick={() => setBureau(a)} title={`Ouvrir « ${a.titre} » dans le navigateur (version ${a.version})`}>
                 <Pencil className="h-4 w-4" /> Modifier
