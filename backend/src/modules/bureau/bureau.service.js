@@ -75,6 +75,20 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
   }
 
   const svc = {
+    /**
+     * Conversion Word/Excel/PowerPoint → PDF via le moteur d'édition déjà déployé (ONLYOFFICE/Collabora), pour tout
+     * appelant qui a juste besoin d'un PDF (gabarits `render.service.js`) — pas d'édition, pas de session, pas de
+     * traçabilité d'annexe. `null` si aucun VRAI moteur n'est configuré pour cet organisme (jamais le simulateur : il
+     * ne rend pas le document demandé, seulement un PDF de test) ; l'appelant se replie alors sur
+     * `shared/convert.js` (LibreOffice / Microsoft Office).
+     */
+    async versPdf(organismeId, buffer, ext) {
+      const port = await portPour(organismeId);
+      const moteur = port?.capabilities?.()?.moteur;
+      if (!port?.versPdf || moteur === 'fake' || moteur === 'simulateur') return null;
+      return port.versPdf({ buffer, ext });
+    },
+
     /** Ce que l'interface doit savoir : y a-t-il un bureau, quels formats, lequel, et pourquoi pas. */
     async capabilities(ctx, organismeId) {
       const port = await portPour(organismeId);

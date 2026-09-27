@@ -27,7 +27,7 @@ const Verrou = z.object({ force: z.boolean().default(false) });
 const Pattern = z.object({ pattern: z.string().min(3).max(80).describe('Variables : {ANNEE} {N_SEANCE} {ORDRE} {ORDRE:03} {RUBRIQUE}') });
 const Apercu = Pattern.extend({ seanceId: Id.optional() });
 
-module.exports = ({ makeRouter, odj, render, config }) => {
+module.exports = ({ makeRouter, odj, render, config, espace }) => {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.storage.maxUploadBytes, files: 1 } });
   const r = makeRouter('/api/v1/organismes/:orgId');
   const ADMIN = ['org_admin', 'scc'];
@@ -90,6 +90,10 @@ module.exports = ({ makeRouter, odj, render, config }) => {
     summary: "Rouvre un ordre du jour arrêté (retour en préparation ; motif obligatoire)", tags: T, org: true, roles: ADMIN, params: PS, body: Reouvrir,
     description: "Réservé au SCC / administrateur. Refusé si la séance est déjà convoquée ou tenue. Les numéros redeviennent modifiables et seront recalculés au prochain arrêt ; l'opération est historisée et auditée.",
   }, async (req, res) => res.json(await odj.reouvrir(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+
+  r.post('/seances/:id/documents/reconstruire', { summary: "Reconstruit tous les PDF (exposés, projets) déjà figés pour l'espace élus de cette séance", tags: T, org: true, roles: ADMIN, params: PS,
+    description: "Purge le cache existant (quelle que soit sa version) et régénère — utile après un changement de gabarit ou de moteur de conversion, ou un échec précédent." },
+  async (req, res) => res.json(await espace.reconstruireSeance(req.org.id, req.valid.params.id)));
 
   r.post('/seances/:id/odj/verrou', { summary: "Prend le verrou d'édition (10 min)", tags: T, org: true, params: PS, body: Verrou },
     async (req, res) => res.json(await odj.takeLock(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));

@@ -36,7 +36,7 @@ async function stamp(buffer, text) {
   return Buffer.from(await doc.save());
 }
 
-function createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log }) {
+function createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log, parapheur }) {
   const nomOf = (e) => `${cap(e.prenom)} ${String(e.nom || '').toUpperCase()}`.trim();
   const cfgOf = async (org) => (await settings.resolve(org));
 
@@ -65,6 +65,35 @@ function createEspaceElus({ db, audit, settings, render, tenue, storage, cahier,
 
   // ------------------------------------------------------------------------------------------------- documents d'un point
   const tplVersion = async (org, type) => (await db.get('SELECT version FROM render_templates WHERE organisme_id = $1 AND doc_type = $2', [org, type]))?.version ?? 0;
+
+  /**
+   * Figé une fois généré (ELU-60, ELU-64) : l'ordre du jour est arrêté, le document présenté à l'élu ne doit pas
+   * être reconstruit (conversion Word -> PDF comprise, coûteuse) à chaque lecture. Le PDF non filigrané est mis en
+   * cache par (acte, cible, version) — le filigrane nominatif, lui, reste appliqué à chaque requête (peu coûteux)
+   * puisqu'il dépend de l'élu qui consulte. Appelée soit à la première lecture (repli), soit par avance dès que
+   * l'ordre du jour est arrêté, ou que le contenu d'un acte déjà arrêté est modifié (`figerDocumentsActe`).
+   */
+  async function assurerFige(ctx, org, acteId, cible, deliberationId, version, titre) {
+    const delibIdCle = cible === 'deliberation' ? deliberationId : null;
+    const fige = await db.get(
+      `SELECT f.storage_key FROM actes_documents_figes g JOIN files f ON f.id = g.file_id
+       WHERE g.acte_id = $1 AND g.cible = $2 AND g.deliberation_id IS NOT DISTINCT FROM $3 AND g.version = $4`,
+      [acteId, cible, delibIdCle, version]);
+    if (fige) return storage.get(fige.storage_key);
+    const r = await render.renderActe(ctx, org, acteId, cible === 'expose' ? { cible: 'expose', mode: 'propre' } : { cible: 'deliberation', deliberationId, mode: 'propre' });
+    const buffer = r.buffer;
+    const nomFichier = `${cible}-acte-${acteId}-${version}.pdf`;
+    const put = await storage.put(buffer, { organismeId: org, ext: 'pdf', categorie: 'espace-elus', nom: nomFichier, titre: `${cible === 'expose' ? 'Exposé des motifs' : 'Délibération'} — ${titre}`, auteur: 'espace-elus' });
+    const f = await db.get(
+      `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by)
+       VALUES ($1,$2,$3,'application/pdf',$4,$5,'espace-elus') RETURNING id`,
+      [org, put.key, nomFichier, put.size, put.sha256]);
+    await db.run(
+      `INSERT INTO actes_documents_figes (organisme_id, acte_id, cible, deliberation_id, version, file_id) VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (acte_id, cible, deliberation_id, version) DO NOTHING`,
+      [org, acteId, cible, delibIdCle, version, f.id]);
+    return buffer;
+  }
 
   /** Documents d'un point et leur VERSION (sans rien rendre : empreinte des sources). */
   async function docsOfItem(org, it, premiereFoisActe) {
@@ -200,8 +229,9 @@ function createEspaceElus({ db, audit, settings, render, tenue, storage, cahier,
         if (!d) throw E.notFound('Document introuvable');
         version = d.version; titre = d.titre;
         if (k === 'p') {
-          const r = await render.renderActe(ctx, org, it.acte_id, b === 'expose' ? { cible: 'expose', mode: 'propre' } : { cible: 'deliberation', deliberationId: it.deliberation_id, mode: 'propre' });
-          buffer = r.buffer; name = `${b === 'expose' ? 'expose' : 'projet'}-${it.numero || it.id}.pdf`;
+          const cible = b === 'expose' ? 'expose' : 'deliberation';
+          buffer = await assurerFige(ctx, org, it.acte_id, cible, it.deliberation_id, version, titre);
+          name = `${b === 'expose' ? 'expose' : 'projet'}-${it.numero || it.id}.pdf`;
         } else {
           const f = k === 'a'
             ? await db.get('SELECT fl.storage_key, an.titre FROM annexes an JOIN files fl ON fl.id = COALESCE(an.pdf_file_id, an.file_id) WHERE an.id = $1 AND an.acte_id = $2 AND an.communicable', [Number(b), it.acte_id])
@@ -279,10 +309,88 @@ function createEspaceElus({ db, audit, settings, render, tenue, storage, cahier,
       if (!r) throw E.notFound('Note introuvable');
       return { id };
     },
-    /** Collègues avec qui partager (élus de l'organisme, sans l'auteur). */
+    /** Collègues avec qui partager (élus de l'organisme, sans l'auteur) ; délégation éventuelle (mairie, adjoint...). */
     async collegues(elu) {
-      const rows = await db.all('SELECT e.id, e.nom, e.prenom, g.nom AS groupe FROM elus e LEFT JOIN groupes_politiques g ON g.id = e.groupe_id WHERE e.organisme_id = $1 AND e.actif AND e.est_elu AND e.id <> $2 ORDER BY e.nom, e.prenom', [elu.organismeId, elu.id]);
-      return { items: rows.map((r) => ({ id: r.id, nom: nomOf(r), groupe: r.groupe })) };
+      const rows = await db.all('SELECT e.id, e.nom, e.prenom, e.delegation, g.nom AS groupe FROM elus e LEFT JOIN groupes_politiques g ON g.id = e.groupe_id WHERE e.organisme_id = $1 AND e.actif AND e.est_elu AND e.id <> $2 ORDER BY e.nom, e.prenom', [elu.organismeId, elu.id]);
+      return { items: rows.map((r) => ({ id: r.id, nom: nomOf(r), groupe: r.groupe, delegation: r.delegation || null })) };
+    },
+
+    /** Mes préférences : téléphone (libre-service, sinon celui synchronisé depuis le Hub) et notifications par mail. */
+    async preferences(elu) {
+      const e = await db.get('SELECT telephone FROM elus WHERE id = $1', [elu.id]);
+      const c = await db.get('SELECT preferences FROM elu_comptes WHERE elu_id = $1', [elu.id]);
+      return { telephone: e?.telephone || null, notifMail: { parapheurRetour: true, ...(c?.preferences?.notifMail || {}) } };
+    },
+    /**
+     * Génère par avance l'exposé des motifs et le projet de délibération de TOUS les points d'un acte à une séance
+     * (ELU-60, ELU-64) — au lieu d'attendre la première lecture d'un élu. Appelée par `odj.service.js` → `arreter()`
+     * (bus `odj.arrete`) : c'est l'arrêt de l'ordre du jour, pas la simple inscription, qui rend le document définitif
+     * (numérotation figée) ; et par `figerSiArrete` quand le contenu d'un acte déjà arrêté est modifié. Best-effort :
+     * une erreur de rendu ne doit jamais bloquer l'appelant (l'élu déclenchera alors la génération à la première
+     * lecture, comme repli).
+     */
+    async figerDocumentsActe(organismeId, acteId, seanceId) {
+      const org = requireOrg(organismeId);
+      const items = await db.all(
+        "SELECT * FROM seance_items WHERE organisme_id = $1 AND seance_id = $2 AND acte_id = $3 AND kind = 'deliberation' AND statut = 'a_traiter' ORDER BY position",
+        [org, seanceId, acteId]);
+      const ctx = SYS(org);
+      for (const [i, it] of items.entries()) {
+        for (const d of await docsOfItem(org, it, i === 0)) {
+          if (d.type !== 'expose' && d.type !== 'projet') continue;
+          try { await assurerFige(ctx, org, it.acte_id, d.type === 'expose' ? 'expose' : 'deliberation', it.deliberation_id, d.version, d.titre); }
+          catch (e) { log?.warn({ e: e.message, acteId: it.acte_id, cible: d.type }, 'espace-elus : échec de la génération anticipée du document'); }
+        }
+      }
+    },
+
+    /**
+     * Contenu d'un acte modifié (texte re-commité) APRÈS l'arrêt de l'ordre du jour de sa séance : régénère par
+     * avance le document figé plutôt que de laisser la prochaine lecture d'un élu attendre la reconstruction. Un
+     * acte pas encore inscrit à un ordre du jour arrêté n'a rien à régénérer par avance (`text.committed` déclenche
+     * cet appel à chaque commit, y compris pendant la rédaction, bien avant l'arrêt).
+     */
+    async figerSiArrete(organismeId, acteId) {
+      const org = requireOrg(organismeId);
+      const a = await db.get(
+        `SELECT s.id AS seance_id FROM actes a JOIN seances s ON s.id = a.seance_id
+         WHERE a.id = $1 AND a.organisme_id = $2 AND s.odj_statut <> 'en_preparation'`, [acteId, org]);
+      if (a) await svc.figerDocumentsActe(org, acteId, a.seance_id);
+    },
+
+    /**
+     * Reconstruit (icône « Reconstruire », côté SCC/agents) tous les exposés et projets déjà figés d'une séance :
+     * utile après une modification du gabarit, un changement de moteur de conversion, ou un échec de génération
+     * antérieur — purge le cache existant pour ces actes (quelle que soit sa version) puis régénère.
+     */
+    async reconstruireSeance(organismeId, seanceId) {
+      const org = requireOrg(organismeId);
+      const items = await db.all("SELECT * FROM seance_items WHERE seance_id = $1 AND organisme_id = $2 AND kind = 'deliberation' AND acte_id IS NOT NULL AND statut <> 'retire'", [seanceId, org]);
+      const ctx = SYS(org);
+      let ok = 0; let echecs = 0;
+      for (const it of items) {
+        await db.run('DELETE FROM actes_documents_figes WHERE acte_id = $1', [it.acte_id]);
+        const premiere = !(await db.get("SELECT 1 AS x FROM seance_items WHERE seance_id = $1 AND acte_id = $2 AND position < $3 AND statut = 'a_traiter'", [it.seance_id, it.acte_id, it.position]));
+        for (const d of await docsOfItem(org, it, premiere)) {
+          if (d.type !== 'expose' && d.type !== 'projet') continue;
+          try { await assurerFige(ctx, org, it.acte_id, d.type === 'expose' ? 'expose' : 'deliberation', it.deliberation_id, d.version, d.titre); ok++; }
+          catch (e) { echecs++; log?.warn?.({ e: e.message, acteId: it.acte_id, cible: d.type }, 'reconstruireSeance : échec de génération'); }
+        }
+      }
+      return { ok, echecs };
+    },
+
+    /** « Mon parapheur » : lien vers le Hub, déjà authentifié comme l'élu, pour SA propre boîte de signature. */
+    async monParapheur(elu) {
+      const c = await db.get('SELECT email FROM elus WHERE id = $1', [elu.id]);
+      return parapheur.accesElu(elu.organismeId, c.email);
+    },
+    async majPreferences(elu, { telephone, notifMail }) {
+      if (telephone !== undefined) await db.run('UPDATE elus SET telephone = $2, updated_at = now() WHERE id = $1', [elu.id, telephone]);
+      if (notifMail) await db.run(
+        `UPDATE elu_comptes SET preferences = jsonb_set(preferences, '{notifMail}', COALESCE(preferences->'notifMail', '{}'::jsonb) || $2::jsonb) WHERE elu_id = $1`,
+        [elu.id, JSON.stringify(notifMail)]);
+      return svc.preferences(elu);
     },
 
     // ------------------------------------------------------------------------------------------------- suivi en direct

@@ -1,17 +1,19 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { HashRouter, Link, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
-import { LogOut, Search } from 'lucide-react';
+import { LogOut, Search, Settings } from 'lucide-react';
 import { api, session } from './api';
 import { purger } from './docs';
 import Accueil from './pages/Accueil';
 import Seance from './pages/Seance';
 import { Connexion, Invitation } from './pages/Acces';
 import Recherche from './pages/Recherche';
+import Preferences from './pages/Preferences';
 import { ThemeToggle } from './theme';
 import Legal from './pages/Legal';
 import EtatBackend from './EtatBackend';
 import { OrgLogo, useBranding, useFavicon } from './Brand';
 import GroupePopover from './GroupePopover';
+import MonParapheur from './MonParapheur';
 
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./dev/DevAnnot')) : null;
 
@@ -25,12 +27,14 @@ function Cadre() {
   return (
     <div className="min-h-screen bg-page">
       <header className="border-b border-primary-deep/40 bg-gradient-to-r from-nav-from to-nav-to text-white shadow-lift"><div className="accent-bar" aria-hidden="true" /><div className="flex h-14 items-center gap-3 px-4">
-        <OrgLogo className="h-8" /><span className="text-[13px] text-white/70">Espace élus</span>
-        {elu?.groupe && <GroupePopover groupe={elu.groupe} moi={elu.nom} />}
-        <span className="ml-auto hidden text-[13px] text-white/80 sm:inline">{elu?.nom}</span>
-        <button className="rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
-        <button className="rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={sortir} aria-label="Me déconnecter" title="Me déconnecter"><LogOut className="h-5 w-5" /></button>
-      <ThemeToggle className="text-white/80 hover:bg-white/10 hover:text-white" /></div>
+        <OrgLogo className="h-8 shrink-0" /><span className="hidden shrink-0 text-[13px] text-white/70 sm:inline">Espace élus</span>
+        {elu?.groupe && <GroupePopover groupe={elu.groupe} moi={elu.nom} delegation={elu.delegation} />}
+        <span className="ml-auto hidden shrink-0 text-[13px] text-white/80 sm:inline">{elu?.nom}</span>
+        <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
+        <MonParapheur />
+        <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/preferences')} aria-label="Mes préférences" title="Mes préférences"><Settings className="h-5 w-5" /></button>
+        <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={sortir} aria-label="Me déconnecter" title="Me déconnecter"><LogOut className="h-5 w-5" /></button>
+      <ThemeToggle className="shrink-0 text-white/80 hover:bg-white/10 hover:text-white" /></div>
       </header>
       <EtatBackend />
       <Outlet />
@@ -57,6 +61,7 @@ export default function App() {
           <Route index element={<Accueil />} />
           <Route path="seances/:id" element={<Seance />} />
           <Route path="recherche" element={<Recherche />} />
+          <Route path="preferences" element={<Preferences />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -910,13 +910,13 @@ DMZ ─────────────────── firewall : un seul
 
 ### 18.4 bis Réalisation de l'espace élus (D85) : PDF finalisés, téléchargement en arrière-plan, APK
 
-- **ELU-60** — **Périmètre strict** : les élus n'accèdent qu'à des **documents finalisés en PDF** mis en page par l'outil — convocation, ordre du jour, **exposé des motifs**, **projet de délibération**, **annexes communicables** (PDF), pièces des dossiers simples, **cahier numérique** (profil *Élus*). **Jamais** les notes de séance, les décomptes de saisie, le circuit, les commentaires ni l'application de saisie : c'est un **front distinct** (`elus.html`, bundle séparé, ne contient aucun code d'agent) et une **API distincte** (`/api/v1/elus/…`, `/api/v1/elus-auth/…`).
+- **ELU-60** — **Périmètre strict** : les élus n'accèdent qu'à des **documents finalisés en PDF** mis en page par l'outil — convocation, ordre du jour, **exposé des motifs**, **projet de délibération**, **annexes communicables** (PDF), pièces des dossiers simples, **cahier numérique** (profil *Élus*). **Jamais** les notes de séance, les décomptes de saisie, le circuit, les commentaires ni l'application de saisie : c'est un **front distinct** (projet autonome `elus-dmz/`, aucune dépendance sur `frontend/`, aucun code d'agent) et une **API distincte** (`/api/v1/elus/…`, `/api/v1/elus-auth/…`).
 - **ELU-61** — **Authentification** : compte créé par **invitation du SCC** (lien personnel à usage unique envoyé par mail, valable 7 jours, jamais affiché ni conservé en clair) ; **mot de passe robuste** (12 caractères, lettres et chiffres/symboles) que le SCC ne peut ni lire ni réinitialiser (il renvoie une invitation) ; **code à usage unique par mail** à chaque connexion (10 minutes, 5 essais) ; **appareil de confiance** (30 jours, paramétrable) pour ne pas retaper le code ; **verrouillage 15 minutes** après 5 échecs ; erreurs **génériques** (pas d'énumération des comptes) ; sessions **courtes et révocables** (12 h, `elus.session_heures`) ; désactivation par le SCC qui révoque les sessions. Le jeton d'élu est signé avec un **secret dérivé et une audience propre** : il est **rejeté par l'API des agents**, et un jeton d'agent est rejeté par l'espace élus. **« Se souvenir de moi »** : case proposée à la connexion (élus et agents) qui conserve **l'identifiant seulement** dans le navigateur — jamais le mot de passe ; l'appareil de confiance (30 jours) évite en plus le code par mail.
 - **ELU-62** — **Mise à disposition** : une séance n'apparaît qu'après l'**envoi de la convocation** (ou l'**arrêt de l'ordre du jour**, paramètre `elus.mad_declencheur`), au même instant pour tous les membres de l'instance ; une commission n'est vue que de ses membres. Un point **retiré** reste affiché « retiré » **sans document** ; les avis de commission sont affichés par point.
 - **ELU-63** — **Filigrane nominatif** sur chaque PDF servi (pied de page + diagonale claire : « remis à Prénom NOM — séance du … »), **identique à chaque téléchargement** donc compatible avec le stockage hors ligne.
 - **ELU-64** — **Versions et manifeste** : chaque document a une **version** (empreinte de ses sources : textes, gabarit, fichier), servie en `ETag` (**304** si inchangé). Le **manifeste** de la séance liste tous les documents **dans l'ordre de lecture** avec leur version ; il ne demande aucun rendu au serveur. Un texte modifié change la version : le document est signalé **« modifié depuis ma dernière lecture »**.
 - **ELU-65** — **Téléchargement en arrière-plan** (**APK et application web**) : à l'ouverture de la séance, au retour du réseau et périodiquement, le client compare le manifeste à son stockage local et **télécharge en arrière-plan** ce qui manque ou a changé (3 téléchargements simultanés, reprise et nouvel essai, contrôle de version, respect de l'économiseur de données, vérification de l'espace disponible), dans l'ordre : convocation, ordre du jour, puis point par point, cahier en dernier. **Le passage d'un point au suivant est instantané** (lecture depuis le stockage local) ; l'état est affiché (« 34 / 40 documents prêts hors ligne »). Le stockage est **propre à l'élu**, **purgé à la déconnexion**. Le téléchargement en arrière-plan **n'est pas une lecture** ; les lectures (y compris **hors ligne**) sont enregistrées avec leur date réelle et **transmises au retour du réseau** (preuve de consultation MAD-06).
-- **ELU-66** — **APK** : le même code est empaqueté dans une application Android (Capacitor, projet `frontend/elus-apk`) ; l'URL de l'API et l'origine autorisée (CORS) sont **paramétrées** ; le stockage hors ligne repose sur le stockage de l'application. Un **service natif d'arrière-plan** (téléchargement application fermée) reste une **extension** derrière la même interface (`prefetch`), à ajouter au moment de la construction de l'APK.
+- **ELU-66** — **APK** : le même code est empaqueté dans une application Android (Capacitor, projet `elus-dmz/elus-apk`) ; l'URL de l'API et l'origine autorisée (CORS) sont **paramétrées** ; le stockage hors ligne repose sur le stockage de l'application. Un **service natif d'arrière-plan** (téléchargement application fermée) reste une **extension** derrière la même interface (`prefetch`), à ajouter au moment de la construction de l'APK.
 - **ELU-67** — **Lu / favoris** par point, **notes personnelles** par point : **privées** par défaut, partageables avec **son groupe** ou des **élus nommés**, révocables ; **ni les agents, ni le SCC, ni les administrateurs ne peuvent les lire** (aucune route) ; les annotations ancrées sur le PDF (surlignage, dessin) restent une **phase ultérieure**.
 - **ELU-68** — **Suivi de la séance en direct** : le point en cours et l'avancement (points clos, et — selon `elus.affiche_resultats` — « adoptée / rejetée ») sont suivis en **attente longue** ; **aucune note, aucun décompte de saisie**.
 - **ELU-69** — **Côté SCC** : liste des comptes (aucun / invité / actif / désactivé), invitation et renvoi, désactivation, et **preuve de consultation** par séance (par élu : documents lus, ouvertures, première et dernière lecture, lecture hors ligne) — **métadonnées seulement**.
@@ -952,6 +952,14 @@ DMZ ─────────────────── firewall : un seul
 - **ELU-51** — **Anti-aspiration** : plafonds de téléchargement, filigrane nominatif sur les PDF servis (paramétrable), alerte sur comportements anormaux.
 - **ELU-52** — **Journal d'accès** complet (connexion, consultation, téléchargement, partage) ; audit de sécurité / test d'intrusion avant mise en production.
 - **ELU-53** — Ergonomie **tablette d'abord**, grands caractères, thème clair/sombre, conformité **RGAA**.
+
+### 18.7 Mise en ligne (première version, 0.50.0)
+
+L'espace des élus est **en ligne** sur **`https://vibedelib.ivry94.fr`** : le front est servi par le conteneur `elus-dmz` de **l'hôte DMZ** (`172.17.1.3`, dossier `/opt/docker/marc/elus-dmz`, déploiement par `pulldmz.bat` qui copie **les seuls fichiers suivis par git** puis reconstruit), derrière le reverse proxy public. Côté backend, le réglage `elus.url_base` (organisme) vaut `https://vibedelib.ivry94.fr` : les invitations envoyées aux élus pointent donc vers cette adresse.
+
+- **Le pare-feu DMZ → LAN doit ouvrir le port du backend.** Depuis l'hôte DMZ, `10.103.130.106:3021` **ne répond pas** (3001, 80 et 443 répondent) : sans cette ouverture, le front se charge mais **tout appel d'API reste en attente** (vérifié : `/api/v1/public/branding` et `/api/v1/elus-auth/…` expirent, alors qu'ils répondent en 2 ms depuis le LAN). La règle à demander est la même que celle qui existe déjà pour le parapheur (`3001`) : **DMZ → 10.103.130.106:3021**.
+- Variables du conteneur DMZ : `ELUS_BACKEND_HOST` (adresse LAN du backend), `ELUS_BACKEND_PORT` (le seul port ouvert par le pare-feu), `ELUS_DMZ_PORT` (port publié, 5161). Rien n'est écrit en dur.
+- Le relais nginx ne laisse passer que `/api/v1/elus/`, `/api/v1/elus-auth/`, `/api/v1/public/branding` et un `/api/status` synthétique ; tout le reste est refusé.
 
 ---
 
@@ -1010,10 +1018,14 @@ Une page de **suivi de séance** est **synchronisée en direct** : tous ceux qui
 ### 19.4 Signature
 
 - **SIG-01** — **Réalisée pour les décisions et arrêtés (D114, ex-D19).** Un acte dont le **type** porte `signature: true` (Décision, Arrêté) **ne passe pas au conseil** : à la fin de son circuit, il passe à l'état **`À signer`** et part au **parapheur** pour la **signature du maire**. Le **circuit reste le même** que pour les délibérations ; il peut être spécialisé par type d'acte (D26). Port `SignaturePort` branché sur le **module `parapheur` d'appdsi (DSIHUB)** ; **iParapheur** est proposé au paramétrage mais **non branché**. Paramétrage par organisme (Paramétrages › **Parapheur (signature)**) : `fournisseur`, `actif`, `mode` (**dev** = tous les envois vers une **adresse d'essai unique** ; **prod** = au **signataire** paramétré), compte technique du Hub (**secret chiffré au repos**, jamais renvoyé), nom/e-mail/qualité du signataire. Sans Hub configuré, un **simulateur** prend le relais (retour signé/refusé simulable en dev). Tables `parapheur_config`, `parapheur_envois`, `parapheur_journal` (migration `0061`).
+  - **En mode dev, l'adresse d'essai est unique et prime.** Un appelant peut proposer son signataire (le collecteur d'arrêtés repère l'élu dans le document) : en dev, l'**e-mail** et un éventuel mode **SMS** sont rabattus sur le paramétrage, sinon un arrêté partait au signataire réel alors qu'on croyait tester (constaté). Le nom/la qualité demandés restent affichés (on voit qui aurait signé), et le mode P12/manuscrite demandé est conservé. Règles isolées dans `modules/parapheur/signataire.js` (testées).
 - **SIG-02** — **Journal des échanges** : ce qui est **envoyé** au parapheur et ce qu'il **retourne** (demande, accusé, état, retour) est **journalisé** et consultable sur la **fiche du dossier** (bloc Signature) et dans l'**administration**. Le parapheur du Hub **n'a pas de webhook** : l'état est obtenu par **interrogation** (polling) ; un retour **signé** met l'acte à `Signé`, un **refus** à `Signature refusée`.
+  - **Un refus n'est pas une injoignabilité.** Quand le Hub répond par un code d'erreur, le message remonté reprend **le code HTTP et la réponse du Hub** (« Le parapheur DSIHUB a répondu HTTP 500 : … »). Auparavant, tout échec était résumé en « Hub DSI injoignable : ERR_BAD_RESPONSE », ce qui envoyait chercher une panne réseau alors que le serveur avait répondu — et causait réellement (constaté) : la GED du **Hub** n'était pas configurée, il répondait donc `500 Alfresco : site/dossier racine GED non configuré (voir /admin/ged)`. « Injoignable » n'est plus dit que lorsque le Hub est réellement injoignable.
 - **SIG-03** — **Délibérations d'autorisation** : une **décision** est prise par le maire dans le cadre d'une **délégation du conseil** ; elle doit **lier une ou plusieurs délibérations adoptées** qui l'autorisent (bloc « Délibérations d'autorisation » sur la fiche, recherche dans la bibliothèque). La **complétude** l'exige avant l'envoi au circuit. Table `acte_liens` (migration `0061`).
 - **SIG-04** — **Qui peut envoyer en signature (autorisation).** Dans VibeDélib, seuls l'**administrateur** et le **SCC** peuvent envoyer, relancer, interroger ou annuler un envoi, et uniquement sur un acte **qu'ils peuvent voir**, de **type signé**, à l'état `À signer` ou `Signature refusée` (contrôle `actes.load` + rôles sur `POST /parapheur/actes/:id/…`). Chaque action est **auditée au nom de l'agent réel**. **Limite assumée** : le parapheur du Hub n'identifie que le **compte technique** de VibeDélib (jeton de session), pas l'agent ; l'autorisation est donc **portée par VibeDélib**, pas vérifiée par le parapheur (voir Q-PARA dans la section 32).
 - **SIG-05** — **Reste à faire** : signature du **PV** par le maire et le secrétaire de séance, signature du **texte adopté** (après vote) par le maire, niveau de signature (avancée / qualifiée) et format transmis à S²LOW (PAdES intégré ou PKCS#7 détaché) ; signature **papier + numérisation** possible.
+- **SIG-06** — **Après signature, l'acte officiel est le document revenu du parapheur.** Le parapheur appose les signatures, la mention (« Signé électroniquement par … le … ») et un **QR de vérification sur toutes les pages**, pointant vers sa page publique (`<URL publique>/verification/<jeton>`, sans authentification). VibeDélib **sert ce PDF-là** — aperçu du dossier, extrait du registre, bibliothèque — au lieu de recomposer un document qui ne porterait ni signature ni QR : `render.documentSigne` est consulté **avant** toute autre source (`renderActe`, `bibliotheque.pdf`). L'« exposé des motifs » reste le rapport rédigé dans VibeDélib (il ne fait pas partie de l'acte signé).
+- **SIG-07** — **Délégation : « le maire ou l'adjoint·e ».** Un acte signé par le maire peut l'être, par délégation, par un adjoint ou un agent désigné : les libellés parlent donc de « la signature du maire ou de l'adjoint·e » (fiche, création de dossier, Paramétrages › Parapheur, aide du collecteur, textes d'aide des types). Le parapheur du Hub porte la délégation (« signé X par délégation de Y ») ; VibeDélib la **reprend** : `GET /api/parapheur/:id` expose `signataires[].signed_by_name`, conservé dans `parapheur_envois.signe_par_nom` (migration `0077`) et affiché sur la fiche — « Signé par X (par délégation de Y) » — tandis que `actes.signe_par` porte le délégué.
 
 ### 19.5 Préparation et envoi au contrôle de légalité (S²LOW, module ACTES)
 
@@ -1138,6 +1150,9 @@ Affichage, mise en ligne sur le site de la commune, **recueil des actes administ
 - **REC-29** — **Alertes de recherche (D98, REC-07)** : sur une recherche enregistrée, la cloche « **Me prévenir quand un nouvel acte correspond** ». À l'activation, les résultats du moment sont mémorisés (pas de déluge) ; ensuite une vérification **au plus horaire**, faite **avec les droits de la personne**, l'informe **dans l'application** (notification qui ouvre la recherche) dès que de nouveaux actes correspondent, en indiquant le nombre et les premiers titres. Un acte qui cesse puis recommence à correspondre n'est pas re-signalé. Désactivable à tout moment ; supprimée avec la recherche.
 - **REC-30** — **Deux dispositifs distincts (D105)**, à ne pas confondre : (1) **la bibliothèque des actes de la collectivité** — une fois les séances closes, **tous les agents** peuvent **rechercher et consulter** les délibérations **adoptées** (texte, **exposé des motifs**, extrait du registre, annexes publiables), sans droit particulier sur le dossier d'origine ; sont exclus les actes confidentiels ou à huis clos, sauf droit explicite (REC-02) ; (2) **le trajet de mes actes** (« Mes actes ») — les dossiers **pour lesquels j'ai eu un rôle à un moment** (rédacteur, co-rédacteur, valideur d'une étape, remplaçant, commentateur, rapporteur) : je les consulte **avec leur trajet complet** — le **circuit qu'ils ont eu** (étapes, qui, quand, refus et motifs), les **modifications suivies**, les **commentaires** et les **amendements** adoptés en séance —, même après la clôture, y compris les dossiers **non adoptés** (rejetés, retirés, ajournés, abandonnés).
 - **REC-31** — **Écrans (D105)** : la **recherche** (bibliothèque) renvoie des résultats en consultation seule, avec l'exposé des motifs et l'extrait du registre affichables dans la visionneuse ; **« Mes actes »** est une liste filtrable (année, séance, mon rôle, résultat) qui ouvre la **fiche de trajet** : frise du circuit, chronologie (dépôt, validations, refus, séance, vote, amendements, transmission, AR), et pièces. Les droits de chaque dispositif sont indépendants : consulter la bibliothèque n'ouvre pas le trajet d'un acte, et avoir un rôle sur un acte n'ouvre pas les autres.
+  - **La bibliothèque contient aussi les actes signés par le maire.** Un **arrêté** ou une **décision** (type portant `signature: true`) **entre dans la bibliothèque dès la signature** — il n'a pas de séance : la date affichée est celle de la signature et le résultat « Signé par le maire ». Y entrent donc deux origines : les **délibérations adoptées** (séance close, point traité, résultat positif) et les **actes signés** non confidentiels.
+  - **Filtre par type d'acte** dans la recherche avancée (délibération, vœu, décision, arrêté), à côté de la thématique, la nature, la rubrique, la direction, le rapporteur et l'instance ; le numéro de suivi permet aussi de retrouver un arrêté, et le badge de type le distingue dans la liste.
+  - **Un acte signé reste 15 jours dans les listes de travail.** Après signature, l'acte demeure **15 jours** dans **« Tous les actes »** et **« Mes actes »** (le temps que l'administration le voie passer), puis n'est plus consultable que dans la **bibliothèque**.
 
 ---
 
@@ -2199,7 +2214,7 @@ le **transport**, parce que les deux produits n'ont pas la même architecture.
 | Intégration page | `DocsAPI.DocEditor` dans un conteneur | une **iframe** (`cool.html?WOPISrc=…`) |
 | Récupération du fichier | le moteur appelle notre route | `GET /wopi/:cle/contents` (GetFile) |
 | Enregistrement | **rappel** à chaque sauvegarde (jeton HS256) | **PutFile** : le moteur nous rapporte le fichier |
-| « Enregistrer maintenant » | commande serveur (`POST /command`) | **n'existe pas** → c'est la **fin de session** qui écrit |
+| « Enregistrer maintenant » | commande serveur (`POST /command`) | message **`Action_Save`** à l'éditeur, qui écrit puis répond `Action_Save_Resp` |
 | Conversion PDF | `/converter` (même rendu que l'écran) | **n'existe pas** → repli **LibreOffice** du backend |
 | Format | docx/xlsx/pptx, odt/ods/odp, rtf, txt, csv… | idem (LibreOffice) |
 
@@ -2213,10 +2228,19 @@ déployé), et l'administration s'en sert pour proposer un sélecteur.
 ### Ce qui change pour « Sauvegarder et fermer »
 
 - ONLYOFFICE : le serveur ordonne l'enregistrement, puis **attend** la version créée.
-- Collabora : aucun équivalent. Le front **retire d'abord l'iframe** — mettre fin à la session fait écrire le document
-  par le moteur — puis demande la version au backend, qui attend l'écriture (12 s) et, si rien n'arrive, répond
-  « rien à enregistrer » (l'agent avait déjà enregistré, ou n'avait rien modifié). C'est un résultat **positif** :
-  Collabora enregistre aussi tout seul, à intervalle régulier.
+- Collabora : il n'existe pas de commande serveur équivalente. Le front **arme d'abord l'attente du backend**
+  (`POST …/enregistrer`), **puis** envoie `{ MessageId: 'Action_Save', Values: { DontTerminateEdit: true, Notify: true } }`
+  à l'iframe : l'éditeur écrit, le PutFile crée la version, et l'attente se résout. Dans l'autre ordre, la version arrive
+  **avant** que quiconque l'attende et il faut patienter le délai complet pour rien — c'était la lenteur ressentie.
+  La session est ensuite fermée proprement (`Close_Session`, que l'éditeur traduit par `closedocument` sur son
+  WebSocket), puis l'iframe est retirée.
+- Collabora enregistre **aussi tout seul** : `per_document.autosave_duration_secs` (2 minutes ici, 5 par défaut) et
+  `per_document.always_save_on_exit=true` — **faux par défaut**, ce qui faisait perdre les dernières frappes à qui
+  fermait son onglet sans cliquer sur « Sauvegarder et fermer ». Chaque enregistrement automatique crée une version :
+  le délai est un compromis entre « ne rien perdre » et « ne pas noyer l'historique ».
+- La **conversion PDF** qui suit un enregistrement ne fait plus attendre l'agent : elle part en arrière-plan
+  (`annexes.pdfEnArrierePlan`), et la lecture sait toujours la produire à la demande (premier aperçu possiblement plus
+  long, puis en cache).
 
 ### Hôte WOPI (`backend/src/modules/bureau/wopi.js`)
 
@@ -2241,6 +2265,21 @@ Points à ne pas manquer :
    **409** (protocole), pas une écriture.
 4. Un refus métier (droit, gel après transmission) répond `{"Status": 1}` : **200 + refus**, sinon Collabora réessaie en
    boucle.
+5. **Le jeton d'accès est décoré par le moteur.** Collabora n'envoie pas `<clé>` : il accole ses paramètres de
+   diagnostic à la *valeur* du jeton, avec un point d'interrogation — on reçoit `access_token=<clé>?debug=0`. Une
+   comparaison stricte renvoie donc 403 et l'éditeur affiche « Accès refusé ». On compare la clé seule (`verifierAcces`
+   coupe avant `?`, `&` ou `#`), la sécurité est inchangée : il faut toujours connaître les 128 bits.
+6. **Les réponses vides du protocole passent par `res.type('text/plain').send('')`.** `res.text()` **n'existe pas** en
+   Express : chaque **LOCK répondait 500**, Collabora n'avait donc jamais de verrou — et **refusait d'enregistrer**
+   (« Save failed ») alors que le reste fonctionnait. Le faux `res` des tests avait inventé cette méthode, ce qui a
+   masqué le défaut ; il expose maintenant `type()`/`send()` comme le runtime.
+7. **Le `WOPISrc` doit être joignable par le MOTEUR, pas par le navigateur.** Les appels WOPI (CheckFileInfo, GetFile,
+   PutFile) viennent du moteur seul : le `WOPISrc` est donc bâti sur **`BUREAU_URL_RAPPEL`** (l'adresse de rappel,
+   interne), et non sur `PUBLIC_BASE_URL`. En production, les conteneurs **ne joignent pas** le nom public (vérifié :
+   `fetch failed` sur `https://vibedelib.ivry.local`), et une base publique aurait donc cassé Collabora dès sa mise en
+   service par organisme. `PUBLIC_BASE_URL` ne sert plus qu'au `PostMessageOrigin`, la seule valeur que le navigateur
+   compare. Corollaire : **l'hôte du `WOPISrc` doit figurer dans `domain`** (variable `BUREAU_HOTE_WOPI`), sinon
+   Collabora répond `Access denied to CheckFileInfo`.
 
 ### Choix du moteur par organisme
 
@@ -2256,15 +2295,29 @@ Points à ne pas manquer :
 ### Mise en production (Docker)
 
 ```bash
-# .env racine
+# .env racine (production)
 BUREAU_COLLABORA_URL=http://collabora:9980
 BUREAU_COLLABORA_URL_NAVIGATEUR=/collabora-delib        # relais du frontal, comme /office-delib
-BUREAU_HOTE_PUBLIQUE=vibedelib.ivry.local              # liste des hôtes acceptés par Collabora (compose)
+BUREAU_HOTE_PUBLIQUE=vibedelib.ivry.local              # hôte public (frontal)
+BUREAU_HOTE_WOPI=10.103.130.106,10.103.130.106:3021    # hôte du WOPISrc VU PAR LE MOTEUR (jamais le nom public)
+BUREAU_URL_RAPPEL=http://backend:3021                  # adresse de rappel : base du WOPISrc
+BUREAU_HOTE_PUBLIQUE_DEV=localhost:5160                # origine du navigateur de développement
+BUREAU_HOTE_WOPI_DEV=10.103.230.21,10.103.230.21:3021  # adresse du poste de développement, vue par le moteur
+BUREAU_AUTOSAVE_SEC=120                                # enregistrement automatique de Collabora (2 min)
 COLLABORA_ADMIN_PASSWORD=<mot de passe>                 # administration du moteur
 ```
 
+Deux moteurs Collabora cohabitent : `collabora` (profil `bureau`, port publié 9981, `server_name` = nom public) et
+`collabora-dev` (profil `bureau-dev`, port publié 9982, `server_name=localhost:5160`). **Un seul moteur ne peut pas
+servir les deux** : Collabora n'accepte le WebSocket de l'éditeur que si son origine est `http(s)://<server_name>`, et
+le développement se fait en clair sur `localhost:5160` — le navigateur verrait sinon
+`Rejecting origin [http://localhost:5160] expected [https://vibedelib.ivry.local]`.
+
+Les deux moteurs tournent sur des **images dérivées** (`docker/collabora/Dockerfile`, `docker/onlyoffice/Dockerfile`)
+qui embarquent les **polices de la Ville** : voir §37.
+
 ```bash
-docker compose --profile bureau up -d
+docker compose --profile bureau --profile bureau-dev up -d --build
 docker compose logs -f collabora                        # premier démarrage : quelques minutes
 ```
 
@@ -2290,13 +2343,16 @@ premiers ont été trouvés en production, un par un :
 3. **`extra_params` n'a pas d'indice.** Écrit `extra_params1`, le paramètre est silencieusement ignoré : le moteur
    reste en HTTPS, le frontal répond `502 upstream prematurely closed connection` et la log dit
    `SSL support: SSL is enabled`. Le TLS interne est coupé par `--o:ssl.enable=false`.
-4. **`domain=${BUREAU_HOTE_PUBLIQUE}$`** : Collabora n'accepte que les hôtes autorisés, et le sien est le nôtre
-   (le navigateur passe par le frontal). `cap_add: MKNOD` est également requis.
+4. **`domain=…` : deux hôtes différents, à ne pas confondre.** Collabora n'accepte que les hôtes autorisés, et il y en
+   a **deux sortes** : le nom public de l'application (`BUREAU_HOTE_PUBLIQUE`, celui du navigateur) et **l'hôte du
+   `WOPISrc`**, c'est-à-dire l'adresse par laquelle le moteur rappellera le backend (`BUREAU_HOTE_WOPI`). Oublier le
+   second donne `Access denied to CheckFileInfo` — l'éditeur s'ouvre, puis échoue à charger le document. `cap_add:
+   MKNOD` est également requis.
 
-La ligne complète, telle qu'elle est en production :
+La ligne complète, telle qu'elle est en production (sauvegarde automatique comprise, voir §36) :
 
 ```yaml
-- extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:server_name=${BUREAU_HOTE_PUBLIQUE} --o:net.service_root=/collabora-delib
+- extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:server_name=${BUREAU_HOTE_PUBLIQUE} --o:net.service_root=/collabora-delib --o:per_document.autosave_duration_secs=${BUREAU_AUTOSAVE_SEC:-120} --o:per_document.always_save_on_exit=true
 ```
 
 Le `healthcheck` de l'image (`coolwsd --probe`) ne vérifie que le binaire, pas l'écoute réseau : un conteneur peut être
@@ -2335,5 +2391,99 @@ curl -H "X-WOPI-Override: CHECK_FILE_INFO" \
 ```
 
 Une annexe ouverte avec Collabora doit produire, dans les logs du backend, `annexe enregistrée depuis le bureau en ligne`
-avec `moteur: collabora`. Le `WOPISrc` contenu dans l'`src` de l'iframe doit être en `https://<app>/api/v1/public/…` :
-s'il contient l'adresse interne du backend, le navigateur ne pourra ni l'appeler ni l'appeler depuis une page https.
+avec `moteur: collabora`, et les quatre appels WOPI (`GET /<clé>`, `GET /<clé>/contents`, `POST /<clé>` pour le verrou,
+`POST /<clé>/contents` pour l'écriture) doivent tous répondre **200**. Le `WOPISrc` de l'`src` de l'iframe doit être
+l'**adresse de rappel** : c'est le MOTEUR qui l'appelle (jamais le navigateur), une adresse publique n'étant pas
+joignable depuis les conteneurs.
+
+---
+
+## 37. Ce que les agents voient : polices, pièces jointes, utilisateurs, arrêtés
+
+### Les polices de la Ville dans les deux éditeurs
+
+Les deux moteurs tournent désormais sur des **images dérivées** qui embarquent la famille **Interstate** :
+
+- **Collabora** : les fichiers sont déposés dans `/opt/collaboraoffice/share/fonts/truetype/` — c'est là que LibreOffice
+  lit ses polices dans cette image (elle n'a **ni `fc-cache` ni `/usr/share/fonts`**), et fontconfig les indexe au
+  démarrage. `remote_font_config` (chargement par URL) a été écarté : l'image est une *release*, qui exige **https**,
+  et le conteneur ne joint pas le nom public.
+- **ONLYOFFICE** : `/usr/share/fonts/truetype/custom/`, puis **`documentserver-generate-allfonts.sh`** — sans cette
+  régénération, le moteur continue de servir une liste de polices figée.
+
+Vérification : `AllFonts.js` doit citer les 15 styles d'`Interstate`, et l'index de polices de Collabora
+(`/opt/cool/.cache/fontconfig`) doit contenir « Interstate ».
+
+Les polices **ne sont pas versionnées** (police commerciale, Font Bureau) : elles vivent dans `docker/fonts/interstate/`
+sur le serveur et sont ignorées par git (`.gitignore`, `.dockerignore`). Un rebuild ailleurs suppose de les y déposer.
+Aucun document existant n'est modifié : la police est rendue disponible, elle n'est pas substituée.
+
+### Pièces jointes : mêmes boutons pour toutes les pièces
+
+Un bouton **Aperçu** est proposé sur **toutes** les pièces, **y compris les PDF** (qui n'en avaient pas) ; le
+téléchargement est une simple icône, sans afficher l'extension. Quand l'aperçu est demandé avant que le PDF n'existe, il
+est produit à la demande puis mis en cache — l'enregistrement, lui, ne l'attend plus.
+
+### Utilisateurs & rôles : les noms de l'historique séparés des agents
+
+La reprise AIRS a créé des identifiants pour rattacher les **actes antérieurs** (`agent_ref.source = 'airs'` : 111 lignes,
+dont une seule s'est jamais connectée). Ils ne sont plus mêlés aux agents réels : **exclus par défaut**, une case
+« Afficher les noms importés (actes antérieurs) » les fait réapparaître, et une **pastille discrète** les signale.
+L'affichage des noms est normalisé **Prénom NOM** pour tout le monde (`nomAffiche`), les sources n'étant pas homogènes
+(l'annuaire rend « Marc Chevalier », AIRS « CHRYSTELLE PETIT »).
+
+### Tous les actes : filtre par type
+
+Filtre par **type d'acte** (délibération, vœu, décision, arrêté) en tête de page, cumulable avec les deux vues
+(par étape du circuit, par date du conseil).
+
+### Collecteurs d'arrêtés : chemin réseau UNC sous Linux
+
+Le champ « dossier source » accepte un chemin UNC dans les deux cas, sans montage préalable :
+
+- **Windows** : PowerShell (`New-SmbMapping`, identifiants en variables d'environnement) ;
+- **Linux** (le serveur applicatif, en Docker) : **`smbclient`** (paquet `samba-client` de l'image backend).
+
+Précautions de la mise en œuvre Linux : le mot de passe passe par la variable **`PASSWD`** (jamais en ligne de commande,
+que `ps` montre) ; les lectures et écritures transitent par un fichier temporaire local (la sortie standard de smbclient
+mêle les messages de service au contenu) ; `mkdir` n'ayant pas d'équivalent `-p`, les dossiers intermédiaires
+(`_traites/<date>`) sont créés **segment par segment**. Testé de bout en bout contre un partage SMB réel : test d'accès,
+liste, lecture, écriture, déplacement, suppression.
+
+### Collecteurs d'arrêtés : classement, communicabilité et suite donnée
+
+Ce qui n'est pas réglé dans le collecteur est **proposé par l'IA** au moment de la collecte (consigne « Analyse des
+arrêtés collectés », éditable dans Paramétrages › Assistant IA), puis reste modifiable dans le dossier :
+
+| Réglage du collecteur | Rôle | Si laissé vide |
+|---|---|---|
+| **Nature**, **Matière**, **Rubrique** | Rattachement aux référentiels de l'organisme (les valeurs **communes** sont héritées) | proposition de l'IA, sinon la nature inscrite dans le type d'acte « arrêté » |
+| **Direction porteuse** | La direction à laquelle l'arrêté est rattaché ; le **libellé complet** est enregistré avec le code, pour que l'acte affiche le nom et non le code (`BF` → « DIRECTION DES SYSTEMES D'INFORMATION ») | proposition de l'IA, sinon le réglage `organisation.direction_generale`, sinon la première direction de l'organigramme |
+| **Communicabilité** | `normale` (public) ou `confidentiel` (données personnelles, sécurité…) : certains arrêtés ne sont pas publics | proposition de l'IA, sinon `normale` |
+| **Suite donnée** | **Envoi direct en signature** (comportement historique) ou **circuit** choisi parmi les circuits publiés | envoi direct en signature |
+| **Type de signature** | **P12** (certificat, le plus fort) ou **manuscrite** ; c'est le mode transmis au parapheur pour les arrêtés de ce collecteur | mode du paramétrage du parapheur |
+
+Quelques points de conception :
+
+- **Les arrêtés ne passent pas par une commission** : le collecteur n'en demande pas, et n'en inscrit pas.
+- Un **circuit** fait entrer l'arrêté dans le circuit choisi (`engine.submit(..., { circuitId })` accepte désormais un
+  circuit explicite, au lieu du circuit applicable le plus spécifique). La fin du circuit déclenche l'envoi en signature
+  par le parapheur (mécanisme `circuit.completed`), exactement comme pour un acte rédigé à la main.
+- Quand un circuit est configuré, **l'élu signataire n'est plus exigé** : la signature est celle configurée pour le
+  parapheur, et non un élu repéré dans le document. Sans circuit, il reste nécessaire (l'IA, le sous-dossier, puis le
+  paramètre du collecteur).
+- Les référentiels de classement sont **communs** (`organisme_id IS NULL`) et résolus par le service de référentiels
+  (`refs.list`) : un identifiant d'une autre collectivité ne peut pas être accepté par erreur.
+- Le collecteur agit sans session humaine : la création et l'envoi au circuit passent par un **contexte système**
+  (`isPlatformAdmin`), ce qui reste tracé dans l'audit (`acte.collecte`, `circuit.submit`).
+- **Aucune commission pour avis** : un acte signé par le maire (arrêté, décision) ne passe pas au conseil. La fiche
+  d'un tel acte ne demande donc plus de commission — elle était auparavant marquée obligatoire et **bloquait l'envoi au
+  parapheur** (`Dossier.tsx`, drapeau `typeInfo.meta.signature`).
+- **Emplacement de la signature** — indispensable avant l'envoi au parapheur, et jusqu'ici deviné pour les arrêtés
+  collectés. Le collecteur propose désormais deux façons de le fixer :
+  1. un **repère textuel** cherché dans le PDF final (par exemple `[SIGNATURE]`) : le modèle Word/PDF déposé dit
+     lui-même où signer. La recherche ignore accents et majuscules, et la position est convertie dans la convention du
+     parapheur (centre en pourcentage de la page, x depuis la gauche, y depuis le haut, dimensions en points PDF) ;
+  2. à défaut, un **cadre** réglé sur le collecteur (page, centre x/y en %, largeur et hauteur en points).
+  Sans repère trouvé ni cadre réglé, le cadre par défaut s'applique (page 1, 75 % / 85 %, 150 × 60). L'origine retenue
+  est inscrite dans le dossier (`custom.collecteur.signature`) pour que l'administration sache d'où vient la position.

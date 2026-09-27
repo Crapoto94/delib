@@ -201,11 +201,13 @@ function Fiche({ a, onClose, onChange, onShare }: { a: Ann; onClose: () => void;
   );
 }
 
-export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100 }: { blob: Blob; doc: { key: string; version: string; titre: string }; seanceId: number; zoom?: number }) {
+export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotationsOpen = false, onToggleAnnotations }: { blob: Blob; doc: { key: string; version: string; titre: string }; seanceId: number; zoom?: number; annotationsOpen?: boolean; onToggleAnnotations?: () => void }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null); const [erreur, setErreur] = useState<string | null>(null);
   const [anns, setAnns] = useState<Ann[]>([]); const [mode, setMode] = useState<Mode>('lire'); const [couleur, setCouleur] = useState(COULEURS[0]);
-  const [sel, setSel] = useState<number | null>(null); const [panneau, setPanneau] = useState(false); const [partage, setPartage] = useState<null | { ann: Ann | null }>(null);
+  const [sel, setSel] = useState<number | null>(null); const [partage, setPartage] = useState<null | { ann: Ann | null }>(null); const [localPanneau, setLocalPanneau] = useState(false);
   const [brouillon, setBrouillon] = useState<null | { page: number; kind: 'note' | 'signet'; rects: Rect[]; texte: string }>(null); const [msg, setMsg] = useState<string | null>(null);
+  const panneau = annotationsOpen ?? localPanneau;
+  const basculerPanneau = onToggleAnnotations ?? (() => setLocalPanneau((v) => !v));
   const textes = useRef(new Map<number, PageText>()); const traites = useRef(new Set<number>());
 
   useEffect(() => {
@@ -285,7 +287,7 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100 }: { blo
       <div className="flex flex-wrap items-center gap-1 border-b border-line bg-surface px-2 py-1.5" role="toolbar" aria-label="Outils d’annotation">
         {OUTILS.map(([m, l, I]) => <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m} className={`inline-flex items-center gap-1 rounded px-2.5 py-2 text-[13px] font-semibold ${mode === m ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}><I className="h-4 w-4" /><span className="hidden sm:inline">{l}</span></button>)}
         <span className="mx-1 flex items-center gap-1" role="group" aria-label="Couleur">{COULEURS.map((c) => <button key={c} aria-label={`Couleur ${c}`} aria-pressed={couleur === c} onClick={() => setCouleur(c)} className={`h-5 w-5 rounded-full border ${couleur === c ? 'ring-2 ring-slate-800 ring-offset-1' : ''}`} style={{ background: c }} />)}</span>
-        <button className="ml-auto inline-flex items-center gap-1 rounded px-2.5 py-2 text-[13px] font-semibold hover:bg-slate-100" onClick={() => setPanneau(!panneau)} aria-expanded={panneau}><PanelRight className="h-4 w-4" /> Annotations ({anns.length})</button>
+        {!onToggleAnnotations && <button className="ml-auto inline-flex items-center gap-1 rounded px-2.5 py-2 text-[13px] font-semibold hover:bg-slate-100" onClick={basculerPanneau} aria-expanded={panneau}><PanelRight className="h-4 w-4" /> Annotations ({anns.length})</button>}
       </div>
       {/* consignes en surimpression : elles ne décalent jamais la page (le geste tombe toujours où on vise) */}
       {mode !== 'lire' && <div className="pointer-events-none relative z-30 h-0"><div className="pointer-events-auto mx-auto flex w-fit max-w-[92%] items-center gap-3 rounded-b-lg bg-slate-900/85 px-3 py-1 text-[12px] text-white shadow" role="status">
@@ -294,16 +296,16 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100 }: { blo
       {msg && <p role="alert" className="flex items-center bg-ko-bg px-3 py-1 text-[12px] text-ko">{msg}<button className="ml-auto" onClick={() => setMsg(null)} aria-label="Fermer"><X className="h-3.5 w-3.5" /></button></p>}
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 flex-1 space-y-2 overflow-auto bg-slate-100 p-2">
-          <div className="space-y-2" style={{ width: `${zoom}%`, minWidth: '100%' }}>
-            {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => <Page key={`${n}-${zoom}`} pdf={pdf} num={n} anns={anns} mode={mode} couleur={couleur} selected={sel} onCreate={creer} onSelect={(id) => { setSel(id); setPanneau(true); }} onText={surTexte} onSelection={surlignerSelection} />)}
+          <div className="space-y-2" style={{ width: `${zoom}%` }}>
+            {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => <Page key={`${n}-${zoom}`} pdf={pdf} num={n} anns={panneau ? anns : []} mode={mode} couleur={couleur} selected={sel} onCreate={creer} onSelect={(id) => { setSel(id); if (!panneau) basculerPanneau(); }} onText={surTexte} onSelection={surlignerSelection} />)}
           </div>
         </div>
-        {panneau && (
+        {annotationsOpen && (
           <aside className="w-full max-w-sm shrink-0 space-y-2 overflow-y-auto border-l border-line bg-surface p-2 max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-30 max-sm:max-w-full" aria-label="Annotations du document">
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary !py-1.5 text-[12px]" onClick={() => setPartage({ ann: null })}><Share2 className="h-3.5 w-3.5" /> Partager…</button>
               <button className="btn-secondary !py-1.5 text-[12px]" onClick={exporter}><Download className="h-3.5 w-3.5" /> Mon dossier annoté</button>
-              <button className="ml-auto rounded p-1 hover:bg-slate-100 sm:hidden" onClick={() => setPanneau(false)} aria-label="Fermer"><X className="h-4 w-4" /></button>
+              <button className="ml-auto rounded p-1 hover:bg-slate-100 sm:hidden" onClick={basculerPanneau} aria-label="Fermer"><X className="h-4 w-4" /></button>
             </div>
             {courante && <Fiche a={courante} onClose={() => setSel(null)} onChange={charger} onShare={() => setPartage({ ann: courante })} />}
             {!anns.length ? <p className="p-4 text-center text-[13px] text-mute">Aucune annotation sur ce document. Choisissez un outil ci-dessus.</p> : (

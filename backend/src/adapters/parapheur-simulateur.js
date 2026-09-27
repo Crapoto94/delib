@@ -49,6 +49,9 @@ function createParapheurSimulateur() {
     retour(ref, { statut = 'signe', motif = null } = {}) {
       const d = dossiers.get(ref) || {}; dossiers.set(ref, { ...d, statut, motif, ...(statut === 'signe' ? { signeAt: new Date().toISOString() } : {}) });
     },
+
+    /** En simulation : pas de vrai Hub, on renvoie une URL locale de démonstration. */
+    async accesDelegue(_cfg, email) { return { url: `#/simulateur/parapheur?email=${encodeURIComponent(email)}` }; },
   };
 }
 

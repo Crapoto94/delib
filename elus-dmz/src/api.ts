@@ -8,7 +8,7 @@ const K = { token: 'elus.token', expire: 'elus.expire', elu: 'elus.elu', device:
 declare global { interface Window { __ELUS_API__?: string } }
 export const apiBase: string = window.__ELUS_API__ || (import.meta.env.VITE_ELUS_API as string | undefined) || '/api/v1';
 
-export type EluSession = { id: number; nom: string; organismeId: number; groupe: string | null };
+export type EluSession = { id: number; nom: string; organismeId: number; groupe: string | null; delegation: string | null };
 const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k: string, v: string | null) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* stockage indisponible */ } };
 

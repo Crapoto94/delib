@@ -55,7 +55,11 @@ function odjSampleItems(noms) {
   return items;
 }
 
-function createRender({ db, audit, storage, actes, config, annexes }) {
+function createRender({ db, audit, storage, actes, config, annexes, bureau }) {
+  // Le moteur d'édition déjà déployé (ONLYOFFICE/Collabora, D39) convertit aussi Word -> PDF : on l'essaie avant le
+  // repli Microsoft Office / LibreOffice de `shared/convert.js` (mêmes rendus que ce que l'agent édite à l'écran,
+  // et surtout : pas besoin d'automatisation Office headless, notoirement instable hors session interactive).
+  const moteurBureau = (organismeId) => (bureau ? { versPdf: (a) => bureau.versPdf(organismeId, a.buffer, a.ext) } : undefined);
   const measures = new Map();
   const measure = (family = 'interstate') => { if (!measures.has(family)) measures.set(family, T.createMeasure(family, config.fontsDir)); return measures.get(family); };
   const cache = new Map();
@@ -222,7 +226,7 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
         `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
         [org, put.key, nom, isDocx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf', put.size, pages, put.sha256, ctx.username]);
       // PDF de consultation : conversion du Word si besoin, puis pose de la trame si elle manque.
-      let pdfBuffer = isDocx ? await convertirEnPdf(file.buffer, 'docx') : file.buffer;
+      let pdfBuffer = isDocx ? await convertirEnPdf(file.buffer, 'docx', { moteur: moteurBureau(org) }) : file.buffer;
       if (!pdfBuffer) throw E.incomplete('Conversion Word → PDF indisponible sur le serveur (LibreOffice absent)');
       const meta = (await db.get('SELECT code FROM ref_items WHERE id = $1', [a.type_id]))?.code || null;
       const docType = meta === 'decision' ? 'decision' : meta === 'arrete' ? 'arrete' : 'deliberation';
@@ -359,7 +363,7 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
     /** Modèle Word fusionné puis converti en PDF (LibreOffice). */
     async renderDocxPdf(ctx, organismeId, acteId, opts) {
       const d = await svc.renderDocx(ctx, organismeId, acteId, opts);
-      const pdf = await convertirEnPdf(d.buffer, 'docx');
+      const pdf = await convertirEnPdf(d.buffer, 'docx', { moteur: moteurBureau(organismeId) });
       if (!pdf) throw E.incomplete('Conversion Word → PDF indisponible sur le serveur (LibreOffice absent)');
       const info = await inspectPdf(pdf);
       return { buffer: pdf, pageCount: info.pages, name: d.name.replace(/\.docx$/, '.pdf') };
@@ -417,7 +421,7 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
     /** Aperçu du modèle Word (données de test) converti en PDF. */
     async docxSamplePdf(ctx, organismeId, docType) {
       const d = await svc.docxSample(ctx, organismeId, docType);
-      const pdf = await convertirEnPdf(d.buffer, 'docx');
+      const pdf = await convertirEnPdf(d.buffer, 'docx', { moteur: moteurBureau(organismeId) });
       if (!pdf) throw E.incomplete('Conversion Word → PDF indisponible sur le serveur (LibreOffice absent)');
       const info = await inspectPdf(pdf);
       return { buffer: pdf, pageCount: info.pages, name: d.name.replace(/\.docx$/, '.pdf') };
@@ -685,7 +689,7 @@ function createRender({ db, audit, storage, actes, config, annexes }) {
         const vars = Object.fromEntries(Object.entries(variables).map(([k, v]) => [`{${k}}`, String(v ?? '')]));
         const modele = await svc.docxBytes(tpl.docxFileId);
         const buffer = await D.remplir(modele.bytes, vars);
-        const pdf = await convertirEnPdf(buffer, 'docx');
+        const pdf = await convertirEnPdf(buffer, 'docx', { moteur: moteurBureau(org) });
         if (!pdf) throw E.incomplete('Conversion Word → PDF indisponible sur le serveur (LibreOffice absent)');
         const info = await inspectPdf(pdf);
         return { buffer: pdf, pageCount: info.pages };

@@ -144,6 +144,24 @@ function createDsihubParapheur({ tls, http: injected } = {}) {
         .catch((e) => { throw failNet(e); });
       return { _echange: { methode: 'POST', url: `/api/parapheur/${ref}/annuler`, httpStatus: r.status, reponse: r.data } };
     },
+
+    /**
+     * Lien d'accès au Hub, déjà authentifié, pour un ÉLU consultant SON parapheur (pas l'envoi d'un acte) : le
+     * compte technique (celui de `jeton`) obtient un jeton pour son propre compte, puis demande au Hub un jeton
+     * DÉLÉGUÉ pour l'élu identifié par e-mail (`/api/auth/magapp-parapheur-access-pour`, restreint côté Hub aux
+     * comptes techniques autorisés — jamais le mot de passe de l'élu). Même principe que le « magasin
+     * d'applications » utilisé par les agents, un cran plus loin.
+     */
+    async accesDelegue(cfg, email) {
+      const client = clientOf(cfg); const token = await jeton(client, cfg);
+      const r = await client.post('/api/auth/magapp-parapheur-access-pour', { email }, { headers: { Authorization: `Bearer ${token}` } })
+        .catch((e) => { throw failNet(e); });
+      if (r.status === 404) throw E.notFound('Aucun compte Hub DSI ne correspond à cette adresse e-mail');
+      if (r.status >= 400) throw E.upstream(`Le Hub DSI a refusé la délégation d’accès (HTTP ${r.status}${r.data?.message ? ` : ${r.data.message}` : ''})`);
+      const url = r.data?.url;
+      if (!url) throw E.upstream('Le Hub DSI n’a pas renvoyé de lien d’accès');
+      return { url };
+    },
   };
 }
 

@@ -146,7 +146,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const comments = createComments({ db, audit, actes, acl, bus });
   const textes = createTextes({ db, audit, actes, acl, bus });
   late.texts = textes;
-  const render = createRender({ db, audit, storage, refs, actes, textes, config, annexes });
+  const render = createRender({ db, audit, storage, refs, actes, textes, config, annexes, bureau });
   const docs = createDocs({ render, config });
   const commissions = createCommissions({ db, audit, actes, acl, settings, bus, log, late });
   late.commissions = commissions;
@@ -198,8 +198,12 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   bus.on('tenue.close', (p) => ged.auto(p));
   bus.on('cahier.built', (p) => ged.auto(p)); // un cahier terminé part en GED sans attendre la clôture de la séance
   const sms = createSms({ db, config, settings, log, tls: config.tls, http: smsHttp });
-  const eluAuth = createEluAuth({ db, config, mail, settings, audit, log, sms });
-  const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log });
+  const eluAuth = createEluAuth({ db, config, mail, settings, audit, log, sms, ad });
+  const espace = createEspaceElus({ db, audit, settings, render, tenue, storage, cahier, log, parapheur });
+  // Ordre du jour arrêté (numérotation figée) → génère par avance les documents de l'espace élus (ELU-60, ELU-64).
+  bus.on('odj.arrete', (p) => espace.figerDocumentsActe(p.organismeId, p.acteId, p.seanceId));
+  // Contenu d'un acte modifié après l'arrêt de son ordre du jour : régénère par avance plutôt que d'attendre l'élu.
+  bus.on('text.committed', (p) => espace.figerSiArrete(p.organismeId, p.acteId));
   const annotations = createAnnotations({ db, audit, config, espace, settings });
   const amendements = createAmendements({ db, audit, tenue, textes });
   const entrainement = createEntrainement({ db, actes, textes, audit });

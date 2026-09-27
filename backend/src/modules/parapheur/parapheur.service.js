@@ -140,6 +140,19 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
       return view(await cfgOf(org));
     },
 
+    /**
+     * Lien « Mon parapheur » pour un ÉLU (espace élus, pas l'envoi d'un acte) : ouvre son propre espace de
+     * signature sur le Hub, déjà authentifié — jamais un envoi d'acte, jamais le mot de passe de l'élu.
+     * Indisponible en simulation locale sans Hub configuré comme un accès réel (message clair, pas d'erreur).
+     */
+    async accesElu(organismeId, email) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org);
+      if (cfg.fournisseur === 'iparapheur') throw E.conflict(INDISPONIBLE);
+      const ad = adapterOf(cfg);
+      if (!ad) throw E.conflict('Parapheur non configuré pour cette collectivité');
+      return ad.accesDelegue(cfg, email);
+    },
+
     async tester(ctx, organismeId, essai = null) {
       const org = requireOrg(organismeId); let cfg = await cfgOf(org);
       if (essai) cfg = { ...cfg, ...Object.fromEntries(Object.entries({ mode: essai.mode, url: essai.url?.trim().replace(/\/+$/, ''), utilisateur: essai.utilisateur?.trim(), secret: essai.motDePasse || undefined }).filter(([, x]) => x !== undefined)) };

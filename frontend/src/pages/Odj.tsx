@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import FriseSeance from './FriseSeance';
 import { DeleteSeanceModal, EditSeanceModal } from './SeanceActions';
-import { ArrowDown, ArrowUp, BookOpen, Download, FileText, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2, Radio, Pencil } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Download, FileText, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2, Radio, Pencil, RefreshCw } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -108,6 +108,13 @@ export default function Odj() {
   const odjPdf = async () => { try { const r = await api.get(orgPath(o, `/seances/${id}/odj/pdf`), { responseType: 'blob' }); showPdf(r.data, `Ordre du jour — ${d?.seance?.instance ?? ''}`); } catch (e: any) { toast(errMsg(e), 'ko'); } };
   const odjInternePdf = async () => { try { const r = await api.get(orgPath(o, `/seances/${id}/odj-interne/pdf`), { params: { tri: triInterne }, responseType: 'blob' }); showPdf(r.data, `Ordre du jour interne — ${d?.seance?.instance ?? ''}`); } catch (e: any) { toast(errMsg(e), 'ko'); } };
   const previewPattern = async (value: string) => { try { setPattern({ value, exemples: (await api.post(orgPath(o, '/numerotation/apercu'), { pattern: value, seanceId: Number(id) })).data.exemples }); } catch (e: any) { setPattern({ value, exemples: [`⚠ ${errMsg(e)}`] }); } };
+  const reconstruireDocuments = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post(orgPath(o, `/seances/${id}/documents/reconstruire`), {});
+      toast(`${r.data.ok} document(s) reconstruit(s)${r.data.echecs ? `, ${r.data.echecs} échec(s)` : ''}`, r.data.echecs ? 'ko' : undefined);
+    } catch (e: any) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
 
   if (odj.loading && !d) return <Loading />;
   if (odj.error || !d) return <ErrorBox msg={odj.error || 'Séance introuvable'} />;
@@ -128,6 +135,7 @@ export default function Odj() {
           {canEdit && meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/convocation`}><Mail className="h-4 w-4" /> Convocation</Link>}
           {meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/suivi`}><Radio className="h-4 w-4" /> Suivi de séance</Link>}
           {canEdit && meta.data?.kind !== 'commission' && <button className="btn-secondary" onClick={() => setCahierOpen(true)}><BookOpen className="h-4 w-4" /> Cahier de séance</button>}
+          {isScc && <button className="btn-secondary" onClick={reconstruireDocuments} disabled={busy} title="Régénère les PDF (exposés, projets) déjà figés pour l'espace élus"><RefreshCw className="h-4 w-4" /> Reconstruire les documents</button>}
           <button className="btn-secondary" onClick={odjPdf}><FileText className="h-4 w-4" /> Ordre du jour (PDF)</button>
           {canEdit && <span className="inline-flex items-center gap-1"><Select className="input !w-auto !py-1" aria-label="Tri de l'ordre du jour interne" value={triInterne} onChange={(e) => setTriInterne(e.target.value as any)}><option value="commission">Par commission</option><option value="rapporteur">Par rapporteur</option><option value="delegation">Par délégation</option></Select><button className="btn-secondary" onClick={odjInternePdf} title="Document de travail du SCC : avancement, annexes, dernier passage hiérarchique"><FileText className="h-4 w-4" /> Ordre du jour interne</button></span>}
           <button className="btn-secondary" onClick={exportCsv}><Download className="h-4 w-4" /> Tableau de suivi (CSV)</button>
