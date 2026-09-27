@@ -28,6 +28,14 @@ const Conf = z.object({
   confidentialite: z.enum(['normale', 'confidentiel']).optional(),
   // Circuit à faire suivre à l'arrêté (identifiant d'une définition publiée). Absent = envoi direct en signature.
   circuitId: z.number().int().positive().nullable().optional(),
+  // Emplacement de la signature : repère textuel cherché dans le document (« [SIGNATURE] »), et/ou cadre explicite
+  // (page, centre x/y en % de la page, largeur/hauteur en points PDF) — même convention que l'emplacement d'un acte.
+  signatureTexte: z.string().max(60).nullable().optional(),
+  signaturePosition: z.object({
+    page: z.number().int().min(1).max(500),
+    x: z.number().min(0).max(100), y: z.number().min(0).max(100),
+    w: z.number().min(10).max(600), h: z.number().min(10).max(300),
+  }).nullable().optional(),
 }).partial();
 
 const Collecteur = z.object({

@@ -28,6 +28,8 @@ export const VERSIONS: Version[] = [
       "Tous les actes : filtre par type d'acte (délibération, vœu, décision, arrêté).",
       "Collecteurs d'arrêtés : un chemin réseau UNC fonctionne désormais aussi lorsque l'application est installée sur un serveur Linux, sans montage préalable.",
       "Collecteurs d'arrêtés : chaque collecteur précise la nature, la matière, la rubrique, la direction porteuse (nom complet), la communicabilité (certains arrêtés ne sont pas publics) et la suite donnée — envoi direct en signature ou circuit choisi. Ce qui est laissé vide est proposé par l'IA.",
+      "Arrêtés et décisions signés par le maire : la fiche ne demande plus de commission pour avis (elle bloquait à tort l'envoi en signature).",
+      "Emplacement de la signature : le collecteur peut définir un cadre (page, position, dimensions) ou un repère dans le document (par exemple [SIGNATURE]) que l'application retrouve pour y poser la signature.",
     ],
   },
   {

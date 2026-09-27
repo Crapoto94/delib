@@ -21,6 +21,7 @@ const STATUTS: Record<string, { t: string; tone: 'ok' | 'warn' | 'ko' | 'gray' }
     cible: '', utilisateur: '', motDePasse: '', sousDossiers: 'gauche', mouvement: 'deplacer', dossierSignes: '',
     natureId: '' as number | '', matiereId: '' as number | '', rubriqueId: '' as number | '',
     directionCode: '', directionLabel: '', confidentialite: 'normale', circuitId: '' as number | '',
+    signatureTexte: '', sigPage: '', sigX: '', sigY: '', sigW: '', sigH: '',
 });
 
 /** Collecteurs d'arrêtés : moisson d'une boîte mail (Microsoft Graph) ou d'un dossier de partage, analyse IA et envoi en signature. */
@@ -46,6 +47,7 @@ export default function AdminCollecteurs() {
     cible: c.cible || '', utilisateur: c.utilisateur || '', motDePasse: '', sousDossiers: c.sousDossiers || 'gauche', mouvement: c.mouvement || 'deplacer', dossierSignes: c.dossierSignes || '',
     natureId: c.natureId ?? '', matiereId: c.matiereId ?? '', rubriqueId: c.rubriqueId ?? '',
     directionCode: c.directionCode || '', directionLabel: c.directionLabel || '', confidentialite: c.confidentialite || 'normale', circuitId: c.circuitId ?? '',
+    signatureTexte: c.signatureTexte || '', sigPage: c.signaturePosition?.page ?? '', sigX: c.signaturePosition?.x ?? '', sigY: c.signaturePosition?.y ?? '', sigW: c.signaturePosition?.w ?? '', sigH: c.signaturePosition?.h ?? '',
   } : vide());
 
   const corps = () => {
@@ -60,6 +62,11 @@ export default function AdminCollecteurs() {
     config.directionLabel = f.directionLabel || null;
     config.confidentialite = f.confidentialite === 'confidentiel' ? 'confidentiel' : 'normale';
     config.circuitId = f.circuitId || null;
+    // Signature : un repère dans le document prime, sinon le cadre explicite (même convention que l'emplacement d'un acte).
+    config.signatureTexte = f.signatureTexte.trim() || null;
+    config.signaturePosition = f.sigPage
+      ? { page: Number(f.sigPage), x: Number(f.sigX) || 75, y: Number(f.sigY) || 85, w: Number(f.sigW) || 150, h: Number(f.sigH) || 60 }
+      : null;
     if (f.type === 'mail') {
       if (f.graphMailbox.trim()) config.graphMailbox = f.graphMailbox.trim();
       config.retraitMail = !!f.retraitMail;
@@ -233,6 +240,22 @@ export default function AdminCollecteurs() {
                   {circuits.data?.filter((c) => c.activeVersionId).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
                 </Select>
               </Field>
+
+              <div className="grid gap-3 rounded border border-line p-3 md:col-span-2 md:grid-cols-3">
+                <p className="text-[12px] text-mute md:col-span-3">
+                  Emplacement de la signature du maire. Si le document déposé porte un <b>repère</b> (par exemple
+                  <code> [SIGNATURE] </code>), c'est lui qui est utilisé, où qu'il soit ; sinon le cadre ci-dessous
+                  s'applique. Sans repère ni cadre : page 1, 75 % / 85 %, 150 × 60 points.
+                </p>
+                <Field label="Repère dans le document" hint="Texte présent à l'endroit où signer (ex. [SIGNATURE]). La recherche ignore accents et majuscules.">
+                  <input className="input font-mono" value={f.signatureTexte} placeholder="[SIGNATURE]" onChange={(e) => setF({ ...f, signatureTexte: e.target.value })} />
+                </Field>
+                <Field label="Page"><input className="input" type="number" min={1} value={f.sigPage} placeholder="1" onChange={(e) => setF({ ...f, sigPage: e.target.value })} /></Field>
+                <Field label="Largeur (points)"><input className="input" type="number" min={10} max={600} value={f.sigW} placeholder="150" onChange={(e) => setF({ ...f, sigW: e.target.value })} /></Field>
+                <Field label="Centre horizontal (%)" hint="Depuis la gauche de la page."><input className="input" type="number" min={0} max={100} value={f.sigX} placeholder="75" onChange={(e) => setF({ ...f, sigX: e.target.value })} /></Field>
+                <Field label="Centre vertical (%)" hint="Depuis le haut de la page."><input className="input" type="number" min={0} max={100} value={f.sigY} placeholder="85" onChange={(e) => setF({ ...f, sigY: e.target.value })} /></Field>
+                <Field label="Hauteur (points)"><input className="input" type="number" min={10} max={300} value={f.sigH} placeholder="60" onChange={(e) => setF({ ...f, sigH: e.target.value })} /></Field>
+              </div>
             </div>
 
             {f.type === 'dossier' ? (

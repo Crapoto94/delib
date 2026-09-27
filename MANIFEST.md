@@ -2460,3 +2460,14 @@ Quelques points de conception :
   (`refs.list`) : un identifiant d'une autre collectivité ne peut pas être accepté par erreur.
 - Le collecteur agit sans session humaine : la création et l'envoi au circuit passent par un **contexte système**
   (`isPlatformAdmin`), ce qui reste tracé dans l'audit (`acte.collecte`, `circuit.submit`).
+- **Aucune commission pour avis** : un acte signé par le maire (arrêté, décision) ne passe pas au conseil. La fiche
+  d'un tel acte ne demande donc plus de commission — elle était auparavant marquée obligatoire et **bloquait l'envoi au
+  parapheur** (`Dossier.tsx`, drapeau `typeInfo.meta.signature`).
+- **Emplacement de la signature** — indispensable avant l'envoi au parapheur, et jusqu'ici deviné pour les arrêtés
+  collectés. Le collecteur propose désormais deux façons de le fixer :
+  1. un **repère textuel** cherché dans le PDF final (par exemple `[SIGNATURE]`) : le modèle Word/PDF déposé dit
+     lui-même où signer. La recherche ignore accents et majuscules, et la position est convertie dans la convention du
+     parapheur (centre en pourcentage de la page, x depuis la gauche, y depuis le haut, dimensions en points PDF) ;
+  2. à défaut, un **cadre** réglé sur le collecteur (page, centre x/y en %, largeur et hauteur en points).
+  Sans repère trouvé ni cadre réglé, le cadre par défaut s'applique (page 1, 75 % / 85 %, 150 × 60). L'origine retenue
+  est inscrite dans le dossier (`custom.collecteur.signature`) pour que l'administration sache d'où vient la position.

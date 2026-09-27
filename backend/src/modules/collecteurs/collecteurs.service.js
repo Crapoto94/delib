@@ -27,6 +27,42 @@ const TAILLE_MAX = 20 * 1024 * 1024;
 const TAILLE_MAX_IA = 60 * 1024 * 1024;
 
 let pdfjs = null;
+
+/**
+ * Cherche un repère de signature dans le PDF (par exemple « [SIGNATURE] », ou un simple mot posé à l'endroit où le
+ * maire doit signer) et renvoie le cadre au format attendu par le parapheur : `page`, centre `x`/`y` en POURCENTAGE de
+ * la page (x depuis la gauche, y depuis le haut) et dimensions en points PDF. `null` si le repère est absent.
+ *
+ * pdfjs donne la position du texte en points, origine en bas à gauche : on retourne donc l'ordonnée (hauteur de page
+ * moins l'ordonnée PDF) pour exprimer le centre depuis le haut, comme le fait l'interface.
+ */
+async function chercherRepereSignature(buffer, repere, { w = 150, h = 60 } = {}) {
+  const cible = nettoyerNom(repere);
+  if (!cible) return null;
+  pdfjs = pdfjs || await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer), useSystemFonts: true, verbosity: 0, isEvalSupported: false }).promise;
+  try {
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const vue = page.getViewport({ scale: 1 });
+      const items = (await page.getTextContent()).items;
+      const item = items.find((x) => x.str && nettoyerNom(x.str).includes(cible));
+      if (item) {
+        // `transform[4]`/`transform[5]` : origine du texte (points PDF, depuis le bas à gauche).
+        const largeur = Math.abs(item.width || 0);
+        const hauteur = Math.abs(item.height || 0) || 12;
+        const cx = item.transform[4] + largeur / 2;
+        const cyDepuisLeBas = item.transform[5] + hauteur / 2;
+        page.cleanup();
+        const borne = (v) => Math.min(96, Math.max(4, Math.round(v * 10) / 10));
+        return { page: i, w, h, x: borne((cx / vue.width) * 100), y: borne(((vue.height - cyDepuisLeBas) / vue.height) * 100) };
+      }
+      page.cleanup();
+    }
+    return null;
+  } finally { await doc.destroy(); }
+}
+
 async function lirePdf(buffer) {
   pdfjs = pdfjs || await import('pdfjs-dist/legacy/build/pdf.mjs');
   const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer), useSystemFonts: true, verbosity: 0, isEvalSupported: false }).promise;
@@ -111,6 +147,9 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
       directionLabel: c.directionLabel || null,
       confidentialite: c.confidentialite === 'confidentiel' ? 'confidentiel' : 'normale',
       circuitId: c.circuitId ?? null,
+      // Emplacement de la signature : un repère textuel dans le document prime, sinon le cadre ci-dessous.
+      signatureTexte: c.signatureTexte || null,
+      signaturePosition: c.signaturePosition ?? null,
     };
     if (r.type === 'mail') {
       return { ...base, mailbox: c.graphMailbox || '', dossierSignes: c.dossierSignes || null, retraitMail: c.retraitMail !== false, essai: !!c.essai };
@@ -279,7 +318,26 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
       await db.run('UPDATE files SET pages = $2 WHERE id = $1', [pf.id, pages]);
       pdfFileId = pf.id;
     }
-    await db.run('UPDATE actes SET document_source_file_id = $2, document_source_pdf_file_id = $3 WHERE id = $1', [r.id, src.id, pdfFileId]);
+    /**
+     * Emplacement de la signature. Trois sources, dans l'ordre : le REPÈRE présent dans le document (le modèle déposé
+     * dit lui-même où signer), puis le cadre réglé sur le collecteur, puis le cadre par défaut. Le repère est cherché
+     * dans le PDF final (après conversion Word → PDF et pose de la trame).
+     */
+    let position = posDefault;
+    let originePosition = 'defaut';
+    const repere = String(reglages.signatureTexte || '').trim();
+    if (repere) {
+      const trouve = await chercherRepereSignature(pdfBuffer, repere).catch((e) => { log?.warn?.({ err: e.message }, 'repère de signature illisible'); return null; });
+      if (trouve) { position = trouve; originePosition = 'repere'; }
+    }
+    if (originePosition === 'defaut' && reglages.signaturePosition && Number(reglages.signaturePosition.page) >= 1) {
+      const p = reglages.signaturePosition;
+      position = { page: Number(p.page), x: Number(p.x), y: Number(p.y), w: Number(p.w) || 150, h: Number(p.h) || 60 };
+      originePosition = 'reglage';
+    }
+    custom.collecteur.signature = { origine: originePosition, repere: originePosition === 'repere' ? repere : null, ...position };
+    await db.run('UPDATE actes SET document_source_file_id = $2, document_source_pdf_file_id = $3, signature_position = $4::jsonb, custom = $5::jsonb WHERE id = $1',
+      [r.id, src.id, pdfFileId, JSON.stringify(position), JSON.stringify(custom)]);
     await audit.log(null, { organismeId: org, action: 'acte.collecte', entity: 'actes', entityId: r.id, after: { collecteur: collecteur.nom, origine, fichier: nom, elu: elu?.email ?? null, type: typeNom || null, statut: ok ? 'a_signer' : 'brouillon', trame: trameFinale } });
     return { ...r, document_source_file_id: src.id, document_source_pdf_file_id: pdfFileId };
   }
@@ -622,4 +680,4 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
 
   return svc;
 }
-module.exports = { createCollecteurs };
+module.exports = { createCollecteurs, chercherRepereSignature };

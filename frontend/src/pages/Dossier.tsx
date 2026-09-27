@@ -117,7 +117,7 @@ function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable
     rubrique: f.rubriqueId === '' || f.rubriqueId == null,
     nature: f.natureId === '' || f.natureId == null,
     rapporteur: !signature && (f.rapporteurId === '' || f.rapporteurId == null),
-    commission: (allCommissions.data?.length ?? 0) > 0 && !(commissions.data?.items ?? []).some((c: any) => !c.retireeAt),
+    commission: !signature && (allCommissions.data?.length ?? 0) > 0 && !(commissions.data?.items ?? []).some((c: any) => !c.retireeAt),
     incidence: f.incidenceFinanciere == null,
   };
   const mq = (k: keyof typeof manque) => editable && manque[k];
@@ -178,6 +178,8 @@ function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable
           <Select className="input" disabled={dis} value={f.rapporteurDelegation ?? ''} onChange={(e) => setF({ ...f, rapporteurDelegation: e.target.value })}>
             <option value="">— choisir —</option>{delegationsElu.map((d) => <option key={d} value={d}>{d}</option>)}
           </Select></Field>)}
+        {/* Un acte signé par le maire (arrêté, décision) ne passe pas au conseil : aucune commission pour avis. */}
+        {!signature && (
         <div className="md:col-span-2">
           <Field label="Commissions (pour avis) *" missing={mq('commission')} hint="Le projet est soumis pour avis à la ou les commissions sélectionnées. Obligatoire dès que la collectivité a des commissions actives.">
             {(commissions.data?.items ?? []).some((c: any) => !c.retireeAt) ? (
@@ -193,7 +195,7 @@ function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable
                 <button type="button" className="btn-secondary" disabled={!selCommission} onClick={addCommission}>Ajouter</button>
               </div>)}
           </Field>
-        </div>
+        </div>)}
         <div className="md:col-span-2">
           <Field label="Directions en info (copie)" hint="Facultatif. Le directeur de ces directions est notifié quand le projet arrive au SCC, leur DGA quand la délibération arrive à l'étape DGA.">
             {dirsInfo.length ? <ul className="mb-2 flex flex-wrap gap-2">{dirsInfo.map((d: any) => (
