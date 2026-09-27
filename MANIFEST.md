@@ -2199,7 +2199,7 @@ le **transport**, parce que les deux produits n'ont pas la même architecture.
 | Intégration page | `DocsAPI.DocEditor` dans un conteneur | une **iframe** (`cool.html?WOPISrc=…`) |
 | Récupération du fichier | le moteur appelle notre route | `GET /wopi/:cle/contents` (GetFile) |
 | Enregistrement | **rappel** à chaque sauvegarde (jeton HS256) | **PutFile** : le moteur nous rapporte le fichier |
-| « Enregistrer maintenant » | commande serveur (`POST /command`) | **n'existe pas** → c'est la **fin de session** qui écrit |
+| « Enregistrer maintenant » | commande serveur (`POST /command`) | message **`Action_Save`** à l'éditeur, qui écrit puis répond `Action_Save_Resp` |
 | Conversion PDF | `/converter` (même rendu que l'écran) | **n'existe pas** → repli **LibreOffice** du backend |
 | Format | docx/xlsx/pptx, odt/ods/odp, rtf, txt, csv… | idem (LibreOffice) |
 
@@ -2213,10 +2213,19 @@ déployé), et l'administration s'en sert pour proposer un sélecteur.
 ### Ce qui change pour « Sauvegarder et fermer »
 
 - ONLYOFFICE : le serveur ordonne l'enregistrement, puis **attend** la version créée.
-- Collabora : aucun équivalent. Le front **retire d'abord l'iframe** — mettre fin à la session fait écrire le document
-  par le moteur — puis demande la version au backend, qui attend l'écriture (12 s) et, si rien n'arrive, répond
-  « rien à enregistrer » (l'agent avait déjà enregistré, ou n'avait rien modifié). C'est un résultat **positif** :
-  Collabora enregistre aussi tout seul, à intervalle régulier.
+- Collabora : il n'existe pas de commande serveur équivalente. Le front **arme d'abord l'attente du backend**
+  (`POST …/enregistrer`), **puis** envoie `{ MessageId: 'Action_Save', Values: { DontTerminateEdit: true, Notify: true } }`
+  à l'iframe : l'éditeur écrit, le PutFile crée la version, et l'attente se résout. Dans l'autre ordre, la version arrive
+  **avant** que quiconque l'attende et il faut patienter le délai complet pour rien — c'était la lenteur ressentie.
+  La session est ensuite fermée proprement (`Close_Session`, que l'éditeur traduit par `closedocument` sur son
+  WebSocket), puis l'iframe est retirée.
+- Collabora enregistre **aussi tout seul** : `per_document.autosave_duration_secs` (2 minutes ici, 5 par défaut) et
+  `per_document.always_save_on_exit=true` — **faux par défaut**, ce qui faisait perdre les dernières frappes à qui
+  fermait son onglet sans cliquer sur « Sauvegarder et fermer ». Chaque enregistrement automatique crée une version :
+  le délai est un compromis entre « ne rien perdre » et « ne pas noyer l'historique ».
+- La **conversion PDF** qui suit un enregistrement ne fait plus attendre l'agent : elle part en arrière-plan
+  (`annexes.pdfEnArrierePlan`), et la lecture sait toujours la produire à la demande (premier aperçu possiblement plus
+  long, puis en cache).
 
 ### Hôte WOPI (`backend/src/modules/bureau/wopi.js`)
 
@@ -2241,6 +2250,21 @@ Points à ne pas manquer :
    **409** (protocole), pas une écriture.
 4. Un refus métier (droit, gel après transmission) répond `{"Status": 1}` : **200 + refus**, sinon Collabora réessaie en
    boucle.
+5. **Le jeton d'accès est décoré par le moteur.** Collabora n'envoie pas `<clé>` : il accole ses paramètres de
+   diagnostic à la *valeur* du jeton, avec un point d'interrogation — on reçoit `access_token=<clé>?debug=0`. Une
+   comparaison stricte renvoie donc 403 et l'éditeur affiche « Accès refusé ». On compare la clé seule (`verifierAcces`
+   coupe avant `?`, `&` ou `#`), la sécurité est inchangée : il faut toujours connaître les 128 bits.
+6. **Les réponses vides du protocole passent par `res.type('text/plain').send('')`.** `res.text()` **n'existe pas** en
+   Express : chaque **LOCK répondait 500**, Collabora n'avait donc jamais de verrou — et **refusait d'enregistrer**
+   (« Save failed ») alors que le reste fonctionnait. Le faux `res` des tests avait inventé cette méthode, ce qui a
+   masqué le défaut ; il expose maintenant `type()`/`send()` comme le runtime.
+7. **Le `WOPISrc` doit être joignable par le MOTEUR, pas par le navigateur.** Les appels WOPI (CheckFileInfo, GetFile,
+   PutFile) viennent du moteur seul : le `WOPISrc` est donc bâti sur **`BUREAU_URL_RAPPEL`** (l'adresse de rappel,
+   interne), et non sur `PUBLIC_BASE_URL`. En production, les conteneurs **ne joignent pas** le nom public (vérifié :
+   `fetch failed` sur `https://vibedelib.ivry.local`), et une base publique aurait donc cassé Collabora dès sa mise en
+   service par organisme. `PUBLIC_BASE_URL` ne sert plus qu'au `PostMessageOrigin`, la seule valeur que le navigateur
+   compare. Corollaire : **l'hôte du `WOPISrc` doit figurer dans `domain`** (variable `BUREAU_HOTE_WOPI`), sinon
+   Collabora répond `Access denied to CheckFileInfo`.
 
 ### Choix du moteur par organisme
 
@@ -2256,15 +2280,29 @@ Points à ne pas manquer :
 ### Mise en production (Docker)
 
 ```bash
-# .env racine
+# .env racine (production)
 BUREAU_COLLABORA_URL=http://collabora:9980
 BUREAU_COLLABORA_URL_NAVIGATEUR=/collabora-delib        # relais du frontal, comme /office-delib
-BUREAU_HOTE_PUBLIQUE=vibedelib.ivry.local              # liste des hôtes acceptés par Collabora (compose)
+BUREAU_HOTE_PUBLIQUE=vibedelib.ivry.local              # hôte public (frontal)
+BUREAU_HOTE_WOPI=10.103.130.106,10.103.130.106:3021    # hôte du WOPISrc VU PAR LE MOTEUR (jamais le nom public)
+BUREAU_URL_RAPPEL=http://backend:3021                  # adresse de rappel : base du WOPISrc
+BUREAU_HOTE_PUBLIQUE_DEV=localhost:5160                # origine du navigateur de développement
+BUREAU_HOTE_WOPI_DEV=10.103.230.21,10.103.230.21:3021  # adresse du poste de développement, vue par le moteur
+BUREAU_AUTOSAVE_SEC=120                                # enregistrement automatique de Collabora (2 min)
 COLLABORA_ADMIN_PASSWORD=<mot de passe>                 # administration du moteur
 ```
 
+Deux moteurs Collabora cohabitent : `collabora` (profil `bureau`, port publié 9981, `server_name` = nom public) et
+`collabora-dev` (profil `bureau-dev`, port publié 9982, `server_name=localhost:5160`). **Un seul moteur ne peut pas
+servir les deux** : Collabora n'accepte le WebSocket de l'éditeur que si son origine est `http(s)://<server_name>`, et
+le développement se fait en clair sur `localhost:5160` — le navigateur verrait sinon
+`Rejecting origin [http://localhost:5160] expected [https://vibedelib.ivry.local]`.
+
+Les deux moteurs tournent sur des **images dérivées** (`docker/collabora/Dockerfile`, `docker/onlyoffice/Dockerfile`)
+qui embarquent les **polices de la Ville** : voir §37.
+
 ```bash
-docker compose --profile bureau up -d
+docker compose --profile bureau --profile bureau-dev up -d --build
 docker compose logs -f collabora                        # premier démarrage : quelques minutes
 ```
 
@@ -2290,13 +2328,16 @@ premiers ont été trouvés en production, un par un :
 3. **`extra_params` n'a pas d'indice.** Écrit `extra_params1`, le paramètre est silencieusement ignoré : le moteur
    reste en HTTPS, le frontal répond `502 upstream prematurely closed connection` et la log dit
    `SSL support: SSL is enabled`. Le TLS interne est coupé par `--o:ssl.enable=false`.
-4. **`domain=${BUREAU_HOTE_PUBLIQUE}$`** : Collabora n'accepte que les hôtes autorisés, et le sien est le nôtre
-   (le navigateur passe par le frontal). `cap_add: MKNOD` est également requis.
+4. **`domain=…` : deux hôtes différents, à ne pas confondre.** Collabora n'accepte que les hôtes autorisés, et il y en
+   a **deux sortes** : le nom public de l'application (`BUREAU_HOTE_PUBLIQUE`, celui du navigateur) et **l'hôte du
+   `WOPISrc`**, c'est-à-dire l'adresse par laquelle le moteur rappellera le backend (`BUREAU_HOTE_WOPI`). Oublier le
+   second donne `Access denied to CheckFileInfo` — l'éditeur s'ouvre, puis échoue à charger le document. `cap_add:
+   MKNOD` est également requis.
 
-La ligne complète, telle qu'elle est en production :
+La ligne complète, telle qu'elle est en production (sauvegarde automatique comprise, voir §36) :
 
 ```yaml
-- extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:server_name=${BUREAU_HOTE_PUBLIQUE} --o:net.service_root=/collabora-delib
+- extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:server_name=${BUREAU_HOTE_PUBLIQUE} --o:net.service_root=/collabora-delib --o:per_document.autosave_duration_secs=${BUREAU_AUTOSAVE_SEC:-120} --o:per_document.always_save_on_exit=true
 ```
 
 Le `healthcheck` de l'image (`coolwsd --probe`) ne vérifie que le binaire, pas l'écoute réseau : un conteneur peut être
@@ -2335,5 +2376,61 @@ curl -H "X-WOPI-Override: CHECK_FILE_INFO" \
 ```
 
 Une annexe ouverte avec Collabora doit produire, dans les logs du backend, `annexe enregistrée depuis le bureau en ligne`
-avec `moteur: collabora`. Le `WOPISrc` contenu dans l'`src` de l'iframe doit être en `https://<app>/api/v1/public/…` :
-s'il contient l'adresse interne du backend, le navigateur ne pourra ni l'appeler ni l'appeler depuis une page https.
+avec `moteur: collabora`, et les quatre appels WOPI (`GET /<clé>`, `GET /<clé>/contents`, `POST /<clé>` pour le verrou,
+`POST /<clé>/contents` pour l'écriture) doivent tous répondre **200**. Le `WOPISrc` de l'`src` de l'iframe doit être
+l'**adresse de rappel** : c'est le MOTEUR qui l'appelle (jamais le navigateur), une adresse publique n'étant pas
+joignable depuis les conteneurs.
+
+---
+
+## 37. Ce que les agents voient : polices, pièces jointes, utilisateurs, arrêtés
+
+### Les polices de la Ville dans les deux éditeurs
+
+Les deux moteurs tournent désormais sur des **images dérivées** qui embarquent la famille **Interstate** :
+
+- **Collabora** : les fichiers sont déposés dans `/opt/collaboraoffice/share/fonts/truetype/` — c'est là que LibreOffice
+  lit ses polices dans cette image (elle n'a **ni `fc-cache` ni `/usr/share/fonts`**), et fontconfig les indexe au
+  démarrage. `remote_font_config` (chargement par URL) a été écarté : l'image est une *release*, qui exige **https**,
+  et le conteneur ne joint pas le nom public.
+- **ONLYOFFICE** : `/usr/share/fonts/truetype/custom/`, puis **`documentserver-generate-allfonts.sh`** — sans cette
+  régénération, le moteur continue de servir une liste de polices figée.
+
+Vérification : `AllFonts.js` doit citer les 15 styles d'`Interstate`, et l'index de polices de Collabora
+(`/opt/cool/.cache/fontconfig`) doit contenir « Interstate ».
+
+Les polices **ne sont pas versionnées** (police commerciale, Font Bureau) : elles vivent dans `docker/fonts/interstate/`
+sur le serveur et sont ignorées par git (`.gitignore`, `.dockerignore`). Un rebuild ailleurs suppose de les y déposer.
+Aucun document existant n'est modifié : la police est rendue disponible, elle n'est pas substituée.
+
+### Pièces jointes : mêmes boutons pour toutes les pièces
+
+Un bouton **Aperçu** est proposé sur **toutes** les pièces, **y compris les PDF** (qui n'en avaient pas) ; le
+téléchargement est une simple icône, sans afficher l'extension. Quand l'aperçu est demandé avant que le PDF n'existe, il
+est produit à la demande puis mis en cache — l'enregistrement, lui, ne l'attend plus.
+
+### Utilisateurs & rôles : les noms de l'historique séparés des agents
+
+La reprise AIRS a créé des identifiants pour rattacher les **actes antérieurs** (`agent_ref.source = 'airs'` : 111 lignes,
+dont une seule s'est jamais connectée). Ils ne sont plus mêlés aux agents réels : **exclus par défaut**, une case
+« Afficher les noms importés (actes antérieurs) » les fait réapparaître, et une **pastille discrète** les signale.
+L'affichage des noms est normalisé **Prénom NOM** pour tout le monde (`nomAffiche`), les sources n'étant pas homogènes
+(l'annuaire rend « Marc Chevalier », AIRS « CHRYSTELLE PETIT »).
+
+### Tous les actes : filtre par type
+
+Filtre par **type d'acte** (délibération, vœu, décision, arrêté) en tête de page, cumulable avec les deux vues
+(par étape du circuit, par date du conseil).
+
+### Collecteurs d'arrêtés : chemin réseau UNC sous Linux
+
+Le champ « dossier source » accepte un chemin UNC dans les deux cas, sans montage préalable :
+
+- **Windows** : PowerShell (`New-SmbMapping`, identifiants en variables d'environnement) ;
+- **Linux** (le serveur applicatif, en Docker) : **`smbclient`** (paquet `samba-client` de l'image backend).
+
+Précautions de la mise en œuvre Linux : le mot de passe passe par la variable **`PASSWD`** (jamais en ligne de commande,
+que `ps` montre) ; les lectures et écritures transitent par un fichier temporaire local (la sortie standard de smbclient
+mêle les messages de service au contenu) ; `mkdir` n'ayant pas d'équivalent `-p`, les dossiers intermédiaires
+(`_traites/<date>`) sont créés **segment par segment**. Testé de bout en bout contre un partage SMB réel : test d'accès,
+liste, lecture, écriture, déplacement, suppression.
