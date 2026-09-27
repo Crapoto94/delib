@@ -21,7 +21,7 @@ const STATUTS: Record<string, { t: string; tone: 'ok' | 'warn' | 'ko' | 'gray' }
     cible: '', utilisateur: '', motDePasse: '', sousDossiers: 'gauche', mouvement: 'deplacer', dossierSignes: '',
     natureId: '' as number | '', matiereId: '' as number | '', rubriqueId: '' as number | '',
     directionCode: '', directionLabel: '', confidentialite: 'normale', circuitId: '' as number | '',
-    signatureTexte: '', sigPage: '', sigX: '', sigY: '', sigW: '', sigH: '',
+    signatureTexte: '', sigPage: '', sigX: '', sigY: '', sigW: '', sigH: '', signatureMode: '',
 });
 
 /** Collecteurs d'arrêtés : moisson d'une boîte mail (Microsoft Graph) ou d'un dossier de partage, analyse IA et envoi en signature. */
@@ -47,7 +47,7 @@ export default function AdminCollecteurs() {
     cible: c.cible || '', utilisateur: c.utilisateur || '', motDePasse: '', sousDossiers: c.sousDossiers || 'gauche', mouvement: c.mouvement || 'deplacer', dossierSignes: c.dossierSignes || '',
     natureId: c.natureId ?? '', matiereId: c.matiereId ?? '', rubriqueId: c.rubriqueId ?? '',
     directionCode: c.directionCode || '', directionLabel: c.directionLabel || '', confidentialite: c.confidentialite || 'normale', circuitId: c.circuitId ?? '',
-    signatureTexte: c.signatureTexte || '', sigPage: c.signaturePosition?.page ?? '', sigX: c.signaturePosition?.x ?? '', sigY: c.signaturePosition?.y ?? '', sigW: c.signaturePosition?.w ?? '', sigH: c.signaturePosition?.h ?? '',
+    signatureTexte: c.signatureTexte || '', sigPage: c.signaturePosition?.page ?? '', sigX: c.signaturePosition?.x ?? '', sigY: c.signaturePosition?.y ?? '', sigW: c.signaturePosition?.w ?? '', sigH: c.signaturePosition?.h ?? '', signatureMode: c.signatureMode || '',
   } : vide());
 
   const corps = () => {
@@ -67,6 +67,7 @@ export default function AdminCollecteurs() {
     config.signaturePosition = f.sigPage
       ? { page: Number(f.sigPage), x: Number(f.sigX) || 75, y: Number(f.sigY) || 85, w: Number(f.sigW) || 150, h: Number(f.sigH) || 60 }
       : null;
+    config.signatureMode = f.signatureMode || null;
     if (f.type === 'mail') {
       if (f.graphMailbox.trim()) config.graphMailbox = f.graphMailbox.trim();
       config.retraitMail = !!f.retraitMail;
@@ -249,6 +250,13 @@ export default function AdminCollecteurs() {
                 </p>
                 <Field label="Repère dans le document" hint="Texte présent à l'endroit où signer (ex. [SIGNATURE]). La recherche ignore accents et majuscules.">
                   <input className="input font-mono" value={f.signatureTexte} placeholder="[SIGNATURE]" onChange={(e) => setF({ ...f, signatureTexte: e.target.value })} />
+                </Field>
+                <Field label="Type de signature" hint="La signature P12 (certificat) est la plus forte ; la manuscrite est une signature simple mémorisée par le parapheur.">
+                  <Select className="input" value={f.signatureMode} onChange={(e) => setF({ ...f, signatureMode: e.target.value })}>
+                    <option value="">— selon le paramétrage du parapheur —</option>
+                    <option value="securise">Signature P12 (certificat)</option>
+                    <option value="simple">Signature manuscrite (simple)</option>
+                  </Select>
                 </Field>
                 <Field label="Page"><input className="input" type="number" min={1} value={f.sigPage} placeholder="1" onChange={(e) => setF({ ...f, sigPage: e.target.value })} /></Field>
                 <Field label="Largeur (points)"><input className="input" type="number" min={10} max={600} value={f.sigW} placeholder="150" onChange={(e) => setF({ ...f, sigW: e.target.value })} /></Field>

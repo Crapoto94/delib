@@ -14,6 +14,7 @@
 const { createSecretBox } = require('../../shared/secretbox');
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
+const { signataireOf, signataireEnvoi } = require('./signataire');
 
 const INDISPONIBLE = 'Le parapheur iParapheur n’est pas encore disponible : choisissez le parapheur DSIHUB.';
 
@@ -46,14 +47,6 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
       { code: 'iparapheur', nom: 'iParapheur', editeur: 'Libriciel', description: 'Parapheur tiers : reprise prévue, non implémentée pour le moment.', disponible: false, defaut: false },
     ],
   });
-
-  /**
-   * Le signataire remis au parapheur : adresse d'essai unique en « dev », signataire paramétré en « prod ».
-   * `mode` : le mode de signature demandé au parapheur (securise par défaut) ; `telephone` : requis pour le SMS.
-   */
-  const signataireOf = (cfg) => (cfg.mode === 'dev'
-    ? { nom: cfg.signataire_nom || 'Signataire (test)', email: cfg.email_test || null, qualite: cfg.signataire_qualite || null, mode: cfg.signature_mode || 'securise', telephone: cfg.signataire_telephone || null }
-    : { nom: cfg.signataire_nom || null, email: cfg.signataire_email || null, qualite: cfg.signataire_qualite || null, mode: cfg.signature_mode || 'securise', telephone: cfg.signataire_telephone || null });
 
   /** Le contrôle du signataire selon le mode : l'e-mail est toujours requis ; le SMS exige aussi un portable. */
   const verifierSignataire = (cfg, signataire) => {
@@ -229,7 +222,7 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
       if (!cfg.actif) throw E.conflict('Le parapheur est désactivé pour cette collectivité (Paramétrages / Parapheur).');
       const ad = adapterOf(cfg);
       if (!ad) throw E.conflict(INDISPONIBLE);
-      const signataire = signataireOpt ? { ...signataireOf(cfg), ...signataireOpt } : signataireOf(cfg);
+      const signataire = signataireEnvoi(cfg, signataireOpt);
       verifierSignataire(cfg, signataire);
       // L'emplacement de la signature est défini dans VibeDélib avant l'envoi (mécanisme du Hub DSI).
       const pos = a.signature_position;

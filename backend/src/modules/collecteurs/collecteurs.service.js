@@ -150,6 +150,8 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
       // Emplacement de la signature : un repère textuel dans le document prime, sinon le cadre ci-dessous.
       signatureTexte: c.signatureTexte || null,
       signaturePosition: c.signaturePosition ?? null,
+      // Mode de signature demandé au parapheur (P12 ou manuscrite) : null = celui du paramétrage.
+      signatureMode: c.signatureMode === 'simple' ? 'simple' : (c.signatureMode === 'securise' ? 'securise' : null),
     };
     if (r.type === 'mail') {
       return { ...base, mailbox: c.graphMailbox || '', dossierSignes: c.dossierSignes || null, retraitMail: c.retraitMail !== false, essai: !!c.essai };
@@ -464,7 +466,8 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
         await alerter(org, acte, collecteur, [`l’envoi au circuit a échoué : ${e.message}`]);
       }
     } else if (ok) {
-      const signataire = { nom: elu.nomComplet, email: elu.email, qualite: 'arrêté (collecteur)' };
+      // Le collecteur peut imposer le mode de signature de ses arrêtés (P12 ou manuscrite) ; sinon celui du parapheur.
+      const signataire = { nom: elu.nomComplet, email: elu.email, qualite: 'arrêté (collecteur)', ...(collecteur.config?.signatureMode ? { mode: collecteur.config.signatureMode } : {}) };
       try {
         await parapheur.demanderEnvoi(null, org, acte.id, { auto: true, signataire });
         detail.envoye = true;

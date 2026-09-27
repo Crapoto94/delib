@@ -31,6 +31,9 @@ const Conf = z.object({
   // Emplacement de la signature : repère textuel cherché dans le document (« [SIGNATURE] »), et/ou cadre explicite
   // (page, centre x/y en % de la page, largeur/hauteur en points PDF) — même convention que l'emplacement d'un acte.
   signatureTexte: z.string().max(60).nullable().optional(),
+  // Mode de signature demandé au parapheur pour les arrêtés de ce collecteur : P12 (« securise ») ou manuscrite
+  // (« simple »). Absent = celui du paramétrage du parapheur.
+  signatureMode: z.enum(['securise', 'simple']).nullable().optional(),
   signaturePosition: z.object({
     page: z.number().int().min(1).max(500),
     x: z.number().min(0).max(100), y: z.number().min(0).max(100),

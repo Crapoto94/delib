@@ -31,6 +31,8 @@ export const VERSIONS: Version[] = [
       "Arrêtés et décisions signés par le maire : la fiche ne demande plus de commission pour avis (elle bloquait à tort l'envoi en signature).",
       "Emplacement de la signature : le collecteur peut définir un cadre (page, position, dimensions) ou un repère dans le document (par exemple [SIGNATURE]) que l'application retrouve pour y poser la signature.",
       "Parapheur : un refus n'est plus annoncé comme une injoignabilité — le message reprend le code HTTP et la réponse du serveur (« a répondu HTTP 500 : … »), au lieu du seul ERR_BAD_RESPONSE qui faisait chercher une panne réseau.",
+      "Parapheur en mode dev : l'adresse d'essai est bien la seule utilisée pour tous les envois, y compris les arrêtés collectés (auparavant, le signataire repéré dans le document pouvait partir à sa vraie adresse).",
+      "Collecteur d'arrêtés : le type de signature (P12 ou manuscrite) se règle sur le collecteur ; sinon celui du paramétrage du parapheur s'applique.",
     ],
   },
   {
