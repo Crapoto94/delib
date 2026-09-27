@@ -49,7 +49,10 @@ services:
   # Consommateur de ressources : prévoir ~2 Go de RAM et un CPU de plus que l'application seule.
   documentserver:
     profiles: ["bureau"]
-    image: onlyoffice/documentserver:9.4
+    image: delib/documentserver:9.4
+    # Image dérivée : ONLYOFFICE + les polices de la Ville (Interstate). Voir docker/onlyoffice/Dockerfile — sans
+    # régénération de la liste des polices, le moteur ne verrait pas les fichiers ajoutés.
+    build: { context: ., dockerfile: docker/onlyoffice/Dockerfile }
     restart: always
     environment:
       - JWT_ENABLED=true
@@ -77,7 +80,9 @@ services:
   # également borné. Voir MANIFEST §36.
   collabora:
     profiles: ["bureau"]
-    image: collabora/code:latest
+    image: delib/collabora:local
+    # Image dérivée : Collabora + les polices de la Ville (Interstate). Voir docker/collabora/Dockerfile.
+    build: { context: ., dockerfile: docker/collabora/Dockerfile }
     restart: always
     cap_add: ["MKNOD"]             # demandé par Collabora (proxies d'E/S pour l'accès direct aux fichiers)
     environment:
@@ -120,7 +125,9 @@ services:
   # aucune URL publique. Il n'est démarré qu'avec le profil `bureau-dev`.
   collabora-dev:
     profiles: ["bureau-dev"]
-    image: collabora/code:latest
+    image: delib/collabora:local
+    # Même image dérivée que le moteur de production (polices incluses) : le second build est donc instantané.
+    build: { context: ., dockerfile: docker/collabora/Dockerfile }
     restart: always
     cap_add: ["MKNOD"]
     environment:

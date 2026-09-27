@@ -1,0 +1,14 @@
+# Contexte de construction des moteurs de documents (docker/collabora, docker/onlyoffice) : le contexte est la racine
+# du dépôt, on écarte donc tout ce qui est lourd et inutile. Les polices (docker/fonts) doivent rester incluses.
+.git
+.gitignore
+**/node_modules
+backend/storage
+backend/dev-*.log
+frontend/dist
+frontend/dist-elus
+frontend/public/pdfjs
+design
+police
+interstate
+*.tar
