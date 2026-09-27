@@ -242,7 +242,9 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
       await j(org, envoi.id, acteId, 'sortant', { resume: `Demande de signature (${signataire.mode})`, corps: payload });
 
       try {
-        const r = await ad.creer(cfg, { titre, message: await messageActe(a), mode: 'sequentiel', service: a.direction_label || a.direction_code || null, signataires: [{ ...signataire, positions }], documents: [{ nom: nomDoc, buffer: doc.buffer, mime: 'application/pdf' }] });
+        // Nom affiché comme expéditeur de l'e-mail de signature (« La collectivité vous invite à signer un arrêté »).
+        // La direction de l'acte, elle, reste dans le message du dossier (voir `messageActe`).
+        const r = await ad.creer(cfg, { titre, message: await messageActe(a), mode: 'sequentiel', service: 'La collectivité', signataires: [{ ...signataire, positions }], documents: [{ nom: nomDoc, buffer: doc.buffer, mime: 'application/pdf' }] });
         const e = r._echange || {};
         await j(org, envoi.id, acteId, 'entrant', { methode: e.methode, url: e.url, httpStatus: e.httpStatus, resume: `Accusé d’enregistrement (${r.reference || r.id || 'sans référence'})`, reponse: e.reponse || r.brut });
         await db.run("UPDATE parapheur_envois SET statut = 'a_signer', ref_externe = $2, lien_externe = $3, reponse = $4::jsonb, updated_at = now() WHERE id = $1",

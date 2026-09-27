@@ -78,7 +78,7 @@ function createDsihubParapheur({ tls, http: injected } = {}) {
       }
       const payload = {
         title: titre, ...(message ? { message } : {}), ...(deadline ? { deadline } : {}),
-        // Direction porteuse : le Hub s'en sert comme expéditeur (« la DIRECTION … vous invite à signer un arrêté »).
+        // Nom affiché comme expéditeur de la demande : le Hub écrit « <service> vous invite à signer un arrêté ».
         ...(service ? { service: String(service).slice(0, 200) } : {}),
         mode: mode || 'sequentiel', link_validity_minutes: 60,
         signataires: (signataires || []).map((s) => ({
