@@ -21,7 +21,10 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': { target: env.VITE_API_TARGET || 'http://localhost:3021', changeOrigin: true },
         // Moteur(s) de documents joignables depuis le poste de développement, via le serveur qui les héberge.
-        '/collabora-delib': { target: env.VITE_COLLABORA_TARGET || 'http://10.103.130.106:9981', changeOrigin: false, ws: true },
+        // Collabora pointe sur le moteur de DÉVELOPPEMENT (9982) : c'est le seul dont le nom d'hôte annoncé est
+        // `localhost:5160`, donc le seul dont le WebSocket accepte l'origine du navigateur
+        // (le moteur de production, 9981, n'accepte que https://vibedelib.ivry.local).
+        '/collabora-delib': { target: env.VITE_COLLABORA_TARGET || 'http://10.103.130.106:9982', changeOrigin: false, ws: true },
         '/office-delib': { target: env.VITE_ONLYOFFICE_TARGET || 'http://10.103.130.106:9980', changeOrigin: false, ws: true },
       } },
   };

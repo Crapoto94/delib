@@ -11,13 +11,18 @@ const base = (extra = {}) => ({
   ...extra,
 });
 
-/** Fausse réponse HTTP : on vérifie le statut et les en-têtes, pas le contenu binaire. */
+/**
+ * Fausse réponse HTTP : on vérifie le statut et les en-têtes, pas le contenu binaire.
+ *
+ * Volontairement fidèle à Express sur les points qui comptent : `type()` puis `send()`. Une méthode d'aisance
+ * inventée ici (`text()`) avait masqué un 500 sur LOCK — le code appelait une méthode que le runtime n'a pas.
+ */
 const reponse = () => {
   const r = { statut: 200, entetes: {}, corps: null };
   r.set = (e) => { Object.assign(r.entetes, e); return r; };
   r.status = (s) => { r.statut = s; return r; };
+  r.type = (t) => { r.entetes['Content-Type'] = t; return r; };
   r.json = (v) => { r.corps = v; return r; };
-  r.text = (v) => { r.corps = v; return r; };
   r.send = (v) => { r.corps = v; return r; };
   return r;
 };

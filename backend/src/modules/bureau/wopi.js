@@ -45,7 +45,14 @@ module.exports = function creerWopi({ bureau, port }) {
   });
 
   /** 409 + le verrou qui bloque : c'est ainsi que le protocole dit « ce n'est pas ton verrou, réessaie ». */
-  const conflit = (res, existant) => res.set({ 'X-WOPI-Lock': String(existant || '') }).status(409).text('');
+  const conflit = (res, existant) => res.set({ 'X-WOPI-Lock': String(existant || '') }).status(409).type('text/plain').send('');
+
+  /**
+   * Réponses vides du protocole (verrous, identifiant d'utilisateur) : le corps doit être vide, mais la réponse doit
+   * passers par l'API d'Express — `res.text()` n'existe pas (les tests le simulaient, le runtime non : d'où un 500
+   * sur LOCK, puis un enregistrement refusé parce que le verrou n'existait pas).
+   */
+  const vide = (res, extra = {}) => entetes(res, extra).status(200).type('text/plain').send('');
 
   return {
     /** CheckFileInfo : l'état du document et ce que Collabora a le droit d'y faire. */
@@ -87,27 +94,27 @@ module.exports = function creerWopi({ bureau, port }) {
         if (v && v.valeur !== fourni) return conflit(res, v.valeur);
         const valeur = fourni || port.nouveauNonce();
         verrous.set(s.cle, { valeur, expire: Date.now() + DUREE_VERROU_MS });
-        return entetes(res, { 'X-WOPI-Lock': valeur }).status(200).text('');
+        return vide(res, { 'X-WOPI-Lock': valeur });
       }
       if (action === 'REFRESH_LOCK') {
         if (!v || v.valeur !== fourni) return conflit(res, v?.valeur);
         v.expire = Date.now() + DUREE_VERROU_MS;
-        return entetes(res, { 'X-WOPI-Lock': v.valeur }).status(200).text('');
+        return vide(res, { 'X-WOPI-Lock': v.valeur });
       }
       if (action === 'UNLOCK') {
         if (!v || v.valeur !== fourni) return conflit(res, v?.valeur);
         verrous.delete(s.cle);
-        return entetes(res).status(200).text('');
+        return vide(res);
       }
       // GET_LOCK : 200 + le verrou s'il y en a un, 409 + verrou vide sinon (contrat du protocole).
-      if (v) return entetes(res, { 'X-WOPI-Lock': v.valeur }).status(200).text('');
+      if (v) return vide(res, { 'X-WOPI-Lock': v.valeur });
       return conflit(res, '');
     },
 
     /** GET_RANDOM_USER_ID : Collabora demande un identifiant d'utilisateur « aléatoire » pour son cache local. */
     async randomUserId(req, res) {
       await session(req);
-      return entetes(res, { 'X-WOPI-UserId': port.nouveauNonce() }).status(200).text('');
+      return vide(res, { 'X-WOPI-UserId': port.nouveauNonce() });
     },
 
     /** Opérations que nous n'offrons pas : lien de partage, renommage, application mobile COBALT. */
