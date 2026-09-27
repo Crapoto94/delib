@@ -8,5 +8,5 @@ services:
       BACKEND_HOST: ${ELUS_BACKEND_HOST:?adresse du backend VibeDélib sur le LAN}
       BACKEND_PORT: ${ELUS_BACKEND_PORT:-3021}
     read_only: true
-    tmpfs: [/var/cache/nginx, /var/run, /tmp]
+    tmpfs: [/var/cache/nginx, /var/run, /tmp, /etc/nginx/conf.d]
     security_opt: ["no-new-privileges:true"]

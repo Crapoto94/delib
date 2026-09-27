@@ -3,7 +3,7 @@ import { Monitor, Moon, Sun } from 'lucide-react';
 
 /**
  * Thème clair / sombre / automatique (UI-04, D99). Le choix est mémorisé sur l'appareil ; « auto » suit le réglage du système.
- * Le même script d'initialisation est en tête de index.html et elus.html pour éviter tout clignotement au chargement.
+ * Le même script d'initialisation est en tête de index.html (ici et dans le index.html principal de frontend/) pour éviter tout clignotement au chargement.
  */
 export type ThemeChoice = 'auto' | 'light' | 'dark';
 const KEY = 'vd-theme';

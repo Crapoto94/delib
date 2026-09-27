@@ -16,11 +16,14 @@ police/
 docker/fonts/
 interstate/
 
-# ressources pdf.js copiees au build (frontend/scripts/copy-pdfjs-assets.mjs)
+# ressources pdf.js copiees au build (scripts/copy-pdfjs-assets.mjs)
 frontend/public/pdfjs/
-dist-elus/
+elus-dmz/public/pdfjs/
 
 # accès serveur : jamais versionnés
 SSH.txt
 pulldocker.ini
 pulldocker-*.ini
+pulldmz.ini
+pulldmz-*.ini
+elus-dmz/.env

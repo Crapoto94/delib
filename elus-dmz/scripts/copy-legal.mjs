@@ -1,7 +1,7 @@
 // Synchronise les documents de référence à la racine du dépôt (CGU.md,
-// LICENCE.md, MANIFEST.md) vers elus-dmz/src/legal, d'où l'application les
-// importe pour les afficher (routes /cgu et /licence). La racine reste la
-// source unique : on modifie ces documents à la racine, jamais la copie.
+// LICENCE.md) vers elus-dmz/src/legal, d'où l'application les importe pour
+// les afficher (routes /cgu et /licence). La racine reste la source unique :
+// on modifie ces documents à la racine, jamais la copie.
 //
 // Hors contexte Docker (où seuls les fichiers de elus-dmz/ sont copiés), les
 // sources de la racine sont absentes : le script le signale et laisse en place
@@ -16,7 +16,7 @@ const projet = resolve(here, '..');
 const racine = resolve(projet, '..');
 const dest = resolve(projet, 'src', 'legal');
 
-const FICHIERS = ['CGU.md', 'LICENCE.md', 'MANIFEST.md'];
+const FICHIERS = ['CGU.md', 'LICENCE.md'];
 await mkdir(dest, { recursive: true });
 
 let copies = 0;

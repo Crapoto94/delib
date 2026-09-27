@@ -25,7 +25,7 @@ export default function EtatBackend() {
   return (
     <div role="status" className="mb-3 flex items-center gap-2 rounded border border-warn/30 bg-warn-bg px-3 py-2 text-[13px] text-warn">
       <WifiOff className="h-4 w-4 shrink-0" />
-      <span>Connexion au serveur impossible pour le moment — les documents déjà téléchargés restent consultables.</span>
+      <span>Le système est actuellement en maintenance — la connexion n'est pas possible pour le moment. Les documents déjà téléchargés restent consultables.</span>
     </div>
   );
 }

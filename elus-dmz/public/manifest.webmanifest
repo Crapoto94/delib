@@ -1,6 +1,6 @@
 {
-  "name": "VibeDélib — Espace des élus",
-  "short_name": "Élus",
+  "name": "Espace élus",
+  "short_name": "Espace élus",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

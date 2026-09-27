@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react()],
-    server: { port: 5160, strictPort: true, watch: { ignored: ['**/dist/**', '**/dist-elus/**'] }, // les builds (dont celui de l'espace élus) ne doivent pas faire tomber le serveur de dev
+    server: { port: 5160, strictPort: true, watch: { ignored: ['**/dist/**'] },
       proxy: {
         '/api': { target: env.VITE_API_TARGET || 'http://localhost:3021', changeOrigin: true },
         // Moteur(s) de documents joignables depuis le poste de développement, via le serveur qui les héberge.

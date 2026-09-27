@@ -592,7 +592,7 @@ function Signature({ acte, toast, onChanged }: { acte: any; toast: (m: string, k
   const enErreur = !!e && e.statut === 'erreur';
   const titreEnvoi = etat.data?.blocage || null;
   const envoyer = async (forcer: boolean) => {
-    if (forcer && !confirm(`Envoyer « ${acte.titre} » en signature du maire ?\n\nLe circuit n'est pas terminé. Le dossier passera à l'état « À signer ».`)) return;
+    if (forcer && !confirm(`Envoyer « ${acte.titre} » en signature (maire ou adjoint·e par délégation) ?\n\nLe circuit n'est pas terminé. Le dossier passera à l'état « À signer ».`)) return;
     await go('envoi', () => api.post(orgPath(o, `/parapheur/actes/${acte.id}/envoi`), forcer ? { forcer: true } : {}), forcer ? 'Décision envoyée en signature (circuit non terminé)' : 'Document envoyé en signature');
   };
   // Le Hub n'a pas de webhook : tant qu'un envoi est en cours, on interroge le parapheur en arrière-plan
@@ -616,8 +616,8 @@ function Signature({ acte, toast, onChanged }: { acte: any; toast: (m: string, k
   }, [enCours, acte.id, o]);
   return (
     <section className="card p-5" aria-labelledby="signature">
-      <h3 id="signature" className="mb-2 flex items-center gap-2">Signature du maire {e?.statut && <Badge tone={e.statut === 'signe' ? 'ok' : e.statut === 'refuse' ? 'ko' : 'warn'}>{e.statut === 'signe' ? 'Signé' : e.statut === 'refuse' ? 'Refusé' : e.statut === 'erreur' ? 'Erreur' : 'En attente'}</Badge>}</h3>
-      <p className="mb-3 text-[13px] text-mute">Cet acte n'est pas inscrit au conseil : à la fin du circuit, il est envoyé au parapheur pour la signature du maire.</p>
+      <h3 id="signature" className="mb-2 flex items-center gap-2">Signature du maire ou de l'adjoint·e {e?.statut && <Badge tone={e.statut === 'signe' ? 'ok' : e.statut === 'refuse' ? 'ko' : 'warn'}>{e.statut === 'signe' ? 'Signé' : e.statut === 'refuse' ? 'Refusé' : e.statut === 'erreur' ? 'Erreur' : 'En attente'}</Badge>}</h3>
+      <p className="mb-3 text-[13px] text-mute">Cet acte n'est pas inscrit au conseil : à la fin du circuit, il est envoyé au parapheur pour la signature du maire ou, par délégation, de l'adjoint·e.</p>
       {etat.loading && !etat.data ? <Loading /> : !etat.data ? <ErrorBox msg={etat.error} /> : (
         <>
           {enErreur && <p className="mb-3 rounded bg-ko-bg p-2 text-[13px] text-ko">L'envoi précédent a échoué{e.motif ? ` : ${e.motif}` : ''}. Corrigez le paramétrage si besoin, puis <b>renvoyez</b> le document.</p>}

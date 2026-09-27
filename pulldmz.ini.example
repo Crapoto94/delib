@@ -1,0 +1,6 @@
+# Copier en pulldmz.ini (non versionné) et renseigner les accès du serveur DMZ.
+ip:172.17.1.3
+port:22
+login:root
+password:mot-de-passe
+chemin:/opt/docker/marc/elus-dmz

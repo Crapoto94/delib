@@ -58,6 +58,7 @@
 }
 
 @layer base {
+  html, body, #root { height: 100%; }
   body {
     @apply font-sans text-[14px] leading-[22px] antialiased bg-page text-ink;
     /* léger dégradé teinté en haut de page : la page n'est pas un aplat */

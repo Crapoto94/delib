@@ -6,7 +6,7 @@
 const v = (n) => `rgb(var(--c-${n}) / <alpha-value>)`;
 
 export default {
-  content: ['./index.html', './elus.html', './src/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       fontFamily: { sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'] },

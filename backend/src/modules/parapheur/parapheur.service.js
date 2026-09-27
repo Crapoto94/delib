@@ -213,7 +213,7 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
       const typeSigne = !!meta.meta?.signature;
       // Le privilège (administrer l'acte : administrateur ou SCC) est vérifié AVANT l'état, pour que le bouton sache s'il peut forcer.
       const peutForcer = !auto && forcer && acl.isAdmin(c, org);
-      if (!typeSigne) throw E.conflict('Ce type d’acte ne passe pas par la signature du maire (il est inscrit au conseil).');
+      if (!typeSigne) throw E.conflict('Ce type d’acte ne passe pas par la signature du maire ou de l’adjoint·e (il est inscrit au conseil).');
       if (!['a_signer', 'signature_refusee'].includes(a.statut)) {
         if (!peutForcer) throw E.conflict(`Un acte « ${a.statut} » n’est pas en attente de signature.`);
         // Envoi forcé : l'acte passe directement en signature, même si le circuit n'est pas terminé.

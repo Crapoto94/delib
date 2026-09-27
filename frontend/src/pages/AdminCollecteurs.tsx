@@ -244,7 +244,7 @@ export default function AdminCollecteurs() {
 
               <div className="grid gap-3 rounded border border-line p-3 md:col-span-2 md:grid-cols-3">
                 <p className="text-[12px] text-mute md:col-span-3">
-                  Emplacement de la signature du maire. Si le document déposé porte un <b>repère</b> (par exemple
+                  Emplacement de la signature (maire ou adjoint·e par délégation). Si le document déposé porte un <b>repère</b> (par exemple
                   <code> [SIGNATURE] </code>), c'est lui qui est utilisé, où qu'il soit ; sinon le cadre ci-dessous
                   s'applique. Sans repère ni cadre : page 1, 75 % / 85 %, 150 × 60 points.
                 </p>

@@ -1,26 +1,34 @@
 # Espace des élus en DMZ
 
-Front des élus (React, bundle **séparé** de l'application des agents) + nginx qui ne relaie que `/api/v1/elus/` et `/api/v1/elus-auth/`.
+Front des élus autonome (React, projet **séparé** du reste du dépôt — aucune dépendance sur `frontend/`,
+build context Docker = ce dossier seul) + nginx qui ne relaie que `/api/v1/elus/` et `/api/v1/elus-auth/`.
 
 ```
 Élu ──HTTPS──▶ reverse proxy DMZ ──HTTP──▶ [elus-dmz : nginx + front] ──1 port TCP──▶ backend VibeDélib (LAN)
 ```
 
 ## Paramètres (variables d'environnement)
+Copier `.env.example` en `.env` (non versionné) sur l'hôte Docker DMZ :
+
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `ELUS_BACKEND_HOST` | adresse du backend sur le LAN (obligatoire) | — |
 | `ELUS_BACKEND_PORT` | port du backend (la seule ouverture du pare-feu DMZ → LAN) | 3021 |
 | `ELUS_DMZ_PORT` | port publié du conteneur | 5161 |
 
-Côté backend : `ELUS_URL` (ou le paramètre `elus.url_base`) = adresse publique de l'espace, utilisée dans les invitations ;
+Côté backend : `ELUS_URL` (ou le paramètre `elus.url_base`) = adresse publique de l'espace (sans suffixe de page, ex. `https://elus.ivry94.fr`), utilisée dans les invitations ;
 `CORS_ORIGINS` doit lister l'origine de l'APK (`https://localhost`) si l'application mobile appelle l'API directement.
 
 ## Construire et lancer
 ```
-docker compose -f elus-dmz/docker-compose.yml up -d --build
+docker compose up -d --build
 ```
-Développement : `cd frontend && npm run dev:elus` (port 5161, API proxifiée vers le backend) ou `http://localhost:5160/elus.html`.
+Développement : `npm install && npm run dev` (port 5161, API proxifiée vers `http://localhost:3021`).
+
+## Déploiement
+`pulldmz.ps1`/`pulldmz.bat` à la racine du dépôt copient uniquement les fichiers suivis par git de ce
+dossier vers le serveur DMZ (jamais `node_modules/` ni `dist/` locaux), puis reconstruisent et relancent
+le conteneur sur place. Configuration dans `pulldmz.ini` (non versionné, voir `pulldmz.ini.example`).
 
 ## Ce que la DMZ ne contient pas
 Aucune base de données, aucun secret, aucune clé d'API, aucun code de l'application de saisie. Le jeton d'un élu est signé avec un secret et

@@ -112,7 +112,7 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
           <div className="rounded border border-line p-3 text-[13px]" role="note">
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <TypeBadge acte={{ typeCode: sel.code, typeLibelle: sel.libelle }} pastille={sel.meta?.pastille} />
-              {sel.meta?.signature && <Badge tone="warn">Signature du maire à la fin</Badge>}
+              {sel.meta?.signature && <Badge tone="warn">Signature du maire ou de l'adjoint·e à la fin</Badge>}
               {sel.meta?.autorisations && <span className="badge bg-violet-bg text-violet border-violet/30">Lier les délibérations d'autorisation</span>}
             </div>
             <p className="text-mute">{sel.meta?.aide}</p>

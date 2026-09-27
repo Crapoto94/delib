@@ -49,7 +49,7 @@ function createEluAuth({ db, config, mail, settings, audit, log, sms }) {
     if (config.mailRedirectTo) { to = config.mailRedirectTo; subj = `[RECETTE → ${email}] ${subject}`; body = `<p><em>Mode recette : ce message était destiné à ${email}.</em></p>${html}`; }
     await mail.send({ to, subject: subj, html: body, footer: footerOf(cfg) });
   }
-  const baseUrl = async (org) => String((await settings.resolve(org))['elus.url_base']?.value || process.env.ELUS_URL || 'http://localhost:5160/elus.html').replace(/\/+$/, '');
+  const baseUrl = async (org) => String((await settings.resolve(org))['elus.url_base']?.value || process.env.ELUS_URL || 'http://localhost:5161').replace(/\/+$/, '');
 
   async function nouveauLien(org, eluId) {
     const token = crypto.randomBytes(32).toString('base64url');

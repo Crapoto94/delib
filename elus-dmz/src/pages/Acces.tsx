@@ -3,17 +3,22 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, deviceId, errMsg, session } from '../api';
 import { ThemeToggle } from '../theme';
 import EtatBackend from '../EtatBackend';
+import TabletFrame from '../TabletFrame';
+import { OrgLogo, useBranding, useFavicon } from '../Brand';
 
-const Cadre = ({ titre, children }: { titre: string; children: ReactNode }) => (
-  <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-nav-from to-nav-to px-4">
+const Cadre = ({ titre, children }: { titre: string; children: ReactNode }) => {
+  useFavicon(useBranding());
+  return (
+  <div className="relative flex min-h-full items-center justify-center bg-gradient-to-br from-nav-from to-nav-to px-4 py-6">
     <div className="absolute right-3 top-3"><ThemeToggle className="text-white/80 hover:bg-white/10 hover:text-white" /></div>
     <div className="w-full max-w-md rounded-xl border border-line border-t-4 border-t-action-solid bg-surface p-6 shadow-float">
-      <div className="mb-5 text-center"><div className="text-[13px] font-semibold uppercase tracking-widest text-mute">VibeDélib</div><h1 className="mt-1 text-[24px]">{titre}</h1></div>
+      <div className="mb-5 text-center"><OrgLogo className="mx-auto mb-2 h-12" /><div className="text-[13px] font-semibold uppercase tracking-widest text-mute">Espace élus</div><h1 className="mt-1 text-[24px]">{titre}</h1></div>
       <EtatBackend />
       {children}
     </div>
   </div>
-);
+  );
+};
 const Err = ({ msg }: { msg: string | null }) => (msg ? <div role="alert" className="mb-3 rounded border border-ko/30 bg-ko-bg px-3 py-2 text-[14px] text-ko">{msg}</div> : null);
 const champ = 'input !py-3 !text-[16px]';
 
@@ -79,7 +84,8 @@ export function Connexion() {
   const oubliMail = async () => { if (!email) { setErr('Saisissez d’abord votre adresse e-mail.'); return; } try { await api.post('/elus-auth/oubli', { email }); setMsg('Si un compte existe, un lien de réinitialisation vient de vous être envoyé.'); setErr(null); } catch (x) { setErr(errMsg(x)); } };
   if (oubliSms) return <OubliSms emailInitial={email} onRetour={() => setOubliSms(false)} onSession={fin} />;
   return (
-    <Cadre titre="Espace des élus">
+    <TabletFrame>
+    <Cadre titre="Connexion">
       <Err msg={err} />{msg && <div className="mb-3 rounded bg-ok-bg px-3 py-2 text-[14px] text-ok-text">{msg}</div>}
       {!defi ? (
         <form onSubmit={etape1} className="space-y-3">
@@ -99,6 +105,7 @@ export function Connexion() {
           <button type="button" className="w-full text-center text-[13px] text-mute" onClick={() => { setDefi(null); setCode(''); }}>Recommencer</button>
         </form>)}
     </Cadre>
+    </TabletFrame>
   );
 }
 

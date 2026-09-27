@@ -10,19 +10,21 @@ import Recherche from './pages/Recherche';
 import { ThemeToggle } from './theme';
 import Legal from './pages/Legal';
 import EtatBackend from './EtatBackend';
+import { OrgLogo, useBranding, useFavicon } from './Brand';
 
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./dev/DevAnnot')) : null;
 
 function Cadre() {
   const nav = useNavigate();
   const elu = session.elu();
+  useFavicon(useBranding());
   useEffect(() => { if (!session.token()) nav('/connexion', { replace: true }); }, [nav]);
   const sortir = async () => { try { await api.post('/elus-auth/deconnexion'); } catch { /* déjà expirée */ } await purger(); session.clear(); nav('/connexion', { replace: true }); };
   if (!session.token()) return <Navigate to="/connexion" replace />;
   return (
     <div className="min-h-screen bg-page">
       <header className="border-b border-primary-deep/40 bg-gradient-to-r from-nav-from to-nav-to text-white shadow-lift"><div className="accent-bar" aria-hidden="true" /><div className="flex h-14 items-center gap-3 px-4">
-        <span className="font-bold">VibeDélib</span><span className="text-[13px] text-white/70">Espace des élus</span>
+        <OrgLogo className="h-8" /><span className="text-[13px] text-white/70">Espace élus</span>
         <span className="ml-auto hidden text-[13px] text-white/80 sm:inline">{elu?.nom}</span>
         <button className="rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
         <button className="rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={sortir} aria-label="Me déconnecter" title="Me déconnecter"><LogOut className="h-5 w-5" /></button>

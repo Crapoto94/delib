@@ -41,8 +41,8 @@ export default function AdminParapheur() {
   return (
     <div className="space-y-6">
       <section className="card p-5">
-        <h2>Parapheur (signature du maire)</h2>
-        <p className="mb-3 text-mute">Les <b>décisions</b> et <b>arrêtés</b> ne sont pas inscrits au conseil : à la fin de leur circuit, ils partent au parapheur pour la signature du maire. Choisissez le parapheur ; les échanges (ce qui est envoyé et retourné) sont journalisés plus bas et sur la fiche de chaque dossier.</p>
+        <h2>Parapheur (signature du maire ou de l'adjoint·e)</h2>
+        <p className="mb-3 text-mute">Les <b>décisions</b> et <b>arrêtés</b> ne sont pas inscrits au conseil : à la fin de leur circuit, ils partent au parapheur pour la signature du maire ou, par délégation, de l'adjoint·e. Choisissez le parapheur ; les échanges (ce qui est envoyé et retourné) sont journalisés plus bas et sur la fiche de chaque dossier.</p>
         <div className="grid gap-3 md:grid-cols-2" role="radiogroup" aria-label="Parapheur">
           {fournisseurs.map((x) => (
             <button key={x.code} role="radio" aria-checked={f.fournisseur === x.code} disabled={!x.disponible} onClick={() => choisir(x)}
