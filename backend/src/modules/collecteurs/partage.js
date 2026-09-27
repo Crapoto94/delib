@@ -65,6 +65,11 @@ function partageLocal(cible) {
 const SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+# Les noms de fichiers sortent en clair sur la sortie standard, que Node relit en UTF-8. Sans ces deux lignes,
+# PowerShell écrit dans la page de codes de la console : « Délégation » devient « D?l?gation », le nom enregistré ne
+# correspond plus à aucun fichier, et la lecture échoue (« Fichier introuvable »).
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 $base = $env:VD_COL_BASE.TrimEnd('\')
 $parts = $base.TrimStart('\').Split('\')
 if ($parts.Length -lt 2) { throw "Chemin UNC invalide (attendu : \\serveur\partage\dossier)" }
