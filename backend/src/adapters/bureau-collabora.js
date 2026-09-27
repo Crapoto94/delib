@@ -105,11 +105,22 @@ function createBureauCollabora({ url, urlNavigateur, publicBaseUrl, langue = 'fr
     /** Coordonnées du moteur, pour les diagnostics (et l/admin). */
     infos: () => ({ moteur: 'collabora', url: serveur, navigateur, formats: FORMATS }),
 
-    /** Vérifie l'accès WOPI : la clé de session EST le jeton d'accès, il suffit qu'il corresponde. */
+    /**
+     * Vérifie l'accès WOPI : la clé de session EST le jeton d'accès, il suffit qu'il corresponde.
+     *
+     * Collabora ne renvoie pas le jeton nu : il y accroche ses propres paramètres de diagnostic en ***
+     * collant un point d'interrogation*** — sur une session réelle on reçoit
+     * `access_token=<clé>?debug=0`. Le `?debug=0` fait donc partie de la valeur du jeton telle qu'elle arrive
+     * dans `req.query`. On compare donc la clé seule ; la sécurité est inchangée (il faut toujours connaître
+     * les 128 bits), mais on ne dépend plus d'une convention interne du moteur.
+     */
     verifierAcces(cle, jeton) {
       const c = String(cle || '');
       if (!/^[0-9a-f]{32}$/.test(c)) return { ok: false, motif: 'cle_invalide' };
-      if (jeton !== undefined && String(jeton || '') !== c) return { ok: false, motif: 'jeton_invalide' };
+      if (jeton !== undefined) {
+        const fourni = String(jeton || '').split(/[?&#]/)[0];
+        if (fourni !== c) return { ok: false, motif: 'jeton_invalide' };
+      }
       return { ok: true };
     },
 

@@ -110,6 +110,29 @@ services:
     ports: ["9981:9980"]
     # Démarrage lent (premier lancement) : prévoyez quelques minutes avant la première édition.
 
+  # Instance de DÉVELOPPEMENT, séparée de celle de production.
+  #
+  # Pourquoi deux moteurs : Collabora n'accepte le WebSocket de l'éditeur que si son origine est
+  # « https://<server_name> » (le TLS est terminé en amont). En production c'est vibedelib.ivry.local ; en
+  # développement c'est http://localhost:5160, en clair. Un seul moteur ne peut pas être les deux à la fois :
+  # le navigateur verrait « Rejecting origin [http://localhost:5160] expected [https://vibedelib.ivry.local] ».
+  # D'où un second moteur, dont le nom d'hôte EST celui du poste de développement et qui n'annonce donc
+  # aucune URL publique. Il n'est démarré qu'avec le profil `bureau-dev`.
+  collabora-dev:
+    profiles: ["bureau-dev"]
+    image: collabora/code:latest
+    restart: always
+    cap_add: ["MKNOD"]
+    environment:
+      - domain=${BUREAU_HOTE_PUBLIQUE_DEV:-localhost:5160}
+      - extra_params=--o:ssl.enable=false --o:ssl.termination=false --o:server_name=${BUREAU_HOTE_PUBLIQUE_DEV:-localhost:5160} --o:net.service_root=/collabora-delib
+      - username=${COLLABORA_ADMIN_USER:-admin}
+      - password=${COLLABORA_ADMIN_PASSWORD:?mot de passe d'administration Collabora requis}
+      - TZ=Europe/Paris
+    volumes: ["collaboradevdata:/opt/cool/var/lib/cool", "collaboradevlogs:/var/log/collabora"]
+    # 9982 : le port 9981 reste celui du moteur de production.
+    ports: ["9982:9980"]
+
   # PostgreSQL local : uniquement avec --profile local-db (en production on utilise le serveur partagé du .env).
   postgres:
     profiles: ["local-db"]
@@ -130,3 +153,5 @@ volumes:
   officelogs:
   collaboradata:
   collaboralogs:
+  collaboradevdata:
+  collaboradevlogs:

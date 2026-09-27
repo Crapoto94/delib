@@ -72,6 +72,17 @@ describe('bureau en ligne — adaptateur Collabora (WOPI)', () => {
     expect(p.verifierAcces(CLE, 'autre').ok).toBe(false);
     expect(p.verifierAcces('pas-une-cle', 'pas-une-cle').ok).toBe(false);
   });
+
+  it('accepte le jeton que Collabora décore de ses paramètres de diagnostic', () => {
+    const p = createBureauCollabora(base());
+    // C’est ce que le moteur envoie vraiment : il colle un « ? » à la valeur du jeton.
+    expect(p.verifierAcces(CLE, `${CLE}?debug=0`)).toEqual({ ok: true });
+    expect(p.verifierAcces(CLE, `${CLE}&debug=0`)).toEqual({ ok: true });
+    expect(p.verifierAcces(CLE, undefined)).toEqual({ ok: true });
+    // …sans pour autant accepter une clé abrégée ou un autre jeton.
+    expect(p.verifierAcces(CLE, `${CLE.slice(0, 31)}?debug=0`).ok).toBe(false);
+    expect(p.verifierAcces(CLE, 'autre').ok).toBe(false);
+  });
 });
 
 describe('bureau en ligne — hôte WOPI', () => {
