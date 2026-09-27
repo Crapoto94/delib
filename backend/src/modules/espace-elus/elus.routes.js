@@ -61,6 +61,8 @@ module.exports = ({ makeRouter, limiter, eluAuth, espace, recherche, annotations
     async (req, res) => res.json(await eluAuth.code({ ...req.valid.body, ip: req.ip })));
   a.post('/deconnexion', { summary: 'Déconnexion : la session est révoquée', tags: T, elu: true },
     async (req, res) => res.json(await eluAuth.deconnexion(req.elu.jti)));
+  a.get('/etat', { summary: 'Disponibilité minimale du backend (aucune donnée sensible) : utilisé par le front DMZ pour signaler une coupure sans bloquer la lecture hors ligne', tags: T, auth: false },
+    async (req, res) => res.json({ ok: true }));
 
   // ------------------------------------------------------------------------------------------------ espace (jeton d'élu)
   const r = makeRouter('/api/v1/elus');

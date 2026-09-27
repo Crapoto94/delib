@@ -21,7 +21,7 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
    * Acte de la bibliothèque, non confidentiel : une **délibération adoptée** (séance close, point traité, résultat
    * positif) ou un **acte signé par le maire** (arrêté, décision), qui n'a pas de séance et entre dès la signature.
    */
-  const eligible = (org, acteId) => db.get(`
+  const eligible = (org, acteId, staff = false) => db.get(`
     SELECT a.id, a.numero_suivi, a.titre, a.statut, a.type_id, a.matiere_id, a.direction_label, a.direction_code, a.confidentialite, a.montant, a.incidence_financiere,
            (CASE WHEN a.custom->'airs'->>'origine' IS NOT NULL THEN a.custom->'airs'->>'origine' = 'archive' ELSE a.statut = 'archive' END) AS est_archive,
            (a.custom->'airs'->>'origine' = 'courant') AS airs_courant,
@@ -34,9 +34,12 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
     LEFT JOIN instances i ON i.id = s.instance_id
     LEFT JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite'
     LEFT JOIN ref_items t ON t.id = a.type_id
-    WHERE a.organisme_id = $1 AND a.id = $2 AND a.confidentialite = 'normale' AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu')
+    WHERE a.organisme_id = $1 AND a.id = $2 ${staff ? '' : "AND a.confidentialite = 'normale'"} AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu')
       AND ((sp.resultat LIKE 'adopte%') OR ((t.meta->>'signature')::boolean AND a.statut = 'signe'))
     ORDER BY s.date_seance DESC NULLS LAST LIMIT 1`, [org, acteId]);
+
+/** L'appelant est-il de l'administration (voit aussi les actes confidentiels dans la bibliothèque) ? */
+const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) => r.role === 'org_admin' || r.role === 'scc');
 
   const svc = {
     RESULTATS,
@@ -44,10 +47,15 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
     // ---------------------------------------------------------------------------------------------------------- 1. bibliothèque
     async chercher(ctx, organismeId, { q = '', annee, matiereId, natureId, rubriqueId, instanceId, rapporteurId, typeId, directionCode, du, au, etat = 'tous', limit = 20, offset = 0 } = {}) {
       const org = requireOrg(organismeId); const p = [org]; const add = (v) => { p.push(v); return `$${p.length}`; };
+      // Actes confidentiels : la bibliothèque est ouverte à tous les agents, mais l'administration (administrateur
+      // d'organisme, SCC, administrateur de plateforme) doit y retrouver les actes confidentiels signés — sinon un
+      // arrêté marqué « confidentiel » à la collecte disparaîtrait de la bibliothèque pour tout le monde.
+      const staff = !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) => r.role === 'org_admin' || r.role === 'scc');
+      const cloison = staff ? [] : ["a.confidentialite = 'normale'"];
       // Deux origines à égalité dans la bibliothèque :
       //   - les DÉLIBÉRATIONS adoptées en séance close (cas historique) ;
       //   - les actes SIGNÉS par le maire (arrêtés, décisions), qui n'ont pas de séance et y entrent dès la signature.
-      const commun = ['a.organisme_id = $1', "a.confidentialite = 'normale'", "a.statut NOT IN ('abandonne', 'retire')", "NOT (a.custom ? 'biblio_exclu')"];
+      const commun = ['a.organisme_id = $1', ...cloison, "a.statut NOT IN ('abandonne', 'retire')", "NOT (a.custom ? 'biblio_exclu')"];
       const wSeance = [];        // propres à la branche « délibération adoptée »
       const wSigne = [`(t.meta->>'signature')::boolean`, "a.statut = 'signe'"];
       const communFiltres = [];  // filtres appliqués aux deux branches
@@ -100,11 +108,11 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
             FROM actes a JOIN seance_items it ON it.acte_id = a.id AND it.statut = 'a_traiter' AND it.kind = 'deliberation'
             JOIN seances s ON s.id = it.seance_id AND ${CLOSES}
             JOIN seance_points sp ON sp.item_id = it.id AND sp.etat = 'traite'
-            WHERE a.organisme_id = $1 AND a.confidentialite = 'normale' AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu') AND sp.resultat LIKE 'adopte%'
+            WHERE a.organisme_id = $1 ${staff ? '' : "AND a.confidentialite = 'normale'"} AND a.statut NOT IN ('abandonne', 'retire') AND NOT (a.custom ? 'biblio_exclu') AND sp.resultat LIKE 'adopte%'
           UNION
           SELECT EXTRACT(year FROM a.signe_at AT TIME ZONE 'Europe/Paris')::int AS y
             FROM actes a JOIN ref_items t ON t.id = a.type_id
-            WHERE a.organisme_id = $1 AND a.confidentialite = 'normale' AND a.statut = 'signe' AND (t.meta->>'signature')::boolean AND NOT (a.custom ? 'biblio_exclu')
+            WHERE a.organisme_id = $1 ${staff ? '' : "AND a.confidentialite = 'normale'"} AND a.statut = 'signe' AND (t.meta->>'signature')::boolean AND NOT (a.custom ? 'biblio_exclu')
         ) q WHERE y IS NOT NULL ORDER BY y DESC`, [org])).map((r) => r.y);
       return {
         total, annees, items: rows.slice(Number(offset), Number(offset) + Number(limit)).map((r) => ({
@@ -115,7 +123,7 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
 
     /** Fiche de consultation : métadonnées, exposé, visas et dispositif, annexes publiables. Journalisée. */
     async consulter(ctx, organismeId, acteId) {
-      const org = requireOrg(organismeId); const a = await eligible(org, acteId);
+      const org = requireOrg(organismeId); const a = await eligible(org, acteId, estStaff(ctx));
       if (!a) throw E.notFound("Cet acte n'est pas dans la bibliothèque (il n'est pas adopté, sa séance n'est pas close ou il est confidentiel)");
       const rows = await db.all('SELECT id, kind, deliberation_id, markdown FROM tracked_texts WHERE acte_id = $1 ORDER BY id', [a.id]);
       const pick = (kind) => rows.find((t) => t.kind === kind && (kind === 'expose' ? true : t.deliberation_id === a.deliberation_id))?.markdown || '';
@@ -179,7 +187,7 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
 
     /** PDF consultable : exposé des motifs, délibération ou extrait du registre (avec le tampon de la préfecture quand l'AR est reçu). */
     async pdf(ctx, organismeId, acteId, cible) {
-      const org = requireOrg(organismeId); const a = await eligible(org, acteId);
+      const org = requireOrg(organismeId); const a = await eligible(org, acteId, estStaff(ctx));
       if (!a) throw E.notFound("Cet acte n'est pas dans la bibliothèque");
       const s = sys(ctx);
       await audit.log(ctx, { organismeId: org, action: 'bibliotheque.pdf', entity: 'actes', entityId: a.id, after: { cible } });

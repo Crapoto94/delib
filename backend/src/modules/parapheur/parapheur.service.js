@@ -414,6 +414,9 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
         : !enAttente ? 'Le circuit n’est pas terminé : l’envoi en signature se fera à la fin du circuit.'
         : (!signataireOf(cfg).email) ? 'Renseignez le signataire (nom et e-mail) dans le paramétrage du parapheur.' : null;
       return {         envoi: envoi ? { id: envoi.id, statut: envoi.statut, fournisseur: envoi.fournisseur, mode: envoi.mode, ref: envoi.reponse?.reference || envoi.ref_externe, refId: envoi.ref_externe, lien: envoi.lien_externe, signataireNom: envoi.signataire_nom, signataireEmail: envoi.signataire_email, document: envoi.document_nom, demandeAt: envoi.demande_at, signeAt: envoi.signe_at, refuseAt: envoi.refuse_at, motif: envoi.motif,
+        // Mode de signature RÉELLEMENT demandé pour cet envoi (le paramétrage du parapheur peut changer ensuite : il
+        // ne faut pas afficher « P12 » pour une signature qui a été faite en manuscrite).
+        signatureMode: envoi.payload?.signatureMode || null,
           documentSigne: envoi.document_signe_file_id ? { fileId: envoi.document_signe_file_id, nom: docSigne?.original_name || null } : null } : null,
         signaturePosition: a.signature_position || null,
         blocage,

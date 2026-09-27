@@ -1,0 +1,152 @@
+@import '@fontsource/source-sans-3/400.css';
+@import '@fontsource/source-sans-3/600.css';
+@import '@fontsource/source-sans-3/700.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Jetons de couleur (UI-03, UI-04, D99) : canaux RGB, consommés par tailwind.config.js.
+ * Thème clair par défaut ; thème sombre par le réglage de l'appareil (« auto ») ou par le choix explicite data-theme="dark".
+ */
+:root {
+  color-scheme: light;
+  --c-page: 236 241 249; --c-surface: 255 255 255; --c-soft: 230 238 255; --c-line: 209 219 234;
+  --c-ink: 15 23 42; --c-mute: 71 85 105; --c-head: 15 41 66;
+  --c-primary: 15 41 66; --c-primary-hover: 30 58 138; --c-primary-deep: 0 20 40;
+  --c-action: 37 99 235; --c-action-solid: 37 99 235; --c-azur: 56 189 248;
+  --c-ok: 5 122 85; --c-ok-solid: 5 150 105; --c-ok-bg: 209 250 229; --c-ok-text: 6 95 70;
+  --c-warn: 180 83 9; --c-warn-solid: 180 83 9; --c-warn-bg: 254 243 199;
+  --c-ko: 190 18 60; --c-ko-solid: 225 29 72; --c-ko-bg: 255 228 230;
+  --c-violet: 109 40 217; --c-violet-bg: 237 233 254; --c-indigo: 67 56 202; --c-indigo-bg: 224 231 255;
+  --c-nav-from: 15 41 66; --c-nav-to: 30 58 138;
+  --c-side: 26 34 52; --c-side-text: 163 177 204;
+  --c-s50: 244 247 252; --c-s100: 233 239 248; --c-s200: 217 226 240; --c-s300: 195 206 224;
+  --c-s400: 148 163 184; --c-s500: 100 116 139; --c-s600: 71 85 105; --c-s700: 51 65 85;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --c-page: 11 18 32; --c-surface: 19 29 48; --c-soft: 27 40 68; --c-line: 45 60 90;
+  --c-ink: 230 236 247; --c-mute: 152 165 189; --c-head: 232 238 251;
+  --c-primary: 43 91 215; --c-primary-hover: 59 111 232; --c-primary-deep: 8 15 30;
+  --c-action: 108 160 255; --c-action-solid: 47 107 234; --c-azur: 56 189 248;
+  --c-ok: 52 211 153; --c-ok-solid: 4 120 87; --c-ok-bg: 15 46 39; --c-ok-text: 110 231 183;
+  --c-warn: 251 191 36; --c-warn-solid: 180 83 9; --c-warn-bg: 51 39 15;
+  --c-ko: 251 113 133; --c-ko-solid: 190 18 60; --c-ko-bg: 58 20 32;
+  --c-violet: 196 181 253; --c-violet-bg: 43 32 80; --c-indigo: 165 180 252; --c-indigo-bg: 30 36 84;
+  --c-nav-from: 8 15 30; --c-nav-to: 22 40 76;
+  --c-side: 9 15 27; --c-side-text: 152 165 189;
+  --c-s50: 22 34 56; --c-s100: 30 44 72; --c-s200: 42 58 90; --c-s300: 58 75 107;
+  --c-s400: 113 129 158; --c-s500: 138 154 182; --c-s600: 169 182 204; --c-s700: 197 208 228;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    color-scheme: dark;
+    --c-page: 11 18 32; --c-surface: 19 29 48; --c-soft: 27 40 68; --c-line: 45 60 90;
+    --c-ink: 230 236 247; --c-mute: 152 165 189; --c-head: 232 238 251;
+    --c-primary: 43 91 215; --c-primary-hover: 59 111 232; --c-primary-deep: 8 15 30;
+    --c-action: 108 160 255; --c-action-solid: 47 107 234; --c-azur: 56 189 248;
+    --c-ok: 52 211 153; --c-ok-solid: 4 120 87; --c-ok-bg: 15 46 39; --c-ok-text: 110 231 183;
+    --c-warn: 251 191 36; --c-warn-solid: 180 83 9; --c-warn-bg: 51 39 15;
+    --c-ko: 251 113 133; --c-ko-solid: 190 18 60; --c-ko-bg: 58 20 32;
+    --c-violet: 196 181 253; --c-violet-bg: 43 32 80; --c-indigo: 165 180 252; --c-indigo-bg: 30 36 84;
+    --c-nav-from: 8 15 30; --c-nav-to: 22 40 76;
+    --c-side: 9 15 27; --c-side-text: 152 165 189;
+    --c-s50: 22 34 56; --c-s100: 30 44 72; --c-s200: 42 58 90; --c-s300: 58 75 107;
+    --c-s400: 113 129 158; --c-s500: 138 154 182; --c-s600: 169 182 204; --c-s700: 197 208 228;
+  }
+}
+
+@layer base {
+  body {
+    @apply font-sans text-[14px] leading-[22px] antialiased bg-page text-ink;
+    /* léger dégradé teinté en haut de page : la page n'est pas un aplat */
+    background-image: linear-gradient(180deg, rgb(var(--c-soft) / 0.75), transparent 340px);
+    background-repeat: no-repeat;
+  }
+  h1 { @apply text-[26px] leading-[34px] font-bold text-head md:text-[32px] md:leading-[40px]; }
+  h2 { @apply text-[20px] leading-[28px] font-bold text-head md:text-[24px] md:leading-[32px]; }
+  h3 { @apply text-[16px] leading-[24px] font-semibold text-head; }
+  :focus-visible { @apply outline outline-2 outline-offset-2 outline-action; }
+  mark { color: #0F172A; }
+  ::selection { background: rgb(var(--c-action) / 0.28); }
+}
+@layer components {
+  .card { @apply bg-surface border border-line rounded-lg shadow-card; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2 text-[12px] font-semibold leading-4 border transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-primary text-white border-transparent shadow-sm hover:bg-primary-hover; }
+  .btn-ok { @apply btn bg-ok-solid text-white border-transparent shadow-sm hover:brightness-110; }
+  .btn-ko { @apply btn bg-ko-bg text-ko border-ko/40 hover:brightness-95; }
+  .btn-secondary { @apply btn bg-surface text-slate-700 border-slate-300 hover:bg-soft hover:border-action/40; }
+  .input { @apply w-full rounded border border-slate-300 bg-surface px-3 py-2 text-[14px] text-ink focus:border-action focus:ring-2 focus:ring-action/20; }
+  .label { @apply block text-[12px] font-semibold text-slate-600 mb-1; }
+  .badge { @apply inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-bold tracking-wide; }
+  th { @apply text-left text-[11px] font-bold uppercase tracking-wider text-head px-3 py-2 border-b border-line bg-soft; }
+  td { @apply px-3 py-2 border-b border-line align-top; }
+  tbody tr:hover > td { background-color: rgb(var(--c-soft) / 0.55); }
+}
+
+/* Barres de défilement (UI-03) : fines, arrondies, teintées par le thème ; le menu latéral sombre a la sienne */
+* { scrollbar-width: thin; scrollbar-color: rgb(var(--c-s400) / 0.55) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: rgb(var(--c-s400) / 0.5); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--c-action) / 0.75); }
+*::-webkit-scrollbar-corner { background: transparent; }
+aside nav { scrollbar-color: rgba(255,255,255,0.28) transparent; }
+aside nav::-webkit-scrollbar { width: 8px; }
+aside nav::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.25); }
+aside nav::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.5); }
+
+/* Barre d'accent des cartes de synthèse et fil de couleur sous l'en-tête */
+.accent-bar { height: 3px; background: linear-gradient(90deg, rgb(var(--c-action)), rgb(var(--c-azur)) 55%, rgb(var(--c-ok))); }
+
+/* Mini feu d'artifice de l'écran de félicitations après l'envoi d'un dossier */
+@keyframes feu-artifice {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.4); opacity: 0; }
+}
+.feu { animation: feu-artifice 1000ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+@media (prefers-reduced-motion: reduce) { .feu { animation: none; opacity: 0.6; } }
+
+/* Éditeur de textes (TipTap) : rendu proche du document final */
+.prose-doc { outline: none; min-height: 60vh; font-size: 16px; line-height: 26px; }
+.prose-doc p { margin: 0 0 0.85em; }
+.prose-doc ul { list-style: disc; padding-left: 1.4em; margin: 0 0 0.85em; }
+.prose-doc ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.85em; }
+.prose-doc p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: rgb(var(--c-s400)); float: left; height: 0; pointer-events: none; white-space: pre-line; }
+.prose-doc strong { font-weight: 700; }
+.prose-doc img { max-width: 100%; height: auto; }
+/* Tableaux : bordures (y compris les lignes verticales), en-tête grisé. */
+.prose-doc table { width: 100%; border-collapse: collapse; margin: 0 0 0.85em; table-layout: fixed; }
+.prose-doc th, .prose-doc td { border: 1px solid #cbd5e1; padding: 4px 8px; vertical-align: top; text-align: left; word-break: break-word; }
+.prose-doc th { background: #f1f5f9; font-weight: 700; }
+.prose-doc th p, .prose-doc td p { margin: 0; }
+/* Mêmes tableaux/images dans les aperçus de texte (hors éditeur). */
+.text-preview p { margin: 0 0 0.4em; }
+.text-preview img { max-width: 100%; height: auto; }
+.text-preview table { width: 100%; border-collapse: collapse; margin: 0 0 0.5em; table-layout: fixed; }
+.text-preview th, .text-preview td { border: 1px solid #cbd5e1; padding: 3px 6px; text-align: left; vertical-align: top; word-break: break-word; }
+.text-preview th { background: #f1f5f9; font-weight: 700; }
+/* Image de l'éditeur : poignées de redimensionnement et de rotation quand elle est sélectionnée */
+.vd-image { display: block; width: 100%; max-width: 100%; }
+.vd-image[data-align='center'] { text-align: center; }
+.vd-image[data-align='right'] { text-align: right; }
+.vd-image-frame { position: relative; display: inline-block; line-height: 0; }
+.vd-image-frame[data-selected='true'] { outline: 2px solid rgb(var(--c-action)); outline-offset: 2px; }
+.vd-grip { position: absolute; width: 11px; height: 11px; background: rgb(var(--c-surface)); border: 1.5px solid rgb(var(--c-action)); border-radius: 2px; z-index: 6; }
+.vd-grip-nw { left: -6px; top: -6px; cursor: nwse-resize; }
+.vd-grip-ne { right: -6px; top: -6px; cursor: nesw-resize; }
+.vd-grip-sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.vd-grip-se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+.vd-rotate { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; background: rgb(var(--c-surface)); border: 1.5px solid rgb(var(--c-action)); border-radius: 50%; cursor: grab; font-size: 12px; color: rgb(var(--c-action)); z-index: 6; }
+
+/* Documents techniques (DAT/DEX) rendus depuis le Markdown */
+.doc-md { color: rgb(var(--c-s700)); font-size: 14px; line-height: 22px; }
+.doc-md p { margin: 0 0 0.75em; }
+.doc-md ul { list-style: disc; padding-left: 1.4em; margin: 0 0 0.85em; }
+.doc-md ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.85em; }
+.doc-md li { margin: 0.15em 0; }
+.doc-md li > p { margin: 0; }
+.doc-md strong { font-weight: 700; color: rgb(var(--c-ink)); }
+.doc-md > *:last-child { margin-bottom: 0; }

@@ -269,6 +269,10 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
   }, [acte.id, acte.statut, acte.updatedAt]);
   const [open, setOpen] = useState<number | null>(null);
   const [srcOpen, setSrcOpen] = useState(false);
+  // Acte signé : la section présente le document officiel ; le texte rédigé avant signature est consultable à la
+  // demande. Ce `useState` doit rester AVEC les autres hooks (avant tout retour conditionnel), sinon React lève
+  // « Rendered more hooks than during the previous render ».
+  const [voirTextes, setVoirTextes] = useState(false);
   // Une décision (ou un arrêté) n'a pas de délibéré : le dispositif est l'acte lui-même, on le nomme par son type.
   const acteLabel = acte.typeCode === 'decision' ? 'Décision' : acte.typeCode === 'arrete' ? 'Arrêté' : null;
   // Le dispositif d'une délibération est son « délibéré » ; celui d'une décision ou d'un arrêté est son « décide ».
@@ -293,6 +297,36 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
   const list = texts.data ?? [];
   const kindLabel = (t: any) => (t.kind === 'dispositif' ? dispositifLabel : KIND_LABEL[t.kind]);
   const ouvrirSigne = async () => { const m = await openPdf(() => api.get(orgPath(org!.id, `/parapheur/actes/${acte.id}/document-signe`), { responseType: 'blob' }), `${acteLabel || 'Acte'} signé(e) — ${acte.titre}`); if (m) toast(m, 'ko'); };
+  const telechargerSigne = async () => { try { const r = await api.get(orgPath(org!.id, `/parapheur/actes/${acte.id}/document-signe`), { responseType: 'blob' }); const u = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = u; a.download = `${acteLabel || 'acte'}-${acte.numeroSuivi}-signe.pdf`; a.click(); URL.revokeObjectURL(u); } catch (e) { toast(errMsg(e), 'ko'); } };
+  // Acte signé : la section présente le DOCUMENT OFFICIEL revenu du parapheur (signatures, mention, QR). Le texte
+  // rédigé avant signature n'est plus qu'une pièce de travail, consultable à la demande.
+  if (signe) return (
+    <section className="card p-5" aria-labelledby="textes">
+      <h3 id="textes" className="mb-3">Texte de l'acte</h3>
+      <div className="rounded-lg border-2 border-ok/30 bg-ok-bg/30 p-4">
+        <div className="mb-1 flex flex-wrap items-center gap-2"><Badge tone="ok">Signé</Badge><b className="min-w-0 break-all">Document officiel revenu du parapheur</b></div>
+        <p className="text-[13px] text-mute">C'est ce document qui fait foi : signatures, mention et QR de vérification sur toutes les pages. Il n'est plus modifiable.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className="btn-primary" onClick={ouvrirSigne}><Eye className="h-4 w-4" /> Voir le document signé</button>
+          <button className="btn-secondary" onClick={telechargerSigne}><Download className="h-4 w-4" /> Télécharger</button>
+          <button className="btn-secondary" onClick={() => setVoirTextes((v) => !v)}>{voirTextes ? 'Masquer' : 'Voir'} le texte avant signature</button>
+        </div>
+      </div>
+      {voirTextes && (
+        <div className="mt-4 space-y-4 opacity-80">
+          {list.map((t) => {
+            const md = previews.data?.[t.id] ?? '';
+            return (
+              <div key={t.id} className="rounded-lg border border-line bg-surface p-4">
+                <div className="mb-1 flex items-center gap-2"><h4 className="text-[15px] font-bold text-head">{kindLabel(t)}</h4></div>
+                {md ? <div className="text-preview text-[14px] leading-[22px] text-slate-700" dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} /> : <p className="text-mute">—</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
   // Acte rédigé hors application : c'est le document joint qui fait foi, on ne propose pas l'éditeur de texte.
   const source = acte.documentSource;
   const voirSource = async () => { const m = await openPdf(() => api.get(orgPath(org!.id, `/actes/${acte.id}/document-source`), { responseType: 'blob' }), `${acteLabel || 'Acte'} — ${acte.titre}`); if (m) toast(m, 'ko'); };
@@ -550,7 +584,6 @@ function Signature({ acte, toast, onChanged }: { acte: any; toast: (m: string, k
     try { await fn(); toast(ok); etat.reload(); onChanged?.(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); }
   };
   const e = etat.data?.envoi;
-  const voirSigne = async () => { const m = await openPdf(() => api.get(orgPath(o, `/parapheur/actes/${acte.id}/document-signe`), { responseType: 'blob' }), `Document signé — ${acte.titre}`); if (m) toast(m, 'ko'); };
   // L'acte est « en attente de signature » (fin de circuit) : seul cas où l'envoi est « normal ».
   const enAttente = ['a_signer', 'signature_refusee'].includes(acte.statut) || !e || ['erreur', 'annule', 'refuse'].includes(e.statut);
   // Le circuit n'est pas terminé : un administrateur / le SCC peut tout de même envoyer la décision en signature.
@@ -591,7 +624,13 @@ function Signature({ acte, toast, onChanged }: { acte: any; toast: (m: string, k
           <dl className="mb-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px]">
             <dt className="text-mute">Parapheur</dt><dd>{etat.data.config.fournisseurs.find((f: any) => f.code === etat.data.config.fournisseur)?.nom}{etat.data.simulateur && <span className="ml-2 text-[12px] text-warn">(simulation : aucun envoi réel)</span>}</dd>
             <dt className="text-mute">Mode</dt><dd>{etat.data.config.mode === 'dev' ? `dev — envoi à ${etat.data.config.email_test}` : `prod — signataire ${etat.data.config.signataire_email}`}</dd>
-            <dt className="text-mute">Signature</dt><dd>{(etat.data.config.modes_signature?.find((x: any) => x.code === etat.data.config.signature_mode)?.nom) || 'Signature P12 (certificat)'}{e?.signataireEmail && etat.data.config.signature_mode === 'sms' && etat.data.config.signataire_telephone ? ` · ${etat.data.config.signataire_telephone}` : ''}</dd>
+            <dt className="text-mute">Signature</dt><dd>{(() => {
+              // Mode RÉELLEMENT utilisé pour cet envoi (le paramétrage peut changer après coup) : une signature
+              // manuscrite ne doit pas être présentée comme une signature P12.
+              const code = e?.signatureMode || etat.data.config.signature_mode;
+              const nom = etat.data.config.modes_signature?.find((x: any) => x.code === code)?.nom;
+              return nom || (code === 'simple' ? 'Signature manuscrite (simple)' : code === 'sms' ? 'Signature par SMS' : 'Signature P12 (certificat)');
+            })()}{e?.signatureMode === 'sms' && etat.data.config.signataire_telephone ? ` · ${etat.data.config.signataire_telephone}` : ''}</dd>
             <dt className="text-mute">Emplacement</dt><dd>{pos ? `page ${pos.page} · ${Math.round(pos.x)} % / ${Math.round(pos.y)} %` : <span className="font-semibold text-warn">à définir</span>}{peutPlacer && <button className="ml-2 text-action underline" onClick={() => setPlaceOpen(true)}>{pos ? 'modifier' : 'définir'}</button>}</dd>
             {e && <><dt className="text-mute">Signataire</dt><dd>{e.signataireNom} · {e.signataireEmail}</dd>
               <dt className="text-mute">Demandé le</dt><dd>{dt(e.demandeAt)}</dd>
@@ -600,10 +639,7 @@ function Signature({ acte, toast, onChanged }: { acte: any; toast: (m: string, k
               {e.ref && <><dt className="text-mute">Référence</dt><dd className="font-mono text-[12px]">{e.ref}</dd></>}</>}
           </dl>
           {(e?.statut === 'signe' || e?.documentSigne) && (
-            <div className="mb-3">
-              <button className="btn-primary" onClick={voirSigne}><Download className="h-4 w-4" /> Document signé (PDF)</button>
-              <p className="mt-1 text-[12px] text-mute">Le document signé revenu du parapheur fait foi : il ne peut plus être modifié.</p>
-            </div>)}
+            <p className="mb-3 text-[12px] text-mute">Le document signé revenu du parapheur fait foi : il est présenté dans <b>« Texte de l'acte »</b>.</p>)}
           {staff && !pos && <p className="mb-3 rounded bg-warn-bg p-2 text-[13px] text-warn">Définissez l'<b>emplacement de la signature</b> ci-dessus avant d'envoyer le document au parapheur.</p>}
           {staff && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -926,6 +962,9 @@ export default function Dossier() {
   const gabaritType = ['decision', 'arrete'].includes(a.typeCode) ? a.typeCode : 'deliberation';
   const libelleType = a.typeCode === 'decision' ? 'Décision' : a.typeCode === 'arrete' ? 'Arrêté' : 'Délibération';
   const modeleDocx = !!gabarits.data?.find((t) => t.docType === gabaritType)?.docx;
+  // Acte signé : plus d'action, plus de modèle Word, plus de circuit — la page présente l'acte officiel, en pleine
+  // largeur.
+  const signe = a.statut === 'signe' && !!a.typeInfo?.meta?.signature;
   const telechargerDocx = async () => { try { const r = await api.get(orgPath(o, `/actes/${a.id}/docx`), { params: { docType: gabaritType }, responseType: 'blob' }); const url = URL.createObjectURL(r.data); const el = document.createElement('a'); el.href = url; el.download = `${gabaritType}-${a.numeroSuivi}.docx`; el.click(); URL.revokeObjectURL(url); } catch (e) { toast(errMsg(e), 'ko'); } };
   const apercuModele = async () => { const m = await openPdf(() => api.get(orgPath(o, `/actes/${a.id}/docx-pdf`), { params: { docType: gabaritType }, responseType: 'blob' }), `${libelleType} (modèle Word) — ${a.titre}`); if (m) toast(`Aperçu impossible : ${m}`, 'ko'); };
   const onEnvoye = (data: any) => {
@@ -940,12 +979,14 @@ export default function Dossier() {
         <div className="flex flex-wrap items-center gap-3"><h1 className="min-w-0 flex-1">{a.titre}</h1><TypeBadge acte={a} />{a.urgence && <UrgentBadge urgent />}<StatutBadge statut={a.statut} signataire={a.signataireNom} />
           <button className="btn-secondary" onClick={() => setCopying(true)}><Copy className="h-4 w-4" /> Copier…</button>
           <button className="btn-secondary" onClick={apercuDossier}><Eye className="h-4 w-4" /> Aperçu PDF du dossier</button>
-          {modeleDocx && <button className="btn-secondary" onClick={telechargerDocx}><FileText className="h-4 w-4" /> {libelleType} Word</button>}
-          {modeleDocx && <button className="btn-secondary" onClick={apercuModele}><Eye className="h-4 w-4" /> {libelleType} (modèle)</button>}
+          {!signe && modeleDocx && <button className="btn-secondary" onClick={telechargerDocx}><FileText className="h-4 w-4" /> {libelleType} Word</button>}
+          {!signe && modeleDocx && <button className="btn-secondary" onClick={apercuModele}><Eye className="h-4 w-4" /> {libelleType} (modèle)</button>}
           {peutSupprimer && <button className="btn-secondary text-ko" onClick={supprimer}><Trash2 className="h-4 w-4" /> Supprimer</button>}</div>
       </div>
-      {c && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      {/* Circuit : affiché seulement si l'acte l'a réellement suivi (un arrêté collecté envoyé directement en
+          signature n'a jamais eu de circuit — le montrer serait trompeur). */}
+      {c?.submitted && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
+      <div className={signe ? 'grid gap-6' : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]'}>
         <div className="space-y-6">
           <Fiche acte={a} editable={editable} onSaved={() => { reloadAll(); toast('Fiche enregistrée'); }} onCommissions={reloadAll} />
           {a.typeInfo?.meta?.autorisations && <Autorisations acte={a} editable={editable} onChanged={() => { reloadAll(); toast('Délibérations d\'autorisation mises à jour'); }} toast={toast} />}
@@ -953,7 +994,8 @@ export default function Dossier() {
           {a.typeInfo?.meta?.signature && <Signature acte={a} toast={toast} onChanged={reloadAll} />}          <Annexes acte={a} editable={editable || !!c?.actions?.validate} toast={toast} />
           <Discussion acte={a} toast={toast} />
         </div>
-        <aside className="space-y-4">
+        {/* Acte signé : plus aucune action — la page s'affiche en pleine largeur, pour lire l'acte officiel. */}
+        {!signe && <aside className="space-y-4">
           {a.custom?.entrainement && <div role="note" className="rounded border border-primary/30 bg-primary/5 p-3 text-[13px]"><b>Dossier d’entraînement</b> : essayez tout librement. Il ne partira jamais dans un vrai circuit et se supprime tout seul au bout de 14 jours.</div>}
           <ActiverAssiste acte={a} editable={editable} onReload={reloadAll} toast={toast} />
           <Actions acte={a} circuit={c} reload={reloadAll} toast={toast} onEnvoye={onEnvoye} />
@@ -963,7 +1005,7 @@ export default function Dossier() {
           <CommissionsBox acte={a} editable={editable} toast={toast} />
           {(a.statut === 'brouillon' || a.statut === 'modification_demandee') && <ActesProches acte={a} />}
           <Historique circuit={c} />
-        </aside>
+        </aside>}
       </div>
       {copying && <CopieModal acte={a} onClose={() => setCopying(false)} toast={toast} />}
       {a.custom?.assiste?.actif && <DossierAssiste acte={a} editable={editable} onReload={reloadAll} onApercu={apercuDossier} toast={toast} />}

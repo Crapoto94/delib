@@ -284,8 +284,12 @@ function createCollecteurs({ db, audit, settings, config, log, mail, ai, prompts
       ?? (arreteRef?.meta?.natureCode ? (await refs.byCode('nature', arreteRef.meta.natureCode, org).catch(() => null))?.id ?? null : null);
     const matiereId = await refId('matiere', reglages.matiereId || ia?.matiere, org);
     const rubriqueId = await refId('rubrique', reglages.rubriqueId || ia?.rubrique, org);
-    // Communicabilité : certains arrêtés ne sont pas publics (données personnelles, sécurité…). Défaut : normale.
-    const confidentiel = reglages.confidentialite === 'confidentiel' || String(ia?.confidentialite || '').toLowerCase().startsWith('confid');
+    // Communicabilité : certains arrêtés ne sont pas publics (données personnelles, sécurité…). Le choix fait sur le
+    // collecteur PRIME ; l'IA n'est consultée que si le collecteur n'a rien décidé. Sans cela, l'IA pouvait déclarer
+    // « confidentiel » un acte que l'administration avait explicitement marqué communicable (constaté : un arrêté
+    // jugé « document technique » par l'IA devenait confidentiel contre le réglage du collecteur).
+    const regle = reglages.confidentialite === 'confidentiel' ? 'confidentiel' : reglages.confidentialite === 'normale' ? 'normale' : null;
+    const confidentiel = regle ? regle === 'confidentiel' : String(ia?.confidentialite || '').toLowerCase().startsWith('confid');
     const confidentialite = confidentiel ? 'confidentiel' : 'normale';
     const trameFinale = trame === 'presente' ? 'presente' : 'a_ajouter';
     const titre = String(objet || nom.replace(/\.[a-z0-9]+$/i, '')).trim().slice(0, 250) || 'Arrêté (collecteur)';
