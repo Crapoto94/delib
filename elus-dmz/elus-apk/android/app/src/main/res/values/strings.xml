@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VibeDélib Élus</string>
+    <string name="title_activity_main">VibeDélib Élus</string>
+    <string name="package_name">fr.ivry.vibedelib.elus</string>
+    <string name="custom_url_scheme">fr.ivry.vibedelib.elus</string>
+</resources>

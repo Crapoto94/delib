@@ -1,8 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * Enveloppe Android (APK) de l'espace des élus : le MÊME code que le web (`npm run build` -> dist).
- * Voir README.md pour la construction. L'URL de l'API se fixe à la compilation : VITE_ELUS_API=https://elus.exemple.fr/api/v1
+ * Enveloppe Android tablette : le même build web que l'espace élus ; l'instance/API est choisie au premier lancement.
  */
 const config: CapacitorConfig = {
   appId: 'fr.ivry.vibedelib.elus',

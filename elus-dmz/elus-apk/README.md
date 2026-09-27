@@ -1,23 +1,33 @@
-# APK de l'espace des élus
+# VibeDélib Élus pour tablette Android
 
-L'application Android est une **enveloppe Capacitor** autour du build web des élus : une seule base de code (web + APK).
+L’APK embarque le même frontend que l’espace élus web. Au premier lancement, il propose l’adresse de l’instance publiée, préremplie avec `https://vibedelib.ivry94.fr/elus`. L’adresse peut être modifiée depuis le bouton globe dans l’application. Elle est mémorisée sur la tablette et vérifiée avant utilisation.
 
-## Construire
-```
-cd elus-dmz
-VITE_ELUS_API=https://elus.exemple.fr/api/v1 npm run build      # -> dist
+L’application utilise l’API du même hôte (`/api/v1`). Pour `https://vibedelib.ivry94.fr/elus`, l’API appelée est donc `https://vibedelib.ivry94.fr/api/v1`.
+
+## Prérequis de construction
+
+- Node.js 22 ou plus récent
+- JDK 17 ou plus récent
+- Android SDK avec les plateformes et outils de compilation demandés par Capacitor
+
+## Construire l’APK de débogage
+
+Depuis `elus-dmz` :
+
+```powershell
+npm ci
+npm run build
 cd elus-apk
-npm init -y && npm i @capacitor/core @capacitor/cli @capacitor/android
-npx cap add android && npx cap sync android
-npx cap open android                                                   # Android Studio : Build > Generate Signed APK
+npm ci
+npx cap sync android
+cd android
+.\gradlew.bat assembleDebug
 ```
-Côté backend, ajouter `https://localhost` à `CORS_ORIGINS` (origine de la WebView Capacitor).
 
-## Téléchargement en arrière-plan (ELU-65)
-- **Ce qui est fait** : le code de l'application (`src/docs.ts`) télécharge en arrière-plan les documents de la séance dans le stockage de l'appareil
-  (manifeste versionné, 3 en parallèle, reprise, contrôle de version, respect de l'économiseur de données, purge à la déconnexion).
-  Il démarre à l'ouverture de l'application, au retour du réseau, au retour au premier plan et toutes les 10 minutes. Le passage d'un point à l'autre lit
-  le stockage local : il est instantané.
-- **Extension native (à ajouter à la construction de l'APK)** : pour poursuivre le téléchargement **application fermée**, brancher un plugin d'arrière-plan
-  (WorkManager, p. ex. `@capacitor/background-runner`) qui appelle la même fonction `prefetchSeance(seanceId)` avec le jeton de session. L'interface ne change pas.
-- **Sécurité** : jeton d'élu court (12 h), documents nominatifs filigranés, stockage propre à l'élu et effacé à la déconnexion ; épinglage de certificat possible via le plugin HTTP natif.
+L’APK installable est produit dans `elus-apk/android/app/build/outputs/apk/debug/app-debug.apk`.
+
+Le backend doit autoriser l’origine WebView Capacitor `https://localhost` dans `CORS_ORIGINS`, en plus des origines web habituelles. Il doit aussi présenter un certificat HTTPS reconnu par Android.
+
+## Mode hors ligne
+
+Les documents téléchargés sont conservés localement pour permettre leur lecture hors ligne, puis supprimés à la déconnexion ou au changement d’instance. La session reste propre à l’élu.

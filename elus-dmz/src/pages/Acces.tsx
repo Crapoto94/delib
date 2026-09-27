@@ -5,6 +5,7 @@ import { ThemeToggle } from '../theme';
 import EtatBackend from '../EtatBackend';
 import TabletFrame from '../TabletFrame';
 import { OrgLogo, useBranding, useFavicon } from '../Brand';
+import { isNativeApp } from '../api';
 
 const Cadre = ({ titre, children }: { titre: string; children: ReactNode }) => {
   useFavicon(useBranding());
@@ -78,6 +79,7 @@ export function Connexion() {
             <label className="flex items-center gap-2 text-[14px]"><input type="checkbox" checked={souvenir} onChange={(e) => setSouvenir(e.target.checked)} /> Se souvenir de moi sur ce navigateur <span className="text-[12px] text-mute">(identifiant seulement)</span></label>
             <button className="btn-primary w-full !py-3 !text-[16px]" disabled={busy}>Se connecter</button>
             <button type="button" className="w-full text-center text-[13px] text-action" onClick={() => { setOubli(true); setErr(null); setMsg(null); }}>Mot de passe Ville oublié ? Recevoir un code par SMS</button>
+            {isNativeApp() && <button type="button" className="w-full text-center text-[13px] text-mute" onClick={() => nav('/instance')}>Changer d’instance</button>}
           </form>}
       </Cadre>
     </TabletFrame>

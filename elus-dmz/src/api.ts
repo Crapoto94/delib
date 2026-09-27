@@ -4,13 +4,35 @@ import axios from 'axios';
  * Client de l'espace élus. Aucun code de l'application des agents n'est importé ici : ce bundle est servi seul en DMZ / dans l'APK.
  * L'URL de l'API est paramétrable pour l'APK (window.__ELUS_API__ ou VITE_ELUS_API) ; par défaut, même origine (/api/v1).
  */
-const K = { token: 'elus.token', expire: 'elus.expire', elu: 'elus.elu', device: 'elus.device' };
-declare global { interface Window { __ELUS_API__?: string } }
-export const apiBase: string = window.__ELUS_API__ || (import.meta.env.VITE_ELUS_API as string | undefined) || '/api/v1';
-
-export type EluSession = { id: number; nom: string; organismeId: number; groupe: string | null; delegation: string | null };
+const K = { token: 'elus.token', expire: 'elus.expire', elu: 'elus.elu', device: 'elus.device', instance: 'elus.instanceUrl' };
 const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k: string, v: string | null) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* stockage indisponible */ } };
+declare global { interface Window { __ELUS_API__?: string } }
+declare global { interface Window { Capacitor?: { isNativePlatform?: () => boolean } } }
+
+export const isNativeApp = () => !!window.Capacitor?.isNativePlatform?.();
+export const instanceUrl = () => read(K.instance);
+
+/** L'URL saisie est celle du site publié (/elus ou racine), l'API est servie au même hôte sous /api/v1. */
+export function apiBaseForInstance(value: string): string {
+  let text = value.trim();
+  if (!text) throw new Error('Saisissez l’adresse de l’instance.');
+  if (!/^https?:\/\//i.test(text)) text = `https://${text}`;
+  let url: URL;
+  try { url = new URL(text); } catch { throw new Error('Adresse invalide. Exemple : https://vibedelib.ivry94.fr/elus'); }
+  if (url.protocol !== 'https:') throw new Error('L’instance doit utiliser HTTPS.');
+  if (url.username || url.password || url.search || url.hash) throw new Error('Saisissez uniquement l’adresse du site, sans identifiants ni paramètres.');
+  const path = url.pathname.replace(/\/+$/, '');
+  if (path && path !== '/elus' && path !== '/api/v1') throw new Error('Utilisez l’adresse du site, éventuellement suivie de /elus.');
+  return `${url.origin}/api/v1`;
+}
+
+const savedInstance = (() => { try { return localStorage.getItem(K.instance); } catch { return null; } })();
+export const apiBase: string = savedInstance
+  ? (() => { try { return apiBaseForInstance(savedInstance); } catch { return '/api/v1'; } })()
+  : window.__ELUS_API__ || (import.meta.env.VITE_ELUS_API as string | undefined) || '/api/v1';
+
+export type EluSession = { id: number; nom: string; organismeId: number; groupe: string | null; delegation: string | null };
 
 export const session = {
   token: () => { const t = read(K.token); const e = read(K.expire); return t && (!e || new Date(e) > new Date()) ? t : null; },
@@ -27,6 +49,13 @@ export const deviceId = () => {
 };
 
 export const api = axios.create({ baseURL: apiBase, timeout: 60000 });
+export function setInstanceUrl(value: string) {
+  const normalized = new URL(value.trim().match(/^https:\/\//i) ? value.trim() : `https://${value.trim()}`);
+  const base = apiBaseForInstance(value);
+  write(K.instance, normalized.toString().replace(/\/$/, ''));
+  api.defaults.baseURL = base;
+  return base;
+}
 api.interceptors.request.use((cfg) => { const t = session.token(); if (t) cfg.headers.Authorization = `Bearer ${t}`; return cfg; });
 api.interceptors.response.use((r) => r, (e) => {
   if (e.response?.status === 401 && !String(e.config?.url).includes('/elus-auth/')) { session.clear(); if (!location.hash.startsWith('#/connexion')) location.hash = '#/connexion'; }

@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { HashRouter, Link, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
-import { LogOut, Search, Settings } from 'lucide-react';
-import { api, session } from './api';
+import { Globe2, LogOut, Search, Settings } from 'lucide-react';
+import { api, instanceUrl, isNativeApp, session } from './api';
 import { purger } from './docs';
 import Accueil from './pages/Accueil';
 import Seance from './pages/Seance';
@@ -14,6 +14,7 @@ import EtatBackend from './EtatBackend';
 import { OrgLogo, useBranding, useFavicon } from './Brand';
 import GroupePopover from './GroupePopover';
 import MonParapheur from './MonParapheur';
+import Instance from './Instance';
 
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./dev/DevAnnot')) : null;
 
@@ -33,6 +34,7 @@ function Cadre() {
         <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
         <MonParapheur />
         <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/preferences')} aria-label="Mes préférences" title="Mes préférences"><Settings className="h-5 w-5" /></button>
+        {isNativeApp() && <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/instance')} aria-label="Changer d’instance" title={`Instance : ${instanceUrl() || ''}`}><Globe2 className="h-5 w-5" /></button>}
         <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={sortir} aria-label="Me déconnecter" title="Me déconnecter"><LogOut className="h-5 w-5" /></button>
       <ThemeToggle className="shrink-0 text-white/80 hover:bg-white/10 hover:text-white" /></div>
       </header>
@@ -48,12 +50,16 @@ function Cadre() {
 }
 
 /** Espace des élus : application autonome (web et APK). Routage par « # » : fonctionne tel quel dans l'APK et derrière n'importe quel serveur statique. */
-export default function App() {
+function AppRoutes() {
+  const nav = useNavigate();
+  const [instanceChoisie, setInstanceChoisie] = useState(() => !isNativeApp() || !!instanceUrl());
+  const instanceEnregistree = () => { setInstanceChoisie(true); nav('/connexion', { replace: true }); };
+  if (!instanceChoisie) return <Instance onSaved={instanceEnregistree} />;
   return (
-    <HashRouter>
       <Routes>
         <Route path="/connexion" element={<Connexion />} />
         <Route path="/invitation/:token" element={<Invitation />} />
+        <Route path="/instance" element={isNativeApp() ? <Instance onSaved={instanceEnregistree} /> : <Navigate to="/connexion" replace />} />
         <Route path="/cgu" element={<Legal doc="cgu" />} />
         <Route path="/licence" element={<Legal doc="licence" />} />
         {DevAnnot && <Route path="/dev/annot" element={<Suspense fallback={null}><DevAnnot /></Suspense>} />}
@@ -65,6 +71,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </HashRouter>
   );
 }
+
+export default function App() { return <HashRouter><AppRoutes /></HashRouter>; }
