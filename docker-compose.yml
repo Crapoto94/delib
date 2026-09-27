@@ -84,7 +84,11 @@ services:
       # Hôtes acceptés par le moteur : le navigateur arrive par notre frontal, sous le même nom d'hôte que l'application.
       # (Collabora n'a pas d'équivalent de `alias_name1` chez ONLYOFFICE : le préfixe /collabora-delib est celui de la
       # requête, transmis par le frontal via X-Forwarded-Host — voir frontend/nginx.conf.)
-      - domain=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public de l'application requis (ex. vibedelib.ivry.local)}$
+      # BUREAU_HOTE_PUBLIQUE_DEV ajoute un hôte à la liste : c'est le poste de développeur qui atteint le moteur par le
+      # port publié (9981) au lieu du frontal. Sans lui, la découverte de développement est refusée par Collabora avec
+      # « Bad request » — l'éditeur ne s'ouvre pas, et le motif ne dit rien du sous-chemin.
+      # Pas de `${VAR:+…}` ici : cette forme n'est pas évaluée, le complément disparaît sans un mot.
+      - domain=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public de l'application requis (ex. vibedelib.ivry.local)},${BUREAU_HOTE_PUBLIQUE_DEV:-127.0.0.1}
       # Le TLS est terminé par le proxy en amont : le moteur parle HTTP en interne, et annonce des URL en https.
       #   --o:ssl.enable=false        le moteur ne sert pas de TLS lui-même
       #   --o:ssl.termination=true    « un reverse proxy termine le TLS » : les URL annoncées deviennent https/wss

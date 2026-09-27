@@ -98,8 +98,12 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
           cadre.allow = 'clipboard-read; clipboard-write';
           zone.current.appendChild(cadre);
           // L'éditeur peut nous demander de fermer (Cmd/Ctrl+W) : c'est une fermeture « sauvegarder et fermer ».
+          // On n'écoute que l'origine du cadre que nous venons de créer : en production elle est la nôtre (le frontal
+          // relaie le moteur sous le même nom d'hôte), mais en développement le moteur est joint par son port publié
+          // et n'est donc pas de la même origine qu'un http://localhost:5160.
+          const origine = (() => { try { return new URL(r.data.src, window.location.origin).origin; } catch { return ''; } })();
           const ecouteur = (e: MessageEvent) => {
-            if (e.origin !== window.location.origin) return;      // seul notre propre moteur nous parle
+            if (e.origin !== origine) return;         // seul le moteur que nous avons chargé nous parle
             if (e.data?.MessageId === 'App_Close') fermerRef.current?.();
             if (e.data?.MessageId === 'App_Error') setErreur("Le module d'édition a rencontré une erreur.");
           };
