@@ -64,7 +64,7 @@ function createDsihubParapheur({ tls, http: injected } = {}) {
       } catch (e) { return { ok: false, message: e.message, details: { etape: 'connexion' } }; }
     },
 
-    async creer(cfg, { titre, message, deadline, mode, signataires, documents }) {
+    async creer(cfg, { titre, message, deadline, mode, signataires, documents, service }) {
       const client = clientOf(cfg); const token = await jeton(client, cfg);
       const docs = documents || [];
       const form = new FormData();
@@ -78,6 +78,8 @@ function createDsihubParapheur({ tls, http: injected } = {}) {
       }
       const payload = {
         title: titre, ...(message ? { message } : {}), ...(deadline ? { deadline } : {}),
+        // Direction porteuse : le Hub s'en sert comme expéditeur (« la DIRECTION … vous invite à signer un arrêté »).
+        ...(service ? { service: String(service).slice(0, 200) } : {}),
         mode: mode || 'sequentiel', link_validity_minutes: 60,
         signataires: (signataires || []).map((s) => ({
           email: s.email, nom: s.nom, ...(s.qualite ? { title: s.qualite } : {}),
