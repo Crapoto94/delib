@@ -249,8 +249,9 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
 
     const sql = (extraWhere, extraRank) => `
       SELECT a.id, a.numero_suivi, a.titre, a.statut, a.type_id, a.nature_id, a.matiere_id, a.rubrique_id, a.rapporteur_id, a.direction_code, a.direction_label,
-             a.created_at, a.incidence_financiere, d.seance_id, d.instance_id, d.instance_nom, d.date_seance, d.resultat, d.numero, d.item_id, ${extraRank} AS rang
+             a.created_at, a.incidence_financiere, pe.signataire_nom AS signataire_nom, d.seance_id, d.instance_id, d.instance_nom, d.date_seance, d.resultat, d.numero, d.item_id, ${extraRank} AS rang
       FROM search_index si JOIN actes a ON a.id = si.acte_id
+      LEFT JOIN parapheur_envois pe ON pe.id = a.parapheur_envoi_id
       LEFT JOIN LATERAL (
         SELECT it.id AS item_id, it.numero, se.id AS seance_id, se.date_seance, se.instance_id, i.nom AS instance_nom, sp.resultat
         FROM seance_items it JOIN seances se ON se.id = it.seance_id JOIN instances i ON i.id = se.instance_id LEFT JOIN seance_points sp ON sp.item_id = it.id
@@ -326,7 +327,7 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
     const out = {
       total: liste.length, tronque: brutes.length >= PLAFOND, limit, offset, approchee, dureeMs: Date.now() - t0,
       items: page.map((r) => ({
-        acteId: r.id, numeroSuivi: r.numero_suivi, numero: r.numero || null, titre: r.titre, statut: r.statut, extrait: ex.get(r.id) || '',
+        acteId: r.id, numeroSuivi: r.numero_suivi, numero: r.numero || null, titre: r.titre, statut: r.statut, signataireNom: r.signataire_nom ?? null, extrait: ex.get(r.id) || '',
         type: lib.ref(r.type_id), nature: lib.ref(r.nature_id), matiere: lib.ref(r.matiere_id), rubrique: lib.ref(r.rubrique_id), rapporteur: lib.elu(r.rapporteur_id),
         direction: r.direction_label || r.direction_code, seanceId: cle(r, 'seance_id'), itemId: cle(r, 'item_id'), instance: cle(r, 'instance_nom'), dateSeance: cle(r, 'date_seance'),
         resultat: r.resultat ? { code: r.resultat, libelle: RESULTATS[r.resultat] } : null, creeLe: r.created_at,

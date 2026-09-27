@@ -20,6 +20,7 @@ const toActe = (r) => r && ({
   directionsInfo: r.directions_info ?? [],
   submittedAt: r.submitted_at, abandonedAt: r.abandoned_at, abandonMotif: r.abandon_motif, createdAt: r.created_at, updatedAt: r.updated_at,
   signeAt: r.signe_at ?? null, signePar: r.signe_par ?? null, parapheurEnvoiId: r.parapheur_envoi_id ?? null,
+signataireNom: r.signataire_nom ?? null,
   documentSourceTrame: r.document_source_trame ?? null,
   signaturePosition: r.signature_position ?? null,
 });
@@ -50,8 +51,9 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
 
     async raw(organismeId, id) {
       const a = await db.get(
-        `SELECT a.*, t.code AS type_code, t.libelle AS type_libelle FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id
-         WHERE a.id = $1 AND a.organisme_id = $2`, [id, requireOrg(organismeId)]);
+      `SELECT a.*, t.code AS type_code, t.libelle AS type_libelle, pe.signataire_nom AS signataire_nom FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id
+       LEFT JOIN parapheur_envois pe ON pe.id = a.parapheur_envoi_id
+       WHERE a.id = $1 AND a.organisme_id = $2`, [id, requireOrg(organismeId)]);
       if (!a) throw E.notFound('Acte introuvable');
       return a;
     },
@@ -202,7 +204,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
       if (!f.includeAbandoned) w.push("a.statut <> 'abandonne'");
       const where = w.join(' AND ');
       const total = (await db.get(`SELECT count(*)::int AS n FROM actes a WHERE ${where}`, p)).n;
-      const rows = await db.all(`SELECT a.*, t.code AS type_code, t.libelle AS type_libelle FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id WHERE ${where} ORDER BY a.updated_at DESC, a.id DESC LIMIT ${add(f.limit || 50)} OFFSET ${add(f.offset || 0)}`, p);
+      const rows = await db.all(`SELECT a.*, t.code AS type_code, t.libelle AS type_libelle, pe.signataire_nom AS signataire_nom FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id LEFT JOIN parapheur_envois pe ON pe.id = a.parapheur_envoi_id WHERE ${where} ORDER BY a.updated_at DESC, a.id DESC LIMIT ${add(f.limit || 50)} OFFSET ${add(f.offset || 0)}`, p);
       return { total, limit: f.limit || 50, offset: f.offset || 0, items: await svc.attachSeance(rows.map(toActe)) };
     },
 

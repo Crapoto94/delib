@@ -53,7 +53,7 @@ export default function TousLesActes() {
                     <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${it.acte.id}`}>{it.acte.titre}</Link> <TypeBadge acte={it.acte} /> {it.acte.urgence && <UrgentBadge urgent />}<div className="text-[12px] text-mute">{it.acte.direction?.label ? `${it.acte.direction.label} · ` : ''}<AgentName u={it.acte.redacteur} /></div></td>
       {vue === 'conseil' && <td>{it.enRetard ? <Badge tone="ko">{it.etape.label}</Badge> : <span className="text-[12px]">{it.etape.label}</span>}</td>}
       <td><SeanceVisee acte={it.acte} /></td>
-      <td><StatutOuEtape statut={it.acte.statut} etape={it.etape} /></td>
+      <td><StatutOuEtape statut={it.acte.statut} etape={it.etape} signataire={it.acte.signataireNom} /></td>
       <td className="text-[12px]">{it.etape?.dueAt ? (it.enRetard ? <Badge tone="ko">En retard · {dt(it.etape.dueAt, { dateStyle: 'short' })}</Badge> : dt(it.etape.dueAt, { dateStyle: 'medium' })) : '—'}</td>
     </tr>);
 

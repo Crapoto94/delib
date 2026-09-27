@@ -183,7 +183,7 @@ export function ListeDossiers({ scopeParDefaut = 'mine' }: { scopeParDefaut?: st
                 <td className="font-mono text-[12px]">#{a.numeroSuivi}</td>
                 <td><TypeBadge acte={a} /></td>
                 <td><Link to={`/dossiers/${a.id}`} className="font-semibold text-head hover:underline">{a.titre}</Link>{a.urgence && <span className="ml-2 align-middle"><UrgentBadge urgent /></span>}{a.custom?.assiste?.actif && <span title="Dossier assisté" className="ml-1 inline-flex align-middle text-action"><GraduationCap className="h-3.5 w-3.5" aria-label="Dossier assisté" /></span>}</td>
-                <td className="text-mute">{a.direction?.label}</td><td><AgentName u={a.redacteur} /></td><td><SeanceVisee acte={a} /></td><td><StatutBadge statut={a.statut} /></td>
+                <td className="text-mute">{a.direction?.label}</td><td><AgentName u={a.redacteur} /></td><td><SeanceVisee acte={a} /></td><td><StatutBadge statut={a.statut} signataire={a.signataireNom} /></td>
                 <td className="text-mute">{a.statut === 'archive' ? '—' : dt(a.updatedAt, { dateStyle: 'short' })}</td>
                 <td className="text-right"><Link to={`/mes-actes/${a.id}`} className="text-[12px] font-semibold text-action hover:underline">Trajet</Link></td>
               </tr>))}

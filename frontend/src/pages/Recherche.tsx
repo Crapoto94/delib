@@ -128,7 +128,7 @@ export default function Recherche() {
                     <li key={r.acteId} className="card p-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link to={`/dossiers/${r.acteId}`} className="text-[15px] font-semibold text-head hover:underline">{r.titre}</Link>
-                        <StatutBadge statut={r.statut} />
+                        <StatutBadge statut={r.statut} signataire={r.signataireNom} />
                         {r.resultat && <Badge tone={r.resultat.code.startsWith('adopte') ? 'ok' : 'ko'}>{r.resultat.libelle}</Badge>}
                       </div>
                       <div className="mt-0.5 text-[12px] text-mute">

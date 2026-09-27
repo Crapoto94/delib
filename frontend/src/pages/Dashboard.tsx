@@ -82,7 +82,7 @@ export function Synthese() {
                 <td><Link className="font-semibold text-head hover:underline" to={`/dossiers/${a.id}`}>{a.titre}</Link>{a.urgence && <span className="ml-2 align-middle"><UrgentBadge urgent /></span>}</td>
                 <td className="text-mute">{a.direction?.label}</td>
                 <td><SeanceVisee acte={a} /></td>
-                <td><StatutBadge statut={a.statut} /></td>
+                <td><StatutBadge statut={a.statut} signataire={a.signataireNom} /></td>
               </tr>))}
           </tbody></table>
         </section>)}

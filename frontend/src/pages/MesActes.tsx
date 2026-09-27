@@ -37,7 +37,7 @@ export function ListeTrajets({ statut, hors }: { statut?: string; hors?: string 
             <tr key={a.acteId}><td><b>{a.titre}</b> <TypeBadge acte={a} /><div className="text-[12px] text-mute">n° {a.numeroSuivi} · créé le {dt(a.creeLe, { dateStyle: 'short' })}</div></td>
               <td className="text-[12px]"><AgentName u={a.redacteur} /></td>
               <td className="space-x-1">{a.roles.map((r: any) => <Badge key={r.code} tone="blue">{r.label}</Badge>)}</td>
-              <td><StatutBadge statut={a.statut} />{a.resultatLabel && <div className="mt-1 text-[11px] text-mute">{a.resultatLabel}</div>}</td>
+              <td><StatutBadge statut={a.statut} signataire={a.signataireNom} />{a.resultatLabel && <div className="mt-1 text-[11px] text-mute">{a.resultatLabel}</div>}</td>
               <td className="text-[12px]">{a.dateSeance ? dt(a.dateSeance, { dateStyle: 'medium' }) : '—'}</td>
               <td className="text-right"><Link className="btn-secondary !py-1" to={`/mes-actes/${a.acteId}`}>Voir le trajet</Link></td></tr>))}</tbody></table></div>
           <Pagination className="mt-3" total={d.data.total} limit={LIMIT} page={page} onPage={setPage} itemLabel="acte" />
@@ -64,7 +64,7 @@ function Trajet({ acteId }: { acteId: number }) {
   return (
     <div className="space-y-4">
       <div className="text-[12px] text-mute"><Link to="/" className="hover:underline">← Mes actes</Link></div>
-      <PageTitle title={a.titre} sub={<span>Dossier n° {a.numeroSuivi} · {a.direction ?? '—'} · rédigé par <AgentName u={a.redacteur} /> · <StatutBadge statut={a.statut} /> · mes rôles : {t.roles.map((r: any) => r.label).join(', ')}</span>} />
+      <PageTitle title={a.titre} sub={<span>Dossier n° {a.numeroSuivi} · {a.direction ?? '—'} · rédigé par <AgentName u={a.redacteur} /> · <StatutBadge statut={a.statut} signataire={a.signataireNom} /> · mes rôles : {t.roles.map((r: any) => r.label).join(', ')}</span>} />
 
       <section className="card p-4"><h3 className="mb-3">Le circuit qu’a eu ce dossier</h3>
         {!t.circuit.length ? <p className="text-mute">Ce dossier n’est jamais entré en circuit.</p> : (

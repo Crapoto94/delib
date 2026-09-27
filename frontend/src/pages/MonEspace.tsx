@@ -59,7 +59,7 @@ export default function MonEspace() {
         <td className="text-[12px]"><AgentName u={t.acte.redacteur} /></td>
         {showEtape && <td className="text-[12px]">{t.step?.label ?? '—'}</td>}
         <td><SeanceVisee acte={t.acte} /></td>
-        <td><StatutOuEtape statut={t.acte.statut} etape={t.step} /></td>
+            <td><StatutOuEtape statut={t.acte.statut} etape={t.step} signataire={t.acte.signataireNom} /></td>
         <td className="text-[12px]">{t.step?.dueAt ? (t.enRetard ? <Badge tone="ko">En retard · {dt(t.step.dueAt, { dateStyle: 'short' })}</Badge> : dt(t.step.dueAt, { dateStyle: 'medium' })) : '—'}</td>
       </tr>);
   };

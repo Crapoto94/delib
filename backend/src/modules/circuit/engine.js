@@ -644,9 +644,10 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       for (const [d, sv] of h.services) { p.push(d, sv); or.push(`(a.direction_code = $${p.length - 1} AND a.service_code = $${p.length})`); }
       p.push(IN_CIRCUIT, POST_CIRCUIT);
       const poursuite = await db.all(
-        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due, t.code AS type_code, t.libelle AS type_libelle
+        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due, t.code AS type_code, t.libelle AS type_libelle, pe.signataire_nom AS signataire_nom
          FROM actes a LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
          LEFT JOIN ref_items t ON t.id = a.type_id
+         LEFT JOIN parapheur_envois pe ON pe.id = a.parapheur_envoi_id
          WHERE a.organisme_id = $1 AND (${or.join(' OR ')})
            AND ((a.statut = ANY($${p.length - 1}::text[]) AND a.current_step_key IS NOT NULL)
              OR (a.statut = ANY($${p.length}::text[]) AND a.current_step_key IS NULL))
@@ -673,9 +674,10 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
     async enCours(ctx, organismeId) {
       const org = organismeId;
       const rows = await db.all(
-        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due, t.code AS type_code, t.libelle AS type_libelle
+        `SELECT a.*, i.label AS cur_label, i.step_key AS cur_key, i.holders AS cur_holders, i.due_at AS cur_due, t.code AS type_code, t.libelle AS type_libelle, pe.signataire_nom AS signataire_nom
          FROM actes a LEFT JOIN step_instances i ON i.acte_id = a.id AND i.status = 'current'
          LEFT JOIN ref_items t ON t.id = a.type_id
+         LEFT JOIN parapheur_envois pe ON pe.id = a.parapheur_envoi_id
          WHERE a.organisme_id = $1 AND a.statut = ANY($2::text[])
            -- Un acte signé (arrêté, décision) entre aussitôt dans la bibliothèque : il ne reste ici que
            -- 15 jours, le temps que l'administration le voie passer.
