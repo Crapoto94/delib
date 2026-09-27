@@ -196,8 +196,18 @@ function partageSmbClient({ cible, utilisateur, motDePasse }) {
     enfant.on('error', (e) => { clearTimeout(minuteur); reject(E.upstream(`smbclient indisponible sur ce serveur : ${e.message}`)); });
     enfant.on('close', (code) => { clearTimeout(minuteur); code === 0 ? resolve(sortie) : reject(E.upstream(propre(erreur || sortie) || `Échec de l'accès au partage (code ${code})`)); });
   });
-  /** `mkdir` échoue si le dossier existe déjà : ce n'est pas une erreur pour nous. */
-  const creerDossier = async (d) => { try { if (d) await executer(`mkdir "${d}"`); } catch { /* déjà présent */ } };
+  /**
+   * `mkdir` de smbclient ne crée PAS les dossiers intermédiaires (pas de `mkdir -p`), et il échoue si le dossier
+   * existe déjà : on crée donc chaque segment l'un après l'autre, en ignorant les échecs. C'est ce qui permet de
+   * ranger les fichiers traités dans `_traites/<date>` au premier passage.
+   */
+  const creerDossier = async (d) => {
+    let prefixe = '';
+    for (const segment of String(d || '').split('/').filter(Boolean)) {
+      prefixe = prefixe ? `${prefixe}/${segment}` : segment;
+      try { await executer(`mkdir "${prefixe}"`); } catch { /* déjà présent */ }
+    }
+  };
   const temporaire = (suffixe) => path.join(os.tmpdir(), `vibedelib-smb-${process.pid}-${Date.now()}-${suffixe}`);
   const lireEntrees = async (dossier) => String(await executer(`cd "${dossier}"; ls`)).split(/\r?\n/)
     .map((l) => RE_LS.exec(l)).filter(Boolean)
