@@ -2309,11 +2309,31 @@ toucher au code.
 
 ### Vérification
 
+La découverte qui répond 200 **ne prouve rien** : elle répond aussi quand l'éditeur ne peut rien charger. Les trois
+commandes ci-dessous, dans cet ordre, disent si l'iframe sera blanche ou pas.
+
 ```bash
-curl https://<app>/collabora-delib/hosting/discovery   # le moteur répond
+# 1. la découverte annonce-t-elle le relais, en https, et sous le préfixe ?
+curl -s https://<app>/collabora-delib/hosting/discovery | grep -o 'urlsrc="[^"]*"'
+#    attendu : https://<app>/collabora-delib/browser/…/cool.html?
+#    si c'est http:// ou /browser/… sans le préfixe : service_root ou server_name manque
+
+# 2. la page sert-elle ses ressources sous le préfixe, et en wss ?
+curl -s https://<app>/collabora-delib/browser/x/cool.html | grep -oE 'data-host = "[^"]+"|src="[^"]+"' | head -3
+#    attendu : data-host = "wss://<app>…   et   src="/collabora-delib/browser/…/bundle.js"
+#    si src="/browser/…" : le relais retire le préfixe alors qu'il ne le doit pas
+
+# 3. le moteur sert-il vraiment ce JavaScript ? (c'est lui qui manquait, Symptôme : page blanche)
+curl -so /dev/null -w '%{http_code}\n' https://<app>/collabora-delib/browser/x/bundle.js   # 200
+```
+
+Puis le contrat WOPI, une fois une annexe réellement ouverte :
+
+```bash
 curl -H "X-WOPI-Override: CHECK_FILE_INFO" \
      "https://<app>/api/v1/public/bureau/wopi/<cle>?access_token=<cle>" -i   # 200 + l'état du document
 ```
 
 Une annexe ouverte avec Collabora doit produire, dans les logs du backend, `annexe enregistrée depuis le bureau en ligne`
-avec `moteur: collabora`.
+avec `moteur: collabora`. Le `WOPISrc` contenu dans l'`src` de l'iframe doit être en `https://<app>/api/v1/public/…` :
+s'il contient l'adresse interne du backend, le navigateur ne pourra ni l'appeler ni l'appeler depuis une page https.
