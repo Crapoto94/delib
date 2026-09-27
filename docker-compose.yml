@@ -86,7 +86,9 @@ services:
       # requête, transmis par le frontal via X-Forwarded-Host — voir frontend/nginx.conf.)
       - domain=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public de l'application requis (ex. vibedelib.ivry.local)}$
       # Le TLS est terminé par le proxy en amont : le moteur parle HTTP en interne, et annonce des URL en https.
-      - extra_params1=--o:ssl.enable=false
+      # ATTENTION : la variable est `extra_params` (sans indice). Avec `extra_params1`, le paramètre est IGNORÉ,
+      # Collabora reste en HTTPS et le frontal obtient « upstream prematurely closed connection » (502).
+      - extra_params=--o:ssl.enable=false
       - username=${COLLABORA_ADMIN_USER:-admin}
       - password=${COLLABORA_ADMIN_PASSWORD:?mot de passe d'administration Collabora requis}
       - TZ=Europe/Paris

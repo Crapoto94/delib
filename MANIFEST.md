@@ -2277,7 +2277,10 @@ Quatre points spécifiques, tous dans le compose ou le frontal :
 2. **`domain=${BUREAU_HOTE_PUBLIQUE}$`** : Collabora n'accepte que les hôtes autorisés, et le sien est le nôtre
    (le navigateur passe par le frontal).
 3. **`cap_add: MKNOD`** est requis par Collabora.
-4. `extra_params1=--o:ssl.enable=false` : le TLS est terminé en amont.
+4. **`extra_params=--o:ssl.enable=false`** : le TLS est terminé en amont, le moteur parle donc HTTP en interne.
+   **La variable n'a pas d'indice** : écrite `extra_params1`, elle est silencieusement ignorée, Collabora reste en
+   HTTPS et le frontal répond `502 upstream prematurely closed connection`. C'est le piège de ce déploiement — la
+   ligne de log qui tranche est `SSL support: SSL is enabled`.
 
 **Licence — à trancher avant un usage réel** : l'image `collabora/code` est l'édition de **développement** (gratuite pour
 l'évaluation) ; un usage en production suppose un **abonnement Collabora**, et les connexions simultanées y sont
