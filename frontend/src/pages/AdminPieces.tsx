@@ -52,7 +52,7 @@ export default function AdminPieces() {
         <h3 className="mb-1">Édition en ligne des pièces jointes</h3>
         {bureau?.enabled ? (
           <>
-            <p className="mb-4 text-[13px] text-mute">Un agent peut ouvrir une annexe Word ou Excel directement dans le navigateur, sans Word sur son poste, et chaque enregistrement devient une nouvelle version de la pièce. Formats acceptés par le serveur de documents : {(bureau.formats || []).join(', ')}.</p>
+            <p className="mb-4 text-[13px] text-mute">Un agent peut ouvrir une annexe Word, Excel ou présentation directement dans le navigateur, sans Word sur son poste, et chaque enregistrement devient une nouvelle version de la pièce. Formats acceptés par le serveur de documents : {(bureau.formats || []).join(', ')}.</p>
             <label className="flex items-start gap-3">
               <input type="checkbox" className="mt-1" checked={bureauOn} onChange={(e) => basculerBureau(e.target.checked)} />
               <span>Autoriser l'édition en ligne pour cet organisme{!bureauOn && <em className="block text-[12px] text-mute">Les agents continueront de déposer leurs fichiers ; rien n'est perdu à la désactivation.</em>}</span>

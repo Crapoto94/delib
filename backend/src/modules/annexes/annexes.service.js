@@ -1,7 +1,7 @@
 /**
- * Annexes (section 13) : PDF, Word ou Excel (Word/Excel convertis en PDF), contrôlées (signature du fichier,
- * sans contenu actif pour un PDF), empreinte SHA-256, versionnées (même nom = version suivante, l'ancienne reste
- * consultable), ordonnables, avec drapeaux de communication, de publication et de transmission.
+ * Annexes (section 13) : PDF, Word, Excel ou présentation (les formats Office convertis en PDF), contrôlées
+ * (signature du fichier, sans contenu actif pour un PDF), empreinte SHA-256, versionnées (même nom = version suivante,
+ * l'ancienne reste consultable), ordonnables, avec drapeaux de communication, de publication et de transmission.
  */
 const { E } = require('../../shared/errors');
 const { inspectPdf } = require('../../shared/infra');
@@ -13,6 +13,10 @@ const MIMES = {
   doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   odt: 'application/vnd.oasis.opendocument.text', ods: 'application/vnd.oasis.opendocument.spreadsheet',
+  // Présentations : le serveur de documents les édite comme les autres (type « slide ») et le convertisseur les rend
+  // en PDF (LibreOffice Impress côté repli). Le dossier assemble des PDF : le rendu produit ici est donc le même.
+  ppt: 'application/vnd.ms-powerpoint', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  odp: 'application/vnd.oasis.opendocument.presentation',
 };
 const extOf = (name) => String(name || '').split('.').pop().toLowerCase();
 const startsWith = (buf, magic) => magic.every((b, i) => buf[i] === b);
@@ -42,7 +46,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bure
       const name = cleanName(file.originalname || 'annexe.pdf');
       const ext = extOf(name);
       const mime = MIMES[ext];
-      if (!mime) throw E.badRequest(`Type de fichier non accepté (.${ext}) : PDF, Word (.docx, .doc), Excel (.xlsx, .xls), OpenDocument (.odt, .ods)`);
+      if (!mime) throw E.badRequest(`Type de fichier non accepté (.${ext}) : PDF, Word (.docx, .doc), Excel (.xlsx, .xls), OpenDocument (.odt, .ods) ou présentation (.pptx, .ppt, .odp)`);
       let pages = null;
       if (ext === 'pdf') pages = (await inspectPdf(file.buffer)).pages;
       else if (!(startsWith(file.buffer, ZIP) || startsWith(file.buffer, OLE))) throw E.badRequest('Le contenu du fichier ne correspond pas à son extension');

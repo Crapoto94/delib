@@ -23,7 +23,7 @@ module.exports = ({ makeRouter, bureau }) => {
 
   const r = makeRouter('/api/v1/organismes/:orgId/actes/:id/annexes');
   r.post('/:annexeId/ouvrir', {
-    summary: 'Ouvre une annexe Word/Excel dans le navigateur', tags: T, org: true, params: PA,
+    summary: 'Ouvre une annexe Word, Excel ou présentation dans le navigateur', tags: T, org: true, params: PA,
     description: "Renvoie la configuration d'éditeur (`sdk` + `config`). Le moteur de documents enregistre ensuite par "
       + "son propre rappel : chaque sauvegarde crée une version, l'ancienne reste consultable, le PDF est régénéré et la "
       + "recherche est réindexée. Une annexe figée (acte transmis, signé) ou un PDF ne sont pas ouvrables.",

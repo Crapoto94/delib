@@ -2,8 +2,9 @@
 FROM node:22-alpine
 ENV NODE_ENV=production
 # LibreOffice : conversion des documents Office en PDF et des gabarits Word .docx. Writer pour le texte, Calc pour les
-# classeurs .xlsx (Writer seul ne sait pas les convertir) : c'est le repli local quand le bureau en ligne est absent.
-RUN apk add --no-cache libreoffice-writer libreoffice-calc ttf-dejavu fontconfig
+# classeurs (.xlsx) et Impress pour les présentations (.pptx) — chacun ne sait convertir que sa famille : c'est le repli
+# local quand le bureau en ligne est absent.
+RUN apk add --no-cache libreoffice-writer libreoffice-calc libreoffice-impress ttf-dejavu fontconfig
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev

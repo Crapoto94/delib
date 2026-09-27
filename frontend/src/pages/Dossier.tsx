@@ -373,8 +373,8 @@ function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toas
           <div className="mb-2 cursor-pointer rounded-lg border-2 border-dashed border-action/30 bg-soft p-6 text-center" onClick={() => input.current?.click()}
             onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) upload(f); }}>
             {busy ? <Spinner /> : <Upload className="mx-auto h-6 w-6 text-action" />}
-            <div className="mt-1 font-semibold">Glissez votre fichier ici ou cliquez pour choisir</div><div className="text-[12px] text-mute">PDF, Word ou Excel (annexes, plans, devis…) — convertis en PDF à la validation finale · {tailleMaxMo} Mo au plus</div>
-            <input ref={input} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
+            <div className="mt-1 font-semibold">Glissez votre fichier ici ou cliquez pour choisir</div><div className="text-[12px] text-mute">PDF, Word, Excel ou présentation (annexes, plans, devis…) — convertis en PDF à la validation finale · {tailleMaxMo} Mo au plus</div>
+            <input ref={input} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.ppt,.pptx,.odp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
           </div>
           <label className="mb-4 flex items-center justify-center gap-2 text-[12px] text-mute"><input type="checkbox" checked={comm} onChange={(e) => setComm(e.target.checked)} /> Communicable (visible dans la bibliothèque et par les élus)</label>
         </>)}

@@ -15,9 +15,10 @@ export const VERSION = '0.48.0';
 
 export const VERSIONS: Version[] = [
   {
-    version: '0.48.0', type: 'minor', titre: 'Bureau en ligne : éditer une annexe Word ou Excel dans le navigateur',
+    version: '0.48.0', type: 'minor', titre: 'Bureau en ligne : éditer une annexe Word, Excel ou présentation dans le navigateur',
     items: [
-      "Bouton Modifier sur une annexe Word ou Excel : le document s'ouvre dans le navigateur, sans Word sur le poste, sans plugin ni macro.",
+      "Bouton Modifier sur une annexe Word, Excel ou présentation : le document s'ouvre dans le navigateur, sans Word sur le poste, sans plugin ni macro.",
+      "Les annexes acceptent désormais aussi les présentations (.pptx, .ppt, .odp), converties en PDF comme les autres.",
       "Chaque enregistrement remplace l'annexe en passant par le circuit habituel : nouvelle version, PDF régénéré, audit et historique. Le gel après transmission reste respecté.",
       "Un serveur de documents unique, déployé côté serveur, assure le rendu et la conversion en PDF : ce qu'on lit à l'écran et ce qu'on imprime ne peuvent plus diverger.",
       "Sans moteur déployé, le bouton n'apparaît pas et l'application fonctionne exactement comme avant (dépôt manuel des annexes).",
