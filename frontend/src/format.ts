@@ -10,7 +10,7 @@ export const STATUTS: Record<string, { label: string; tone: 'gray' | 'blue' | 'o
   retire: { label: 'Retiré', tone: 'gray' }, ajourne: { label: 'Ajourné', tone: 'warn' }, abandonne: { label: 'Abandonné', tone: 'gray' }, archive: { label: 'Archivé', tone: 'gray' },
   texte_definitif_pret: { label: 'Texte définitif prêt', tone: 'ok' }, pret_a_transmettre: { label: 'Prêt à transmettre', tone: 'ok' }, transmis: { label: 'Transmis', tone: 'blue' },
   ar_recu: { label: 'AR reçu', tone: 'ok' }, publie: { label: 'Publié', tone: 'ok' }, executoire: { label: 'Exécutoire', tone: 'ok' },
-  a_signer: { label: 'À signer (maire)', tone: 'warn' }, signe: { label: 'Signé', tone: 'ok' }, signature_refusee: { label: 'Signature refusée', tone: 'ko' },
+  a_signer: { label: 'À signer (signataire)', tone: 'warn' }, signe: { label: 'Signé', tone: 'ok' }, signature_refusee: { label: 'Signature refusée', tone: 'ko' },
 };
 
 /** Types d'acte : libellé et couleur de pastille (repli quand le référentiel ne les fournit pas). */
