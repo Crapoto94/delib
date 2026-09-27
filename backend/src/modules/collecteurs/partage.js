@@ -6,7 +6,9 @@
  * (profondeur 1), lire un fichier (base64 sur la sortie standard), déplacer, copier et supprimer.
  */
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { E } = require('../../shared/errors');
 
@@ -162,15 +164,107 @@ function partageSmb({ cible, utilisateur, motDePasse }) {
   };
 }
 
+/**
+ * Même partage, mais vu depuis le serveur d'exploitation **Linux** : `smbclient` (Samba) remplace PowerShell.
+ *   - le mot de passe passe par la variable d'environnement `PASSWD`, que smbclient lit nativement : il n'apparaît
+ *     jamais dans la ligne de commande (visible par `ps`) ;
+ *   - les lectures et les écritures passent par des fichiers temporaires locaux : la sortie de smbclient mêle les
+ *     messages de service au contenu, la sortie standard n'est pas fiable pour du binaire ;
+ *   - un échec est un code de retour non nul, le `NT_STATUS_…` étant recopié tel quel pour que l'administrateur
+ *     comprenne (partage inconnu, identifiants refusés, fichier verrouillé…).
+ */
+function decouperUNC(cible) {
+  const p = String(cible).replace(/\//g, '\\').replace(/^\\+/, '').split('\\').map((s) => s.trim()).filter(Boolean);
+  if (p.length < 2) throw E.badRequest('Chemin UNC invalide (attendu : \\\\serveur\\partage\\dossier)');
+  return { share: `//${p[0]}/${p[1]}`, base: p.slice(2).join('/') };
+}
+
+/** Ligne de `smbclient ls` : «   nom                        A    1234  Mon Sep 27 06:00:00 2026 ». */
+const RE_LS = /^\s+(.+?)\s{2,}([A-Z]{1,6})\s+(\d+)\s+(.*?)\s*$/;
+
+function partageSmbClient({ cible, utilisateur, motDePasse }) {
+  const { share, base } = decouperUNC(cible);
+  const chemin = (sous) => [base, ...(sous ? String(sous).replace(/\//g, '\\').split('\\').filter(Boolean) : [])].filter(Boolean).join('/');
+  const env = { ...process.env, PASSWD: motDePasse || '' };
+  const propre = (t) => (motDePasse ? String(t).split(motDePasse).join('***') : String(t)).trim().slice(0, 600);
+
+  const executer = (commandes, { timeoutMs = 120000 } = {}) => new Promise((resolve, reject) => {
+    const enfant = spawn('smbclient', [share, '-U', utilisateur || 'guest', '-c', commandes], { env, windowsHide: true });
+    let sortie = ''; let erreur = '';
+    const minuteur = setTimeout(() => { enfant.kill(); reject(E.upstream('Le partage réseau ne répond pas (délai dépassé)')); }, timeoutMs);
+    enfant.stdout.on('data', (d) => { sortie += d; }); enfant.stderr.on('data', (d) => { erreur += d; });
+    enfant.on('error', (e) => { clearTimeout(minuteur); reject(E.upstream(`smbclient indisponible sur ce serveur : ${e.message}`)); });
+    enfant.on('close', (code) => { clearTimeout(minuteur); code === 0 ? resolve(sortie) : reject(E.upstream(propre(erreur || sortie) || `Échec de l'accès au partage (code ${code})`)); });
+  });
+  /** `mkdir` échoue si le dossier existe déjà : ce n'est pas une erreur pour nous. */
+  const creerDossier = async (d) => { try { if (d) await executer(`mkdir "${d}"`); } catch { /* déjà présent */ } };
+  const temporaire = (suffixe) => path.join(os.tmpdir(), `vibedelib-smb-${process.pid}-${Date.now()}-${suffixe}`);
+  const lireEntrees = async (dossier) => String(await executer(`cd "${dossier}"; ls`)).split(/\r?\n/)
+    .map((l) => RE_LS.exec(l)).filter(Boolean)
+    .map((m) => ({ nom: m[1].trim(), dossier: m[2].includes('D'), taille: Number(m[3]) || 0, brut: m[4] }))
+    .filter((e) => e.nom !== '.' && e.nom !== '..' && !e.nom.startsWith('.'));
+
+  return {
+    type: 'smb',
+    async tester() {
+      await creerDossier(base);
+      const f = temporaire('test');
+      await fs.promises.writeFile(f, 'ok');
+      const nom = `.vibedelib-test-${crypto.randomBytes(4).toString('hex')}`;
+      try { await executer(`cd "${base}"; put "${f}" "${nom}"; del "${nom}"`); return { ok: true, message: `Partage accessible : ${cible}` }; }
+      finally { await fs.promises.rm(f, { force: true }); }
+    },
+    async listerSousDossiers() { return (await lireEntrees(base)).filter((e) => e.dossier).map((e) => e.nom).sort(); },
+    async listerFichiers(sous) {
+      return (await lireEntrees(chemin(sous))).filter((e) => !e.dossier).map((e) => {
+        const t = Date.parse(e.brut);
+        return { nom: e.nom, taille: e.taille, modifie: Number.isNaN(t) ? null : new Date(t).toISOString() };
+      }).sort((a, b) => a.nom.localeCompare(b.nom));
+    },
+    async lire(sous, nom) {
+      const f = temporaire('get');
+      try { await executer(`cd "${chemin(sous)}"; get "${nom}" "${f}"`); return await fs.promises.readFile(f); }
+      finally { await fs.promises.rm(f, { force: true }); }
+    },
+    async deplace(sous, nom, destSous) {
+      const dest = chemin(destSous);
+      await creerDossier(dest);
+      await executer(`cd "${chemin(sous)}"; rename "${nom}" "${dest}/${nom}"`);
+    },
+    async copier(sous, nom, destSous) {
+      const f = temporaire('cp');
+      const dest = chemin(destSous);
+      try {
+        await creerDossier(dest);
+        await executer(`cd "${chemin(sous)}"; get "${nom}" "${f}"`);
+        await executer(`cd "${dest}"; put "${f}" "${nom}"`);
+      } finally { await fs.promises.rm(f, { force: true }); }
+    },
+    async supprimer(sous, nom) { await executer(`cd "${chemin(sous)}"; del "${nom}"`); },
+    async ecrire(sous, nom, buffer) {
+      const f = temporaire('put');
+      const dest = chemin(sous);
+      try {
+        await fs.promises.writeFile(f, buffer);
+        await creerDossier(dest);
+        await executer(`cd "${dest}"; put "${f}" "${nom}"`);
+      } finally { await fs.promises.rm(f, { force: true }); }
+    },
+  };
+}
+
 /** Choisit un transport d'après la cible : UNC → partage Windows ; sinon dossier tel quel. */
 function choisirPartage({ cible, utilisateur, motDePasse }) {
   const c = String(cible || '').trim();
   if (!c) throw E.conflict('Aucun dossier source configuré');
   if (/^\\\\[^\\]+\\[^\\]+/.test(c)) {
-    if (process.platform !== 'win32') throw E.conflict('Un chemin réseau UNC n\'est pris en charge que sous Windows : montez le partage et indiquez le dossier monté');
-    return partageSmb({ cible: c, utilisateur, motDePasse });
+    // Partage réseau. Deux mises en œuvre, une par système du serveur d'exploitation :
+    //   - Windows : PowerShell (script encodé, identifiants par variables d'environnement) ;
+    //   - Linux (le serveur applicatif, en Docker) : `smbclient` (Samba), qui parle SMB2/3 nativement.
+    // Le champ « chemin UNC » de l'écran Collecteurs vaut donc dans les deux cas, sans montage préalable.
+    return process.platform === 'win32' ? partageSmb({ cible: c, utilisateur, motDePasse }) : partageSmbClient({ cible: c, utilisateur, motDePasse });
   }
   return partageLocal(c);
 }
 
-module.exports = { choisirPartage, partageLocal, partageSmb };
+module.exports = { choisirPartage, partageLocal, partageSmb, partageSmbClient, decouperUNC };

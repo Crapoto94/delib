@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { api, org as orgPath } from '../api';
 import { AgentName } from '../AgentName';
 import { useAuth } from '../auth';
-import { dt } from '../format';
+import { dt, TYPE_ACTES } from '../format';
+import { Select } from '../Select';
 import { Badge, Empty, ErrorBox, Loading, PageTitle, StatutOuEtape, TypeBadge, UrgentBadge, useLoad } from '../ui';
 import { SeanceVisee } from '../SeanceVisee';
 
@@ -13,12 +14,14 @@ const ORDRE_ETAPES = ['Rédaction', 'À corriger'];
 /**
  * Tous les actes (administrateur / SCC) : les actes qui ne sont pas encore passés au conseil,
  * séparés par une rupture — soit selon l'étape du circuit, soit selon la date du conseil pressenti.
+ * Un filtre par type d'acte (délibération, vœu, décision, arrêté) vient en tête, pour les collecteurs d'arrêtés.
  */
 export default function TousLesActes() {
   const { org } = useAuth(); const o = org!.id;
   const [vue, setVue] = useState<Vue>('etape');
+  const [type, setType] = useState('');
   const d = useLoad(async () => (await api.get(orgPath(o, '/circuit/en-cours'))).data.items as any[], [o]);
-  const items = d.data ?? [];
+  const items = (d.data ?? []).filter((t) => !type || t.acte.typeCode === type);
   const retard = items.filter((t) => t.enRetard).length;
 
   // Rupture : par étape du circuit, ou par date de conseil pressenti.
@@ -58,6 +61,11 @@ export default function TousLesActes() {
     <div className="space-y-6">
       <PageTitle title="Tous les actes" sub="Les actes qui ne sont pas encore passés au conseil." actions={
         <>
+          {/* Filtre par type : le premier besoin exprimé est « les arrêtés », mais il vaut pour les quatre types. */}
+          <Select className="input !w-auto" value={type} onChange={(e) => setType(e.target.value)} aria-label="Filtrer par type d'acte">
+            <option value="">Tous les types d'acte</option>
+            {Object.entries(TYPE_ACTES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </Select>
           <div role="tablist" className="flex rounded bg-surface p-1 shadow-card">
             {([['etape', 'Par étape du circuit'], ['conseil', 'Par date du conseil']] as [Vue, string][]).map(([k, l]) => (
               <button key={k} role="tab" aria-selected={vue === k} onClick={() => setVue(k)} className={`rounded px-3 py-2 text-[13px] font-semibold ${vue === k ? 'bg-primary text-white' : 'text-slate-700'}`}>{l}</button>
@@ -66,7 +74,9 @@ export default function TousLesActes() {
           {retard > 0 && <Badge tone="ko">{retard} en retard</Badge>}
         </>} />
 
-      {d.loading && !d.data ? <Loading /> : d.error ? <ErrorBox msg={d.error} /> : !items.length ? <div className="card"><Empty>Aucun acte en cours.</Empty></div> : (
+      {d.loading && !d.data ? <Loading /> : d.error ? <ErrorBox msg={d.error} /> : !items.length ? (
+        <div className="card"><Empty>{type ? 'Aucun acte de ce type en cours.' : 'Aucun acte en cours.'}</Empty></div>
+      ) : (
         liste.map((g) => (
           <section key={g.cle} aria-label={g.libelle} className="card">
             <div className="flex items-center gap-2 border-b border-line px-5 py-3">

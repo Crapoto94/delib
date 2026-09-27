@@ -104,7 +104,13 @@ services:
       #                               requête qui n'est pas sous /collabora-delib.
       # ATTENTION : la syntaxe est `net.service_root` (point). Avec `net/service_root` ou `extra_params1`, l'option est
       # ignorée : l'éditeur s'ouvre, puis plus aucune ressource (JS, CSS, WebSocket) ne se charge.
-      - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:server_name=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public requis} --o:net.service_root=/collabora-delib
+      #
+      # Sauvegarde automatique : par défaut, Collabora n'enregistre qu'après 5 minutes de modification ET
+      # `always_save_on_exit` est FAUX — un agent qui ferme son onglet sans cliquer sur « Sauvegarder et fermer »
+      # perdait donc ses dernières frappes (il devait enregistrer à la main). On abaisse le délai et on force
+      # l'enregistrement à la sortie du dernier éditeur. Chaque enregistrement crée une version : 2 minutes est un
+      # compromis entre « ne rien perdre » et « ne pas noyer l'historique ».
+      - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:server_name=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public requis} --o:net.service_root=/collabora-delib --o:per_document.autosave_duration_secs=${BUREAU_AUTOSAVE_SEC:120} --o:per_document.always_save_on_exit=true
       - username=${COLLABORA_ADMIN_USER:-admin}
       - password=${COLLABORA_ADMIN_PASSWORD:?mot de passe d'administration Collabora requis}
       - TZ=Europe/Paris
@@ -133,7 +139,7 @@ services:
       # server_name = l'origine du navigateur de développement (c'est elle que le moteur compare au WebSocket) ;
       # domain = en plus, l'hôte du WOPISrc que ce moteur de développement va appeler (le poste, sur le réseau).
       - domain=${BUREAU_HOTE_PUBLIQUE_DEV:-localhost:5160},${BUREAU_HOTE_WOPI_DEV:-127.0.0.1}
-      - extra_params=--o:ssl.enable=false --o:ssl.termination=false --o:server_name=${BUREAU_HOTE_PUBLIQUE_DEV:-localhost:5160} --o:net.service_root=/collabora-delib
+      - extra_params=--o:ssl.enable=false --o:ssl.termination=false --o:server_name=${BUREAU_HOTE_PUBLIQUE_DEV:-localhost:5160} --o:net.service_root=/collabora-delib --o:per_document.autosave_duration_secs=${BUREAU_AUTOSAVE_SEC:120} --o:per_document.always_save_on_exit=true
       - username=${COLLABORA_ADMIN_USER:-admin}
       - password=${COLLABORA_ADMIN_PASSWORD:?mot de passe d'administration Collabora requis}
       - TZ=Europe/Paris

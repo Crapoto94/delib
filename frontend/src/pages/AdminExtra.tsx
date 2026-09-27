@@ -64,7 +64,8 @@ function Fiche({ username, onClose, onChanged }: { username: string; onClose: ()
 export function Utilisateurs() {
   const { org } = useAuth(); const o = org!.id;
   const [q, setQ] = useState(''); const [typed, setTyped] = useState(''); const [open, setOpen] = useState<string | null>(null); const [avecRole, setAvecRole] = useState(false);
-  const res = useLoad(async () => (await api.get(orgPath(o, '/utilisateurs'), { params: { q: q.trim().length >= 2 ? q : undefined, avecRole: avecRole || undefined } })).data.items as any[], [o, q, avecRole]);
+  const [importes, setImportes] = useState(false);
+  const res = useLoad(async () => (await api.get(orgPath(o, '/utilisateurs'), { params: { q: q.trim().length >= 2 ? q : undefined, avecRole: avecRole || undefined, importes: importes || undefined } })).data.items as any[], [o, q, avecRole, importes]);
   useEffect(() => { const t = setTimeout(() => setQ(typed), 350); return () => clearTimeout(t); }, [typed]);
   return (
     <div className="space-y-4">
@@ -72,12 +73,14 @@ export function Utilisateurs() {
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex min-w-[280px] flex-1 items-center rounded border border-slate-300 bg-surface px-3"><Search className="h-4 w-4 text-mute" /><input autoFocus className="w-full bg-transparent px-2 py-3 outline-none" placeholder="Filtrer ou rechercher un utilisateur…" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Rechercher un utilisateur" /></div>
         <label className="flex items-center gap-2"><input type="checkbox" checked={avecRole} onChange={(e) => setAvecRole(e.target.checked)} /> Seulement ceux qui ont un rôle</label>
+        {/* Les noms repris de l'historique AIRS ne sont pas des agents : masqués par défaut, sinon ils noient la liste. */}
+        <label className="flex items-center gap-2"><input type="checkbox" checked={importes} onChange={(e) => setImportes(e.target.checked)} /> Afficher les noms importés (actes antérieurs)</label>
         {res.data && <span className="text-[12px] text-mute">{res.data.length} utilisateur(s)</span>}
       </div>
       <div className="card overflow-x-auto">
         {res.loading && !res.data ? <Loading /> : !res.data?.length ? <Empty>Aucun utilisateur trouvé.</Empty> : (
           <table className="w-full"><thead><tr><th>Agent</th><th>Direction</th><th>Rôles ici</th><th>Dernière connexion</th><th /></tr></thead><tbody>{res.data.map((a: any) => (
-            <tr key={a.username} className="hover:bg-soft"><td><b>{a.displayName}</b><div className="text-[12px] text-mute">{a.username} · {a.email}</div></td><td className="text-mute">{a.direction?.label}{a.poste ? <div className="text-[12px]">{a.poste}</div> : null}</td>
+            <tr key={a.username} className="hover:bg-soft"><td><b>{a.displayName}</b>{a.source === 'airs' && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-amber-400 align-middle" title="Nom repris de l'historique (actes antérieurs) : ce n'est pas un agent actuel" aria-label="Nom importé" />}<div className="text-[12px] text-mute">{a.username} · {a.email}</div></td><td className="text-mute">{a.direction?.label}{a.poste ? <div className="text-[12px]">{a.poste}</div> : null}</td>
               <td>{a.isPlatformAdmin && <Badge tone="warn">plateforme</Badge>} {a.roles.map((r: any) => <Badge key={r.id} tone="blue">{ROLES[r.role]}</Badge>)}{!a.roles.length && !a.isPlatformAdmin && <span className="text-mute">—</span>}</td>
               <td className="text-[12px] text-mute">{a.lastLoginAt ? dt(a.lastLoginAt, { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td>
               <td className="text-right">{a.knownLocally ? <button className="btn-secondary" onClick={() => setOpen(a.username)}>Gérer</button> : <span className="text-[12px] text-mute">Jamais connecté</span>}</td></tr>))}</tbody></table>)}

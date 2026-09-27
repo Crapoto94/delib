@@ -5,8 +5,20 @@
 const { E } = require('../../shared/errors');
 const { requireOrg } = require('../../db/pool');
 
+/**
+ * Nom affiché : prénom (initiale en capitale) puis NOM en capitales. Les sources ne sont pas homogènes — l'annuaire
+ * rend « Marc Chevalier », la reprise AIRS « CHRYSTELLE PETIT » ou « Benjamin Badia » — et l'administration voyait
+ * donc les deux côte à côte. À défaut de prénom/nom (noms importés d'actes anciens), on garde le libellé d'origine.
+ */
+const nomAffiche = (r) => {
+  const p = String(r.prenom || '').trim();
+  const n = String(r.nom || '').trim();
+  if (!p && !n) return r.display_name || r.username;
+  const prenom = p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '';
+  return `${prenom} ${n.toUpperCase()}`.trim();
+};
 const toA = (r) => ({
-  username: r.username, displayName: r.display_name || r.username, email: r.email, matricule: r.matricule,
+  username: r.username, displayName: nomAffiche(r), nom: r.nom, prenom: r.prenom, email: r.email, matricule: r.matricule,
   direction: r.direction_code ? { code: r.direction_code, label: r.direction_label } : null, service: r.service_label ? { code: r.service_code, label: r.service_label } : null,
   poste: r.poste, source: r.source, actif: r.actif, lastLoginAt: r.last_login_at, knownLocally: true,
 });
@@ -16,13 +28,17 @@ const MODES = ['redacteur', 'service', 'direction'];
 function createUsers({ db, audit, dir, organismes, access, log, settings, acl }) {
   const svc = {
     /** Recherche : agents connus localement puis annuaire RH (une panne de l'annuaire n'empêche pas la recherche locale). */
-    async search(ctx, organismeId, q, { avecRole = false, limit = 100, offset = 0 } = {}) {
+    async search(ctx, organismeId, q, { avecRole = false, importes = false, limit = 100, offset = 0 } = {}) {
       const org = requireOrg(organismeId);
       const text = (q || '').trim();
       // sans recherche : la liste des agents connus (déjà connectés), éventuellement ceux qui ont un rôle ici
       const where = [text ? '(username ILIKE $1 OR display_name ILIKE $1 OR email ILIKE $1 OR nom ILIKE $1 OR prenom ILIKE $1)' : 'TRUE'];
       const p = text ? [`%${text.replace(/[%_]/g, '\\$&')}%`] : [];
       if (avecRole) { p.push(org); where.push(`EXISTS (SELECT 1 FROM user_org_roles r WHERE r.username = agent_ref.username AND (r.organisme_id = $${p.length} OR r.organisme_id IS NULL))`); }
+      // Noms créés par la reprise de l'historique AIRS (source « airs ») : ils n'existent que pour rattacher les actes
+      // antérieurs, ce ne sont plus des agents. Ils ne sont plus mêlés à la liste par défaut (`importes = true` pour les
+      // revoir), sinon ils noient les vingt agents réels sous une centaine de noms.
+      if (!importes) where.push("source IS DISTINCT FROM 'airs'");
       p.push(limit, offset);
       const local = (await db.all(`SELECT * FROM agent_ref WHERE ${where.join(' AND ')} ORDER BY display_name NULLS LAST, username LIMIT $${p.length - 1} OFFSET $${p.length}`, p)).map(toA);
       for (const a of local) a.poste = await dir.posteAffiche({ displayName: a.displayName, direction: a.direction?.label, service: a.service?.label, poste: a.poste });

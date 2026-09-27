@@ -5,7 +5,7 @@ const Id = z.coerce.number().int().positive();
 const P = z.object({ orgId: Id });
 const PU = P.extend({ username: z.string().trim().min(1).max(128) });
 const PR = P.extend({ roleId: Id });
-const Q = z.object({ q: z.string().trim().min(2).max(80).optional(), avecRole: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'), limit: z.coerce.number().int().min(1).max(300).default(100), offset: z.coerce.number().int().min(0).default(0) });
+const Q = z.object({ q: z.string().trim().min(2).max(80).optional(), avecRole: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'), importes: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'), limit: z.coerce.number().int().min(1).max(300).default(100), offset: z.coerce.number().int().min(0).default(0) });
 const Grant = z.object({ role: z.enum(ORG_ROLES) });
 const MODES = ['redacteur', 'service', 'direction'];
 const VisUser = z.object({ visibilite: z.enum(MODES).nullable().describe('null : suit le réglage général de l\u2019organisme') });
@@ -17,7 +17,7 @@ module.exports = ({ makeRouter, users }) => {
   const ADMIN = ['org_admin'];
 
   r.get('/', { summary: 'Recherche un agent (nom, identifiant, e-mail) et montre ses rôles', tags: T, org: true, roles: ADMIN, params: P, query: Q,
-    description: "Agents déjà connectés à l'application + annuaire RH. Les rôles renvoyés sont ceux de l'organisme courant." },
+    description: "Agents déjà connectés à l'application + annuaire RH. Les rôles renvoyés sont ceux de l'organisme courant. Les noms repris de l'historique AIRS (source « airs ») sont exclus, sauf `importes=true`." },
   async (req, res) => res.json({ items: await users.search(req.ctx, req.org.id, req.valid.query.q, req.valid.query) }));
 
   r.get('/:username', { summary: "Fiche et accès d'un utilisateur dans l'organisme", tags: T, org: true, roles: ADMIN, params: PU,
