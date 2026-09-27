@@ -114,7 +114,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
     if (config.bureau.collaboraUrlNavigateur) {
       bureauPorts.collabora = createBureauCollabora({
         url: config.bureau.collaboraUrl, urlNavigateur: config.bureau.collaboraUrlNavigateur,
-        publicBaseUrl: config.publicBaseUrl, langue: config.bureau.langue,
+        publicBaseUrl: config.publicBaseUrl, langue: config.bureau.langue, log,
       });
     }
   }

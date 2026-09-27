@@ -86,9 +86,17 @@ services:
       # requête, transmis par le frontal via X-Forwarded-Host — voir frontend/nginx.conf.)
       - domain=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public de l'application requis (ex. vibedelib.ivry.local)}$
       # Le TLS est terminé par le proxy en amont : le moteur parle HTTP en interne, et annonce des URL en https.
-      # ATTENTION : la variable est `extra_params` (sans indice). Avec `extra_params1`, le paramètre est IGNORÉ,
-      # Collabora reste en HTTPS et le frontal obtient « upstream prematurely closed connection » (502).
-      - extra_params=--o:ssl.enable=false
+      #   --o:ssl.enable=false        le moteur ne sert pas de TLS lui-même
+      #   --o:ssl.termination=true    « un reverse proxy termine le TLS » : les URL annoncées deviennent https/wss
+      #   --o:server_name=…          le nom d'hôte PUBLIC, sinon les URL retombent sur l'hôte du conteneur
+      #   --o:net.service_root=…     DECISIF : Collabora ne travaille PAS sous un préfixe de chemin par défaut, il
+      #                               annonce /browser/… à la racine. Cette option fait announced /collabora-delib/browser/…
+      #                               pour les pages, le WebSocket et la découverte. Elle oblige en revanche le relais à
+      #                               NE PAS retirer le préfixe (contrairement à /office-delib/) et Collabora à refuser une
+      #                               requête qui n'est pas sous /collabora-delib.
+      # ATTENTION : la syntaxe est `net.service_root` (point). Avec `net/service_root` ou `extra_params1`, l'option est
+      # ignorée : l'éditeur s'ouvre, puis plus aucune ressource (JS, CSS, WebSocket) ne se charge.
+      - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:server_name=${BUREAU_HOTE_PUBLIQUE:?nom d'hôte public requis} --o:net.service_root=/collabora-delib
       - username=${COLLABORA_ADMIN_USER:-admin}
       - password=${COLLABORA_ADMIN_PASSWORD:?mot de passe d'administration Collabora requis}
       - TZ=Europe/Paris

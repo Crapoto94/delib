@@ -2268,19 +2268,39 @@ docker compose --profile bureau up -d
 docker compose logs -f collabora                        # premier démarrage : quelques minutes
 ```
 
-Quatre points spécifiques, tous dans le compose ou le frontal :
+Quatre points spécifiques, tous dans le compose ou le frontal — **aucun n'est déductible du reste**, et les trois
+premiers ont été trouvés en production, un par un :
 
-1. **Le relais nginx duplique celui d'ONLYOFFICE`** (`/collabora-delib/`, `X-Forwarded-Proto https`,
-   `X-Forwarded-Host $host/collabora-delib`, `X-Forwarded-Prefix ""`, `rewrite` du préfixe) : sans ces en-têtes
-   Collabora construit ses URL en `http://…` et l'iframe est bloquée en page HTTPS. Collabora n'a pas d'équivalent de
-   `alias_name1` chez ONLYOFFICE : le préfixe `/collabora-delib` est celui de la requête, que le frontal transmet.
-2. **`domain=${BUREAU_HOTE_PUBLIQUE}$`** : Collabora n'accepte que les hôtes autorisés, et le sien est le nôtre
-   (le navigateur passe par le frontal).
-3. **`cap_add: MKNOD`** est requis par Collabora.
-4. **`extra_params=--o:ssl.enable=false`** : le TLS est terminé en amont, le moteur parle donc HTTP en interne.
-   **La variable n'a pas d'indice** : écrite `extra_params1`, elle est silencieusement ignorée, Collabora reste en
-   HTTPS et le frontal répond `502 upstream prematurely closed connection`. C'est le piège de ce déploiement — la
-   ligne de log qui tranche est `SSL support: SSL is enabled`.
+1. **Collabora ne travaille pas sous un préfixe de chemin tout seul.** Par défaut il annonce `/browser/…`,
+   `/cool/…` et `ws://<hôte>` **à la racine** : servies sur le même nom d'hôte que l'application, elles partent dans
+   l'interface et l'éditeur reste blanc (alors même que la découverte répond 200). L'option qui change tout est
+   **`--o:net.service_root=/collabora-delib`** (« Prefix the base URL for all the pages, websockets, etc. with this
+   path », `net/service_root` dans `coolwsd.xml`). Deux pièges autour :
+   - la syntaxe de l'override est **le point** (`net.service_root`), pas la barre oblique : `net/service_root` est
+     accepté sans erreur et **ignoré** ;
+   - une fois l'option appliquée, Collabora **refuse toute requête qui n'est pas sous le préfixe** (`Bad request`).
+     Le relais nginx doit donc **transmettre `/collabora-delib/…` tel quel** — le `rewrite … break;` du bloc
+     `/office-delib/` (nécessaire à ONLYOFFICE, qui ajoute le préfixe deux fois) est ici exactement l'inverse de ce
+     qu'il faut.
+   La preuve du réglage est dans la page servie : `src="/collabora-delib/browser/…/bundle.js"` et non `"/browser/…"`.
+2. **Le schéma et l'hôte des URL annoncées** viennent de deux options, pas des en-têtes `X-Forwarded-*` :
+   `--o:ssl.termination=true` (« un reverse proxy termine le TLS » → `https://` et `wss://`) et
+   `--o:server_name=<hôte public>`. Sans la seconde, les URL retombent sur le nom interne du conteneur. Dans
+   `cool.html`, c'est `data-host = "wss://<hôte>"` qui le montre.
+3. **`extra_params` n'a pas d'indice.** Écrit `extra_params1`, le paramètre est silencieusement ignoré : le moteur
+   reste en HTTPS, le frontal répond `502 upstream prematurely closed connection` et la log dit
+   `SSL support: SSL is enabled`. Le TLS interne est coupé par `--o:ssl.enable=false`.
+4. **`domain=${BUREAU_HOTE_PUBLIQUE}$`** : Collabora n'accepte que les hôtes autorisés, et le sien est le nôtre
+   (le navigateur passe par le frontal). `cap_add: MKNOD` est également requis.
+
+La ligne complète, telle qu'elle est en production :
+
+```yaml
+- extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:server_name=${BUREAU_HOTE_PUBLIQUE} --o:net.service_root=/collabora-delib
+```
+
+Le `healthcheck` de l'image (`coolwsd --probe`) ne vérifie que le binaire, pas l'écoute réseau : un conteneur peut être
+« healthy » et répondre 502. C'est pourquoi la vérification se fait par le relais, pas par l'état du conteneur.
 
 **Licence — à trancher avant un usage réel** : l'image `collabora/code` est l'édition de **développement** (gratuite pour
 l'évaluation) ; un usage en production suppose un **abonnement Collabora**, et les connexions simultanées y sont

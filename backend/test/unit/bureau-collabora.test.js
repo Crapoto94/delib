@@ -40,14 +40,16 @@ describe('bureau en ligne — adaptateur Collabora (WOPI)', () => {
 
   it('donne au navigateur une iframe Collabora pointant sur notre hôte WOPI', () => {
     const p = createBureauCollabora(base());
-    const o = p.open({ cle: CLE, nom: 'note.docx', urlRappel: 'https://delib.ville.fr', user: { username: 'jd' } });
+    const o = p.open({ cle: CLE, nom: 'note.docx', urlRappel: 'http://10.0.0.4:3021', user: { username: 'jd' } });
     expect(o.src.startsWith('/collabora-delib/browser/')).toBe(true);
-    // Le WOPISrc est l'adresse à laquelle LE MOTEUR appellera : celle du backend, jeton compris.
+    // Le WOPISrc est appelé par le NAVIGATEUR : c'est l'adresse publique du backend, jamais son adresse interne
+    // (BUREAU_URL_RAPPEL) que le navigateur ne peut pas joindre et que le mélange http/https bloquerait.
     expect(o.src).toContain(encodeURIComponent(`https://delib.ville.fr/api/v1/public/bureau/wopi/${CLE}`));
+    expect(decodeURIComponent(o.src)).not.toContain('10.0.0.4');
     expect(decodeURIComponent(o.src)).toContain(`access_token=${CLE}`);
     expect(decodeURIComponent(o.src)).toContain('lang=fr-FR');
-    // Sans adresse de rappel, pas d'iframe : on ne veut jamais d'éditeur qui ne pourra pas nous rapporter le document.
-    expect(p.open({ cle: CLE, nom: 'note.docx', urlRappel: null })).toBeNull();
+    // Sans adresse publique, pas d'iframe : on ne veut jamais d'éditeur qui ne pourra pas nous rapporter le document.
+    expect(createBureauCollabora({ ...base(), publicBaseUrl: null }).open({ cle: CLE, nom: 'note.docx' })).toBeNull();
   });
 
   it('n’a ni rappel, ni relecture, ni conversion : ces trois là n’existent pas chez Collabora', async () => {
