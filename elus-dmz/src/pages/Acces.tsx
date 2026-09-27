@@ -15,6 +15,8 @@ const Cadre = ({ titre, children }: { titre: string; children: ReactNode }) => {
         <div className="mb-5 text-center"><OrgLogo className="mx-auto mb-2 h-12" /><div className="text-[13px] font-semibold uppercase tracking-widest text-mute">Espace élus</div><h1 className="mt-1 text-[24px]">{titre}</h1></div>
         <EtatBackend />
         {children}
+        {/* utile pour vérifier que la DMZ et le LAN servent bien la même version (deux chemins de déploiement distincts) */}
+        <p className="mt-4 text-center text-[11px] text-mute">v{__APP_VERSION__} · build {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</p>
       </div>
     </div>
   );
