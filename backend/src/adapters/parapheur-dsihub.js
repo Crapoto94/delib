@@ -113,7 +113,13 @@ function createDsihubParapheur({ tls, http: injected } = {}) {
       const documents = Array.isArray(brut.documents) ? brut.documents.map((d) => ({
         id: d.id, nom: d.original_name || d.nom || null, signe: !!(d.has_signed || d.signed),
       })) : [];
-      return { statut: map[st] || 'en_cours', signeAt: brut.signeAt || brut.date_signature || null, motif: brut.motif || brut.reason || null, documents, brut,
+      // Signataires : qui a signé, et **par délégation de qui** le cas échéant. Le Hub met `signed_by_name` à null
+      // quand le signataire a signé lui-même ; sinon c'est le nom du délégué (un agent ou l'adjoint désigné).
+      const signataires = Array.isArray(brut.signataires) ? brut.signataires.map((s) => ({
+        nom: s.nom || null, email: s.email || null, statut: s.status || null, mode: s.signature_mode || null,
+        signeAt: s.signed_at || null, signePar: s.signed_by_name || null, motif: s.rejection_comment || null,
+      })) : [];
+      return { statut: map[st] || 'en_cours', signeAt: brut.signeAt || brut.date_signature || null, motif: brut.motif || brut.reason || null, documents, signataires, brut,
         _echange: { methode: 'GET', url: `/api/parapheur/${ref}`, httpStatus: r.status, reponse: brut } };
     },
 

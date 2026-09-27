@@ -128,8 +128,8 @@ function Page({ pdf, num, anns, mode, couleur, selected, onCreate, onSelect, onT
 function PartageModal({ seanceId, docKey, ann, onClose, onDone }: { seanceId: number; docKey: string; ann: Ann | null; onClose: () => void; onDone: () => void }) {
   const [portee, setPortee] = useState<'annotation' | 'document' | 'seance'>(ann ? 'annotation' : 'document');
   const [mode, setMode] = useState<'groupe' | 'elus' | 'revoquer'>('groupe');
-  const [collegues, setCollegues] = useState<any[]>([]); const [avec, setAvec] = useState<number[]>([]); const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
-  useEffect(() => { if (mode === 'elus' && !collegues.length) api.get('/elus/collegues').then((r) => setCollegues(r.data.items)).catch(() => undefined); }, [mode, collegues.length]);
+  const [collegues, setCollegues] = useState<any[] | null>(null); const [avec, setAvec] = useState<number[]>([]); const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (mode === 'elus' && collegues === null) api.get('/elus/collegues').then((r) => setCollegues(r.data.items)).catch((e) => { setCollegues([]); setErr(errMsg(e)); }); }, [mode, collegues]);
   const valider = async () => {
     setBusy(true); setErr(null);
     try {
@@ -154,7 +154,13 @@ function PartageModal({ seanceId, docKey, ann, onClose, onDone }: { seanceId: nu
           <label className="flex items-center gap-2"><input type="radio" checked={mode === 'elus'} onChange={() => setMode('elus')} /> Des élus que je choisis…</label>
           <label className="flex items-center gap-2"><input type="radio" checked={mode === 'revoquer'} onChange={() => setMode('revoquer')} /> Personne : <b>retirer tous les partages</b></label>
         </fieldset>
-        {mode === 'elus' && <div className="mb-3 max-h-40 overflow-y-auto rounded border border-line p-2 text-[13px]">{collegues.map((c) => <label key={c.id} className="flex items-center gap-2 py-1"><input type="checkbox" checked={avec.includes(c.id)} onChange={(e) => setAvec(e.target.checked ? [...avec, c.id] : avec.filter((x) => x !== c.id))} />{c.nom}{c.groupe && <span className="text-mute"> · {c.groupe}</span>}</label>)}</div>}
+        {mode === 'elus' && (
+          <div className="mb-3 max-h-40 overflow-y-auto rounded border border-line p-2 text-[13px]">
+            {collegues === null ? <p className="text-mute">Chargement…</p>
+              : collegues.length === 0 ? <p className="text-mute">Aucun autre élu actif dans votre collectivité.</p>
+              : collegues.map((c) => <label key={c.id} className="flex items-center gap-2 py-1"><input type="checkbox" checked={avec.includes(c.id)} onChange={(e) => setAvec(e.target.checked ? [...avec, c.id] : avec.filter((x) => x !== c.id))} />{c.nom}{c.groupe && <span className="text-mute"> · {c.groupe}</span>}</label>)}
+          </div>
+        )}
         <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || (mode === 'elus' && !avec.length)} onClick={valider}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Valider'}</button></div>
       </div>
     </div>

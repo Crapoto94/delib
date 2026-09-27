@@ -11,6 +11,7 @@ import { ThemeToggle } from './theme';
 import Legal from './pages/Legal';
 import EtatBackend from './EtatBackend';
 import { OrgLogo, useBranding, useFavicon } from './Brand';
+import GroupePopover from './GroupePopover';
 
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./dev/DevAnnot')) : null;
 
@@ -25,6 +26,7 @@ function Cadre() {
     <div className="min-h-screen bg-page">
       <header className="border-b border-primary-deep/40 bg-gradient-to-r from-nav-from to-nav-to text-white shadow-lift"><div className="accent-bar" aria-hidden="true" /><div className="flex h-14 items-center gap-3 px-4">
         <OrgLogo className="h-8" /><span className="text-[13px] text-white/70">Espace élus</span>
+        {elu?.groupe && <GroupePopover groupe={elu.groupe} moi={elu.nom} />}
         <span className="ml-auto hidden text-[13px] text-white/80 sm:inline">{elu?.nom}</span>
         <button className="rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
         <button className="rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={sortir} aria-label="Me déconnecter" title="Me déconnecter"><LogOut className="h-5 w-5" /></button>

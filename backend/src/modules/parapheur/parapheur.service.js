@@ -285,7 +285,9 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
       const r = await ad.statut(cfg, envoi.ref_externe);
       const e = r._echange || {};
       await j(org, envoi.id, acteId, 'entrant', { methode: e.methode, url: e.url, httpStatus: e.httpStatus, resume: `État renvoyé par le parapheur : ${r.statut}`, reponse: e.reponse || r.brut });
-      await svc._appliquerRetour(org, acteId, envoi.id, r);
+      // Délégation : le parapheur dit qui a signé (`signePar`) quand ce n'est pas le signataire désigné.
+      const signePar = (r.signataires || []).find((s) => s.signePar)?.signePar || null;
+      await svc._appliquerRetour(org, acteId, envoi.id, { ...r, signePar });
       if (r.statut === 'signe') { await svc._capturerDocumentSigne(org, acteId, envoi.id, cfg, ad, r); await bus.emit('acte.document_signe', { organismeId: org, acteId, envoiId: envoi.id }); }
       return { statut: r.statut, envoi: await dernierEnvoi(org, acteId) };
     },
@@ -328,16 +330,19 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
     },
 
     /** Applique un retour du parapheur (interne) : met à jour l'envoi ET l'état de l'acte. */
-    async _appliquerRetour(org, acteId, envoiId, { statut, signeAt = null, motif = null }) {
+    async _appliquerRetour(org, acteId, envoiId, { statut, signeAt = null, motif = null, signePar = null }) {
       const mapEnvoi = { signe: 'signe', refuse: 'refuse', annule: 'annule', en_cours: 'a_signer' };
       const mapActe = { signe: 'signe', refuse: 'signature_refusee' };
       const stEnvoi = mapEnvoi[statut] || 'a_signer';
-      await db.run("UPDATE parapheur_envois SET statut = $2, signe_at = CASE WHEN $2 = 'signe' THEN COALESCE($3::timestamptz, now()) ELSE signe_at END, refuse_at = CASE WHEN $2 = 'refuse' THEN now() ELSE refuse_at END, motif = COALESCE($4, motif), updated_at = now() WHERE id = $1",
-        [envoiId, stEnvoi, signeAt, motif]);
+      // `signePar` : nom du délégué quand le parapheur a fait signer quelqu'un d'autre que le signataire désigné
+      // (« signé par délégation de »). Vide = le signataire désigné a signé lui-même.
+      await db.run("UPDATE parapheur_envois SET statut = $2, signe_par_nom = COALESCE($5, signe_par_nom), signe_at = CASE WHEN $2 = 'signe' THEN COALESCE($3::timestamptz, now()) ELSE signe_at END, refuse_at = CASE WHEN $2 = 'refuse' THEN now() ELSE refuse_at END, motif = COALESCE($4, motif), updated_at = now() WHERE id = $1",
+        [envoiId, stEnvoi, signeAt, motif, signePar]);
       const stActe = mapActe[statut];
       if (stActe) {
-        await db.run("UPDATE actes SET statut = $2, signe_at = CASE WHEN $2 = 'signe' THEN COALESCE($3::timestamptz, now()) ELSE signe_at END, signe_par = CASE WHEN $2 = 'signe' THEN (SELECT signataire_nom FROM parapheur_envois WHERE id = $4) ELSE signe_par END WHERE id = $1",
-          [acteId, stActe, signeAt, envoiId]);
+        // `signe_par` de l'acte : le délégué s'il y en a un, sinon le signataire désigné.
+        await db.run("UPDATE actes SET statut = $2, signe_at = CASE WHEN $2 = 'signe' THEN COALESCE($3::timestamptz, now()) ELSE signe_at END, signe_par = CASE WHEN $2 = 'signe' THEN COALESCE($5, (SELECT signataire_nom FROM parapheur_envois WHERE id = $4)) ELSE signe_par END WHERE id = $1",
+          [acteId, stActe, signeAt, envoiId, signePar]);
         await bus.emit(statut === 'signe' ? 'acte.signe' : 'acte.signature_refusee', { organismeId: org, acteId, motif });
       }
     },
@@ -417,6 +422,9 @@ function createParapheur({ db, audit, actes, render, storage, bus, config, log, 
         // Mode de signature RÉELLEMENT demandé pour cet envoi (le paramétrage du parapheur peut changer ensuite : il
         // ne faut pas afficher « P12 » pour une signature qui a été faite en manuscrite).
         signatureMode: envoi.payload?.signatureMode || null,
+        // Nom du DÉLÉGUÉ quand le parapheur a fait signer quelqu'un d'autre que le signataire désigné (« signé par
+        // délégation de <signataireNom> ») ; null quand le signataire désigné a signé lui-même.
+        signePar: envoi.signe_par_nom || null,
           documentSigne: envoi.document_signe_file_id ? { fileId: envoi.document_signe_file_id, nom: docSigne?.original_name || null } : null } : null,
         signaturePosition: a.signature_position || null,
         blocage,

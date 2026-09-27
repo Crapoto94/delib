@@ -241,7 +241,8 @@ function createEluAuth({ db, config, mail, settings, audit, log, sms }) {
       await db.run('INSERT INTO elu_sessions (jti, elu_id, expire_le, ip, appareil, via) VALUES ($1,$2,$3,$4,$5,$6)', [jti, c.elu_id, expire, ip ?? null, appareil ? sha(appareil).slice(0, 12) : null, via]);
       await db.run('UPDATE elu_comptes SET derniere_connexion = now() WHERE elu_id = $1', [c.elu_id]);
       const token = jwt.sign({ sub: String(c.elu_id), jti, aud: 'elus' }, secret, { algorithm: 'HS256', expiresIn: Math.floor((expire.getTime() - Date.now()) / 1000) });
-      return { token, tokenType: 'Bearer', expiresAt: expire.toISOString(), elu: { id: c.elu_id, nom: nomOf(c), organismeId: c.organisme_id } };
+      const g = await db.get('SELECT g.nom FROM elus e LEFT JOIN groupes_politiques g ON g.id = e.groupe_id WHERE e.id = $1', [c.elu_id]);
+      return { token, tokenType: 'Bearer', expiresAt: expire.toISOString(), elu: { id: c.elu_id, nom: nomOf(c), organismeId: c.organisme_id, groupe: g?.nom ?? null } };
     },
 
     async deconnexion(jti) { await db.run('UPDATE elu_sessions SET revoquee_le = now() WHERE jti = $1', [jti]); return { ok: true }; },

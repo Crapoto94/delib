@@ -633,6 +633,7 @@ function Signature({ acte, toast, onChanged }: { acte: any; toast: (m: string, k
             })()}{e?.signatureMode === 'sms' && etat.data.config.signataire_telephone ? ` · ${etat.data.config.signataire_telephone}` : ''}</dd>
             <dt className="text-mute">Emplacement</dt><dd>{pos ? `page ${pos.page} · ${Math.round(pos.x)} % / ${Math.round(pos.y)} %` : <span className="font-semibold text-warn">à définir</span>}{peutPlacer && <button className="ml-2 text-action underline" onClick={() => setPlaceOpen(true)}>{pos ? 'modifier' : 'définir'}</button>}</dd>
             {e && <><dt className="text-mute">Signataire</dt><dd>{e.signataireNom} · {e.signataireEmail}</dd>
+              {e.signePar && <><dt className="text-mute">Signé par</dt><dd>{e.signePar} <em className="text-mute">(par délégation de {e.signataireNom})</em></dd></>}
               <dt className="text-mute">Demandé le</dt><dd>{dt(e.demandeAt)}</dd>
               {e.signeAt && <><dt className="text-mute">Signé le</dt><dd>{dt(e.signeAt)}</dd></>}
               {e.motif && <><dt className="text-mute">Motif</dt><dd>{e.motif}</dd></>}

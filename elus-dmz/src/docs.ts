@@ -38,7 +38,9 @@ async function ecrireLocal(key: string, version: string, blob: Blob) {
 export async function purger() { if (supporte()) { try { await caches.delete(cacheName()); } catch { /* */ } } try { localStorage.removeItem('elus.lectures'); } catch { /* */ } etat = { ...etat, seanceId: null, total: 0, prets: 0, echecs: 0, octets: 0 }; emit(); }
 
 async function telecharger(d: Doc): Promise<Blob> {
-  const r = await api.get(d.url.replace(/^\/api\/v1/, ''), { responseType: 'blob' });
+  // Délai plus long que le défaut de `api` (60 s) : un document volumineux peut être filigrané/rendu à la volée
+  // (même valeur que le proxy nginx de la DMZ et que le frontal principal, cf. leurs nginx.conf.template/nginx.conf).
+  const r = await api.get(d.url.replace(/^\/api\/v1/, ''), { responseType: 'blob', timeout: 300000 });
   const version = String(r.headers['x-document-version'] || d.version);
   await ecrireLocal(d.key, version, r.data);
   return r.data as Blob;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 import { api } from './api';
 
@@ -6,15 +6,29 @@ import { api } from './api';
  * Bandeau discret, jamais bloquant : l'espace élus permet de lire hors ligne les
  * documents déjà téléchargés (docs.ts), donc l'indisponibilité du backend ne doit
  * jamais empêcher l'accès à l'application, seulement le signaler.
+ * Il faut DEUX échecs consécutifs avant d'afficher le bandeau : un simple aléa
+ * réseau (timeout ponctuel, seconde de latence) ne doit pas déclencher une
+ * fausse alerte « maintenance » alors que le reste de l'application fonctionne.
  */
 export default function EtatBackend() {
   const [indisponible, setIndisponible] = useState(false);
 
   useEffect(() => {
     let annule = false;
+    let echecsConsecutifs = 0;
+    let derniere = 0;
     const verifier = async () => {
-      try { await api.get('/elus-auth/etat', { timeout: 5000 }); if (!annule) setIndisponible(false); }
-      catch { if (!annule) setIndisponible(true); }
+      const ceCoup = ++derniere;
+      try {
+        await api.get('/elus-auth/etat', { timeout: 5000 });
+        if (annule || ceCoup !== derniere) return;
+        echecsConsecutifs = 0;
+        setIndisponible(false);
+      } catch {
+        if (annule || ceCoup !== derniere) return;
+        echecsConsecutifs += 1;
+        if (echecsConsecutifs >= 2) setIndisponible(true);
+      }
     };
     verifier();
     const id = setInterval(verifier, 20000);
