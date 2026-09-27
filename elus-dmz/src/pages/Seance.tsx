@@ -15,6 +15,7 @@ const DOC_LABEL_COURT: Record<string, string> = { expose: 'Exposé', projet: 'D�
 /** Lecteur d'un document : depuis l'appareil s'il y est (instantané), sinon depuis le réseau. Consigne la lecture (même hors ligne). */
 function Lecteur({ doc, seanceId, documents, onSelectDoc }: { doc: Pick<Doc, 'key' | 'version' | 'url'> & { titre: string; type?: string }; seanceId: number; documents: any[]; onSelectDoc: (key: string) => void }) {
   const [blob, setBlob] = useState<Blob | null>(null); const [err, setErr] = useState<string | null>(null); const [local, setLocal] = useState(false); const [zoom, setZoom] = useState(100); const [annotationsOpen, setAnnotationsOpen] = useState(false);
+  const surZoom = (deltaY: number) => setZoom((z) => Math.min(300, Math.max(25, z - (deltaY > 0 ? 15 : -15))));
   useEffect(() => {
     let stop = false; setBlob(null); setErr(null);
     ouvrirDoc(doc).then((r) => { if (stop) return; setBlob(r.blob); setLocal(r.local); }).catch((e) => { if (!stop) setErr(e?.message || errMsg(e)); });
@@ -46,7 +47,7 @@ function Lecteur({ doc, seanceId, documents, onSelectDoc }: { doc: Pick<Doc, 'ke
         <span className="w-10 text-center tabular-nums">{zoom} %</span>
         <button className="rounded p-2 hover:bg-slate-100" aria-label="Agrandir" onClick={() => setZoom((z) => Math.min(300, z + 15))}><Plus className="h-4 w-4" /></button>
       </div>
-      {err ? <p className="p-6 text-ko">{err}</p> : !blob ? <div className="flex flex-1 items-center justify-center p-10 text-mute"><Loader2 className="h-6 w-6 animate-spin" /></div> : <div className="flex min-h-0 flex-1 flex-col"><LecteurAnnote blob={blob} doc={{ key: doc.key, version: doc.version, titre: doc.titre }} seanceId={seanceId} zoom={zoom} annotationsOpen={annotationsOpen} onToggleAnnotations={() => setAnnotationsOpen((v) => !v)} /></div>}
+      {err ? <p className="p-6 text-ko">{err}</p> : !blob ? <div className="flex flex-1 items-center justify-center p-10 text-mute"><Loader2 className="h-6 w-6 animate-spin" /></div> : <div className="flex min-h-0 flex-1 flex-col"><LecteurAnnote blob={blob} doc={{ key: doc.key, version: doc.version, titre: doc.titre }} seanceId={seanceId} zoom={zoom} annotationsOpen={annotationsOpen} onToggleAnnotations={() => setAnnotationsOpen((v) => !v)} onZoomWheel={surZoom} /></div>}
     </div>
   );
 }
