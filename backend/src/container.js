@@ -61,6 +61,7 @@ const { createGedSimulateur } = require('./adapters/ged-simulateur');
 const { createAlfresco } = require('./adapters/alfresco');
 const { createEluAuth } = require('./modules/espace-elus/elu-auth.service');
 const { createEspaceElus } = require('./modules/espace-elus/espace.service');
+const { createEluCalendrier } = require('./modules/espace-elus/elu-calendrier.service');
 const { createTeletransmission } = require('./modules/teletransmission/tlt.service');
 const { createParapheur } = require('./modules/parapheur/parapheur.service');
 const { createDsihubParapheur } = require('./adapters/parapheur-dsihub');
@@ -204,6 +205,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   bus.on('odj.arrete', (p) => espace.figerDocumentsActe(p.organismeId, p.acteId, p.seanceId));
   // Contenu d'un acte modifié après l'arrêt de son ordre du jour : régénère par avance plutôt que d'attendre l'élu.
   bus.on('text.committed', (p) => espace.figerSiArrete(p.organismeId, p.acteId));
+  const eluCalendrier = createEluCalendrier({ db, audit, espace, config });
   const annotations = createAnnotations({ db, audit, config, espace, settings });
   const amendements = createAmendements({ db, audit, tenue, textes });
   const entrainement = createEntrainement({ db, actes, textes, audit });
@@ -228,7 +230,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('collecteurs', (orgId) => collecteurs.runDt(orgId)); // collecteurs d'arrêtés : passages selon leur intervalle (1h/4h/24h)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, uploadLimit, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, bureau, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs, bureauPorts };
+  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, uploadLimit, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, bureau, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, eluCalendrier, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs, bureauPorts };
 }
 
 module.exports = { buildContainer };

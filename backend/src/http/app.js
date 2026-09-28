@@ -46,6 +46,7 @@ const MODULES = [
   require('../modules/parapheur/parapheur.routes'),
   require('../modules/espace-elus/elus.routes'),
   require('../modules/espace-elus/comptes.routes'),
+  require('../modules/espace-elus/calendrier.routes'),
   require('../modules/ged/ged.routes'),
   require('../modules/recherche/recherche.routes'),
   require('../modules/parametrage/parametrage.routes'),
