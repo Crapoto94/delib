@@ -1,8 +1,8 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import FriseSeance from './FriseSeance';
 import { DeleteSeanceModal, EditSeanceModal } from './SeanceActions';
-import { ArrowDown, ArrowUp, BookOpen, Download, FileText, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2, Radio, Pencil, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, ChevronDown, Download, FileText, Mail, Paperclip, GripVertical, Lock, Plus, Trash2, Undo2, Radio, Pencil, RefreshCw } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -37,6 +37,29 @@ const Legende = () => (
   <span className="flex flex-wrap gap-3 text-[11px] text-mute">{Object.entries(ETAT).map(([k, v]) => <span key={k} className="inline-flex items-center gap-1"><span className={`inline-block h-3 w-3 rounded border border-line ${v.bg}`} />{v.label}</span>)}</span>
 );
 
+/** Bouton « Documents » : regroupe ce qu'on peut générer/télécharger pour la séance, plutôt que de l'étaler en boutons séparés dans la barre d'actions. */
+function DocumentsMenu({ onOdjPdf, onOdjInternePdf, onCsv, onReconstruire, busy }: { onOdjPdf: () => void; onOdjInternePdf?: () => void; onCsv: () => void; onReconstruire?: () => void; busy: boolean }) {
+  const [ouvert, setOuvert] = useState(false);
+  const Item = ({ icon, label, hint, onClick, disabled }: { icon: ReactNode; label: string; hint?: string; onClick: () => void; disabled?: boolean }) => (
+    <button type="button" role="menuitem" title={hint} disabled={disabled} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft disabled:opacity-50" onMouseDown={onClick}>{icon}<span className="flex-1">{label}</span></button>
+  );
+  return (
+    <span className="relative">
+      <button type="button" className="btn-secondary" aria-haspopup="menu" aria-expanded={ouvert} onClick={() => setOuvert(!ouvert)} onBlur={() => setTimeout(() => setOuvert(false), 150)}>
+        <FileText className="h-5 w-5" /> Documents <ChevronDown className="h-4 w-4" />
+      </button>
+      {ouvert && (
+        <div role="menu" className="card absolute right-0 z-20 mt-1 w-72 p-1 shadow-float">
+          <Item icon={<FileText className="h-4 w-4" />} label="Ordre du jour (PDF)" onClick={onOdjPdf} />
+          {onOdjInternePdf && <Item icon={<FileText className="h-4 w-4" />} label="Ordre du jour interne" hint="Document de travail du SCC : avancement, annexes, dernier passage hiérarchique" onClick={onOdjInternePdf} />}
+          <Item icon={<Download className="h-4 w-4" />} label="Tableau de suivi (CSV)" onClick={onCsv} />
+          {onReconstruire && <Item icon={<RefreshCw className="h-4 w-4" />} label="Reconstruire les documents" hint="Régénère les PDF (exposés, projets) déjà figés pour l'espace élus" onClick={onReconstruire} disabled={busy} />}
+        </div>
+      )}
+    </span>
+  );
+}
+
 export default function Odj() {
   const { id } = useParams();
   const { org, isScc } = useAuth(); const o = org!.id; const { toast, node } = useToast(); const navigate = useNavigate();
@@ -50,7 +73,6 @@ export default function Odj() {
   const [point, setPoint] = useState<{ kind: 'libre' | 'chapitre'; titre: string; description: string; numerote: boolean; files: File[] } | null>(null);
   const [dossierOpen, setDossierOpen] = useState<any>(null);
   const [pattern, setPattern] = useState<{ value: string; exemples: string[] } | null>(null);
-  const [triInterne, setTriInterne] = useState<'commission' | 'rapporteur' | 'delegation'>('commission');
   const lockTimer = useRef<any>(null);
   const meta = useLoad(async () => (await api.get(orgPath(o, `/seances/${id}`))).data, [o, id]);
   // avancement de la séance elle-même (point en cours, résultats des votes) : colore l'ordre du jour au fur et à mesure
@@ -106,7 +128,7 @@ export default function Odj() {
   };
   const exportCsv = async () => { const r = await api.get(orgPath(o, `/seances/${id}/odj/export.csv`), { responseType: 'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(r.data); a.download = `odj-${id}.csv`; a.click(); };
   const odjPdf = async () => { try { const r = await api.get(orgPath(o, `/seances/${id}/odj/pdf`), { responseType: 'blob' }); showPdf(r.data, `Ordre du jour — ${d?.seance?.instance ?? ''}`); } catch (e: any) { toast(errMsg(e), 'ko'); } };
-  const odjInternePdf = async () => { try { const r = await api.get(orgPath(o, `/seances/${id}/odj-interne/pdf`), { params: { tri: triInterne }, responseType: 'blob' }); showPdf(r.data, `Ordre du jour interne — ${d?.seance?.instance ?? ''}`); } catch (e: any) { toast(errMsg(e), 'ko'); } };
+  const odjInternePdf = async () => { try { const r = await api.get(orgPath(o, `/seances/${id}/odj-interne/pdf`), { params: { tri: 'commission' }, responseType: 'blob' }); showPdf(r.data, `Ordre du jour interne — ${d?.seance?.instance ?? ''}`); } catch (e: any) { toast(errMsg(e), 'ko'); } };
   const previewPattern = async (value: string) => { try { setPattern({ value, exemples: (await api.post(orgPath(o, '/numerotation/apercu'), { pattern: value, seanceId: Number(id) })).data.exemples }); } catch (e: any) { setPattern({ value, exemples: [`⚠ ${errMsg(e)}`] }); } };
   const reconstruireDocuments = async () => {
     setBusy(true);
@@ -129,19 +151,15 @@ export default function Odj() {
       <PageTitle title={`${meta.data?.kind === 'commission' ? 'Projets présentés — ' : 'Ordre du jour — '}${dt(d.seance.dateSeance, { dateStyle: 'long' })}`}
         sub={<span>{meta.data?.teams && <span className="mr-2"><TeamsLink teams={meta.data.teams} /></span>}Format de numérotation : <code>{d.pattern}</code> · <Badge tone={arrete ? 'ok' : 'warn'}>{arrete ? `arrêté le ${dt(d.arreteAt, { dateStyle: 'short' })}` : 'en préparation — numéros provisoires'}</Badge>{d.lock && <span className="ml-2 inline-flex items-center gap-1 text-warn"><Lock className="h-3.5 w-3.5" /> en cours de modification par {d.lock.username}</span>}</span>}
         actions={<>
-          {isScc && meta.data && <button className="btn-secondary" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" /> Modifier la séance</button>}
-          {isScc && meta.data && <button className="btn-secondary text-ko" onClick={() => setDeleting(true)}><Trash2 className="h-4 w-4" /> Supprimer</button>}
+          {isScc && meta.data && <button className="btn-secondary" onClick={() => setEditing(true)}><Pencil className="h-5 w-5" /> Modifier la séance</button>}
           {canEdit && meta.data && meta.data.statut !== 'annulee' && <button className="btn-secondary" onClick={() => setTeamsOpen(true)}>Teams…</button>}
-          {canEdit && meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/convocation`}><Mail className="h-4 w-4" /> Convocation</Link>}
-          {meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/suivi`}><Radio className="h-4 w-4" /> Suivi de séance</Link>}
-          {canEdit && meta.data?.kind !== 'commission' && <button className="btn-secondary" onClick={() => setCahierOpen(true)}><BookOpen className="h-4 w-4" /> Cahier de séance</button>}
-          {isScc && <button className="btn-secondary" onClick={reconstruireDocuments} disabled={busy} title="Régénère les PDF (exposés, projets) déjà figés pour l'espace élus"><RefreshCw className="h-4 w-4" /> Reconstruire les documents</button>}
-          <button className="btn-secondary" onClick={odjPdf}><FileText className="h-4 w-4" /> Ordre du jour (PDF)</button>
-          {canEdit && <span className="inline-flex items-center gap-1"><Select className="input !w-auto !py-1" aria-label="Tri de l'ordre du jour interne" value={triInterne} onChange={(e) => setTriInterne(e.target.value as any)}><option value="commission">Par commission</option><option value="rapporteur">Par rapporteur</option><option value="delegation">Par délégation</option></Select><button className="btn-secondary" onClick={odjInternePdf} title="Document de travail du SCC : avancement, annexes, dernier passage hiérarchique"><FileText className="h-4 w-4" /> Ordre du jour interne</button></span>}
-          <button className="btn-secondary" onClick={exportCsv}><Download className="h-4 w-4" /> Tableau de suivi (CSV)</button>
+          {canEdit && meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/convocation`}><Mail className="h-5 w-5" /> Convocation</Link>}
+          {meta.data && meta.data.statut !== 'annulee' && <Link className="btn-secondary" to={`/seances/${id}/suivi`}><Radio className="h-5 w-5" /> Suivi de séance</Link>}
+          {canEdit && meta.data?.kind !== 'commission' && <button className="btn-secondary" onClick={() => setCahierOpen(true)}><BookOpen className="h-5 w-5" /> Cahier de séance</button>}
+          <DocumentsMenu onOdjPdf={odjPdf} onOdjInternePdf={canEdit ? odjInternePdf : undefined} onCsv={exportCsv} onReconstruire={isScc ? reconstruireDocuments : undefined} busy={busy} />
           {canEdit && !arrete && <button className="btn-secondary" onClick={() => previewPattern(d.pattern)}>Numérotation…</button>}
           {canEdit && !arrete && <button className="btn-primary" onClick={() => doArret(false)} disabled={busy}>Arrêter l'ordre du jour</button>}
-          {canEdit && d.statut === 'arrete' && <button className="btn-secondary" onClick={doReouvrir} disabled={busy}><Undo2 className="h-4 w-4" /> Rouvrir l'ordre du jour</button>}
+          {canEdit && d.statut === 'arrete' && <button className="btn-secondary" onClick={doReouvrir} disabled={busy}><Undo2 className="h-5 w-5" /> Rouvrir l'ordre du jour</button>}
         </>} />
       {canEdit && <SeanceKpis seanceId={Number(id)} rev={`${d.statut}|${d.items.map((i: any) => `${i.id}:${i.statut}:${i.acte?.etat ?? ''}`).join(',')}`} />}
 
@@ -261,7 +279,7 @@ export default function Odj() {
         <p>L'ordre du jour comporte des anomalies :</p><ul className="list-disc pl-5 text-warn">{(Array.isArray(arret) ? arret : []).map((p: any, i: number) => <li key={i}>{p.message}</li>)}</ul>
         <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setArret(null)}>Corriger</button><button className="btn-ko" onClick={() => doArret(true)}>Arrêter malgré tout</button></div></div></Modal>}
       {cahierOpen && <CahierModal seanceId={Number(id)} onClose={() => setCahierOpen(false)} />}
-      {editing && meta.data && <EditSeanceModal seance={meta.data} onClose={() => setEditing(false)} onDone={() => { toast('Séance modifiée'); meta.reload(); odj.reload(); }} />}
+      {editing && meta.data && <EditSeanceModal seance={meta.data} onClose={() => setEditing(false)} onDone={() => { toast('Séance modifiée'); meta.reload(); odj.reload(); }} onDelete={isScc ? () => { setEditing(false); setDeleting(true); } : undefined} />}
       {deleting && meta.data && <DeleteSeanceModal seance={meta.data} onClose={() => setDeleting(false)} onDone={() => navigate('/seances')} />}
       {teamsOpen && meta.data && <TeamsForm seance={meta.data} onClose={() => setTeamsOpen(false)} onDone={() => { toast('Visioconférence enregistrée'); meta.reload(); }} />}
       {node}

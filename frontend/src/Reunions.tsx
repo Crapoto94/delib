@@ -1,9 +1,10 @@
 import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Video } from 'lucide-react';
+import { CalendarDays, Pencil, Video } from 'lucide-react';
 import { api, errMsg, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { dt } from './format';
+import { DeleteSeanceModal, EditSeanceModal } from './pages/SeanceActions';
 import { Badge, ErrorBox, Field, Loading, Modal, Spinner, useLoad, useToast } from './ui';
 
 /** Choix de la visioconférence Teams d'une séance ou d'une réunion : création automatique, lien collé, ou aucune. */
@@ -38,6 +39,7 @@ export function ReunionsSection({ commissionId, canEdit }: { commissionId: numbe
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const list = useLoad(async () => (await api.get(orgPath(o, `/commissions/${commissionId}/reunions`))).data.items as any[], [commissionId]);
   const [creating, setCreating] = useState(false); const [teamsFor, setTeamsFor] = useState<any>(null);
+  const [editing, setEditing] = useState<any>(null); const [deleting, setDeleting] = useState<any>(null);
   const [f, setF] = useState({ date: '', duree: 90, lieu: 'Teams', teams: 'lien-plus-tard' as 'auto' | 'lien' | 'aucun' | 'lien-plus-tard', joinUrl: '', inviter: false });
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const now = Date.now();
@@ -63,9 +65,10 @@ export function ReunionsSection({ commissionId, canEdit }: { commissionId: numbe
               <Badge tone={r.projets ? 'ok' : 'gray'}>{r.projets} projet(s) présenté(s)</Badge>
               <TeamsLink teams={r.teams} />
               <span className="ml-auto flex gap-2">
-                {canEdit && r.statut !== 'annulee' && <button className="btn-secondary !py-1" onClick={() => setTeamsFor(r)}><Video className="h-3.5 w-3.5" /> Teams</button>}
+                {canEdit && r.statut !== 'annulee' && <button className="btn-secondary !py-1" onClick={() => setTeamsFor(r)}><Video className="h-4 w-4" /> Teams</button>}
                 {canEdit && r.statut !== 'annulee' && <Link className="btn-secondary !py-1" to={`/seances/${r.id}/convocation`}>Convocation</Link>}
-                <Link className="btn-secondary !py-1" to={`/seances/${r.id}`}>Ordre du jour →</Link></span>
+                <Link className="btn-secondary !py-1" to={`/seances/${r.id}`}>Ordre du jour →</Link>
+                {canEdit && <button className="btn-secondary !py-1" aria-label="Modifier la réunion" title="Modifier la réunion" onClick={() => setEditing(r)}><Pencil className="h-4 w-4" /></button>}</span>
             </li>);
         })}</ul>)}
       {creating && (
@@ -85,6 +88,8 @@ export function ReunionsSection({ commissionId, canEdit }: { commissionId: numbe
           </form>
         </Modal>)}
       {teamsFor && <TeamsForm seance={teamsFor} onClose={() => setTeamsFor(null)} onDone={() => { toast('Visioconférence enregistrée'); list.reload(); }} />}
+      {editing && <EditSeanceModal seance={editing} onClose={() => setEditing(null)} onDone={() => { toast('Réunion modifiée'); list.reload(); }} onDelete={canEdit ? () => { setDeleting(editing); setEditing(null); } : undefined} />}
+      {deleting && <DeleteSeanceModal seance={deleting} onClose={() => setDeleting(null)} onDone={() => { toast('Réunion supprimée'); list.reload(); }} />}
       {node}
     </section>
   );

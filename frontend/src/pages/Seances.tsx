@@ -157,11 +157,11 @@ function SeancesList() {
 
       {tab === 'hors' ? <HorsDelai /> : list.loading && !list.data ? <Loading /> : !filtrees.length ? <div className="card"><Empty>{q || annee || instanceId || etat ? 'Aucune séance ne correspond au filtre.' : tab === 'passees' ? 'Aucune séance passée.' : 'Aucune séance à venir.'}</Empty></div> : (
         <div className="space-y-4">{filtrees.map((x) => (
-          <CarteSeance key={x.id} s={x} synth={parId.get(x.id)} isScc={isScc} compacte={vue === 'compacte' || tab === 'passees'} onEdit={() => setEditing(x)} onDelete={() => setDeleting(x)} onRelancer={() => setRelance(x)} />))}</div>)}
+          <CarteSeance key={x.id} s={x} synth={parId.get(x.id)} isScc={isScc} compacte={vue === 'compacte' || tab === 'passees'} onEdit={() => setEditing(x)} onRelancer={() => setRelance(x)} />))}</div>)}
 
       <p className="mt-6 border-t border-line pt-3 text-[12px] text-mute"><b>Rappel L2121-12 CGCT</b> : délai de convocation obligatoire de 5 jours francs avec note de synthèse explicative.</p>
       {creating && <NewSeance onClose={() => setCreating(false)} onDone={reload} />}
-      {editing && <EditSeanceModal seance={editing} onClose={() => setEditing(null)} onDone={reload} />}
+      {editing && <EditSeanceModal seance={editing} onClose={() => setEditing(null)} onDone={reload} onDelete={() => { setDeleting(editing); setEditing(null); }} />}
       {deleting && <DeleteSeanceModal seance={deleting} onClose={() => setDeleting(null)} onDone={reload} />}
       {relance && <RelanceServices seance={relance} onClose={() => setRelance(null)} onDone={reload} />}
       {calendrier && <LienCalendrier onClose={() => setCalendrier(false)} />}

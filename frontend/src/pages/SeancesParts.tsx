@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BellRing, BookOpen, CalendarPlus, ClipboardList, Copy, Mail, MoreVertical, Pencil, Radio, RefreshCw, Trash2 } from 'lucide-react';
+import { BellRing, BookOpen, CalendarPlus, ClipboardList, Copy, Mail, Pencil, Radio, RefreshCw, Trash2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { AgentName } from '../AgentName';
@@ -37,41 +37,30 @@ function Tuile({ titre, droite, gros, note, children }: { titre: string; droite?
   );
 }
 
-/** Menu « ⋮ » d'une carte : modifier, supprimer. */
-function Menu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
-  const [ouvert, setOuvert] = useState(false);
-  return (
-    <span className="relative">
-      <button type="button" className="rounded-lg bg-soft p-2 text-mute hover:text-head" aria-haspopup="menu" aria-expanded={ouvert} aria-label="Plus d’actions" onClick={() => setOuvert(!ouvert)} onBlur={() => setTimeout(() => setOuvert(false), 150)}><MoreVertical className="h-4 w-4" /></button>
-      {ouvert && <div role="menu" className="card absolute right-0 z-20 mt-1 w-44 p-1 shadow-float">
-        <button role="menuitem" className="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-soft" onMouseDown={onEdit}><Pencil className="h-4 w-4" /> Modifier</button>
-        <button role="menuitem" className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-ko hover:bg-ko-bg" onMouseDown={onDelete}><Trash2 className="h-4 w-4" /> Supprimer</button></div>}
-    </span>
-  );
-}
-
 type Synth = { jours: number; cloture: { date: string; jours: number; passe: boolean } | null; jalons: { code: string; label: string; date: string; passe: boolean }[]; dossiers: number; prets: number; dansOdj: number; tauxRealisation: number;
   aTerminer: number; enRetard: number; directionsEnRetard: number; directionsATerminer: number; etape: { cle: string; label: string; retient: string[] } | null; terminee: boolean; indisponible?: boolean };
 
 /** Carte d'une séance à venir (SEA-15) : bloc date, pastilles, titre, indicateurs, jalons, actions. `compacte` : une seule ligne. */
-export function CarteSeance({ s, synth, isScc, compacte, onEdit, onDelete, onRelancer }: { s: any; synth?: Synth; isScc: boolean; compacte: boolean; onEdit: () => void; onDelete: () => void; onRelancer: () => void }) {
+export function CarteSeance({ s, synth, isScc, compacte, onEdit, onRelancer }: { s: any; synth?: Synth; isScc: boolean; compacte: boolean; onEdit: () => void; onRelancer: () => void }) {
   const j = jours(s.dateSeance); const conseil = s.kind !== 'commission'; const annulee = s.statut === 'annulee'; const cloturee = s.statut === 'close'; const ok = synth && !synth.indisponible;
+  // Les réunions de commission se distinguent visuellement du conseil : fond teinté et décalées vers la droite, comme des sous-éléments.
+  const commissionCls = conseil ? '' : '!bg-indigo2-bg !border-indigo2/30 ml-6 sm:ml-12';
   const titre = `${s.instance} — ${dt(s.dateSeance, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} à ${dt(s.dateSeance, { hour: '2-digit', minute: '2-digit' })}`;
   const jal = ok ? synth!.jalons.filter((x) => x.code !== 'seance') : [];
   const nbServices = ok ? (synth!.directionsEnRetard || synth!.directionsATerminer) : 0;
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Link to={`/seances/${s.id}`} className="btn-primary !py-2"><ClipboardList className="h-4 w-4" /> Gérer l’ordre du jour</Link>
-      {conseil && <Link to={`/seances/${s.id}#cahier`} className="btn-secondary !py-2"><BookOpen className="h-4 w-4" /> Cahier</Link>}
-      {conseil && <Link to={`/seances/${s.id}/convocation`} className="btn-secondary !py-2"><Mail className="h-4 w-4" /> Convocation</Link>}
-      {conseil && ['tenue', 'convoquee'].includes(s.statut) && <Link to={`/seances/${s.id}/suivi`} className="btn-secondary !py-2"><Radio className="h-4 w-4" /> Suivi de séance</Link>}
-      {isScc && ok && synth!.aTerminer > 0 && <button className="btn-secondary !py-2" onClick={onRelancer}><BellRing className="h-4 w-4" /> Relancer les services ({nbServices})</button>}
-      {isScc && <Menu onEdit={onEdit} onDelete={onDelete} />}
+      <Link to={`/seances/${s.id}`} className="btn-primary !py-2"><ClipboardList className="h-5 w-5" /> Gérer l’ordre du jour</Link>
+      {conseil && <Link to={`/seances/${s.id}#cahier`} className="btn-secondary !py-2"><BookOpen className="h-5 w-5" /> Cahier</Link>}
+      {conseil && <Link to={`/seances/${s.id}/convocation`} className="btn-secondary !py-2"><Mail className="h-5 w-5" /> Convocation</Link>}
+      {conseil && ['tenue', 'convoquee'].includes(s.statut) && <Link to={`/seances/${s.id}/suivi`} className="btn-secondary !py-2"><Radio className="h-5 w-5" /> Suivi de séance</Link>}
+      {isScc && ok && synth!.aTerminer > 0 && <button className="btn-secondary !py-2" onClick={onRelancer}><BellRing className="h-5 w-5" /> Relancer les services ({nbServices})</button>}
+      {isScc && <button className="btn-secondary !py-2" onClick={onEdit}><Pencil className="h-5 w-5" /> Modifier</button>}
     </div>
   );
   if (compacte) {
     return (
-      <article className={`card flex flex-wrap items-center gap-3 p-3 ${annulee ? 'opacity-60' : ''}`}>
+      <article className={`card ${commissionCls} flex flex-wrap items-center gap-3 p-3 ${annulee ? 'opacity-60' : ''}`}>
         <BlocDate date={s.dateSeance} sombre={j !== null && j >= 0 && j <= 14} />
         <div className="min-w-0 flex-1"><div className="truncate font-bold text-head">{titre}</div><div className="text-[12px] text-mute">{s.lieu || 'Lieu à définir'}{j !== null && j >= 0 ? ` · dans ${j} jour(s)` : ''}{ok ? ` · ${synth!.dansOdj}/${synth!.dossiers} inscrites · ${synth!.tauxRealisation} % instruits` : ''}</div></div>
         {!annulee && <Badge tone={cloturee ? 'gray' : 'blue'}>{cloturee ? 'Clôturée' : 'Non clôturée'}</Badge>}
@@ -79,7 +68,7 @@ export function CarteSeance({ s, synth, isScc, compacte, onEdit, onDelete, onRel
       </article>);
   }
   return (
-    <article className={`card p-5 md:p-6 ${annulee ? 'opacity-60' : ''}`} aria-label={`Séance du ${dt(s.dateSeance, { dateStyle: 'long' })}`}>
+    <article className={`card ${commissionCls} p-5 md:p-6 ${annulee ? 'opacity-60' : ''}`} aria-label={`Séance du ${dt(s.dateSeance, { dateStyle: 'long' })}`}>
       <div className="flex flex-wrap items-start gap-4">
         <BlocDate date={s.dateSeance} sombre={j !== null && j >= 0 && j <= 14} />
         <div className="min-w-0 flex-1 basis-80">

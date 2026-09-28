@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -11,8 +12,8 @@ const toLocalInput = (iso: string) => { const d = new Date(iso); const p = (n: n
 const toDay = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' }) : '');
 const TYPES: Record<string, string> = { ordinaire: 'Ordinaire', extraordinaire: 'Extraordinaire', budgetaire: 'Budgétaire', autre: 'Autre' };
 
-/** Modifier une séance : date, lieu, durée, type et dates clés (un changement de date limite recalcule les rappels). */
-export function EditSeanceModal({ seance, onClose, onDone }: { seance: any; onClose: () => void; onDone: () => void }) {
+/** Modifier une séance : date, lieu, durée, type et dates clés (un changement de date limite recalcule les rappels). `onDelete`, si fourni, propose la suppression depuis cette même modale. */
+export function EditSeanceModal({ seance, onClose, onDone, onDelete }: { seance: any; onClose: () => void; onDone: () => void; onDelete?: () => void }) {
   const { org } = useAuth(); const o = org!.id;
   const [date, setDate] = useState(toLocalInput(seance.dateSeance)); const [lieu, setLieu] = useState<string>(seance.lieu ?? '');
   const [duree, setDuree] = useState<string>(seance.dureeMinutes ? String(seance.dureeMinutes) : ''); const [type, setType] = useState<string>(seance.type ?? 'ordinaire');
@@ -45,7 +46,10 @@ export function EditSeanceModal({ seance, onClose, onDone }: { seance: any; onCl
             </div>
             <p className="mt-2 text-[12px] text-mute">Une date limite modifiée recalcule d’elle-même les rappels des dossiers qui visent la séance.</p>
           </fieldset>)}
-        <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy}>Enregistrer</button></div>
+        <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
+          {onDelete ? <button type="button" className="text-[13px] font-semibold text-ko hover:underline" onClick={onDelete}><Trash2 className="mr-1 inline h-4 w-4" /> Supprimer la séance</button> : <span />}
+          <div className="flex gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy}>Enregistrer</button></div>
+        </div>
       </form>
     </Modal>
   );

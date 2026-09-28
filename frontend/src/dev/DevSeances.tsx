@@ -10,10 +10,10 @@ export default function DevSeances() {
   const noop = () => undefined;
   return (
     <div className="mx-auto max-w-[1200px] space-y-4 p-6">
-      <CarteSeance s={{ ...base, id: 1, dateSeance: dans(45), dateLimiteRedaction: dans(3) }} synth={synth({}) as any} isScc compacte={false} onEdit={noop} onDelete={noop} onRelancer={noop} />
-      <CarteSeance s={{ ...base, id: 2, odjStatut: 'en_preparation', dateSeance: dans(74), dateLimiteRedaction: dans(27) }} synth={synth({ jours: 74, tauxRealisation: 61, dansOdj: 14, dossiers: 23, enRetard: 0, directionsEnRetard: 0, aTerminer: 9, directionsATerminer: 3, cloture: { date: dans(27), jours: 27, passe: false }, etape: { cle: 'redaction', label: 'Rédaction', retient: ['9 dossiers pas encore validés'] } }) as any} isScc compacte={false} onEdit={noop} onDelete={noop} onRelancer={noop} />
-      <CarteSeance s={{ ...base, id: 3, kind: 'commission', instance: 'Commission des finances', dateSeance: dans(9, 9) }} isScc compacte={false} onEdit={noop} onDelete={noop} onRelancer={noop} />
-      <CarteSeance s={{ ...base, id: 4, dateSeance: dans(109) }} synth={synth({ jours: 109 }) as any} isScc compacte onEdit={noop} onDelete={noop} onRelancer={noop} />
+      <CarteSeance s={{ ...base, id: 1, dateSeance: dans(45), dateLimiteRedaction: dans(3) }} synth={synth({}) as any} isScc compacte={false} onEdit={noop} onRelancer={noop} />
+      <CarteSeance s={{ ...base, id: 2, odjStatut: 'en_preparation', dateSeance: dans(74), dateLimiteRedaction: dans(27) }} synth={synth({ jours: 74, tauxRealisation: 61, dansOdj: 14, dossiers: 23, enRetard: 0, directionsEnRetard: 0, aTerminer: 9, directionsATerminer: 3, cloture: { date: dans(27), jours: 27, passe: false }, etape: { cle: 'redaction', label: 'Rédaction', retient: ['9 dossiers pas encore validés'] } }) as any} isScc compacte={false} onEdit={noop} onRelancer={noop} />
+      <CarteSeance s={{ ...base, id: 3, kind: 'commission', instance: 'Commission des finances', dateSeance: dans(9, 9) }} isScc compacte={false} onEdit={noop} onRelancer={noop} />
+      <CarteSeance s={{ ...base, id: 4, dateSeance: dans(109) }} synth={synth({ jours: 109 }) as any} isScc compacte onEdit={noop} onRelancer={noop} />
     </div>
   );
 }
