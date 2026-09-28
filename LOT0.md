@@ -1,7 +1,7 @@
-# LOT 0 — Fondations du backend
+﻿# LOT 0 — Fondations du backend
 
 > Référence : `MANIFEST.md` v1.0 (sections 3, 5, 24, 25, 28, 29). **Backend seul** (décision D35) : le frontend démarre quand les maquettes Stitch sont livrées. L'interface de ce lot est **Swagger UI**.
-> **Lot 0 réalisé le 2026-09-19 (voir §14).** Feu vert donné le 2026-09-19. Ports : backend **3021**, frontend **5160**, DMZ **5161** (D36). Le spike de la section 4 précède tout module.
+> **Lot 0 réalisé le 2026-09-19 (voir §14).** Feu vert donné le 2026-09-19. Ports : backend **3121**, frontend **5160**, DMZ **5161** (D36). Le spike de la section 4 précède tout module.
 
 ## 1. Objectif
 
@@ -32,7 +32,7 @@ Tout ce qui viendra ensuite (actes, circuit, séances…) s'appuiera sur ce socl
 | P3 | **Q55** : source des directions/services et de la fiche agent | **RH Studio** (`STUDIORH_API_URL`, clé fournie) est candidat direct ; à confirmer au spike S3-S4 |
 | P4 | **Clé `dsk_`** du Hub | **fournie** (`HUBDSI_API_KEY`) ; scope à vérifier |
 | P5 | **Compte AD de test** | à fournir pour le spike S1 (à défaut, essais avec le compte de secours) |
-| P6 | **Ports** | **décidés** : 3021 / 5160 / 5161 ; à vérifier libres sur l'hôte Docker |
+| P6 | **Ports** | **décidés** : 3121 / 5160 / 5161 ; à vérifier libres sur l'hôte Docker |
 | P7 | **Administrateurs de plateforme** initiaux (`BOOTSTRAP_ADMINS`) | à fournir ; en attendant, le compte de secours suffit pour amorcer |
 | P8 | Organismes à créer au démarrage : **Ville** (SIREN, nom) et **CCAS** | à confirmer ; création possible ensuite par l'API |
 
@@ -113,7 +113,7 @@ HUBDSI_API_URL=                         HUBDSI_API_KEY=
 STUDIORH_API_URL=                       STUDIORH_API_KEY=
 VILLE_CA_FILE=                          # autorité de certification interne (préféré)
 VILLE_ALLOW_SELF_SIGNED_CERTS=false     # repli, limité aux clients APM/Hub/RH Studio
-PORT=3021
+PORT=3121
 NODE_ENV=production
 JWT_SECRET=  JWT_TTL=8h  SESSION_MAX_HOURS=24
 BOOTSTRAP_ADMINS=                       # identifiants AD, séparés par des virgules

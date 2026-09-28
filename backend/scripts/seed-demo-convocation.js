@@ -3,7 +3,7 @@
  * et à des agents de la Ville — AVEC UNE MESSAGERIE FACTICE (aucun mail n'est réellement envoyé) — puis quelques consultations
  * simulées sur le serveur en marche (liens personnels), pour voir les statistiques et le journal.
  *
- *   node scripts/seed-demo-convocation.js [http://localhost:3021]
+ *   node scripts/seed-demo-convocation.js [http://localhost:3121]
  */
 const path = require('path');
 const { loadConfig } = require('../src/config');
@@ -15,7 +15,7 @@ const { buildContainer } = require('../src/container');
 const { bootstrap } = require('../src/bootstrap');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
-const SERVER = process.argv[2] || 'http://localhost:3021';
+const SERVER = process.argv[2] || 'http://localhost:3121';
 const inDays = (n) => new Date(Date.now() + n * 86400000);
 
 async function main() {

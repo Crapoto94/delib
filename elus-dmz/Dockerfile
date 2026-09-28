@@ -11,6 +11,6 @@ FROM nginx:1.27-alpine
 # le modèle est rendu au démarrage avec BACKEND_HOST / BACKEND_PORT (image officielle : /etc/nginx/templates)
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-ENV BACKEND_HOST=backend BACKEND_PORT=3021
+ENV BACKEND_HOST=backend BACKEND_PORT=3121
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1/api/status >/dev/null || exit 1

@@ -1,4 +1,4 @@
-# MANIFEST — VibeDélib : gestion des délibérations
+﻿# MANIFEST — VibeDélib : gestion des délibérations
 
 > **Statut : v1.43 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
@@ -59,7 +59,7 @@ Sources analysées pour ce document :
 | **D33** | **Délégation** : co-détention (le délégant garde ses droits), **DGS non déléguable**, délégué = tout agent actif de l'organisme, **pas de sous-délégation**. | 9.5 |
 | **D34** | **CCAS** : circuit court de 3 à 4 étapes, **défini avec le CCAS** au moment du paramétrage (aucun impact sur le développement). | 5 |
 | **D35** | **Le développement commence par le backend seul** (API documentée Swagger, tests) ; le **frontend démarre quand les maquettes Stitch sont terminées**. Stitch peut être consulté par le navigateur de l'utilisateur (Chrome), en lecture. | 28, 23.1 |
-| **D36** | **Ports par défaut** : backend **3021**, frontend **5160**, espace élus en DMZ **5161** ; schéma PostgreSQL **`ivrydelib`**. | 3, 30 |
+| **D36** | **Ports par défaut** : backend **3121**, frontend **5160**, espace élus en DMZ **5161** ; schéma PostgreSQL **`ivrydelib`**. | 3, 30 |
 | **D37** | **Tutoriel de première connexion**, ludique, propre à chaque profil, conçu dans Stitch (23.2). | 23.2 |
 | **D38** | **Développement lancé le 2026-09-19** : backend d'abord ; le frontend suit **dès que l'accès à Stitch est établi** (D35). | 28 |
 
@@ -128,7 +128,7 @@ Lu dans le tutoriel de formation (18 pages).
 - **Base** : PostgreSQL partagé de la Ville (`ivry_admin`), **un schéma dédié** (proposé : `ivrydelib`), tables préfixées, requêtes paramétrées `$1…`, migrations numérotées, `TIMESTAMPTZ`, fuseau `Europe/Paris`, UTF-8.
 - **Trois jetons séparés** : `APM_API_KEY` (X-API-KEY, services transverses), `HUBDSI_API_KEY` (`dsk_…`, données Ville), JWT applicatif propre. Aucun côté frontend.
 - **API** : préfixe `/api/v1`, Swagger `/api-docs`, `GET /api/status`, pagination `limit/offset`, erreurs `{ error }`.
-- **Déploiement** : Docker Compose (backend + frontend), `restart: always`, ports **propres** (hors 3001/5173-5177 déjà pris par appdsi) : **backend 3021, frontend 5160, DMZ 5161** (D36), reverse-proxy HTTPS.
+- **Déploiement** : Docker Compose (backend + frontend), `restart: always`, ports **propres** (hors 3001/5173-5177 déjà pris par appdsi) : **backend 3121, frontend 5160, DMZ 5161** (D36), reverse-proxy HTTPS.
 - **Divergences à noter** : appdsi utilise React 19 et du CSS inline ; le guide impose React 18 + Tailwind → **on suit le guide** (Q24).
 - **Espace élus en DMZ** : conteneur distinct sur le modèle de `C:\dev\appdsi\parapheur-dmz` (front minimal + nginx à liste blanche vers un seul port du backend LAN) ; section 18.
 - **Multi-organismes** : une installation, plusieurs organismes (Ville, CCAS…), annuaire d'agents commun ; section 5.
@@ -1878,7 +1878,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.5 | 2026-09-19 | signature reportée, certificat P12 et simulateur S²LOW, IA « propose / l'agent valide », délégation par le valideur, conception graphique avec Stitch |
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
-| **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3121 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
 | **1.44** | 2026-09-21 | **D113** : **gabarits Word (.docx) à variables** pour tous les documents (exposé, délibération, visas/délibéré, dossier complet) — fusion des zones, tableaux et images, conversion PDF (LibreOffice), dépôt/aperçu du modèle par gabarit ; **variable `{numero}`** (numéro du dossier au conseil, dans l'ordre de passage) ; **éditeur enrichi** (images insérables, redimensionnables, orientables, alignables, déplaçables ; tableaux ; alignement de paragraphes ; copier/coller conservé) ; **bibliothèque multi-documents** et délibérations non archivées régénérées au gabarit ; **« Mes actes »** (rubrique « plus à vous », vue par conseil, DIRECTION / Service, pastille « Inscrit au conseil » et fond vert) ; **séances clôturées / non clôturées** et séances reprises d'AIRS « tenue » non closes ; **champ libre service / chargé de mission** à la création ; **journal des versions (what's new)** au pied de page |
 | **1.43** | 2026-09-21 | **D112** : portefeuille « Mes actes » (action attendue, rédaction/validation de l'équipe, actes validés en circuit, inscrits au conseil) et vue « Tous les actes » (administrateur/SCC) avec rupture par étape du circuit ou par conseil pressenti ; bibliothèque (filtre d'état, origine AIRS en violet, compteur d'annexes dont non publiables, PDF d'import pour exposé/extrait) ; annexes Word + PDF associé ; import AIRS des conseils récents et origine des actes ; mots-clés et reprise d'un modèle ; rappel ciblé et réouverture d'ordre du jour ; numéros de suivi robustes |
 | **1.42** | 2026-09-21 | **D111** : import de l'historique **AIRS DELIB** par **sas** et **concordances** (IMP-01 à IMP-20) — processus en quatre temps, sas `airs_*` générique (MCD inconnu), axes de concordance ouverts, contrôle AD des agents, publication idempotente et réversible, questions HUB (Q-AIRS1 à 6) |

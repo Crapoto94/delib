@@ -45,11 +45,11 @@ describe('bureau en ligne — adaptateur Collabora (WOPI)', () => {
 
   it('donne au navigateur une iframe Collabora pointant sur notre hôte WOPI', () => {
     const p = createBureauCollabora(base());
-    const o = p.open({ cle: CLE, nom: 'note.docx', urlRappel: 'http://10.0.0.4:3021', user: { username: 'jd' } });
+    const o = p.open({ cle: CLE, nom: 'note.docx', urlRappel: 'http://10.0.0.4:3121', user: { username: 'jd' } });
     expect(o.src.startsWith('/collabora-delib/browser/')).toBe(true);
     // Le WOPISrc est appelé par le MOTEUR (CheckFileInfo, GetFile, PutFile) : c'est l'adresse de rappel, celle que
     // le moteur peut joindre — jamais l'adresse publique, que les conteneurs ne joignent pas en production.
-    expect(o.src).toContain(encodeURIComponent(`http://10.0.0.4:3021/api/v1/public/bureau/wopi/${CLE}`));
+    expect(o.src).toContain(encodeURIComponent(`http://10.0.0.4:3121/api/v1/public/bureau/wopi/${CLE}`));
     expect(decodeURIComponent(o.src)).not.toContain('delib.ville.fr');
     expect(decodeURIComponent(o.src)).toContain(`access_token=${CLE}`);
     expect(decodeURIComponent(o.src)).toContain('lang=fr-FR');

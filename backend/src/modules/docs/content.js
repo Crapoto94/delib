@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Documents techniques (DAT, DEX) : contenu rédigé en Markdown restreint, rendu à l'identique dans l'aide en ligne
  * et dans le PDF généré par le backend. Les variables (version, date, environnement) sont interpolées à la génération.
  * Markdown accepté par la composition PDF (modules/render/typeset) : titres (#, ##, ###), listes (- et 1.), gras (**).
@@ -34,7 +34,7 @@ VibeDélib est une application web multi-organismes : une même installation ser
 Le schéma ci-dessous reflète le paramétrage déployé : un frontend nginx, un backend Node.js, une base PostgreSQL et le stockage local, complétés par les services externes activés.
 
 - **Navigateur agent** -> **nginx** (frontend, port 5160) : service des fichiers statiques et relais du chemin d'API vers le backend.
-- **nginx** -> **backend Node.js / Express** (port 3021) : API REST, règles métier, moteur de circuit, rendu PDF, ordonnanceur.
+- **nginx** -> **backend Node.js / Express** (port 3121) : API REST, règles métier, moteur de circuit, rendu PDF, ordonnanceur.
 - **backend** -> **PostgreSQL 16** (schéma ivrydelib) : données métier, référentiels, journal d'audit, index de recherche plein texte.
 - **backend** -> **stockage local** (volume ./backend/storage) : annexes PDF, logos et fonds de page.
 - **backend** -> **APM** (HTTPS, en-tête X-API-KEY) : authentification AD, envoi des mails et SMS, IA interne.
@@ -98,7 +98,7 @@ Toutes les communications sortantes passent par un client HTTP commun (délais, 
 
 Les valeurs sensibles ne figurent pas ici ; elles sont fournies par l'environnement de chaque déploiement.
 
-- **Application** : NODE_ENV, PORT (3021), PUBLIC_BASE_URL, CORS_ORIGINS, TRUST_PROXY, LOG_LEVEL, SCHEDULER_ENABLED.
+- **Application** : NODE_ENV, PORT (3121), PUBLIC_BASE_URL, CORS_ORIGINS, TRUST_PROXY, LOG_LEVEL, SCHEDULER_ENABLED.
 - **Base de données** : POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, DB_POOL_MAX, DB_SCHEMA, AUTO_MIGRATE, RLS_ENABLED.
 - **Session et sécurité** : JWT_SECRET, JWT_TTL, SESSION_MAX_HOURS, BOOTSTRAP_ADMINS, LOCAL_ADMIN_ENABLED, LOCAL_ADMIN_USERNAME, LOCAL_ADMIN_PASSWORD.
 - **Services externes** : APM_API_URL, APM_API_KEY, HUBDSI_API_URL, HUBDSI_API_KEY, VILLE_CA_FILE, VILLE_ALLOW_SELF_SIGNED_CERTS.
@@ -113,7 +113,7 @@ Le paramétrage fonctionnel (SIREN, télétransmission, GED, IA, espace élus, n
 
 ## 9. Réseau, exposition et sécurité
 
-- **Ports** : frontend 5160 (nginx 80 dans le conteneur), backend 3021, espace élus en DMZ 5161.
+- **Ports** : frontend 5160 (nginx 80 dans le conteneur), backend 3121, espace élus en DMZ 5161.
 - **Exposition** : seul le frontend (et l'espace élus en DMZ) est exposé ; la base et le backend ne sont pas exposés directement.
 - **Relais d'API** : nginx relaie le chemin d'API vers le backend, ce qui rend l'appel de même origine et supprime le CORS pour le navigateur. Le CORS du backend reste restreint aux origines connues (CORS_ORIGINS), jamais l'étoile.
 - **Transport** : HTTPS assuré par le reverse-proxy de la collectivité ; certificat de l'autorité interne pris en compte pour les appels sortants.
@@ -235,7 +235,7 @@ Ce dossier décrit l'exploitation courante de VibeDélib : installation, configu
 
 ## 2. Inventaire des composants
 
-- **Backend** : API Node.js 22, port interne 3021 ; redémarre toujours ; contrôle de santé sur /api/status.
+- **Backend** : API Node.js 22, port interne 3121 ; redémarre toujours ; contrôle de santé sur /api/status.
 - **Frontend** : nginx 1.27 et fichiers statiques React, port 5160 sur l'hôte.
 - **PostgreSQL 16** : base partagée de la Ville ; un conteneur local facultatif existe pour le développement.
 - **Espace élus (DMZ)** : conteneur distinct, port 5161, déployé séparément.

@@ -19,7 +19,7 @@ function parseDuration(value) {
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().default('development'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(3021),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3121),
   POSTGRES_HOST: z.string().min(1),
   POSTGRES_PORT: z.coerce.number().int().default(5432),
   POSTGRES_DB: z.string().min(1),

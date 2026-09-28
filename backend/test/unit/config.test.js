@@ -8,9 +8,9 @@ const OK = {
 };
 
 describe('configuration', () => {
-  it('applique les valeurs par défaut décidées (port 3021, schéma ivrydelib)', () => {
+  it('applique les valeurs par défaut décidées (port 3121, schéma ivrydelib)', () => {
     const c = buildConfig(OK);
-    expect(c.port).toBe(3021);
+    expect(c.port).toBe(3121);
     expect(c.db.schema).toBe('ivrydelib');
     expect(c.jwt.ttlSeconds).toBe(8 * 3600);
   });

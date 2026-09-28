@@ -29,7 +29,7 @@ beforeAll(async () => {
       BUREAU_MOTEUR: 'onlyoffice',
       BUREAU_URL: 'http://moteur:8080',
       BUREAU_URL_NAVIGATEUR: '/office',
-      BUREAU_URL_RAPPEL: 'http://backend:3021',
+      BUREAU_URL_RAPPEL: 'http://backend:3121',
       BUREAU_JWT_SECRET: SECRET,
     },
   });

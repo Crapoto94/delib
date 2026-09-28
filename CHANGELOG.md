@@ -14,7 +14,7 @@
 - **Le front des élus est en ligne** sur une **adresse publique** (première version) : connexion par lien personnel, ordre du jour, dossier de séance, lecture et annotation des pièces, recherche. Le réglage par organisme `elus.url_base` porte cette adresse, utilisée dans les invitations envoyées aux élus.
 - **Hébergement séparé (DMZ)** : le front est un projet autonome (`elus-dmz/`, aucune dépendance sur `frontend/`), construit et publié par son propre `docker compose` derrière le proxy public ; **aucune base de données, aucun secret** côté élus. Son jeton est signé avec un secret et une audience propres : l'API des agents le refuse.
 - **Liste blanche stricte** dans le nginx de la DMZ : seuls `/api/v1/elus/`, `/api/v1/elus-auth/`, `/api/v1/public/branding` et un `/api/status` synthétique sont relayés ; en-têtes de sécurité, limites de débit et de taille.
-- **Un seul port à ouvrir** : la règle de pare-feu **DMZ → LAN** doit autoriser le port du backend (3021), comme elle l'autorise déjà pour le parapheur (3001). Sans elle, le front se charge mais les appels d'API expirent (vérifié : injoignable depuis la DMZ, 2 ms depuis le LAN). (`MANIFEST §18.7`.)
+- **Joignabilité du backend depuis la DMZ : réparée.** Le port d'origine **`3021`** (interne comme publié) était injoignable depuis la DMZ (le front se chargeait mais tout appel d'API expirait après 5 s, alors qu'il répondait en 2 ms depuis le LAN, et les ports publiés voisins passaient). Le backend est désormais sur **`3121`** (port interne **et** publié) et `ELUS_BACKEND_PORT=3121` côté conteneur DMZ : la DMZ joint le backend, jaugé par une pastille verte/rouge sur la page de connexion. (`MANIFEST §18.7`.)
 
 ## 0.49.0 — Second moteur de documents : Collabora Online, au choix par organisme
 

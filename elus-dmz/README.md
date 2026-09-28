@@ -1,4 +1,4 @@
-# Espace des élus en DMZ
+﻿# Espace des élus en DMZ
 
 Front des élus autonome (React, projet **séparé** du reste du dépôt — aucune dépendance sur `frontend/`,
 build context Docker = ce dossier seul) + nginx qui ne relaie que `/api/v1/elus/` et `/api/v1/elus-auth/`.
@@ -13,7 +13,7 @@ Copier `.env.example` en `.env` (non versionné) sur l'hôte Docker DMZ :
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `ELUS_BACKEND_HOST` | adresse du backend sur le LAN (obligatoire) | — |
-| `ELUS_BACKEND_PORT` | port du backend (la seule ouverture du pare-feu DMZ → LAN) | 3021 |
+| `ELUS_BACKEND_PORT` | port publié du backend sur le LAN (la seule ouverture du pare-feu DMZ → LAN) | 3121 |
 | `ELUS_DMZ_PORT` | port publié du conteneur | 5161 |
 
 Côté backend : `ELUS_URL` (ou le paramètre `elus.url_base`) = adresse publique de l'espace (sans suffixe de page, ex. `https://elus.ivry94.fr`), utilisée dans les invitations ;
@@ -23,7 +23,7 @@ Côté backend : `ELUS_URL` (ou le paramètre `elus.url_base`) = adresse publiqu
 ```
 docker compose up -d --build
 ```
-Développement : `npm install && npm run dev` (port 5161, API proxifiée vers `http://localhost:3021`).
+Développement : `npm install && npm run dev` (port 5161, API proxifiée vers `http://localhost:3121`).
 
 ## Déploiement
 `pulldmz.ps1`/`pulldmz.bat` à la racine du dépôt copient uniquement les fichiers suivis par git de ce

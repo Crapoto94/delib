@@ -16,6 +16,6 @@ COPY seeds ./seeds
 RUN mkdir -p /app/storage && chown node:node /app/storage
 ENV FONTS_DIR=/police
 USER node
-EXPOSE 3021
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3021)+'/api/status').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+EXPOSE 3121
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3121)+'/api/status').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "server.js"]

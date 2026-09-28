@@ -15,5 +15,5 @@ export default defineConfig({
   base: './',
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
   build: { outDir: 'dist', emptyOutDir: true },
-  server: { port: 5161, strictPort: true, proxy: { '/api': { target: process.env.VITE_API_TARGET || 'http://localhost:3021', changeOrigin: true } } },
+  server: { port: 5161, strictPort: true, proxy: { '/api': { target: process.env.VITE_API_TARGET || 'http://localhost:3121', changeOrigin: true } } },
 });

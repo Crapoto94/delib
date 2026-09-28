@@ -1,5 +1,5 @@
 /**
- * Test de fumée contre un backend DÉJÀ démarré (par défaut http://localhost:3021) avec les vrais services.
+ * Test de fumée contre un backend DÉJÀ démarré (par défaut http://localhost:3121) avec les vrais services.
  * Utilise le compte de secours du .env (jamais affiché). Ne consigne que des statuts et des comptages.
  *   node scripts/smoke.js [urlDeBase]
  */
@@ -7,7 +7,7 @@ const path = require('path');
 const axios = require('axios');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
-const base = process.argv[2] || `http://localhost:${process.env.PORT || 3021}`;
+const base = process.argv[2] || `http://localhost:${process.env.PORT || 3121}`;
 const http = axios.create({ baseURL: base, timeout: 20000, validateStatus: () => true });
 let failed = 0;
 const check = (name, ok, detail = '') => { if (!ok) failed++; console.log(`${ok ? 'OK ' : 'KO '} ${name}${detail ? ' — ' + detail : ''}`); };

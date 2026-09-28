@@ -1,5 +1,5 @@
 # VibeDélib — Docker Compose : backend + frontend (+ PostgreSQL local facultatif, + serveur de documents facultatif).
-# Ports : frontend 5160 (nginx, relaie /api), backend 3021, espace élus DMZ 5161 (à venir).
+# Ports : frontend 5160 (nginx, relaie /api), backend 3121 (port interne ET publié), espace élus DMZ 5161.
 # Les secrets viennent du fichier .env à la racine (jamais versionné) ; aucune URL ni clé n'est écrite ici.
 #
 #   docker compose up -d --build                  backend + frontend, PostgreSQL = celui du .env (serveur partagé)
@@ -18,14 +18,14 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=production
-      - PORT=3021
+      - PORT=3121
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5160}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:5160}
       - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-false}
     volumes:
       - ./backend/storage:/app/storage
       - ./police:/police:ro
-    ports: ["3021:3021"]
+    ports: ["3121:3121"]
 
   frontend:
     build: { context: ., dockerfile: frontend/Dockerfile }

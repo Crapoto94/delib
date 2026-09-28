@@ -1,4 +1,4 @@
-# MANIFEST — VibeDélib : gestion des délibérations
+﻿# MANIFEST — VibeDélib : gestion des délibérations
 
 > **Statut : v1.47 — validée le 2026-09-19 (v1.0), mise à jour au fil du développement (voir le journal, section 34).** Le développement démarre par le **lot 0** (voir `LOT0.md`) ; toute évolution du périmètre passe par ce manifeste (journal en section 34).
 > Chaque exigence porte un identifiant (`CRE-03`, `CIR-12`…) pour pouvoir être référencée dans les tickets et les tests.
@@ -59,7 +59,7 @@ Sources analysées pour ce document :
 | **D33** | **Délégation** : co-détention (le délégant garde ses droits), **DGS non déléguable**, délégué = tout agent actif de l'organisme, **pas de sous-délégation**. | 9.5 |
 | **D34** | **CCAS** : circuit court de 3 à 4 étapes, **défini avec le CCAS** au moment du paramétrage (aucun impact sur le développement). | 5 |
 | **D35** | **Le développement commence par le backend seul** (API documentée Swagger, tests) ; le **frontend démarre quand les maquettes Stitch sont terminées**. Stitch peut être consulté par le navigateur de l'utilisateur (Chrome), en lecture. | 28, 23.1 |
-| **D36** | **Ports par défaut** : backend **3021**, frontend **5160**, espace élus en DMZ **5161** ; schéma PostgreSQL **`ivrydelib`**. | 3, 30 |
+| **D36** | **Ports par défaut** : backend **3121**, frontend **5160**, espace élus en DMZ **5161** ; schéma PostgreSQL **`ivrydelib`**. | 3, 30 |
 | **D37** | **Tutoriel de première connexion**, ludique, propre à chaque profil, conçu dans Stitch (23.2). | 23.2 |
 | **D38** | **Développement lancé le 2026-09-19** : backend d'abord ; le frontend suit **dès que l'accès à Stitch est établi** (D35). | 28 |
 
@@ -128,7 +128,7 @@ Lu dans le tutoriel de formation (18 pages).
 - **Base** : PostgreSQL partagé de la Ville (`ivry_admin`), **un schéma dédié** (proposé : `ivrydelib`), tables préfixées, requêtes paramétrées `$1…`, migrations numérotées, `TIMESTAMPTZ`, fuseau `Europe/Paris`, UTF-8.
 - **Trois jetons séparés** : `APM_API_KEY` (X-API-KEY, services transverses), `HUBDSI_API_KEY` (`dsk_…`, données Ville), JWT applicatif propre. Aucun côté frontend.
 - **API** : préfixe `/api/v1`, Swagger `/api-docs`, `GET /api/status`, pagination `limit/offset`, erreurs `{ error }`.
-- **Déploiement** : Docker Compose (backend + frontend), `restart: always`, ports **propres** (hors 3001/5173-5177 déjà pris par appdsi) : **backend 3021, frontend 5160, DMZ 5161** (D36), reverse-proxy HTTPS.
+- **Déploiement** : Docker Compose (backend + frontend), `restart: always`, ports **propres** (hors 3001/5173-5177 déjà pris par appdsi) : **backend 3121, frontend 5160, DMZ 5161** (D36), reverse-proxy HTTPS.
 - **Divergences à noter** : appdsi utilise React 19 et du CSS inline ; le guide impose React 18 + Tailwind → **on suit le guide** (Q24).
 - **Espace élus en DMZ** : conteneur distinct sur le modèle de `C:\dev\appdsi\parapheur-dmz` (front minimal + nginx à liste blanche vers un seul port du backend LAN) ; section 18.
 - **Multi-organismes** : une installation, plusieurs organismes (Ville, CCAS…), annuaire d'agents commun ; section 5.
@@ -957,8 +957,8 @@ DMZ ─────────────────── firewall : un seul
 
 L'espace des élus est **en ligne** sur **`https://vibedelib.ivry94.fr`** : le front est servi par le conteneur `elus-dmz` de **l'hôte DMZ** (`172.17.1.3`, dossier `/opt/docker/marc/elus-dmz`, déploiement par `pulldmz.bat` qui copie **les seuls fichiers suivis par git** puis reconstruit), derrière le reverse proxy public. Côté backend, le réglage `elus.url_base` (organisme) vaut `https://vibedelib.ivry94.fr` : les invitations envoyées aux élus pointent donc vers cette adresse.
 
-- **Le pare-feu DMZ → LAN doit ouvrir le port du backend.** Depuis l'hôte DMZ, `10.103.130.106:3021` **ne répond pas** (3001, 80 et 443 répondent) : sans cette ouverture, le front se charge mais **tout appel d'API reste en attente** (vérifié : `/api/v1/public/branding` et `/api/v1/elus-auth/…` expirent, alors qu'ils répondent en 2 ms depuis le LAN). La règle à demander est la même que celle qui existe déjà pour le parapheur (`3001`) : **DMZ → 10.103.130.106:3021**.
-- Variables du conteneur DMZ : `ELUS_BACKEND_HOST` (adresse LAN du backend), `ELUS_BACKEND_PORT` (le seul port ouvert par le pare-feu), `ELUS_DMZ_PORT` (port publié, 5161). Rien n'est écrit en dur.
+- **Le port publié du backend est `3121`** (port interne `3121`, inchangé pour le frontend LAN qui passe par le réseau Docker). Le port `3121` originellement publié était injoignable depuis la DMZ (vérifié : `10.103.130.106:3121` ne répond pas depuis l'hôte DMZ alors que 3001, 80, 443, 5160, 3121 répondent, et que l'appel expire côté relais nginx en 5 s) : le contournement retenu a été de publier le backend sur **`3121:3121`** et de mettre `ELUS_BACKEND_PORT=3121` dans le `.env` du conteneur DMZ. Le pare-feu DMZ → LAN laisse déjà passer ce port.
+- Variables du conteneur DMZ : `ELUS_BACKEND_HOST` (adresse LAN du backend), `ELUS_BACKEND_PORT` (port publié du backend, `3121` par défaut), `ELUS_DMZ_PORT` (port publié du conteneur, 5161). Rien n'est écrit en dur.
 - Le relais nginx ne laisse passer que `/api/v1/elus/`, `/api/v1/elus-auth/`, `/api/v1/public/branding` et un `/api/status` synthétique ; tout le reste est refusé.
 
 ---
@@ -1900,7 +1900,7 @@ Closes (réponses intégrées, voir section 0) : Q1 à Q5, Q8 à Q16, Q18, Q26 �
 | 0.5 | 2026-09-19 | signature reportée, certificat P12 et simulateur S²LOW, IA « propose / l'agent valide », délégation par le valideur, conception graphique avec Stitch |
 | 0.6 | 2026-09-19 | réponses aux questions : circuit, séance visée, visibilité, commissions, acceptation par modification |
 | **1.0** | 2026-09-19 | **validation** ; défauts retenus (D31 à D34) ; prérequis Q55 sur l'organisation du Hub ; ouverture du lot 0 |
-| **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3021 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
+| **1.1** | 2026-09-19 | **lot 0 réalisé** (backend, 105 tests) ; Q55 résolue par le spike ; schéma `ivrydelib` ; ports 3121 / 5160 / 5161 ; tutoriel de première connexion (état côté serveur) |
 | **1.47** | 2026-09-25 | **Pièces jointes à chaque étape** : ajout, remplacement, réordonnancement et retrait d'annexes possibles à **toutes les étapes du circuit** (droit `canAttach` adossé au moteur, `acl.js` / `engine.js` / `annexes.service.js`) ; **élu rapporteur** : liste réduite aux **noms et prénoms** (fonction et délégations masquées, la délégation se choisit au champ suivant) ; **étape finale SCC garantie** pour un acte rédigé par le SCC (agent ou directrice de la DAJCP) ; **stockage GED classé par catégorie** (nom lisible et métadonnées, migration `0073`) avec **reclassement du stockage existant** (simulation, rejouable, sans re-téléversement) — écran Paramétrages › GED, script et endpoint ; qualité : deux erreurs de lint préexistantes corrigées |
 | **1.46** | 2026-09-24 | **Annexes Word/Excel** (converties en PDF à la validation finale, ré-upload d'un même nom = nouvelle version, ANN-01/04) ; **taille des pièces jointes paramétrable** (Paramétrages › Pièces jointes, défaut 30 Mo) ; **suivi des modifications** : diff par rapport à la personne précédente (jamais contre soi-même) et affichage chronologique décroissant ; **étape du circuit** affichée dans « Mes actes » et « Tous les actes » ; fiche : montant facultatif, commission sans perte de saisie, **délégation de l'élu rapporteur** (migration `0072`) ; « Avis des commissions » masqué sans commission ; **Ordre du jour interne** (PDF) trié par commission / rapporteur / délégation ; **pastille « Urgent »** sur les actes urgents |
 | **1.44** | 2026-09-21 | **D113** : **gabarits Word (.docx) à variables** pour tous les documents (exposé, délibération, visas/délibéré, dossier complet) — fusion des zones, tableaux et images, conversion PDF (LibreOffice), dépôt/aperçu du modèle par gabarit ; **variable `{numero}`** (numéro du dossier au conseil, dans l'ordre de passage) ; **éditeur enrichi** (images insérables, redimensionnables, orientables, alignables, déplaçables ; tableaux ; alignement de paragraphes ; copier/coller conservé) ; **bibliothèque multi-documents** et délibérations non archivées régénérées au gabarit ; **« Mes actes »** (rubrique « plus à vous », vue par conseil, DIRECTION / Service, pastille « Inscrit au conseil » et fond vert) ; **séances clôturées / non clôturées** et séances reprises d'AIRS « tenue » non closes ; **champ libre service / chargé de mission** à la création ; **journal des versions (what's new)** au pied de page |
@@ -2071,7 +2071,7 @@ Trois adresses, trois sens de circulation, **aucune en dur** (`.env`) :
 |---|---|---|---|
 | `BUREAU_URL` | le backend | conversion PDF | `http://documentserver:80` (réseau Docker) |
 | `BUREAU_URL_NAVIGATEUR` | le navigateur | chargement de l'éditeur | `/office-delib` (relatif : le frontal relaie) |
-| `BUREAU_URL_RAPPEL` | le moteur | source à ouvrir, sauvegardes | `http://backend:3021` (réseau Docker), ou l'adresse de l'hôte |
+| `BUREAU_URL_RAPPEL` | le moteur | source à ouvrir, sauvegardes | `http://backend:3121` (réseau Docker), ou l'adresse de l'hôte |
 
 **Deux pièges, tous deux vécus et corrigés en production :**
 
@@ -2086,7 +2086,7 @@ Trois adresses, trois sens de circulation, **aucune en dur** (`.env`) :
    cette ligne.**
 3. Pour le rappel, préférer une valeur sans résolution de nom côté moteur (l'adresse de l'hôte) : le moteur résout
    l'hôte de l'URL de rappel pour son filtre d'IP, et une résolution manquée (recréation de conteneur) fait échouer
-   l'enregistrement. `BUREAU_URL_RAPPEL=http://10.0.0.12:3021` est le plus sûr ; `http://backend:3021` fonctionne
+   l'enregistrement. `BUREAU_URL_RAPPEL=http://10.0.0.12:3121` est le plus sûr ; `http://backend:3121` fonctionne
    quand le réseau Docker est stable.
 
 `BUREAU_MOTEUR=simulateur` (défaut) = aucun moteur : tout fonctionne, le bouton « Modifier » reste masqué et le dépôt
@@ -2156,7 +2156,7 @@ configuration explicite, pas un mode dégradé silencieux).
    BUREAU_MOTEUR=onlyoffice
    BUREAU_URL=http://documentserver:80
    BUREAU_URL_NAVIGATEUR=/office-delib                        # relatif : le frontal sert le moteur en HTTPS
-   BUREAU_URL_RAPPEL=http://backend:3021
+   BUREAU_URL_RAPPEL=http://backend:3121
    BUREAU_JWT_SECRET=<le secret ci-dessus>
    PUBLIC_BASE_URL=https://<adresse publique de l'application> # indispensable (hôte annoncé par le moteur + liens des mails)
    ```
@@ -2180,7 +2180,7 @@ inclus) plutôt que `latest`, qui ferait monter une version majeure sans contrô
 Un même moteur peut servir plusieurs postes : **c'est le backend qui décide de l'adresse du rappel**, à chaque ouverture
 de document, et le moteur appelle simplement celle qu'on lui donne. Rien n'est donc figé dans le dépôt :
 
-- `BUREAU_URL_RAPPEL` désigne le **backend**, pas le moteur : en production c'est le nom du service (`http://backend:3021`),
+- `BUREAU_URL_RAPPEL` désigne le **backend**, pas le moteur : en production c'est le nom du service (`http://backend:3121`),
   **identique pour tout le monde** ; quand l'application tourne sur un poste et le moteur sur un serveur, c'est l'adresse
   de **ce poste-là** sur le réseau que le serveur sait joindre (variable selon le poste : la garder dans le `.env` local,
   jamais versionné).
@@ -2299,10 +2299,10 @@ Points à ne pas manquer :
 BUREAU_COLLABORA_URL=http://collabora:9980
 BUREAU_COLLABORA_URL_NAVIGATEUR=/collabora-delib        # relais du frontal, comme /office-delib
 BUREAU_HOTE_PUBLIQUE=vibedelib.ivry.local              # hôte public (frontal)
-BUREAU_HOTE_WOPI=10.103.130.106,10.103.130.106:3021    # hôte du WOPISrc VU PAR LE MOTEUR (jamais le nom public)
-BUREAU_URL_RAPPEL=http://backend:3021                  # adresse de rappel : base du WOPISrc
+BUREAU_HOTE_WOPI=10.103.130.106,10.103.130.106:3121    # hôte du WOPISrc VU PAR LE MOTEUR (jamais le nom public)
+BUREAU_URL_RAPPEL=http://backend:3121                  # adresse de rappel : base du WOPISrc
 BUREAU_HOTE_PUBLIQUE_DEV=localhost:5160                # origine du navigateur de développement
-BUREAU_HOTE_WOPI_DEV=10.103.230.21,10.103.230.21:3021  # adresse du poste de développement, vue par le moteur
+BUREAU_HOTE_WOPI_DEV=10.103.230.21,10.103.230.21:3121  # adresse du poste de développement, vue par le moteur
 BUREAU_AUTOSAVE_SEC=120                                # enregistrement automatique de Collabora (2 min)
 COLLABORA_ADMIN_PASSWORD=<mot de passe>                 # administration du moteur
 ```
