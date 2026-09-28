@@ -134,14 +134,33 @@ function blocksXml(value, img) {
   return out;
 }
 
+const RELS_DEFAUT = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+const REL_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+const MIME_IMAGE_DEFAUT = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp', tiff: 'image/tiff', tif: 'image/tiff', emf: 'image/x-emf', wmf: 'image/x-wmf' };
+
+/** État des relations/médias d'un .docx en cours de fabrication ou de fusion (modèle Word + documents injectés). */
+function creerEtatRels(relsXml) {
+  const etat = {
+    rels: relsXml || RELS_DEFAUT,
+    relId: 1,
+    media: 0,
+    types: new Set(),
+    images: [],
+  };
+  etat.relId = Math.max(0, ...[...etat.rels.matchAll(/Id="rId(\d+)"/g)].map((m) => Number(m[1]))) + 1;
+  etat.prochainRelId = () => `rId${etat.relId++}`;
+  etat.prochainMedia = (ext) => `image${++etat.media}.${String(ext || 'bin').replace(/[^a-z0-9]/gi, '') || 'bin'}`;
+  etat.ajouterMedia = (nom, bytes, ext) => { etat.images.push({ nom, bytes }); if (MIME_IMAGE_DEFAUT[ext]) etat.types.add(ext); };
+  etat.ajouterRelation = (id, type, cible) => { etat.rels = etat.rels.replace('</Relationships>', `<Relationship Id="${id}" Type="${type}" Target="${cible}"/></Relationships>`); };
+  return etat;
+}
+
 /**
- * Collecteur d'images d'une zone riche : `add(dataUrl, alt, align)` rend le XML du dessin et retient le média à joindre
- * au `.docx`. `relIdDepart` évite de réutiliser un identifiant de relation déjà présent dans le document.
+ * Collecteur d'images d'une zone riche (markdown) : `add(dataUrl, alt, align)` rend le XML du dessin et retient le
+ * média à joindre au `.docx`. L'état partagé `etat` évite de réutiliser un identifiant de relation déjà pris.
  */
-function creerCollecteurImages(relIdDepart = 1) {
-  const images = [];
-  let relId = relIdDepart;
-  let picId = 1;
+function creerCollecteurImages(etat) {
+  let picId = 0;
   const add = (dataUrl, alt, blockAlign = null) => {
     // Réglages de l'éditeur : fragment `#vd:w=200,rot=90,align=center` ajouté à la source.
     const opts = {};
@@ -158,12 +177,51 @@ function creerCollecteurImages(relIdDepart = 1) {
     if (!m) return para(alt || '', blockAlign);
     const mime = m[1]; const bytes = Buffer.from(m[2], 'base64');
     const ext = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : 'jpeg';
-    const name = `image${picId}.${ext}`; const rid = `rId${relId}`;
-    images.push({ name, bytes, rid, mime, ext });
-    relId++; const id = picId++;
-    return drawingXml(rid, imageSize(bytes, mime), id, { ...opts, descr: alt || undefined });
+    const nom = etat.prochainMedia(ext); const rid = etat.prochainRelId();
+    etat.ajouterMedia(nom, bytes, ext);
+    etat.ajouterRelation(rid, REL_IMAGE, `media/${nom}`);
+    picId += 1;
+    return drawingXml(rid, imageSize(bytes, mime), picId, { ...opts, descr: alt || undefined });
   };
-  return { add, images };
+  return { add };
+}
+
+/** Une valeur de variable qui porte un document bureautique entier (texte rédigé dans le bureau en ligne) ? */
+const estDocxBureau = (v) => !!(v && typeof v === 'object' && Buffer.isBuffer(v.docx));
+
+/**
+ * Corps (`<w:body>` sans sa mise en page) d'un document bureautique, prêt à être injecté dans le modèle Word : les
+ * images référencées sont recopiées dans le document cible et leurs relations réécrites. C'est ce qui permet de
+ * conserver polices, tailles et styles du texte édité dans Word.
+ */
+async function corpsDocxPourModele(source, zip, etat) {
+  const src = await JSZip.loadAsync(source);
+  const docFile = src.file('word/document.xml');
+  if (!docFile) throw E.badRequest('Document bureautique invalide (word/document.xml introuvable)');
+  const xml = await docFile.async('text');
+  let corps = (/<w:body\b[^>]*>([\s\S]*)<\/w:body>/.exec(xml) || [])[1] || '';
+  corps = corps.replace(/<w:sectPr\b[\s\S]*?<\/w:sectPr>/g, '');   // la mise en page (marges, trame) reste celle du gabarit
+  const relsFile = src.file('word/_rels/document.xml.rels');
+  const mapRel = new Map();
+  if (relsFile) {
+    const relsXml = await relsFile.async('text');
+    const re = /<Relationship\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*\/?>/g; let m;
+    while ((m = re.exec(relsXml)) !== null) mapRel.set(m[1], m[2]);
+  }
+  const remplace = new Map();
+  for (const id of new Set([...corps.matchAll(/(?:r:(?:embed|id|link))="([^"]+)"/g)].map((x) => x[1]))) {
+    const cible = mapRel.get(id); if (!cible) continue;
+    const chemin = cible.startsWith('/') ? cible.slice(1) : `word/${cible}`;
+    const f = src.file(chemin); if (!f) continue;
+    const bytes = await f.async('nodebuffer');
+    const ext = (chemin.split('.').pop() || 'bin').toLowerCase();
+    const nom = etat.prochainMedia(ext); const rid = etat.prochainRelId();
+    etat.ajouterMedia(nom, bytes, ext);
+    etat.ajouterRelation(rid, REL_IMAGE, `media/${nom}`);
+    remplace.set(id, rid);
+  }
+  // Références recopiées : nouvel identifiant ; sinon on retire l'attribut (relation non transportée).
+  return corps.replace(/(r:(?:embed|id|link))="([^"]+)"/g, (_tout, attr, id) => (remplace.has(id) ? `${attr}="${remplace.get(id)}"` : ''));
 }
 
 /** Fusionne un modèle .docx avec un dictionnaire `{ '{variable}': valeur }` ; renvoie le tampon .docx. */
@@ -176,36 +234,35 @@ async function remplir(buffer, variables) {
   xml = xml.replace(/\{[^{}]*\}/g, (m) => m.replace(/<[^>]+>/g, ''));
   xml = processConditionals(xml, variables);
 
-  // Registre des images : rels existantes + compteur d'id.
   const relsFile = zip.file('word/_rels/document.xml.rels');
-  let rels = relsFile ? await relsFile.async('text') : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
-  const relId = Math.max(0, ...[...rels.matchAll(/Id="rId(\d+)"/g)].map((m) => Number(m[1]))) + 1;
-  const collecteur = creerCollecteurImages(relId);
-  const { images } = collecteur;
+  const etat = creerEtatRels(relsFile ? await relsFile.async('text') : RELS_DEFAUT);
+  const collecteur = creerCollecteurImages(etat);
 
   const entries = Object.entries(variables).sort((a, b) => b[0].length - a[0].length);
   for (const [key, value] of entries) {
-    const rich = hasRich(value);
     const reKey = escapeRe(key);
-    if (rich) {
+    // Texte rédigé dans le bureau en ligne : on injecte le corps Word TEL QUEL (polices, tailles, styles conservés).
+    if (estDocxBureau(value)) {
+      const corps = await corpsDocxPourModele(value.docx, zip, etat);
+      const pRe = new RegExp(`<w:p\\b[^>]*>(?:(?!</w:p>)[\\s\\S])*?${reKey}(?:(?!</w:p>)[\\s\\S])*?</w:p>`, 'g');
+      xml = pRe.test(xml) ? xml.replace(pRe, () => corps) : xml.replace(new RegExp(reKey, 'g'), '');
+      continue;
+    }
+    if (hasRich(value)) {
       const pRe = new RegExp(`<w:p\\b[^>]*>(?:(?!</w:p>)[\\s\\S])*?${reKey}(?:(?!</w:p>)[\\s\\S])*?</w:p>`, 'g');
       if (pRe.test(xml)) { xml = xml.replace(pRe, () => blocksXml(value, collecteur)); continue; }
     }
-    const re = new RegExp(reKey, 'g');
-    xml = xml.replace(re, () => valeurInline(value));
+    xml = xml.replace(new RegExp(reKey, 'g'), () => valeurInline(value));
   }
 
   zip.file('word/document.xml', xml);
-  if (images.length) {
-    for (const im of images) {
-      zip.file(`word/media/${im.name}`, im.bytes);
-      rels = rels.replace('</Relationships>', `<Relationship Id="${im.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${im.name}"/></Relationships>`);
-    }
-    zip.file('word/_rels/document.xml.rels', rels);
+  if (etat.images.length) {
+    for (const im of etat.images) zip.file(`word/media/${im.nom}`, im.bytes);
+    zip.file('word/_rels/document.xml.rels', etat.rels);
     const ctFile = zip.file('[Content_Types].xml');
     if (ctFile) {
       let ct = await ctFile.async('text');
-      for (const ext of new Set(images.map((i) => i.ext))) if (!new RegExp(`Extension="${ext}"`, 'i').test(ct)) ct = ct.replace('</Types>', `<Default Extension="${ext}" ContentType="image/${ext === 'jpeg' ? 'jpeg' : ext}"/></Types>`);
+      for (const ext of etat.types) if (!new RegExp(`Extension="${ext}"`, 'i').test(ct)) ct = ct.replace('</Types>', `<Default Extension="${ext}" ContentType="${MIME_IMAGE_DEFAUT[ext]}"/></Types>`);
       zip.file('[Content_Types].xml', ct);
     }
   }
@@ -283,8 +340,8 @@ const richTexte = (s) => String(s ?? '')
 
 /** Markdown d'un texte suivi → document Word autonome (un .docx prêt à éditer). */
 async function markdownVersDocx(markdown) {
-  const collecteur = creerCollecteurImages(1);
-  const { images } = collecteur;
+  const etat = creerEtatRels(RELS_DEFAUT);
+  const collecteur = creerCollecteurImages(etat);
   const corps = blocksXml(richTexte(markdown), collecteur);
   const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
     + `<w:document ${NS_DOC}><w:body>${corps}`
@@ -296,13 +353,8 @@ async function markdownVersDocx(markdown) {
   zip.file('_rels/.rels', RELS_ROOT);
   zip.file('word/document.xml', xml);
   zip.file('word/styles.xml', STYLES_TEXTE);
-  let rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-  for (const im of images) {
-    zip.file(`word/media/${im.name}`, im.bytes);
-    rels += `<Relationship Id="${im.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${im.name}"/>`;
-  }
-  rels += '</Relationships>';
-  zip.file('word/_rels/document.xml.rels', rels);
+  for (const im of etat.images) zip.file(`word/media/${im.nom}`, im.bytes);
+  zip.file('word/_rels/document.xml.rels', etat.rels);
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 
@@ -442,4 +494,4 @@ async function docxVersMarkdown(buffer) {
   return blocs.map((b) => b.trim()).filter(Boolean).join('\n\n');
 }
 
-module.exports = { remplir, markdownToText, markdownToRich, markdownVersDocx, docxVersMarkdown, escapeXml, BOLD };
+module.exports = { remplir, markdownToText, markdownToRich, markdownVersDocx, docxVersMarkdown, estDocxBureau, escapeXml, BOLD };

@@ -83,6 +83,31 @@ describe('fusion d’un modèle Word (.docx)', () => {
     expect(await lire(await remplir(src, { '{expose}': '{justify} Texte justifié' }))).toContain('<w:jc w:val="both"/>');
   });
 
+  it('injecte le corps d’un document bureautique en conservant polices et tailles', async () => {
+    const modele = await creer(doc(`${para('Avant')}${para('{expose}')}${para('après')}`));
+    const source = await creer(doc('<w:p><w:r><w:rPr><w:rFonts w:ascii="Arial Black"/><w:sz w:val="32"/></w:rPr><w:t>GROS TEXTE</w:t></w:r></w:p>'));
+    const out = await lire(await remplir(modele, { '{expose}': { docx: source } }));
+    expect(out).toContain('<w:t>Avant</w:t>');
+    expect(out).toContain('<w:t>après</w:t>');
+    expect(out).toContain('GROS TEXTE');
+    expect(out).toContain('w:ascii="Arial Black"');
+    expect(out).toContain('<w:sz w:val="32"/>');
+  });
+
+  it('recopie les images d’un document bureautique injecté et réécrit les relations', async () => {
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const zipSrc = new JSZip();
+    zipSrc.file('word/document.xml', doc('<w:p><w:r><w:t>Image</w:t></w:r><w:r><w:drawing><a:blip r:embed="rId9"/></w:drawing></w:r></w:p>'));
+    zipSrc.file('[Content_Types].xml', '<Types/>');
+    zipSrc.file('word/media/photo.png', PNG);
+    zipSrc.file('word/_rels/document.xml.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/photo.png"/></Relationships>');
+    const source = await zipSrc.generateAsync({ type: 'nodebuffer' });
+    const out = await remplir(await creer(doc(para('{expose}'))), { '{expose}': { docx: source } });
+    const z = await JSZip.loadAsync(out);
+    expect(z.file('word/media/image1.png')).toBeTruthy();
+    expect(await z.file('word/document.xml').async('text')).toContain('r:embed="rId1"');
+  });
+
   it('met « Article N » en gras et en MAJUSCULES dans le dispositif', async () => {
     const src = await creer(doc(para('{dispositif}')));
     const out = await lire(await remplir(src, { '{dispositif}': markdownToRich('**Article 1** : une subvention est attribuée.') }));

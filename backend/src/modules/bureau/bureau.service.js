@@ -17,7 +17,7 @@
  */
 const crypto = require('crypto');
 const { E } = require('../../shared/errors');
-const { markdownVersDocx, docxVersMarkdown } = require('../render/docx.service');
+const { markdownVersDocx } = require('../render/docx.service');
 
 const DUREE_SESSION_MIN = 30;      // le lien de téléchargement du moteur n'a pas à vivre plus longtemps
 const PURGE_JOURS = 7;             // sessions inachevées (onglet fermé sans enregistrer) : on les oublie après une semaine
@@ -118,7 +118,10 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
     if (!t) throw E.notFound('Texte introuvable');
     const enCache = cacheTexte.get(s.cle);
     if (enCache && enCache.version === t.version_no) return { buffer: enCache.buffer, t };
-    const buffer = await markdownVersDocx(t.markdown);
+    // Texte déjà rédigé dans le bureau : on rouvre LE document enregistré (polices, tailles, styles conservés).
+    // Sinon (première ouverture), on fabrique un Word à partir du markdown.
+    const enregistre = await late.texts.bureauDocBytes(t);
+    const buffer = enregistre ? enregistre.buffer : await markdownVersDocx(t.markdown);
     if (cacheTexte.size > 200) cacheTexte.clear();
     cacheTexte.set(s.cle, { version: t.version_no, buffer });
     return { buffer, t };
@@ -423,12 +426,10 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
    * changé entre-temps (édition interne, autre session), l'écriture est refusée plutôt qu'écrasée — comme pour une annexe.
    */
   async function enregistrerTexteDepuisMoteur(s, buffer) {
-    let markdown;
-    try { markdown = await docxVersMarkdown(buffer); }
-    catch (e) { log?.warn?.({ textId: s.texte_id, err: e.message }, 'document Word du texte illisible'); return { refuse: 'conversion' }; }
     try {
       const auteur = await access.loadContext(s.username, s.kind || 'ad');
-      const r = await late.texts.commit(auteur, s.organisme_id, s.acte_id, s.texte_id, { markdown, baseVersion: s.version, reason: 'bureau' });
+      // Le .docx rapporté devient la source : polices, tailles et styles conservés (le markdown n'est qu'un secours).
+      const r = await late.texts.commitBureau(auteur, s.organisme_id, s.acte_id, s.texte_id, { buffer, baseVersion: s.version });
       await cloreSession(s, r.version);
       log?.info?.({ textId: s.texte_id, version: r.version, moteur: s.moteur }, 'texte enregistré depuis le bureau en ligne');
       const attente = attentes.get(s.cle);      // une demande « Sauvegarder et fermer » attend peut-être cette version

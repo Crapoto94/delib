@@ -315,18 +315,23 @@ function createRender({ db, audit, storage, actes, config, annexes, bureau }) {
       const { pick, delibs } = await svc.textsFor(ctx, acte);
       const d = delibs.find((x) => x.id === Number(deliberationId)) || (delibs.length === 1 ? delibs[0] : null);
       const base = await svc.varsFor(acte, d);
-      const md = (row) => D.markdownToRich(row?.markdown || '');
+      // Texte rédigé dans le bureau en ligne : on transmet le document bureautique LUI-MÊME, pour que sa mise en forme
+      // (polices, tailles, styles) soit injectée telle quelle dans le modèle Word. Sinon, markdown → texte riche.
+      const md = async (row) => {
+        const buf = await svc.bureauDoc(row);
+        return buf ? { docx: buf } : D.markdownToRich(row?.markdown || '');
+      };
       const out = {};
       for (const [k, v] of Object.entries(base)) out[`{${k}}`] = v === null || v === undefined ? '' : String(v);
       out['{titre}'] = acte.titre || '';
       out['{numero_suivi}'] = String(acte.numero_suivi ?? '');
       out['{deliberation}'] = d?.titre || '';
-      out['{expose}'] = md(pick('expose', null));
-      out['{visas}'] = md(pick('visas', d?.id));
-      out['{considere}'] = md(pick('visas', d?.id));
-      out['{visas_considerants}'] = md(pick('visas', d?.id));
-      out['{dispositif}'] = md(pick('dispositif', d?.id));
-      out['{delibere}'] = md(pick('dispositif', d?.id));
+      out['{expose}'] = await md(pick('expose', null));
+      out['{visas}'] = await md(pick('visas', d?.id));
+      out['{considere}'] = await md(pick('visas', d?.id));
+      out['{visas_considerants}'] = await md(pick('visas', d?.id));
+      out['{dispositif}'] = await md(pick('dispositif', d?.id));
+      out['{delibere}'] = await md(pick('dispositif', d?.id));
       // État de présence de la séance (tenue de séance) : membres, présents, représentés, excusés, non excusés.
       const p = await svc.presenceSeance(org, acte.seance_id || acte.seance_visee_id);
       out['{membres_conseil}'] = String(p.membres);
@@ -498,6 +503,24 @@ function createRender({ db, audit, storage, actes, config, annexes, bureau }) {
       return d ? d.markdown : null;
     },
 
+    /** Le document bureautique d'un texte (source de vérité quand il est rédigé dans le bureau en ligne), ou `null`. */
+    async bureauDoc(row) {
+      if (!row?.bureau_file_id) return null;
+      const f = await db.get('SELECT storage_key FROM files WHERE id = $1', [row.bureau_file_id]);
+      if (!f?.storage_key) return null;
+      try { return await storage.get(f.storage_key); } catch { return null; }
+    },
+
+    /** Le PDF d'un texte rédigé dans le bureau (ou `null`) : convertit le document bureautique, mise en forme conservée. */
+    async bureauPdf(row, organismeId) {
+      const buffer = await svc.bureauDoc(row);
+      if (!buffer) return null;
+      const pdf = await convertirEnPdf(buffer, 'docx', { moteur: moteurBureau(organismeId) });
+      if (!pdf) throw E.incomplete('Conversion PDF du document bureautique indisponible sur le serveur');
+      const info = await inspectPdf(pdf);
+      return { buffer: pdf, pageCount: info.pages };
+    },
+
     /**
      * Aperçu d'un acte : exposé, une délibération, ou dossier complet (exposé + délibérations + annexes, avec sommaire).
      * mode : 'propre' | 'suivi' ; brouillon : utilise mon brouillon non enregistré (PRE-02).
@@ -553,6 +576,7 @@ function createRender({ db, audit, storage, actes, config, annexes, bureau }) {
       const exposePdf = async () => {
         if (source) return source;
         const dx = await docxPdf('expose'); if (dx) return dx;
+        const ext = await svc.bureauPdf(pick('expose', null), acte.organisme_id); if (ext) return ext;
         const tpl = await svc.getTemplate(acte.organisme_id, 'expose');
         const vars = await svc.varsFor(acte, null);
         const content = [...svc.headerItems(tpl.cfg), { type: 'runs', runs: await runs(pick('expose', null)) }];
@@ -565,17 +589,31 @@ function createRender({ db, audit, storage, actes, config, annexes, bureau }) {
         const vars = await svc.varsFor(acte, d);
         const dispLabel = tpl.cfg.sections?.dispositif ?? defautDispositif;
         const montrerVisas = meta !== 'decision'; // une décision n'a ni visas ni considérants
+        const visasRow = pick('visas', d.id); const dispRow = pick('dispositif', d.id);
+        const vExt = montrerVisas ? await svc.bureauPdf(visasRow, acte.organisme_id) : null;
+        const dExt = await svc.bureauPdf(dispRow, acte.organisme_id);
+        // Sans modèle Word, une partie rédigée dans le bureau devient son PDF (polices conservées) : on assemble alors
+        // les PDF des parties, celles restées dans l'outil étant composées par la mise en page habituelle.
+        if (vExt || dExt) {
+          const parties = [];
+          if (montrerVisas) parties.push(vExt ? vExt.buffer : (await svc.build({ organismeId: acte.organisme_id, docType: acteType, content: [...svc.headerItems(tpl.cfg), { type: 'runs', runs: await runs(visasRow) }], vars, watermark, title: `Visas — ${d.titre}` })).buffer);
+          if (dExt) parties.push(dExt.buffer);
+          else parties.push((await svc.build({ organismeId: acte.organisme_id, docType: acteType, content: [...svc.headerItems(tpl.cfg), ...(dispLabel ? [{ type: 'title', text: dispLabel, size: 11, bold: true, align: 'left', after: 4 }] : []), { type: 'runs', runs: await runs(dispRow) }], vars, watermark, title: `Délibéré — ${d.titre}` })).buffer);
+          const merged = await svc.mergePdfs(parties);
+          return { buffer: merged.buffer, pageCount: merged.pageCount };
+        }
         const content = [
           ...svc.headerItems(tpl.cfg),
-          ...(montrerVisas ? [{ type: 'runs', runs: await runs(pick('visas', d.id)) }, { type: 'space', h: 6 }] : []),
+          ...(montrerVisas ? [{ type: 'runs', runs: await runs(visasRow) }, { type: 'space', h: 6 }] : []),
           ...(dispLabel ? [{ type: 'title', text: dispLabel, size: 11, bold: true, align: 'left', after: 4 }] : []),
-          { type: 'runs', runs: await runs(pick('dispositif', d.id)) },
+          { type: 'runs', runs: await runs(dispRow) },
         ];
         return svc.build({ organismeId: acte.organisme_id, docType: acteType, content, vars, watermark, title: `${acteType === 'deliberation' ? 'Délibération' : acteType === 'decision' ? 'Décision' : 'Arrêté'} — ${d.titre}` });
       };
       const visasPdf = async (d) => {
         if (source) return source;
         const dx = await docxPdf('deliberation', d.id); if (dx) return dx;
+        const ext = await svc.bureauPdf(pick('visas', d.id), acte.organisme_id); if (ext) return ext;
         const tpl = await svc.getTemplate(acte.organisme_id, 'deliberation');
         const vars = await svc.varsFor(acte, d);
         const content = [...svc.headerItems(tpl.cfg), { type: 'runs', runs: await runs(pick('visas', d.id)) }];
@@ -584,6 +622,7 @@ function createRender({ db, audit, storage, actes, config, annexes, bureau }) {
       const dispositifPdf = async (d) => {
         if (source) return source;
         const dx = await docxPdf(acteType, d.id); if (dx) return dx;
+        const ext = await svc.bureauPdf(pick('dispositif', d.id), acte.organisme_id); if (ext) return ext;
         const tpl = await svc.getTemplate(acte.organisme_id, acteType);
         const vars = await svc.varsFor(acte, d);
         const dispLabel = tpl.cfg.sections?.dispositif ?? defautDispositif;

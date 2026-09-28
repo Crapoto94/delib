@@ -8,13 +8,15 @@
  */
 const { E } = require('../../shared/errors');
 const S = require('./spans');
+const { docxVersMarkdown } = require('../render/docx.service');
 
 const KINDS = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispositif: 'Délibéré' };
 const MAX_CHARS = 400000;
 const LOCK_MINUTES = 10;
 
-function createTextes({ db, audit, actes, acl, bus }) {
+function createTextes({ db, audit, actes, acl, bus, storage }) {
   const label = (t) => KINDS[t.kind];
+  const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
   async function authorFor(textId, ctx) {
     const cur = await db.get('SELECT * FROM text_authors WHERE text_id = $1 AND username = $2', [textId, ctx.username]);
@@ -35,6 +37,8 @@ function createTextes({ db, audit, actes, acl, bus }) {
   const summary = (t) => ({
     id: t.id, kind: t.kind, label: label(t), deliberationId: t.deliberation_id, version: t.version_no, tracking: t.tracking,
     empty: !t.markdown.trim(), characters: t.markdown.length, updatedBy: t.updated_by, updatedAt: t.updated_at,
+    // Rédigé dans le bureau en ligne : le document bureautique est la source (le markdown n'est qu'un texte de secours).
+    bureau: !!t.bureau_file_id,
     lock: t.lock_until && new Date(t.lock_until) > new Date() ? { user: t.lock_user, until: t.lock_until } : null,
   });
 
@@ -81,7 +85,9 @@ function createTextes({ db, audit, actes, acl, bus }) {
     }
     const version = t.version_no + 1;
     await db.tx(async (q) => {
-      await q.run('UPDATE tracked_texts SET markdown = $2, spans = $3::jsonb, version_no = $4, updated_by = $5 WHERE id = $1', [t.id, next, JSON.stringify(spans), version, ctx.username]);
+      // Rédaction redevenue interne : le markdown redevient la source (le document bureautique précédent est détaché ;
+      // ses versions restent consultables dans text_versions).
+      await q.run('UPDATE tracked_texts SET markdown = $2, spans = $3::jsonb, version_no = $4, updated_by = $5, bureau_file_id = NULL WHERE id = $1', [t.id, next, JSON.stringify(spans), version, ctx.username]);
       await q.run('INSERT INTO text_versions (text_id, version_no, markdown, spans, author, step_key, reason) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7)',
         [t.id, version, next, JSON.stringify(spans), ctx.username, acte.current_step_key, reason]);
       await q.run('DELETE FROM text_drafts WHERE text_id = $1 AND username = $2', [t.id, ctx.username]);
@@ -140,6 +146,56 @@ function createTextes({ db, audit, actes, acl, bus }) {
     },
 
     /**
+     * Le document bureautique d'un texte (source de vérité quand il est rédigé dans le bureau en ligne), ou `null`.
+     * Sert au bureau pour rouvrir le document TEL QU'IL EST (polices conservées), sans repasser par le markdown.
+     */
+    async bureauDocBytes(t) {
+      if (!t?.bureau_file_id) return null;
+      const f = await db.get('SELECT storage_key, original_name, mime FROM files WHERE id = $1', [t.bureau_file_id]);
+      if (!f?.storage_key) return null;
+      return { buffer: await storage.get(f.storage_key), nom: f.original_name, mime: f.mime };
+    },
+
+    /**
+     * Enregistre un texte rapporté par le bureau en ligne : le .docx devient la source (polices, tailles, styles
+     * conservés). Le markdown n'est mis à jour que comme texte de secours (recherche, complétude) ; la version, le
+     * document de chaque version et l'audit sont conservés. Même contrôle de version que `commit` : on refuse plutôt
+     * que d'écraser une version modifiée entre-temps.
+     */
+    async commitBureau(ctx, organismeId, acteId, textId, { buffer, baseVersion, nom, reason = 'bureau' }) {
+      const { acte, t } = await load(ctx, organismeId, acteId, textId, { edit: true });
+      if (t.lock_user && t.lock_user !== ctx.username && new Date(t.lock_until) > new Date()) throw E.conflict(`Texte en cours de modification par ${t.lock_user}`, { lock: { user: t.lock_user, until: t.lock_until } });
+      if (baseVersion !== t.version_no) throw E.conflict('Le texte a été modifié depuis votre lecture', { currentVersion: t.version_no, markdown: t.markdown });
+      if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) throw E.badRequest('Document bureautique invalide (Word attendu)');
+      const sha = require('crypto').createHash('sha256').update(buffer).digest('hex');
+      if (t.bureau_file_id) {
+        const cur = await db.get('SELECT sha256 FROM files WHERE id = $1', [t.bureau_file_id]);
+        if (cur?.sha256 === sha) return { changed: false, version: t.version_no, bureau: true };
+      }
+      // eslint-disable-next-line no-control-regex -- on retire les caractères de contrôle des noms de fichiers
+      const propre = String(nom || `${label(t)}.docx`).replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 200);
+      const put = await storage.put(buffer, { organismeId: acte.organisme_id, ext: 'docx', categorie: 'textes', nom: propre, auteur: ctx.username });
+      const f = await db.get(
+        `INSERT INTO files (organisme_id, storage_key, original_name, mime, size, pages, sha256, created_by, categorie)
+         VALUES ($1,$2,$3,$4,$5,NULL,$6,$7,'textes') RETURNING *`,
+        [acte.organisme_id, put.key, propre, DOCX_MIME, put.size, put.sha256, ctx.username]);
+      let markdown = t.markdown;      // secours : si l'extraction échoue, l'ancien texte est conservé (jamais le rendu)
+      try { markdown = await docxVersMarkdown(buffer); } catch { /* document illisible en texte : on garde l'ancien */ }
+      const spans = S.initialSpans(markdown);
+      const version = t.version_no + 1;
+      await db.tx(async (q) => {
+        await q.run('UPDATE tracked_texts SET markdown = $2, spans = $3::jsonb, bureau_file_id = $4, version_no = $5, updated_by = $6 WHERE id = $1',
+          [t.id, markdown, JSON.stringify(spans), f.id, version, ctx.username]);
+        await q.run('INSERT INTO text_versions (text_id, version_no, markdown, spans, author, step_key, reason, bureau_file_id) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8)',
+          [t.id, version, markdown, JSON.stringify(spans), ctx.username, acte.current_step_key, reason, f.id]);
+        await q.run('DELETE FROM text_drafts WHERE text_id = $1 AND username = $2', [t.id, ctx.username]);
+      });
+      await audit.log(ctx, { organismeId: acte.organisme_id, action: 'texte.bureau', entity: 'tracked_texts', entityId: t.id, after: { acteId: acte.id, kind: t.kind, version, fileId: f.id } });
+      await bus.emit('text.committed', { organismeId: acte.organisme_id, acteId: acte.id, textId: t.id, version, ctx });
+      return { changed: true, version, bureau: true };
+    },
+
+    /**
      * Applique un amendement adopté en séance (VOT-06) : le texte de la partie visée est remplacé, avec suivi des modifications si le suivi est actif,
      * au nom de l'amendement. Ne passe pas par les droits d'édition (l'acte est inscrit à l'ordre du jour) : l'appelant a déjà contrôlé la séance.
      */
@@ -184,8 +240,8 @@ function createTextes({ db, audit, actes, acl, bus }) {
     // ---- historique et comparaison -------------------------------------------------------------------------------------------
     async versions(ctx, organismeId, acteId, textId) {
       const { t } = await load(ctx, organismeId, acteId, textId);
-      const rows = await db.all('SELECT version_no, author, step_key, reason, created_at, length(markdown) AS characters FROM text_versions WHERE text_id = $1 ORDER BY version_no DESC', [t.id]);
-      return rows.map((r) => ({ version: r.version_no, author: r.author, stepKey: r.step_key, reason: r.reason, at: r.created_at, characters: r.characters }));
+      const rows = await db.all('SELECT version_no, author, step_key, reason, created_at, length(markdown) AS characters, bureau_file_id FROM text_versions WHERE text_id = $1 ORDER BY version_no DESC', [t.id]);
+      return rows.map((r) => ({ version: r.version_no, author: r.author, stepKey: r.step_key, reason: r.reason, at: r.created_at, characters: r.characters, bureau: !!r.bureau_file_id }));
     },
     async version(ctx, organismeId, acteId, textId, n) {
       const { t } = await load(ctx, organismeId, acteId, textId);
