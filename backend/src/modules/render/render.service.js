@@ -315,6 +315,12 @@ function createRender({ db, audit, storage, actes, config, annexes, bureau, sett
       const { pick, delibs } = await svc.textsFor(ctx, acte);
       const d = delibs.find((x) => x.id === Number(deliberationId)) || (delibs.length === 1 ? delibs[0] : null);
       const base = await svc.varsFor(acte, d);
+      // Libellé (« Délibéré »/« Décide ») et formule d'introduction du dispositif, paramétrables PAR TYPE D'ACTE :
+      // exposés en variables pour un modèle Word ({libelle_dispositif}, {formule_dispositif}).
+      const metaRow = await db.get('SELECT code, meta FROM ref_items WHERE id = $1', [acte.type_id]);
+      const signature = !!metaRow?.meta?.signature;
+      const typeActe = metaRow?.code === 'decision' ? 'decision' : metaRow?.code === 'arrete' ? 'arrete' : 'deliberation';
+      const reglages = settings ? await settings.resolve(acte.organisme_id, { typeActeId: acte.type_id }) : {};
       // Texte rédigé dans le bureau en ligne : on transmet le document bureautique LUI-MÊME, pour que sa mise en forme
       // (polices, tailles, styles) soit injectée telle quelle dans le modèle Word. Sinon, markdown → texte riche.
       const md = async (row) => {
@@ -332,6 +338,14 @@ function createRender({ db, audit, storage, actes, config, annexes, bureau, sett
       out['{visas_considerants}'] = await md(pick('visas', d?.id));
       out['{dispositif}'] = await md(pick('dispositif', d?.id));
       out['{delibere}'] = await md(pick('dispositif', d?.id));
+      const libelleDispositif = String(reglages['redaction.dispositif_libelle']?.value || (signature ? 'Décide' : 'Délibéré'));
+      const formuleDispositif = String(reglages['redaction.dispositif_entete']?.value
+        || (typeActe === 'deliberation' ? 'Après en avoir délibéré, le conseil DÉCIDE :' : 'DÉCIDE :'));
+      out['{libelle_dispositif}'] = libelleDispositif;
+      out['{libelle_delibere}'] = libelleDispositif;
+      out['{formule_dispositif}'] = formuleDispositif;
+      out['{formule_delibere}'] = formuleDispositif;
+      out['{entete_dispositif}'] = formuleDispositif;
       // État de présence de la séance (tenue de séance) : membres, présents, représentés, excusés, non excusés.
       const p = await svc.presenceSeance(org, acte.seance_id || acte.seance_visee_id);
       out['{membres_conseil}'] = String(p.membres);

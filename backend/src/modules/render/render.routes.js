@@ -48,6 +48,8 @@ const DOCX_VARS = [
   { nom: '{expose}', description: 'Exposé des motifs (texte)' },
   { nom: '{visas}', description: 'Visas et considérants (texte) — alias {considere}' },
   { nom: '{dispositif}', description: 'Délibéré (texte) — alias {delibere}' },
+  { nom: '{libelle_dispositif}', description: 'Libellé du dispositif (« Délibéré », « Décide ») — paramétrable par type d’acte (alias {libelle_delibere})' },
+  { nom: '{formule_dispositif}', description: 'Formule introduisant le dispositif (« Après en avoir délibéré, le conseil DÉCIDE : ») — paramétrable par type d’acte (alias {formule_delibere}, {entete_dispositif})' },
   { nom: '{ordre_du_jour}', description: "Gabarit « Ordre du jour » uniquement : la liste des points, une section par commission (texte riche, une ligne par point)" },
   { nom: '{statut}', description: 'Statut du dossier' },
   { nom: '{membres_conseil}', description: 'Nombre de membres composant le Conseil (tenue de séance)' },

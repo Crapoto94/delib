@@ -81,6 +81,27 @@ describe('gabarit Word (.docx) : dépôt, variables et fusion', () => {
     expect(r.body).toMatchObject({ docx: false });
   });
 
+  it('remplit {libelle_dispositif} et {formule_dispositif} avec les valeurs du type d\'acte', async () => {
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', '<Types/>');
+    zip.file('word/document.xml', '<?xml version="1.0"?><w:document><w:body>'
+      + '<w:p><w:r><w:t>{libelle_dispositif}</w:t></w:r></w:p>'
+      + '<w:p><w:r><w:t>{formule_dispositif}</w:t></w:r></w:p>'
+      + '</w:body></w:document>');
+    const up = await env.http().post(`${base()}/gabarits/deliberation/docx`).set(bearer(t.boot)).attach('file', await zip.generateAsync({ type: 'nodebuffer' }), 'modele.docx');
+    expect(up.status, JSON.stringify(up.body)).toBe(200);
+    const types = (await as(t.boot).get(`${base()}/referentiels/type_acte`)).body.items;
+    const typeId = types.find((x) => x.code === 'deliberation').id;
+    await as(t.boot).put(`${base()}/settings/redaction.dispositif_libelle`, { value: 'Délibère (perso)', scope: 'type_acte', subId: typeId });
+    await as(t.boot).put(`${base()}/settings/redaction.dispositif_entete`, { value: 'Le conseil (perso) DÉCIDE :', scope: 'type_acte', subId: typeId });
+    const xml = await xmlDe((await bin(t.boot, `${base()}/actes/${acteId}/docx`, { docType: 'deliberation' })).body);
+    expect(xml).toContain('Délibère (perso)');
+    expect(xml).toContain('Le conseil (perso) DÉCIDE :');
+    await env.http().delete(`${base()}/settings/redaction.dispositif_libelle`).query({ scope: 'type_acte', subId: typeId }).set(bearer(t.boot));
+    await env.http().delete(`${base()}/settings/redaction.dispositif_entete`).query({ scope: 'type_acte', subId: typeId }).set(bearer(t.boot));
+    await as(t.boot).del(`${base()}/gabarits/deliberation/docx`);
+  });
+
   it('un modèle Word d\'ordre du jour reçoit la liste des points via {ordre_du_jour}', async () => {
     const zip = new JSZip();
     zip.file('[Content_Types].xml', '<Types/>');
