@@ -20,26 +20,41 @@ server {
   location ^~ /api/v1/elus-auth/ {
     limit_req zone=auth burst=10 nodelay;
     proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+    proxy_connect_timeout 5s;         # backend injoignable : répondre 502 tout de suite, pas après 60 s de silence
     proxy_http_version 1.1;
     proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Forwarded-Proto $scheme;
   }
   location ^~ /api/v1/elus/ {
     limit_req zone=api burst=60 nodelay;
     proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+    proxy_connect_timeout 5s;         # backend injoignable : répondre 502 tout de suite, pas après 60 s de silence
     proxy_http_version 1.1;
     proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Forwarded-Proto $scheme;
     proxy_read_timeout 300s;           # attente longue du suivi en direct (25 s) et génération de PDF volumineux (filigrane)
     proxy_buffering off;
   }
   location = /api/status { return 200 '{"status":"ok"}'; add_header Content-Type application/json; }
+  # Diagnostic de déploiement : relaie RÉELLEMENT la sonde backend (rien n'est simulé, contrairement à /api/status).
+  # Tranche en une commande, sans navigateur et sans DNS, entre « la DMZ n'atteint pas le backend » et
+  # « le backend répond mais le navigateur n'aboutit pas » (CSP, instance enregistrée, TLS) :
+  #   curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1/api/diag
+  # 200 = nginx atteint le backend ; 502/504 = pare-feu, BACKEND_HOST ou BACKEND_PORT ; 404 = route absente du backend.
+  location = /api/diag {
+    proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT}/api/v1/elus-auth/etat;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s; proxy_read_timeout 10s;
+  }
   # Identité publique (nom + logo de la collectivité), lisible avant la connexion : deux routes précises, jamais /api/v1/public/ en entier.
   location = /api/v1/public/branding {
     proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+    proxy_connect_timeout 5s;         # backend injoignable : répondre 502 tout de suite, pas après 60 s de silence
     proxy_http_version 1.1;
     proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Forwarded-Proto $scheme;
   }
   location ~ ^/api/v1/public/organismes/[0-9]+/logo$ {
     proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
+    proxy_connect_timeout 5s;         # backend injoignable : répondre 502 tout de suite, pas après 60 s de silence
     proxy_http_version 1.1;
     proxy_set_header Host $host; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Forwarded-Proto $scheme;
   }

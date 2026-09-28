@@ -2,7 +2,7 @@ import { FormEvent, ReactNode, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, deviceId, errMsg, session } from '../api';
 import { ThemeToggle } from '../theme';
-import EtatBackend from '../EtatBackend';
+import EtatBackend, { PastilleBackend } from '../EtatBackend';
 import TabletFrame from '../TabletFrame';
 import { OrgLogo, useBranding, useFavicon } from '../Brand';
 import { isNativeApp } from '../api';
@@ -17,7 +17,10 @@ const Cadre = ({ titre, children }: { titre: string; children: ReactNode }) => {
         <EtatBackend />
         {children}
         {/* utile pour vérifier que la DMZ et le LAN servent bien la même version (deux chemins de déploiement distincts) */}
-        <p className="mt-4 text-center text-[11px] text-mute">v{__APP_VERSION__} · build {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</p>
+        <p className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] text-mute">
+          <span>v{__APP_VERSION__} · build {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</span>
+          <PastilleBackend />
+        </p>
       </div>
     </div>
   );

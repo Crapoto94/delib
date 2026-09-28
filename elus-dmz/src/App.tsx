@@ -10,7 +10,7 @@ import Recherche from './pages/Recherche';
 import Preferences from './pages/Preferences';
 import { ThemeToggle } from './theme';
 import Legal from './pages/Legal';
-import EtatBackend from './EtatBackend';
+import EtatBackend, { PastilleBackend } from './EtatBackend';
 import { OrgLogo, useBranding, useFavicon } from './Brand';
 import GroupePopover from './GroupePopover';
 import MonParapheur from './MonParapheur';
@@ -44,6 +44,8 @@ function Cadre() {
         <Link to="/cgu" className="underline hover:text-ink">Conditions générales d'utilisation</Link>
         <span aria-hidden> · </span>
         <Link to="/licence" className="underline hover:text-ink">Licence d'usage</Link>
+        <span aria-hidden> · </span>
+        <PastilleBackend />
       </footer>
     </div>
   );
