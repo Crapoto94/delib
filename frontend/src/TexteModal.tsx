@@ -123,12 +123,18 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush, top }: { act
           <button className="btn-secondary !py-1" onClick={preview}><Eye className="h-3.5 w-3.5" /> Aperçu mis en page</button></span>
         </div>
         {conflict && <div role="alert" className="border-b border-warn/30 bg-warn-bg px-4 py-2 text-warn">Ce texte a été modifié par quelqu'un d'autre. <button className="font-semibold underline" onClick={async () => { latest.current.dirty = false; setConflict(false); await load(); }}>Recharger sa version</button> (vos dernières frappes seront perdues).</div>}
-        {editing && <div className="flex items-center gap-2 border-b border-line bg-action/5 px-4 py-1.5 text-[12px] leading-snug text-slate-700">
+        {editing && !bureauDispo && <div className="flex items-center gap-2 border-b border-line bg-action/5 px-4 py-1.5 text-[12px] leading-snug text-slate-700">
           <Info className="h-3.5 w-3.5 shrink-0 text-action" aria-hidden="true" />
           <span>Vos modifications sont <b>enregistrées automatiquement</b> au fil de la frappe — rien à valider. Cliquez sur <b>« Terminer »</b> (en haut à droite) quand le texte est vraiment fini.</span>
         </div>}
+        {editing && bureauDispo && <div className="flex items-center gap-2 border-b border-line bg-action/5 px-4 py-1.5 text-[12px] leading-snug text-slate-700">
+          <Info className="h-3.5 w-3.5 shrink-0 text-action" aria-hidden="true" />
+          <span>Ce texte se modifie <b>uniquement dans le bureau en ligne</b>. Chaque enregistrement crée une version ; la vue ci-dessous en reflète le résultat.</span>
+        </div>}
         <div className="min-h-0 flex-1">
-          {editing ? <RichEditor value={text} onChange={change} mode={t.kind as EditorMode} placeholder={PLACEHOLDER[t.kind]} />
+          {/* Mode bureau en ligne : AUCUN éditeur interne — le document ne se modifie que par Word (ONLYOFFICE/Collabora).
+              On n'affiche donc que le rendu à jour, rechargé après chaque enregistrement du moteur. */}
+          {editing && !bureauDispo ? <RichEditor value={text} onChange={change} mode={t.kind as EditorMode} placeholder={PLACEHOLDER[t.kind]} />
             : <div className="h-full overflow-auto bg-soft p-4 md:p-8"><div className="mx-auto min-h-[60vh] max-w-[820px] rounded-lg border border-line bg-surface px-6 py-8 md:px-14">
               {view.markdown ? (mode === 'suivi' && view.tracking ? <SpanView spans={view.spans} /> : <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{mode === 'propre' ? view.markdown : view.markdown}</div>) : <span className="text-mute">Texte vide.</span>}</div></div>}
         </div>
