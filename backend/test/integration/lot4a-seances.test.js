@@ -226,12 +226,14 @@ describe('date limite de rédaction et dérogations', () => {
 
 describe('commissions', () => {
   let com; let com2;
-  it('crée une commission, ses membres (un président) et ses secrétaires', async () => {
+  it('crée une commission, ses membres (co-présidence possible) et ses secrétaires', async () => {
     com = (await as(admin).post(`${base()}/commissions`, { nom: 'La Ville qui débat' })).body;
     expect((await as(admin).post(`${base()}/commissions`, { nom: 'La Ville qui débat' })).status).toBe(409);
     com2 = (await as(admin).post(`${base()}/commissions`, { nom: 'La Ville solidaire' })).body;
     const elus = (await as(admin).get(`${base()}/elus`)).body.items;
-    expect((await as(admin).put(`${base()}/commissions/${com.id}/membres`, { membres: [{ eluId: elus[0].id, fonction: 'president' }, { eluId: elus[1].id, fonction: 'president' }] })).status).toBe(400);
+    const co = await as(admin).put(`${base()}/commissions/${com.id}/membres`, { membres: [{ eluId: elus[0].id, fonction: 'president' }, { eluId: elus[1].id, fonction: 'president' }] });
+    expect(co.status).toBe(200); // co-présidence : plusieurs président·e·s sont autorisés
+    expect(co.body.membres.map((m) => m.fonction)).toEqual(['president', 'president']);
     const r = await as(admin).put(`${base()}/commissions/${com.id}/membres`, { membres: [{ eluId: elus[0].id, fonction: 'president' }, { eluId: elus[1].id }] });
     expect(r.body.membres.map((m) => m.fonction)).toEqual(['president', 'membre']);
     expect((await as(admin).put(`${base()}/commissions/${com.id}/membres`, { membres: [{ eluId: 99999 }] })).status).toBe(400);

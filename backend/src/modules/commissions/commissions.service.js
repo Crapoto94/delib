@@ -79,11 +79,10 @@ function createCommissions({ db, audit, actes, acl, settings, bus, log, late = {
       return after;
     },
 
-    /** Remplace la liste des membres (élus de l'organisme) ; un président au plus. */
+    /** Remplace la liste des membres (élus de l'organisme) ; une commission peut avoir plusieurs président·e·s (co-présidence). */
     async setMembres(ctx, organismeId, id, membres) {
       const org = requireOrg(organismeId);
       const before = await svc.get(org, id);
-      if (membres.filter((m) => m.fonction === 'president').length > 1) throw E.badRequest('Une commission a un seul président');
       const ids = [...new Set(membres.map((m) => m.eluId))];
       if (ids.length !== membres.length) throw E.badRequest('Un élu ne peut figurer qu\'une fois');
       const ok = await db.all('SELECT id FROM elus WHERE organisme_id = $1 AND id = ANY($2::int[])', [org, ids]);
