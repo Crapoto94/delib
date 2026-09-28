@@ -146,13 +146,150 @@ function creerEtatRels(relsXml) {
     media: 0,
     types: new Set(),
     images: [],
+    // Styles et listes importés des documents bureautiques injectés (fusionnés dans le modèle Word).
+    styleDefs: [],
+    styleCompteur: 0,
+    stylesXml: null,
+    stylesTouche: false,
+    numDefs: [],
+    absDefs: [],
+    numMax: 0,
+    absMax: 0,
+    numberingXml: null,
+    numberingTouche: false,
+    relsTouche: false,
   };
   etat.relId = Math.max(0, ...[...etat.rels.matchAll(/Id="rId(\d+)"/g)].map((m) => Number(m[1]))) + 1;
   etat.prochainRelId = () => `rId${etat.relId++}`;
   etat.prochainMedia = (ext) => `image${++etat.media}.${String(ext || 'bin').replace(/[^a-z0-9]/gi, '') || 'bin'}`;
   etat.ajouterMedia = (nom, bytes, ext) => { etat.images.push({ nom, bytes }); if (MIME_IMAGE_DEFAUT[ext]) etat.types.add(ext); };
-  etat.ajouterRelation = (id, type, cible) => { etat.rels = etat.rels.replace('</Relationships>', `<Relationship Id="${id}" Type="${type}" Target="${cible}"/></Relationships>`); };
+  etat.ajouterRelation = (id, type, cible) => { etat.rels = etat.rels.replace('</Relationships>', `<Relationship Id="${id}" Type="${type}" Target="${cible}"/></Relationships>`); etat.relsTouche = true; };
   return etat;
+}
+
+const maxId = (xml, re) => { let m = 0; for (const g of String(xml || '').matchAll(re)) m = Math.max(m, Number(g[1])); return m; };
+
+/** Lit `word/styles.xml` et `word/numbering.xml` du document cible et amorce les compteurs d'identifiants. */
+async function chargerBases(zip, etat) {
+  const sf = zip.file('word/styles.xml'); etat.stylesXml = sf ? await sf.async('text') : null;
+  const nf = zip.file('word/numbering.xml'); etat.numberingXml = nf ? await nf.async('text') : null;
+  etat.numMax = maxId(etat.numberingXml, /<w:num\b[^>]*w:numId="(\d+)"/g);
+  etat.absMax = maxId(etat.numberingXml, /<w:abstractNum\b[^>]*w:abstractNumId="(\d+)"/g);
+}
+
+/** Numérotations d'un `word/numbering.xml` : `numId` → `<w:num>`, `abstractNumId` → `<w:abstractNum>`. */
+function lireNumbering(xml) {
+  const nums = new Map(); const abstracts = new Map();
+  for (const m of String(xml || '').matchAll(/<w:num\b[^>]*w:numId="(\d+)"[\s\S]*?<\/w:num>/g)) nums.set(m[1], m[0]);
+  for (const m of String(xml || '').matchAll(/<w:abstractNum\b[^>]*w:abstractNumId="(\d+)"[\s\S]*?<\/w:abstractNum>/g)) abstracts.set(m[1], m[0]);
+  return { nums, abstracts };
+}
+
+/**
+ * Importe les styles nommés référencés par le corps injecté (`pStyle`/`rStyle`/`tblStyle`), avec leurs dépendances
+ * (`basedOn`, `next`, `link`). Les identifiants sont préfixés pour ne pas écraser ceux du gabarit ; les références du
+ * corps ET des définitions importées sont réécrites.
+ */
+async function fusionnerStyles(src, corps, etat) {
+  const refs = new Set([...corps.matchAll(/<w:(?:pStyle|rStyle|tblStyle)\b[^>]*w:val="([^"]+)"/g)].map((m) => m[1]));
+  if (!refs.size) return corps;
+  const sf = src.file('word/styles.xml');
+  if (!sf) return corps;
+  const srcXml = await sf.async('text');
+  const defs = new Map();
+  for (const m of srcXml.matchAll(/<w:style\b[^>]*w:styleId="([^"]+)"[\s\S]*?<\/w:style>/g)) defs.set(m[1], m[0]);
+  const rename = new Map(); const ordre = []; const vus = new Set();
+  const planifier = (id) => {
+    if (!id || vus.has(id)) return;
+    vus.add(id);
+    const def = defs.get(id); if (!def) return;
+    for (const r of def.matchAll(/<w:(?:basedOn|next|link)\b[^>]*w:val="([^"]+)"/g)) planifier(r[1]);
+    rename.set(id, `vd${++etat.styleCompteur}_${id}`);
+    ordre.push(def);
+  };
+  for (const id of refs) planifier(id);
+  if (!ordre.length) return corps;
+  for (const def of ordre) {
+    let out = def.replace(/(<w:style\b[^>]*w:styleId=")([^"]+)(")/, (_t, p1, sid, p3) => `${p1}${rename.get(sid) || sid}${p3}`);
+    out = out.replace(/(<w:(?:basedOn|next|link)\b[^>]*w:val=")([^"]+)(")/g, (_t, p1, sid, p3) => `${p1}${rename.get(sid) || sid}${p3}`);
+    etat.styleDefs.push(out);
+  }
+  etat.stylesTouche = true;
+  return corps.replace(/(<w:(?:pStyle|rStyle|tblStyle)\b[^>]*w:val=")([^"]+)(")/g, (_t, p1, id, p3) => `${p1}${rename.get(id) || id}${p3}`);
+}
+
+/**
+ * Importe les numérotations (`numId`) référencées par le corps injecté et les styles importés : les définitions
+ * (`<w:num>` + `<w:abstractNum>`) sont recopiées avec des identifiants neufs, puis les références sont réécrites.
+ * `styleDepuis` limite la réécriture aux styles ajoutés par l'appelant (ceux des documents précédents sont déjà faits).
+ */
+async function fusionnerNumbering(src, corps, etat, styleDepuis = 0) {
+  const ids = new Set([...corps.matchAll(/<w:numId\b[^>]*w:val="(\d+)"/g)].map((m) => m[1]));
+  for (let i = styleDepuis; i < etat.styleDefs.length; i++) for (const m of etat.styleDefs[i].matchAll(/<w:numId\b[^>]*w:val="(\d+)"/g)) ids.add(m[1]);
+  if (!ids.size) return corps;
+  const nf = src.file('word/numbering.xml');
+  if (!nf) return corps;
+  const { nums, abstracts } = lireNumbering(await nf.async('text'));
+  if (!nums.size) return corps;
+  const rewrite = new Map(); const absMap = new Map();
+  for (const oldId of ids) {
+    if (rewrite.has(oldId)) continue;
+    const def = nums.get(oldId); if (!def) continue;
+    const om = /<w:abstractNumId\b[^>]*w:val="(\d+)"/.exec(def);
+    let newAbs = null;
+    if (om && abstracts.has(om[1])) {
+      newAbs = absMap.get(om[1]);
+      if (newAbs === undefined) {
+        newAbs = ++etat.absMax; absMap.set(om[1], newAbs);
+        etat.absDefs.push(abstracts.get(om[1]).replace(/(<w:abstractNum\b[^>]*w:abstractNumId=")(\d+)(")/, `$1${newAbs}$3`));
+      }
+    }
+    const newId = ++etat.numMax;
+    rewrite.set(oldId, newId);
+    let d = def.replace(/(<w:num\b[^>]*w:numId=")(\d+)(")/, `$1${newId}$3`);
+    if (newAbs !== null) d = d.replace(/(<w:abstractNumId\b[^>]*w:val=")(\d+)(")/, `$1${newAbs}$3`);
+    etat.numDefs.push(d);
+  }
+  if (!rewrite.size) return corps;
+  etat.numberingTouche = true;
+  for (let i = styleDepuis; i < etat.styleDefs.length; i++) etat.styleDefs[i] = etat.styleDefs[i].replace(/(<w:numId\b[^>]*w:val=")(\d+)(")/g, (_t, p1, id, p3) => `${p1}${rewrite.get(id) ?? id}${p3}`);
+  return corps.replace(/(<w:numId\b[^>]*w:val=")(\d+)(")/g, (_t, p1, id, p3) => `${p1}${rewrite.get(id) ?? id}${p3}`);
+}
+
+/** Insère un fragment dans `[Content_Types].xml`, que le fichier soit complet (`</Types>`) ou vide (`<Types/>`). */
+function poserContentType(ct, fragment) {
+  if (/<Types\s*\/>/.test(ct)) return ct.replace(/<Types\s*\/>/, `<Types>${fragment}</Types>`);
+  return ct.replace('</Types>', `${fragment}</Types>`);
+}
+
+/** Ajoute un `<Override>` de type de contenu pour une partie (`/word/styles.xml`, `/word/numbering.xml`). */
+async function assurerOverride(zip, part, contentType) {
+  const ctFile = zip.file('[Content_Types].xml');
+  if (!ctFile) return;
+  let ct = await ctFile.async('text');
+  if (new RegExp(`PartName="${escapeRe(part)}"`, 'i').test(ct)) return;
+  ct = poserContentType(ct, `<Override PartName="${part}" ContentType="${contentType}"/>`);
+  zip.file('[Content_Types].xml', ct);
+}
+
+/** Écrit les styles importés dans `word/styles.xml` du modèle (créé si absent) et pose la relation. */
+async function ecrireStyles(zip, etat) {
+  const base = etat.stylesXml || '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:styles>';
+  zip.file('word/styles.xml', base.replace('</w:styles>', `${etat.styleDefs.join('')}</w:styles>`));
+  await assurerOverride(zip, '/word/styles.xml', 'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml');
+  if (!/relationships\/styles"/.test(etat.rels)) etat.ajouterRelation(etat.prochainRelId(), 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles', 'styles.xml');
+}
+
+/** Écrit les numérotations importées dans `word/numbering.xml` (créé si absent) et pose la relation. */
+async function ecrireNumbering(zip, etat) {
+  let base = etat.numberingXml || '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:numbering>';
+  // Le schéma impose les `abstractNum` AVANT les `num` : on insère au bon endroit.
+  const absXml = etat.absDefs.join(''); const numXml = etat.numDefs.join('');
+  if (absXml) { const first = base.search(/<w:num\b/); base = first >= 0 ? base.slice(0, first) + absXml + base.slice(first) : base.replace('</w:numbering>', `${absXml}</w:numbering>`); }
+  if (numXml) base = base.replace('</w:numbering>', `${numXml}</w:numbering>`);
+  zip.file('word/numbering.xml', base);
+  await assurerOverride(zip, '/word/numbering.xml', 'application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml');
+  if (!/relationships\/numbering"/.test(etat.rels)) etat.ajouterRelation(etat.prochainRelId(), 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering', 'numbering.xml');
 }
 
 /**
@@ -221,7 +358,12 @@ async function corpsDocxPourModele(source, zip, etat) {
     remplace.set(id, rid);
   }
   // Références recopiées : nouvel identifiant ; sinon on retire l'attribut (relation non transportée).
-  return corps.replace(/(r:(?:embed|id|link))="([^"]+)"/g, (_tout, attr, id) => (remplace.has(id) ? `${attr}="${remplace.get(id)}"` : ''));
+  corps = corps.replace(/(r:(?:embed|id|link))="([^"]+)"/g, (_tout, attr, id) => (remplace.has(id) ? `${attr}="${remplace.get(id)}"` : ''));
+  // Styles nommés (« Titre 1 », styles de liste…) et numérotations : on importe leurs définitions dans le modèle.
+  const styleDepuis = etat.styleDefs.length;
+  corps = await fusionnerStyles(src, corps, etat);
+  corps = await fusionnerNumbering(src, corps, etat, styleDepuis);
+  return corps;
 }
 
 /** Fusionne un modèle .docx avec un dictionnaire `{ '{variable}': valeur }` ; renvoie le tampon .docx. */
@@ -236,6 +378,7 @@ async function remplir(buffer, variables) {
 
   const relsFile = zip.file('word/_rels/document.xml.rels');
   const etat = creerEtatRels(relsFile ? await relsFile.async('text') : RELS_DEFAUT);
+  await chargerBases(zip, etat);
   const collecteur = creerCollecteurImages(etat);
 
   const entries = Object.entries(variables).sort((a, b) => b[0].length - a[0].length);
@@ -256,13 +399,15 @@ async function remplir(buffer, variables) {
   }
 
   zip.file('word/document.xml', xml);
-  if (etat.images.length) {
-    for (const im of etat.images) zip.file(`word/media/${im.nom}`, im.bytes);
-    zip.file('word/_rels/document.xml.rels', etat.rels);
+  for (const im of etat.images) zip.file(`word/media/${im.nom}`, im.bytes);
+  if (etat.stylesTouche) await ecrireStyles(zip, etat);
+  if (etat.numberingTouche) await ecrireNumbering(zip, etat);
+  if (etat.images.length || etat.relsTouche) zip.file('word/_rels/document.xml.rels', etat.rels);
+  if (etat.types.size) {
     const ctFile = zip.file('[Content_Types].xml');
     if (ctFile) {
       let ct = await ctFile.async('text');
-      for (const ext of etat.types) if (!new RegExp(`Extension="${ext}"`, 'i').test(ct)) ct = ct.replace('</Types>', `<Default Extension="${ext}" ContentType="${MIME_IMAGE_DEFAUT[ext]}"/></Types>`);
+      for (const ext of etat.types) if (!new RegExp(`Extension="${ext}"`, 'i').test(ct)) ct = poserContentType(ct, `<Default Extension="${ext}" ContentType="${MIME_IMAGE_DEFAUT[ext]}"/>`);
       zip.file('[Content_Types].xml', ct);
     }
   }

@@ -108,6 +108,36 @@ describe('fusion d’un modèle Word (.docx)', () => {
     expect(await z.file('word/document.xml').async('text')).toContain('r:embed="rId1"');
   });
 
+  it('importe les styles nommés du document bureautique (renommés) et réécrit les références', async () => {
+    const modele = await creer(doc(para('{expose}')));
+    const z = new JSZip();
+    z.file('[Content_Types].xml', '<Types></Types>');
+    z.file('word/document.xml', doc('<w:p><w:pPr><w:pStyle w:val="TitrePerso"/></w:pPr><w:r><w:t>Style</w:t></w:r></w:p>'));
+    z.file('word/styles.xml', '<?xml version="1.0"?><w:styles xmlns:w="x"><w:style w:type="paragraph" w:styleId="TitrePerso"><w:name w:val="Titre perso"/><w:rPr><w:rFonts w:ascii="Georgia"/></w:rPr></w:style></w:styles>');
+    const source = await z.generateAsync({ type: 'nodebuffer' });
+    const out = await JSZip.loadAsync(await remplir(modele, { '{expose}': { docx: source } }));
+    expect(await out.file('word/document.xml').async('text')).toMatch(/<w:pStyle w:val="vd1_TitrePerso"\/>/);
+    const styles = await out.file('word/styles.xml').async('text');
+    expect(styles).toContain('w:styleId="vd1_TitrePerso"');
+    expect(styles).toContain('Georgia');
+  });
+
+  it('importe les listes à puces (numérotation) du document bureautique', async () => {
+    const modele = await creer(doc(para('{visas}')));
+    const z = new JSZip();
+    z.file('[Content_Types].xml', '<Types></Types>');
+    z.file('word/document.xml', doc('<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="3"/></w:numPr></w:pPr><w:r><w:t>Puces</w:t></w:r></w:p>'));
+    z.file('word/numbering.xml', '<?xml version="1.0"?><w:numbering xmlns:w="x"><w:abstractNum w:abstractNumId="7"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:num w:numId="3"><w:abstractNumId w:val="7"/></w:num></w:numbering>');
+    const source = await z.generateAsync({ type: 'nodebuffer' });
+    const out = await JSZip.loadAsync(await remplir(modele, { '{visas}': { docx: source } }));
+    expect(await out.file('word/document.xml').async('text')).toContain('<w:numId w:val="1"/>');
+    const num = await out.file('word/numbering.xml').async('text');
+    expect(num).toContain('w:numId="1"');
+    expect(num).toContain('w:abstractNumId="1"');
+    expect(num).toContain('w:numFmt w:val="bullet"');
+    expect(num.indexOf('<w:abstractNum')).toBeLessThan(num.indexOf('<w:num '));   // schéma : abstractNum avant num
+  });
+
   it('met « Article N » en gras et en MAJUSCULES dans le dispositif', async () => {
     const src = await creer(doc(para('{dispositif}')));
     const out = await lire(await remplir(src, { '{dispositif}': markdownToRich('**Article 1** : une subvention est attribuée.') }));

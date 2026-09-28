@@ -30,7 +30,7 @@ export function SpanView({ spans }: { spans: any[] }) {
 type Toast = (m: string, k?: 'ok' | 'ko') => void;
 
 /** Un texte dans la modale : chargement, enregistrement automatique avec contrôle de version, modifications suivies. */
-function Pane({ acte, t, editable, onChanged, toast, registerFlush, top }: { acte: any; t: any; editable: boolean; onChanged: () => void; toast: Toast; registerFlush: (fn: (() => Promise<void>) | null) => void; top: number }) {
+function Pane({ acte, t, editable, onChanged, toast, registerFlush, top, onTerminer }: { acte: any; t: any; editable: boolean; onChanged: () => void; toast: Toast; registerFlush: (fn: (() => Promise<void>) | null) => void; top: number; onTerminer: () => void }) {
   const { org } = useAuth(); const o = org!.id;
   const base = orgPath(o, `/actes/${acte.id}/textes/${t.id}`);
   const [view, setView] = useState<any>(null);
@@ -164,13 +164,15 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush, top }: { act
       </aside>
       {/* L'éditeur Word occupe tout l'écran SOUS l'en-tête principal (qui reste bleu et visible) : on l'aligne sur le
           même `top` que la modale de texte, et sa barre « Sauvegarder et fermer » n'est donc jamais masquée. */}
+      {/* Quitter le bureau (« Sauvegarder et fermer ») ferme la modale : on revient à la page de l'acte, sans
+          réafficher l'éditeur classique. */}
       {bureauOuvert && (
         <Bureau
           top={top}
           ouvrirUrl={orgPath(o, `/actes/${acte.id}/textes/${t.id}/ouvrir`)}
           enregistrerUrl={orgPath(o, `/actes/${acte.id}/textes/${t.id}/enregistrer`)}
           titre={textLabel(acte, t)} version={view.version}
-          onClose={() => setBureauOuvert(false)}
+          onClose={() => { setBureauOuvert(false); onTerminer(); }}
           onEnregistre={() => { latest.current.dirty = false; load(); onChanged(); }}
           avertir={(m) => toast(m, 'ko')} />
       )}
@@ -209,7 +211,7 @@ export default function TexteModal({ acte, texts, initialId, editable, onClose, 
         </nav>
         <button className="btn-primary" onClick={close}><X className="h-4 w-4" /> Terminer</button>
       </header>
-      <div className="min-h-0 flex-1"><Pane key={cur.id} acte={acte} t={cur} editable={editable} onChanged={onChanged} toast={toast} registerFlush={register} top={top} /></div>
+      <div className="min-h-0 flex-1"><Pane key={cur.id} acte={acte} t={cur} editable={editable} onChanged={onChanged} toast={toast} registerFlush={register} top={top} onTerminer={close} /></div>
     </div>
   );
 }
