@@ -14,9 +14,23 @@ const KINDS = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispo
 const MAX_CHARS = 400000;
 const LOCK_MINUTES = 10;
 
-function createTextes({ db, audit, actes, acl, bus, storage }) {
+function createTextes({ db, audit, actes, acl, bus, storage, settings }) {
   const label = (t) => KINDS[t.kind];
   const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+  /**
+   * Libellés des textes pour un acte. « Délibéré » / « Décide » et la formule d'introduction sont paramétrables PAR TYPE
+   * D'ACTE (arrêté, délibération, décision…) au niveau `type_acte` des paramètres.
+   */
+  async function libellesPour(acte) {
+    const meta = (await db.get('SELECT meta FROM ref_items WHERE id = $1', [acte.type_id]))?.meta || {};
+    const reglages = settings ? await settings.resolve(acte.organisme_id, { typeActeId: acte.type_id }) : {};
+    return {
+      expose: KINDS.expose,
+      visas: KINDS.visas,
+      dispositif: String(reglages['redaction.dispositif_libelle']?.value || (meta.signature ? 'Décide' : KINDS.dispositif)),
+    };
+  }
 
   async function authorFor(textId, ctx) {
     const cur = await db.get('SELECT * FROM text_authors WHERE text_id = $1 AND username = $2', [textId, ctx.username]);
@@ -34,8 +48,8 @@ function createTextes({ db, audit, actes, acl, bus, storage }) {
     return { acte, t };
   }
 
-  const summary = (t) => ({
-    id: t.id, kind: t.kind, label: label(t), deliberationId: t.deliberation_id, version: t.version_no, tracking: t.tracking,
+  const summary = (t, labels) => ({
+    id: t.id, kind: t.kind, label: (labels && labels[t.kind]) || label(t), deliberationId: t.deliberation_id, version: t.version_no, tracking: t.tracking,
     empty: !t.markdown.trim(), characters: t.markdown.length, updatedBy: t.updated_by, updatedAt: t.updated_at,
     // Rédigé dans le bureau en ligne : le document bureautique est la source (le markdown n'est qu'un texte de secours).
     bureau: !!t.bureau_file_id,
@@ -115,8 +129,9 @@ function createTextes({ db, audit, actes, acl, bus, storage }) {
       const acte = await actes.load(ctx, organismeId, acteId);
       const meta = (await db.get('SELECT meta FROM ref_items WHERE id = $1', [acte.type_id]))?.meta || {};
       const rows = await db.all('SELECT * FROM tracked_texts WHERE acte_id = $1 ORDER BY deliberation_id NULLS FIRST, kind DESC', [acte.id]);
+      const labels = await libellesPour(acte);
       // Un type sans exposé ni visas (décision) n'affiche que la décision elle-même, même si des textes vides subsistent d'une version antérieure.
-      return rows.filter((t) => !(meta.expose === 'none' && t.kind === 'expose') && !(meta.visas === 'none' && t.kind === 'visas')).map(summary);
+      return rows.filter((t) => !(meta.expose === 'none' && t.kind === 'expose') && !(meta.visas === 'none' && t.kind === 'visas')).map((t) => summary(t, labels));
     },
 
     async view(ctx, organismeId, acteId, textId, { mode = 'suivi', sinceAt } = {}) {
@@ -131,7 +146,7 @@ function createTextes({ db, audit, actes, acl, bus, storage }) {
       if (mode === 'propre') shown = S.initialSpans(t.markdown);
       else if (mode === 'depuis') shown = S.sinceView(spans, since);
       return {
-        ...summary(t), mode, markdown: t.markdown, spans: shown, html: mode === 'propre' ? undefined : S.annotatedMarkdown(shown),
+        ...summary(t, await libellesPour(acte)), mode, markdown: t.markdown, spans: shown, html: mode === 'propre' ? undefined : S.annotatedMarkdown(shown),
         changes: t.tracking ? S.listChanges(shown) : [], authors, since, seenVersion: seen?.version_no ?? null,
         draft: draft ? { markdown: draft.markdown, updatedAt: draft.updated_at } : null, canEdit: await acl.canEdit(ctx, acte),
       };
@@ -304,7 +319,9 @@ function createTextes({ db, audit, actes, acl, bus, storage }) {
       const rows = await db.all('SELECT kind, deliberation_id, markdown FROM tracked_texts WHERE acte_id = $1', [acte.id]);
       const out = [];
       // Un acte signé par le maire (décision, arrêté) a un « décide » (son dispositif) ; les autres un « délibéré ».
-      const dispLabel = typeMeta.signature ? 'Décide' : KINDS.dispositif;
+      // Le libellé exact est paramétrable par type d'acte.
+      const labels = acte?.type_id ? await libellesPour(acte) : { dispositif: typeMeta.signature ? 'Décide' : KINDS.dispositif };
+      const dispLabel = labels.dispositif;
       if (typeMeta.expose !== 'none' && typeMeta.expose !== 'optional') {
         const e = rows.find((r) => r.kind === 'expose');
         if (!e || !e.markdown.trim()) out.push({ code: 'expose', label: 'Exposé des motifs' });

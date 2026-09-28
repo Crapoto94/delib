@@ -347,3 +347,37 @@ describe('gabarits : marges, en-tête, fond de page', () => {
     expect(Number(plain.headers['x-page-count'])).toBe(pages);
   });
 });
+
+describe('formules paramétrables par type d\'acte', () => {
+  const textePdf = async (buf) => {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), useSystemFonts: true, verbosity: 0, isEvalSupported: false }).promise;
+    let txt = '';
+    for (let i = 1; i <= doc.numPages; i++) txt += `${(await (await doc.getPage(i)).getTextContent()).items.map((x) => x.str).join(' ')} `;
+    return txt.replace(/\s+/g, ' ');
+  };
+
+  it('le libellé et la formule du dispositif sont surchargeables pour le type d\'acte', async () => {
+    const types = (await as(admin).get(`${base()}/referentiels/type_acte`)).body.items;
+    const typeId = types.find((x) => x.code === 'deliberation').id;
+    await as(admin).post(`${base()}/roles`, { username: 'dupont', role: 'org_admin' }).catch(() => {});
+    const chef = await loginAs(env, 'dupont', 'pw-dupont');       // org_admin de la ville
+    const liste = async () => (await as(t.dupont).get(tx())).body.items;
+    expect((await liste()).find((x) => x.kind === 'dispositif').label).toBe('Délibéré');
+
+    await as(chef).put(`${base()}/settings/redaction.dispositif_libelle`, { value: 'Décision du conseil', scope: 'type_acte', subId: typeId });
+    await as(chef).put(`${base()}/settings/redaction.dispositif_entete`, { value: 'LE CONSEIL DÉCIDE SOUVERAINEMENT :', scope: 'type_acte', subId: typeId });
+
+    const l2 = await liste();
+    const disp = l2.find((x) => x.kind === 'dispositif');
+    expect(disp.label).toBe('Décision du conseil');
+    // La formule apparaît dans l'aperçu mis en page (composition PDF, sans modèle Word).
+    const r = await preview(t.dupont, { cible: 'deliberation', deliberationId: disp.deliberationId });
+    expect(r.status).toBe(200);
+    expect(await textePdf(r.body)).toContain('LE CONSEIL DÉCIDE SOUVERAINEMENT');
+
+    await env.http().delete(`${base()}/settings/redaction.dispositif_libelle`).query({ scope: 'type_acte', subId: typeId }).set(bearer(chef));
+    await env.http().delete(`${base()}/settings/redaction.dispositif_entete`).query({ scope: 'type_acte', subId: typeId }).set(bearer(chef));
+    expect((await liste()).find((x) => x.kind === 'dispositif').label).toBe('Délibéré');
+  });
+});

@@ -101,6 +101,32 @@ export function Gabarits() {
   const cur = list.data?.find((t) => t.docType === sel);
   const vars = useLoad(async () => (await api.get(orgPath(o, `/gabarits/${sel}/docx/variables`))).data.items as any[], [o, sel]);
   const docxInput = useRef<HTMLInputElement>(null);
+  // Formules propres à chaque type d'acte : libellé du texte (« Délibéré »/« Décide ») et formule d'introduction.
+  const formules = useLoad(async () => {
+    const items = (await api.get(orgPath(o, '/referentiels/type_acte'))).data.items as any[];
+    const out: any[] = [];
+    await Promise.all(items.map(async (x) => {
+      const s = (await api.get(orgPath(o, '/settings'), { params: { typeActeId: x.id } })).data.settings;
+      out.push({ id: x.id, nom: x.libelle, libelle: s['redaction.dispositif_libelle'] || null, entete: s['redaction.dispositif_entete'] || null });
+    }));
+    return out.sort((a, b) => a.nom.localeCompare(b.nom));
+  }, [o]);
+  const [formEdit, setFormEdit] = useState<Record<number, { libelle?: string; entete?: string }>>({});
+  const formuleDe = (id: number) => formules.data?.find((x: any) => x.id === id);
+  const valeurFormule = (id: number, champ: 'libelle' | 'entete') => (formEdit[id]?.[champ] !== undefined ? String(formEdit[id][champ]) : String(formuleDe(id)?.[champ]?.value ?? ''));
+  const changerFormule = (id: number, champ: 'libelle' | 'entete', v: string) => setFormEdit((s) => ({ ...s, [id]: { ...s[id], [champ]: v } }));
+  const enregistrerFormules = async (id: number) => {
+    try {
+      for (const [key, champ] of [['redaction.dispositif_libelle', 'libelle'], ['redaction.dispositif_entete', 'entete']] as const) {
+        const v = valeurFormule(id, champ).trim();
+        // Vide = valeur par défaut : on retire la valeur du type d'acte (une absence renvoie 404, sans conséquence).
+        if (!v) await api.delete(orgPath(o, `/settings/${key}`), { params: { scope: 'type_acte', subId: id } }).catch((e: any) => { if (e?.response?.status !== 404) throw e; });
+        else await api.put(orgPath(o, `/settings/${key}`), { value: v, scope: 'type_acte', subId: id });
+      }
+      setFormEdit((s) => { const c = { ...s }; delete c[id]; return c; });
+      formules.reload(); toast('Formules enregistrées');
+    } catch (e) { toast(errMsg(e), 'ko'); }
+  };
   if (list.loading && !list.data) return <Loading />;
   if (!cur) return <Empty>Aucun gabarit.</Empty>;
   const uploadDocx = async (file: File) => { try { const fd = new FormData(); fd.append('file', file); await api.post(orgPath(o, `/gabarits/${sel}/docx`), fd); toast('Modèle Word déposé'); list.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
@@ -141,6 +167,25 @@ export function Gabarits() {
             <ul className="mt-1 grid gap-1 sm:grid-cols-2">{vars.data?.map((v) => <li key={v.nom}><code className="font-mono">{v.nom}</code> — <span className="text-mute">{v.description}</span></li>)}</ul>
             <p className="mt-2 text-mute">Conditionnel : <code>{'{IF visas|texte}'}</code> n'affiche « texte » que si la variable a une valeur.</p>
           </div>
+        </section>
+
+        <section className="card p-5">
+          <h3 className="mb-1">Formules par type d'acte</h3>
+          <p className="mb-3 text-[12px] text-mute">Le <b>libellé</b> du texte (« Délibéré » / « Décide ») et la <b>formule</b> qui introduit le dispositif (« Après en avoir délibéré, le conseil DÉCIDE : ») sont propres à chaque type d'acte. Laisser vide pour la valeur par défaut (délibération : « Délibéré » / « Après en avoir délibéré, le conseil DÉCIDE : » ; décision et arrêté : « Décide » / « DÉCIDE : »).</p>
+          {formules.loading && !formules.data ? <Loading /> : (formules.data ?? []).map((x: any) => (
+            <div key={x.id} className="border-t border-line py-3 first:border-t-0">
+              <div className="mb-2 font-semibold">{x.nom}</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Libellé du texte (délibéré / décide)">
+                  <input className="input" value={valeurFormule(x.id, 'libelle')} placeholder={x.nom === 'Délibération' ? 'Délibéré' : 'Décide'} onChange={(e) => changerFormule(x.id, 'libelle', e.target.value)} />
+                </Field>
+                <Field label="Formule d'introduction du dispositif">
+                  <input className="input" value={valeurFormule(x.id, 'entete')} placeholder={x.nom === 'Délibération' ? 'Après en avoir délibéré, le conseil DÉCIDE :' : 'DÉCIDE :'} onChange={(e) => changerFormule(x.id, 'entete', e.target.value)} />
+                </Field>
+              </div>
+              <div className="mt-2 flex justify-end"><button className="btn-secondary !py-1" onClick={() => enregistrerFormules(x.id)}>Enregistrer</button></div>
+            </div>
+          ))}
         </section>
       </div>{node}
     </div>

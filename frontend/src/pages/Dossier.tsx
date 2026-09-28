@@ -295,7 +295,8 @@ function Textes({ acte, editable, onChanged, onApercu, toast }: { acte: any; edi
   if (texts.loading && !texts.data) return <Loading />;
   const dels = acte.deliberations || [];
   const list = texts.data ?? [];
-  const kindLabel = (t: any) => (t.kind === 'dispositif' ? dispositifLabel : KIND_LABEL[t.kind]);
+  // Le libellé du dispositif (« Délibéré »/« Décide ») peut être paramétré par type d'acte : l'API le renvoie.
+  const kindLabel = (t: any) => t.label || (t.kind === 'dispositif' ? dispositifLabel : KIND_LABEL[t.kind]);
   const ouvrirSigne = async () => { const m = await openPdf(() => api.get(orgPath(org!.id, `/parapheur/actes/${acte.id}/document-signe`), { responseType: 'blob' }), `${acteLabel || 'Acte'} signé(e) — ${acte.titre}`); if (m) toast(m, 'ko'); };
   const telechargerSigne = async () => { try { const r = await api.get(orgPath(org!.id, `/parapheur/actes/${acte.id}/document-signe`), { responseType: 'blob' }); const u = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = u; a.download = `${acteLabel || 'acte'}-${acte.numeroSuivi}-signe.pdf`; a.click(); URL.revokeObjectURL(u); } catch (e) { toast(errMsg(e), 'ko'); } };
   // Acte signé : la section présente le DOCUMENT OFFICIEL revenu du parapheur (signatures, mention, QR). Le texte

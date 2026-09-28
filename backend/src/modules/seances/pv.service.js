@@ -19,7 +19,7 @@ const heure = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', 
 const nom = (m) => `${m.prenom ? `${m.prenom} ` : ''}${String(m.nom).toUpperCase()}`.trim();
 const noms = (list) => list.map(nom).join(', ');
 
-function createPv({ db, audit, render, odj, tenue, actes }) {
+function createPv({ db, audit, render, odj, tenue, actes, settings }) {
   const need = async (ctx, org) => { if (!(await odj.canEditOdj(ctx, org))) throw E.forbidden('Les pièces de séance sont réservées au SCC, à la DGS et aux administrateurs'); };
   const load = async (ctx, org, seanceId) => {
     await need(ctx, org);
@@ -187,7 +187,9 @@ function createPv({ db, audit, render, odj, tenue, actes }) {
       const tx = await db.get("SELECT numero_transmis, ar_id, ar_at, sent_at, mode, date_affichage FROM tlt_transactions WHERE acte_id = $1 AND etat = 'poste' AND ar_id IS NOT NULL ORDER BY id DESC LIMIT 1", [acte.id]);
       const jourFr = (x) => (x ? new Date(x).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Paris' }) : '');
       const text = (row) => (row ? render.runsOf({ ...row, markdown: row.markdown }, 'propre') : [{ text: '', type: 'text' }]);
-      const dispLabel = tpl.cfg.sections?.dispositif ?? 'Après en avoir délibéré, le conseil DÉCIDE :';
+      const reglages = settings ? await settings.resolve(org, { typeActeId: acte.type_id }) : {};
+      const dispLabel = tpl.cfg.sections?.dispositif
+        ?? String(reglages['redaction.dispositif_entete']?.value || 'Après en avoir délibéré, le conseil DÉCIDE :');
       const mention = ['', `**Mention du vote** — séance du ${dateLong(d.seance.dateSeance)}`, '', ...voteLines(d, p, map), `**Résultat : ${RESULTAT[p.resultat] || ''}**`, '', ...bureauLines(d, map)];
       const transmission = ['', 'TRANSMIS EN PRÉFECTURE', `LE ${jourFr(tx?.sent_at)}`, 'REÇU EN PRÉFECTURE', `LE ${jourFr(tx?.ar_at)}`, "PUBLIÉ PAR VOIE D'AFFICHAGE", `LE ${jourFr(tx?.date_affichage ? `${String(tx.date_affichage).slice(0, 10)}T12:00:00Z` : tx?.ar_at)}`];
       const corps = await render.build({ organismeId: org, docType: 'deliberation', vars, watermark: wm, title: titre, cfgOverride: sansPagination, content: [

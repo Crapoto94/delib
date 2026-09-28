@@ -145,9 +145,9 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   bus.on('circuit.completed', (p) => annexes.finaliser(p.organismeId, p.acteId)); // validation finale : PDF des annexes Word/Excel
   const bureau = createBureau({ db, audit, actes, annexes, access, settings, ports: bureauPorts, config, transitoire, log, late });
   const comments = createComments({ db, audit, actes, acl, bus });
-  const textes = createTextes({ db, audit, actes, acl, bus, storage });
+  const textes = createTextes({ db, audit, actes, acl, bus, storage, settings });
   late.texts = textes;
-  const render = createRender({ db, audit, storage, refs, actes, textes, config, annexes, bureau });
+  const render = createRender({ db, audit, storage, refs, actes, textes, config, annexes, bureau, settings });
   const docs = createDocs({ render, config });
   const commissions = createCommissions({ db, audit, actes, acl, settings, bus, log, late });
   late.commissions = commissions;
@@ -163,7 +163,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const synthese = createSynthese({ db, kpis, parcours });
   const calendrier = createCalendrier({ db, audit, access, config });
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
-  const pv = createPv({ db, audit, render, odj, tenue, actes });
+  const pv = createPv({ db, audit, render, odj, tenue, actes, settings });
   const bibliotheque = createBibliotheque({ db, audit, render, pv, textes, storage });
   // télétransmission : le simulateur S²LOW tient lieu d'accès tant que le certificat n'est pas obtenu (D20, TLT-19) ; un adaptateur réel peut être injecté
   const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config, access, pv });

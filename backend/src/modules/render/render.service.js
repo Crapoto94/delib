@@ -55,7 +55,7 @@ function odjSampleItems(noms) {
   return items;
 }
 
-function createRender({ db, audit, storage, actes, config, annexes, bureau }) {
+function createRender({ db, audit, storage, actes, config, annexes, bureau, settings }) {
   // Le moteur d'édition déjà déployé (ONLYOFFICE/Collabora, D39) convertit aussi Word -> PDF : on l'essaie avant le
   // repli Microsoft Office / LibreOffice de `shared/convert.js` (mêmes rendus que ce que l'agent édite à l'écran,
   // et surtout : pas besoin d'automatisation Office headless, notoirement instable hors session interactive).
@@ -557,8 +557,11 @@ function createRender({ db, audit, storage, actes, config, annexes, bureau }) {
       const meta = (await db.get('SELECT code FROM ref_items WHERE id = $1', [acte.type_id]))?.code || null;
       const acteType = docTypeForce === 'deliberation' ? 'deliberation'
         : meta === 'decision' ? 'decision' : meta === 'arrete' ? 'arrete' : 'deliberation';
-      // Libellé du bloc de dispositif : propre au type signé (décision/arrêté) ou « le conseil DÉCIDE ».
-      const defautDispositif = acteType === 'deliberation' ? 'Après en avoir délibéré, le conseil DÉCIDE :' : 'DÉCIDE :';
+      // Formule d'introduction du dispositif : propre au type signé (décision/arrêté) ou « le conseil DÉCIDE ».
+      // Elle est paramétrable PAR TYPE D'ACTE (`redaction.dispositif_entete`, portée type_acte).
+      const reglages = settings ? await settings.resolve(acte.organisme_id, { typeActeId: acte.type_id }) : {};
+      const defautDispositif = String(reglages['redaction.dispositif_entete']?.value
+        || (acteType === 'deliberation' ? 'Après en avoir délibéré, le conseil DÉCIDE :' : 'DÉCIDE :'));
 
       const runs = async (row) => {
         if (!row) return [{ text: '', type: 'text' }];

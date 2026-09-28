@@ -150,11 +150,13 @@ function Toolbar({ editor, mode }: { editor: Editor; mode: EditorMode }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const imageAttr = editor.getAttributes('image');
   const rotateImg = (d: number) => { const r = (((Number(imageAttr.rotation) || 0) + d) % 360 + 360) % 360; editor.chain().focus().updateAttributes('image', { rotation: r }).run(); };
-  const addPara = (prefix: string) => editor.chain().focus().command(({ tr, state, dispatch }) => {
-    const end = state.doc.content.size; const p = state.schema.nodes.paragraph;
-    if (dispatch) { const last = state.doc.lastChild; const empty = !!last && last.type.name === 'paragraph' && last.content.size === 0; tr.insert(empty ? end - 1 : end, p.create(null, state.schema.text(prefix))); }
-    return true;
-  }).run();
+  // Insère « Vu » / « Considérant » à la fin ET place le curseur juste après le préfixe, pour écrire directement la suite.
+  const addPara = (prefix: string) => {
+    const end = editor.state.doc.content.size;
+    const last = editor.state.doc.lastChild;
+    const empty = !!last && last.type.name === 'paragraph' && last.content.size === 0;
+    editor.chain().focus().insertContentAt(empty ? end - 1 : end, { type: 'paragraph', content: [{ type: 'text', text: prefix }] }).run();
+  };
   return (
     <div className="flex flex-wrap items-center gap-1 border-b border-line bg-surface px-3 py-2" role="toolbar" aria-label="Mise en forme">
       <Btn title="Annuler" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}><Undo2 className="h-4 w-4" /></Btn>

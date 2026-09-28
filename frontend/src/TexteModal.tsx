@@ -13,7 +13,7 @@ import { useIa } from './useIa';
 
 export const KIND_LABEL: Record<string, string> = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispositif: 'Délibéré' };
 /** Libellé d'un texte : une décision (ou un arrêté) a un « décide » là où une délibération a un « délibéré ». */
-const textLabel = (acte: any, t: any) => (t?.kind === 'dispositif' && (acte?.typeCode === 'decision' || acte?.typeCode === 'arrete')
+const textLabel = (acte: any, t: any) => t?.label || (t?.kind === 'dispositif' && (acte?.typeCode === 'decision' || acte?.typeCode === 'arrete')
   ? 'Décide' : KIND_LABEL[t?.kind]);
 const PLACEHOLDER: Record<string, string> = {
   expose: "Résumez l'intérêt communal en quelques paragraphes simples, sans jargon juridique…",
