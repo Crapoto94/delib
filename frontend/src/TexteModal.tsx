@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentName } from './AgentName';
-import { CheckCircle2, Eye, Info, Sparkles, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Eye, Info, Pencil, Sparkles, X, XCircle } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { dt } from './format';
 import { Loading, useLoad } from './ui';
 import RichEditor, { EditorMode } from './RichEditor';
+import Bureau, { useBureau } from './Bureau';
 import AssistantPanel from './AssistantPanel';
 import BibliothequeVisas from './BibliothequeVisas';
 import { useIa } from './useIa';
@@ -40,6 +41,11 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const [side0, setSide] = useState<'suivi' | 'assistant'>('assistant');
   const ia = useIa(); const assistantOn = ia.any; // aucun usage de l'IA actif : ni bouton, ni onglet, ni panneau
   const gabarits = useLoad(async () => (await api.get(orgPath(o, '/gabarits'))).data.items as any[], [o]);
+  // Éditeur du texte : « interne » (cet éditeur) ou « externe » (bureau en ligne, Word). Le réglage est par organisme.
+  const capa = useBureau(o);
+  const reglages = useLoad(async () => (await api.get(orgPath(o, '/settings'))).data.settings as Record<string, { value?: unknown }>, [o]);
+  const [bureauOuvert, setBureauOuvert] = useState(false);
+  const [interneForce, setInterneForce] = useState(false); // repli ponctuel sur l'éditeur de l'outil
   const side = assistantOn ? side0 : 'suivi';
   const [drawer, setDrawer] = useState(false); // écran étroit : le panneau latéral s'ouvre en tiroir
   const timer = useRef<any>(null); const latest = useRef({ text: '', version: 1, dirty: false });
@@ -90,6 +96,10 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const canEdit = editable && view.canEdit;
   const tracking = view.tracking && view.changes?.length > 0;
   const editing = canEdit && mode === 'edition';
+  // Rédaction confiée au bureau en ligne : on propose de l'ouvrir plutôt que l'éditeur de l'outil (repli possible).
+  const externe = String(reglages.data?.[`redaction.editeur_${t.kind}`]?.value || 'interne') === 'externe';
+  const externePossible = editing && externe && !!capa?.enabled && !interneForce;
+  const ouvrirBureau = async () => { await commit(); setBureauOuvert(true); };
   const visas = t.kind === 'visas';
   const asideVisible = assistantOn || view.tracking || visas;
 
@@ -110,7 +120,17 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
           <span>Vos modifications sont <b>enregistrées automatiquement</b> au fil de la frappe — rien à valider. Cliquez sur <b>« Terminer »</b> (en haut à droite) quand le texte est vraiment fini.</span>
         </div>}
         <div className="min-h-0 flex-1">
-          {editing ? <RichEditor value={text} onChange={change} mode={t.kind as EditorMode} placeholder={PLACEHOLDER[t.kind]} />
+          {externePossible ? (
+            <div className="flex h-full items-center justify-center bg-soft p-6">
+              <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6 text-center shadow-card">
+                <Info className="mx-auto mb-2 h-6 w-6 text-action" aria-hidden="true" />
+                <h3 className="mb-1">Rédaction dans le bureau en ligne</h3>
+                <p className="mb-4 text-[13px] text-mute">Ce texte est paramétré pour être rédigé dans un document Word. Chaque enregistrement crée une nouvelle version ; le suivi des modifications reste actif.</p>
+                <button className="btn-primary" onClick={ouvrirBureau}><Pencil className="h-4 w-4" /> Ouvrir dans le bureau</button>
+                <button className="mt-3 block w-full text-[12px] text-mute underline" onClick={() => setInterneForce(true)}>Utiliser l'éditeur de l'outil pour cette fois</button>
+              </div>
+            </div>
+          ) : editing ? <RichEditor value={text} onChange={change} mode={t.kind as EditorMode} placeholder={PLACEHOLDER[t.kind]} />
             : <div className="h-full overflow-auto bg-soft p-4 md:p-8"><div className="mx-auto min-h-[60vh] max-w-[820px] rounded-lg border border-line bg-surface px-6 py-8 md:px-14">
               {view.markdown ? (mode === 'suivi' && view.tracking ? <SpanView spans={view.spans} /> : <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{mode === 'propre' ? view.markdown : view.markdown}</div>) : <span className="text-mute">Texte vide.</span>}</div></div>}
         </div>
@@ -138,6 +158,15 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
             </>)}
         </div>)}
       </aside>
+      {bureauOuvert && (
+        <Bureau
+          ouvrirUrl={orgPath(o, `/actes/${acte.id}/textes/${t.id}/ouvrir`)}
+          enregistrerUrl={orgPath(o, `/actes/${acte.id}/textes/${t.id}/enregistrer`)}
+          titre={textLabel(acte, t)} version={view.version}
+          onClose={() => { setBureauOuvert(false); setInterneForce(false); }}
+          onEnregistre={() => { latest.current.dirty = false; load(); onChanged(); }}
+          avertir={(m) => toast(m, 'ko')} />
+      )}
     </div>
   );
 }

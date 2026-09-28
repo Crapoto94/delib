@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { api, errMsg, org as orgPath } from './api';
-import { useAuth } from './auth';
 import { Spinner } from './ui';
 
 /**
@@ -53,8 +52,9 @@ export function peutEditer(capa: Capa | null, annexe: any) {
   return !!ext && capa.formats.includes(ext) && ext !== 'pdf';
 }
 
-export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir }: {
-  acteId: number; annexe: any; onClose: () => void; onEnregistre: () => void; avertir: (m: string) => void;
+export default function Bureau({ ouvrirUrl, enregistrerUrl, titre, version, onClose, onEnregistre, avertir }: {
+  ouvrirUrl: string; enregistrerUrl: string; titre: string; version?: number;
+  onClose: () => void; onEnregistre: () => void; avertir: (m: string) => void;
 }) {
   const zone = useRef<HTMLDivElement>(null);
   const editeur = useRef<any>(null);
@@ -64,8 +64,6 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
   const fermeApres = useRef(false);          // l'agent a demandé « Sauvegarder et fermer »
   const [erreur, setErreur] = useState<string | null>(null);
   const [etat, setEtat] = useState<'chargement' | 'enregistrement' | 'pret' | 'enregistre'>('chargement');
-  const { org } = useAuth();
-  const o = org!.id;
   // `fermer` est défini plus bas : les messages reçus de Collabora y accèdent par cette référence.
   const fermerRef = useRef<(() => void) | null>(null);
 
@@ -82,7 +80,7 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
       try {
         // 1. le backend prépare la session d'édition et renvoie soit la configuration signée (ONLYOFFICE), soit
         //    l'adresse de l'iframe (Collabora)
-        const r = await api.post(orgPath(o, `/actes/${acteId}/annexes/${annexe.id}/ouvrir`), {});
+        const r = await api.post(ouvrirUrl, {});
         if (!vivant) return;
         cle.current = r.data.cle;
         moteur.current = String(r.data.moteur || 'onlyoffice');
@@ -93,7 +91,7 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
           const cadre = document.createElement('iframe');
           cadre.id = `bureau-${Math.random().toString(36).slice(2)}`;
           cadre.src = r.data.src;
-          cadre.title = `Édition de ${annexe.titre || annexe.fichier?.nom}`;
+          cadre.title = `Édition de ${titre}`;
           cadre.style.width = '100%'; cadre.style.height = '100%'; cadre.style.border = '0';
           cadre.allow = 'clipboard-read; clipboard-write';
           zone.current.appendChild(cadre);
@@ -144,7 +142,7 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
       editeur.current = null;
       if (zone.current) zone.current.replaceChildren();   // on repart d'une zone vide (le SDK y a mis son iframe)
     };
-  }, [acteId, annexe.id]);
+  }, [ouvrirUrl]);
 
   /** Parle à l'iframe Collabora : elle est de même origine (le relais sert le moteur sous notre origine). */
   const posterCollabora = (message: Record<string, unknown>) => {
@@ -166,7 +164,7 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
     if (!cle.current) { onEnregistre(); onClose(); return; }
     fermeApres.current = true;
     setEtat('enregistrement');
-    const enregistrement = api.post(orgPath(o, `/actes/${acteId}/annexes/${annexe.id}/enregistrer`), { cle: cle.current });
+    const enregistrement = api.post(enregistrerUrl, { cle: cle.current });
     if (moteur.current === 'collabora') posterCollabora({ MessageId: 'Action_Save', Values: { DontTerminateEdit: true, Notify: true } });
     enregistrement
       .then((r) => { if (r.data && r.data.enregistre === false && r.data.raison) avertir(r.data.raison); })
@@ -188,10 +186,10 @@ export default function Bureau({ acteId, annexe, onClose, onEnregistre, avertir 
   fermerRef.current = fermer;   // Collabora peut demander la fermeture (Cmd/Ctrl+W) : il passe par ici.
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={`Édition de ${annexe.titre}`}>
+    <div className="fixed inset-0 z-[60] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={`Édition de ${titre}`}>
       <div className="flex items-center gap-3 border-b border-line px-4 py-2">
-        <strong className="min-w-0 truncate">{annexe.titre || annexe.fichier?.nom}</strong>
-        <span className="text-[12px] text-mute">v{annexe.version} · chaque enregistrement est conservé</span>
+        <strong className="min-w-0 truncate">{titre}</strong>
+        <span className="text-[12px] text-mute">{version ? `v${version} · ` : ''}chaque enregistrement est conservé</span>
         <span className="ml-auto flex items-center gap-1 text-[12px]" role="status" aria-live="polite">
           {etat === 'chargement' ? <><Spinner /> Ouverture…</>
           : etat === 'enregistrement' ? <><Spinner /> Enregistrement…</>

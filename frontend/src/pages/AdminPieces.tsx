@@ -10,12 +10,22 @@ import { useBureau } from '../Bureau';
  * dossier simple de l'ordre du jour. Défaut 30 Mo, borné par le plafond technique du serveur (`MAX_UPLOAD_MB`),
  * et édition en ligne des annexes Word / Excel / présentation dans le navigateur (bureau en ligne), avec le choix
  * du moteur de documents — ONLYOFFICE ou Collabora — pour l'organisme.
+ *
+ * On y choisit aussi, texte par texte (exposé, « Vu et considérant », délibéré), l'éditeur de rédaction : l'éditeur de
+ * l'outil ou le bureau en ligne. Le réglage est porté par l'organisme (`redaction.editeur_<kind>`).
  */
 
 const LIBELLES_MOTEURS: Record<string, string> = {
   onlyoffice: 'ONLYOFFICE Docs',
   collabora: 'Collabora Online',
 };
+
+/** Les textes dont on peut choisir l'éditeur (interne à l'outil, ou bureau en ligne). */
+const TEXTES_EDITABLES: { kind: string; label: string }[] = [
+  { kind: 'expose', label: 'Exposé des motifs' },
+  { kind: 'visas', label: 'Vu et considérant' },
+  { kind: 'dispositif', label: 'Délibéré' },
+];
 
 export default function AdminPieces() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
@@ -42,6 +52,12 @@ export default function AdminPieces() {
       reglage.reload();
       toast('Moteur d’édition enregistré');
     } catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  // Éditeur d'un texte : « interne » (éditeur de l'outil) ou « externe » (bureau en ligne, Word / ONLYOFFICE / Collabora).
+  const editeurDe = (kind: string) => String(reglage.data?.[`redaction.editeur_${kind}`]?.value || 'interne');
+  const changerEditeur = async (kind: string, v: string) => {
+    try { await api.put(orgPath(o, `/settings/redaction.editeur_${kind}`), { value: v, scope: 'organisme' }); reglage.reload(); toast(v === 'externe' ? 'Texte confié au bureau en ligne' : "Texte rendu à l'éditeur de l'outil"); }
+    catch (e) { toast(errMsg(e), 'ko'); }
   };
   const save = async () => {
     setBusy(true);
@@ -90,6 +106,25 @@ export default function AdminPieces() {
           </>
         ) : (
           <p className="text-[13px] text-mute">Aucun serveur de documents n'est déployé sur cette instance : le dépôt de fichiers et la conversion en PDF fonctionnent comme d'habitude.{bureau?.raison ? ` (${bureau.raison})` : ''}</p>
+        )}
+      </section>
+
+      <section className="card p-5">
+        <h3 className="mb-1">Rédaction des textes : éditeur de l'outil ou bureau en ligne</h3>
+        <p className="mb-4 text-[13px] text-mute">Choisissez, texte par texte, l'éditeur utilisé pour la rédaction. L'<b>éditeur de l'outil</b> offre la mise en forme simple et le suivi des modifications ; le <b>bureau en ligne</b> ouvre le texte dans un document Word (ONLYOFFICE ou Collabora) et réimporte chaque enregistrement comme une nouvelle version du texte. Le suivi des modifications et l'historique sont conservés dans les deux cas.</p>
+        {!bureau?.enabled ? (
+          <p className="text-[13px] text-mute">Aucun serveur de documents n'est disponible pour cet organisme : l'éditeur de l'outil est utilisé pour tous les textes.{bureau?.raison ? ` (${bureau.raison})` : ''}</p>
+        ) : (
+          <div className="space-y-3">
+            {TEXTES_EDITABLES.map(({ kind, label }) => (
+              <Field key={kind} label={label} hint={kind === 'dispositif' ? "Pour une décision ou un arrêté, ce texte est le « Décide »." : undefined}>
+                <select className="input w-80" value={editeurDe(kind)} onChange={(e) => changerEditeur(kind, e.target.value)}>
+                  <option value="interne">Éditeur de l'outil</option>
+                  <option value="externe">Bureau en ligne ({LIBELLES_MOTEURS[bureau.moteur || ''] || bureau.moteur})</option>
+                </select>
+              </Field>
+            ))}
+          </div>
         )}
       </section>{node}
     </div>

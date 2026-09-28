@@ -13,6 +13,7 @@ const Id = z.coerce.number().int().positive();
 const Org = z.object({ orgId: Id });
 const P = Org.extend({ id: Id });
 const PA = P.extend({ annexeId: Id });
+const PTx = P.extend({ textId: Id });
 const Cle = z.object({ cle: z.string().regex(/^[0-9a-f]{32}$/, 'clé invalide') });
 const CleSession = z.object({ cle: z.string().regex(/^[0-9a-f]{32}$/, 'clé de session invalide') });
 const T = ['bureau'];
@@ -41,6 +42,24 @@ module.exports = ({ makeRouter, bureau, bureauPorts }) => {
   }, async (req, res) => {
     const { cle } = CleSession.parse(req.body || {});
     res.json(await bureau.enregistrer(req.ctx, req.org.id, req.valid.params.id, req.valid.params.annexeId, cle));
+  });
+
+  const rtx = makeRouter('/api/v1/organismes/:orgId/actes/:id/textes');
+  rtx.post('/:textId/ouvrir', {
+    summary: "Ouvre un texte suivi (exposé, vus et considérants, délibéré) dans le bureau en ligne", tags: T, org: true, params: PTx,
+    description: "Le texte (markdown) est converti en document Word et ouvert dans le serveur de documents. Chaque "
+      + "enregistrement revient sous forme de .docx, est reconverti en markdown puis enregistré par le chemin ordinaire "
+      + "du texte : nouvelle version, suivi des modifications et audit conservés. Le droit est celui de la rédaction.",
+  }, async (req, res) => {
+    const mobile = /Android|iPhone|iPad|Mobile/i.test(String(req.get('user-agent') || ''));
+    res.json(await bureau.ouvrirTexte(req.ctx, req.org.id, req.valid.params.id, req.valid.params.textId, { mobile, userAgent: req.get('user-agent') }));
+  });
+
+  rtx.post('/:textId/enregistrer', {
+    summary: 'Enregistre la session d’édition du texte en cours (Sauvegarder et fermer)', tags: T, org: true, params: PTx,
+  }, async (req, res) => {
+    const { cle } = CleSession.parse(req.body || {});
+    res.json(await bureau.enregistrerTexte(req.ctx, req.org.id, req.valid.params.id, req.valid.params.textId, cle));
   });
 
   // ---- côté moteur de documents : sans session applicative.
@@ -87,5 +106,5 @@ module.exports = ({ makeRouter, bureau, bureauPorts }) => {
     }
   }
 
-  return [org, r, pub, ...(w ? [w] : [])];
+  return [org, r, rtx, pub, ...(w ? [w] : [])];
 };

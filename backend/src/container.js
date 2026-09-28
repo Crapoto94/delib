@@ -143,7 +143,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const actes = createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings });
   const annexes = createAnnexes({ db, audit, storage, refs, actes, config, bus, uploadLimit, bureau: bureauConversion });
   bus.on('circuit.completed', (p) => annexes.finaliser(p.organismeId, p.acteId)); // validation finale : PDF des annexes Word/Excel
-  const bureau = createBureau({ db, audit, actes, annexes, access, settings, ports: bureauPorts, config, transitoire, log });
+  const bureau = createBureau({ db, audit, actes, annexes, access, settings, ports: bureauPorts, config, transitoire, log, late });
   const comments = createComments({ db, audit, actes, acl, bus });
   const textes = createTextes({ db, audit, actes, acl, bus });
   late.texts = textes;

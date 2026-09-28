@@ -438,7 +438,11 @@ function Annexes({ acte, editable, toast }: { acte: any; editable: boolean; toas
             {editable && <button className="text-slate-600 hover:text-ko" aria-label="Supprimer" onClick={async () => { if (confirm(`Supprimer « ${a.titre} » ?`)) { await api.delete(orgPath(o, `/actes/${acte.id}/annexes/${a.id}`)); list.reload(); } }}><Trash2 className="h-5 w-5" /></button>}
           </li>))}</ul>
       )}
-      {bureau && <Bureau acteId={acte.id} annexe={bureau} onClose={() => setBureau(null)} onEnregistre={() => list.reload()} avertir={(m) => toast(m, 'ko')} />}
+      {bureau && <Bureau
+        ouvrirUrl={orgPath(o, `/actes/${acte.id}/annexes/${bureau.id}/ouvrir`)}
+        enregistrerUrl={orgPath(o, `/actes/${acte.id}/annexes/${bureau.id}/enregistrer`)}
+        titre={bureau.titre || bureau.fichier?.nom} version={bureau.version}
+        onClose={() => setBureau(null)} onEnregistre={() => list.reload()} avertir={(m) => toast(m, 'ko')} />}
       {historique && <VersionsAnnexe acte={acte} annexe={historique} onClose={() => setHistorique(null)} toast={toast} />}
     </section>
   );

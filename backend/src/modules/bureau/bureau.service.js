@@ -17,11 +17,15 @@
  */
 const crypto = require('crypto');
 const { E } = require('../../shared/errors');
+const { markdownVersDocx, docxVersMarkdown } = require('../render/docx.service');
 
 const DUREE_SESSION_MIN = 30;      // le lien de téléchargement du moteur n'a pas à vivre plus longtemps
 const PURGE_JOURS = 7;             // sessions inachevées (onglet fermé sans enregistrer) : on les oublie après une semaine
 const DELAI_FERMETURE_MS = 12000; // Collabora écrit en fin de session : on attend sa venue avant de répondre
 const MOTEURS = ['onlyoffice', 'collabora', 'simulateur'];
+// Libellé d'un texte suivi, pour nommer le document Word remis au moteur (exposé, « Vu et considérant », délibéré).
+const NOMS_TEXTE = { expose: 'Exposé des motifs', visas: 'Vu et considérant', dispositif: 'Délibéré' };
+const nomFichierTexte = (t) => `${NOMS_TEXTE[t.kind] || 'Texte'}.docx`;
 const MIMES_BUREAU = {             // extension attendue -> mime renvoyé au moteur
   doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   rtf: 'application/rtf', odt: 'application/vnd.oasis.opendocument.text', txt: 'text/plain',
@@ -32,7 +36,7 @@ const MIMES_BUREAU = {             // extension attendue -> mime renvoyé au mot
 };
 const extDe = (nom) => String(nom || '').split('.').pop().toLowerCase();
 
-function createBureau({ db, audit, actes, annexes, access, settings, ports, config, transitoire, log }) {
+function createBureau({ db, audit, actes, annexes, access, settings, ports, config, transitoire, log, late }) {
   const urlRappel = () => String(config.bureau.urlRappel || '').replace(/\/+$/, '');
   // Enregistrements « forcés » en attente : la commande part vers le moteur, qui rappelle notre route pour livrer le
   // document. La promesse évite de fermer l'éditeur avant que la version existe réellement.
@@ -72,6 +76,52 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
    */
   async function cloreSession(s, version) {
     await db.run('UPDATE bureau_sessions SET consomme_at = COALESCE(consomme_at, now()), version = $2 WHERE id = $1', [s.id, version]);
+  }
+
+  /**
+   * « Sauvegarder et fermer » — le corps commun aux annexes et aux textes : la seule différence est la session visée.
+   * Le sens de l'opération dépend du moteur (voir `enregistrer`) ; cette fonction ne fait qu'attendre la version.
+   */
+  async function fermerSession(s, port) {
+    const attente = attendreSauvegarde(s.cle, port.moteur === 'collabora' ? DELAI_FERMETURE_MS : DELAI_SAUVEGARDE_MS);
+    const demande = await port.forcerSauvegarde(s.cle);
+    if (!demande?.ok) { attentes.delete(s.cle); return { enregistre: false, raison: 'Le serveur de documents n’a pas accepté la sauvegarde.' }; }
+    // « Aucune modification à enregistrer » : le document est déjà à jour côté moteur. On laisse toutefois une courte
+    // grâce à un enregistrement déjà lancé par l'éditeur (l'agent clique pendant que le navigateur envoie encore ses
+    // dernières frappes) : s'il arrive, c'est cette version-là qui compte.
+    if (demande.inchange) {
+      const tard = await Promise.race([attente, new Promise((r) => setTimeout(() => r(null), 3000))]);
+      attentes.delete(s.cle);
+      return tard ? { enregistre: true, version: tard } : { enregistre: true, version: s.version, inchange: true };
+    }
+    // Fin de session (Collabora) : l'écriture peut ne pas venir du tout — rien n'avait été modifié depuis le dernier
+    // enregistrement automatique. C'est une bonne nouvelle, pas un échec : on le dit explicitement.
+    if (demande.fermeture) {
+      const version = await attente;
+      if (version) return { enregistre: true, version };
+      const courant = await db.get('SELECT version FROM bureau_sessions WHERE cle = $1', [s.cle]);
+      return { enregistre: true, version: courant?.version || s.version, inchange: true };
+    }
+    const version = await attente;
+    if (!version) {
+      // Le moteur n'a rien renvoyé dans le délai : l'agent ne doit pas rester bloqué, on lui rend la main.
+      log?.warn?.({ session: s.id }, 'sauvegarde forcée sans réponse du moteur');
+      return { enregistre: false, raison: 'Le serveur de documents n’a pas confirmé l’enregistrement.' };
+    }
+    return { enregistre: true, version };
+  }
+
+  /** Le document Word d'un texte suivi, à partir de son markdown. Mis en cache le temps de la session (CheckFileInfo puis GetFile). */
+  const cacheTexte = new Map();
+  async function docxDuTexte(s) {
+    const t = await db.get('SELECT * FROM tracked_texts WHERE id = $1 AND acte_id = $2', [s.texte_id, s.acte_id]);
+    if (!t) throw E.notFound('Texte introuvable');
+    const enCache = cacheTexte.get(s.cle);
+    if (enCache && enCache.version === t.version_no) return { buffer: enCache.buffer, t };
+    const buffer = await markdownVersDocx(t.markdown);
+    if (cacheTexte.size > 200) cacheTexte.clear();
+    cacheTexte.set(s.cle, { version: t.version_no, buffer });
+    return { buffer, t };
   }
 
   const svc = {
@@ -141,6 +191,39 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
     },
 
     /**
+     * Ouvre un texte suivi (exposé, « Vu et considérant », délibéré) dans le bureau en ligne. Le serveur de documents
+     * reçoit un Word fabriqué à partir du markdown ; l'enregistrement rapporté est reconverti et enregistré par le
+     * chemin ordinaire des textes. Le droit est celui de la rédaction (`edit: true`), donc le gel après transmission
+     * s'applique comme pour une annexe.
+     */
+    async ouvrirTexte(ctx, organismeId, acteId, textId, { mobile = false, userAgent = '' } = {}) {
+      await purger();
+      const capa = await svc.capabilities(ctx, organismeId);
+      if (!capa.enabled) throw E.incomplete(capa.raison || 'Édition en ligne indisponible');
+      const port = await portPour(organismeId);
+      const a = await actes.load(ctx, organismeId, acteId, { edit: true });
+      const t = await db.get('SELECT * FROM tracked_texts WHERE id = $1 AND acte_id = $2', [textId, a.id]);
+      if (!t) throw E.notFound('Texte introuvable');
+      if (t.lock_user && t.lock_user !== ctx.username && new Date(t.lock_until) > new Date())
+        throw E.conflict(`Texte en cours de modification par ${t.lock_user}`);
+      const nom = nomFichierTexte(t);
+      const cle = crypto.randomBytes(16).toString('hex');
+      const session = await db.get(
+        `INSERT INTO bureau_sessions (cle, usage, organisme_id, acte_id, annexe_id, texte_id, username, kind, version, user_agent, moteur, expire_at)
+         VALUES ($1,'edition',$2,$3,NULL,$4,$5,$6,$7,$8,$9, now() + ($10 || ' minutes')::interval) RETURNING *`,
+        [cle, a.organisme_id, a.id, t.id, ctx.username, ctx.kind || 'ad', t.version_no, String(userAgent || '').slice(0, 300), port.moteur || config.bureau.moteur, DUREE_SESSION_MIN]);
+      const ouvert = port.open({
+        cle, nom, mime: MIMES_BUREAU.docx, urlRappel: urlRappel(),
+        url: `${urlRappel()}/api/v1/public/bureau/fichier/${cle}`,
+        user: { id: ctx.username, username: ctx.username, name: ctx.displayName || ctx.username },
+        mobile,
+      });
+      if (!ouvert) { await db.run('DELETE FROM bureau_sessions WHERE id = $1', [session.id]); throw E.incomplete('Le serveur de documents ne peut pas ouvrir ce format'); }
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'bureau.ouvrir_texte', entity: 'tracked_texts', entityId: t.id, after: { version: t.version_no, kind: t.kind, moteur: port.moteur } });
+      return { ...ouvert, cle, version: t.version_no, nom, moteur: port.moteur };
+    },
+
+    /**
      * « Sauvegarder et fermer ». Le sens de l'opération dépend du moteur :
      *   - ONLYOFFICE : on lui ordonne d'enregistrer maintenant (POST /command) et on attend la version ;
      *   - Collabora : la commande n'existe pas. L'interface a déjà retiré l'iframe, ce qui termine la session : le
@@ -153,39 +236,27 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
            AND annexe_id = $4 AND username = $5 AND expire_at > now()`,
         [String(cle || ''), organismeId, acteId, annexeId, ctx.username]);
       if (!s) throw E.notFound('Session d’édition introuvable ou expirée');
-      const port = await portPour(organismeId);
-      const attente = attendreSauvegarde(s.cle, port.moteur === 'collabora' ? DELAI_FERMETURE_MS : DELAI_SAUVEGARDE_MS);
-      const demande = await port.forcerSauvegarde(s.cle);
-      if (!demande?.ok) { attentes.delete(s.cle); return { enregistre: false, raison: 'Le serveur de documents n’a pas accepté la sauvegarde.' }; }
-      // « Aucune modification à enregistrer » : le document est déjà à jour côté moteur. On laisse toutefois une courte
-      // grâce à un enregistrement déjà lancé par l'éditeur (l'agent clique pendant que le navigateur envoie encore ses
-      // dernières frappes) : s'il arrive, c'est cette version-là qui compte.
-      if (demande.inchange) {
-        const tard = await Promise.race([attente, new Promise((r) => setTimeout(() => r(null), 3000))]);
-        attentes.delete(s.cle);
-        return tard ? { enregistre: true, version: tard } : { enregistre: true, version: s.version, inchange: true };
-      }
-      // Fin de session (Collabora) : l'écriture peut ne pas venir du tout — rien n'avait été modifié depuis le dernier
-      // enregistrement automatique. C'est une bonne nouvelle, pas un échec : on le dit explicitement.
-      if (demande.fermeture) {
-        const version = await attente;
-        if (version) return { enregistre: true, version };
-        const courant = await db.get('SELECT version FROM bureau_sessions WHERE cle = $1', [s.cle]);
-        return { enregistre: true, version: courant?.version || s.version, inchange: true };
-      }
-      const version = await attente;
-      if (!version) {
-        // Le moteur n'a rien renvoyé dans le délai : l'agent ne doit pas rester bloqué, on lui rend la main.
-        log?.warn?.({ annexeId: s.annexe_id }, 'sauvegarde forcée sans réponse du moteur');
-        return { enregistre: false, raison: 'Le serveur de documents n’a pas confirmé l’enregistrement.' };
-      }
-      return { enregistre: true, version };
+      return fermerSession(s, await portPour(organismeId));
+    },
+
+    /** Même « Sauvegarder et fermer », pour la session d'édition d'un texte suivi. */
+    async enregistrerTexte(ctx, organismeId, acteId, textId, cle) {
+      const s = await db.get(
+        `SELECT * FROM bureau_sessions WHERE cle = $1 AND usage = 'edition' AND organisme_id = $2 AND acte_id = $3
+           AND texte_id = $4 AND username = $5 AND expire_at > now()`,
+        [String(cle || ''), organismeId, acteId, textId, ctx.username]);
+      if (!s) throw E.notFound('Session d’édition introuvable ou expirée');
+      return fermerSession(s, await portPour(organismeId));
     },
 
     /** Fichier source d'une session d'édition : c'est le moteur qui le demande, avec l'adresse opaque de la session. */
     async fichierDeSession(cle) {
       const s = await db.get(`SELECT * FROM bureau_sessions WHERE cle = $1 AND usage = 'edition' AND expire_at > now()`, [String(cle || '')]);
       if (!s) throw E.notFound('Session introuvable ou expirée');
+      if (s.texte_id) {
+        const { buffer, t } = await docxDuTexte(s);
+        return { buffer, name: nomFichierTexte(t), mime: MIMES_BUREAU.docx };
+      }
       const f = await annexes.contenuParId(s.annexe_id);
       return f;
     },
@@ -225,6 +296,7 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
      * l'agent a été révoqué entre-temps, l'écriture est refusée.
      */
     async enregistrerDepuisMoteur(s, buffer, ext) {
+      if (s.texte_id) return enregistrerTexteDepuisMoteur(s, buffer);
       const nom = await nomDepuis(s.annexe_id, ext);
       let sortie;
       try {
@@ -281,6 +353,22 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
      * l'annexe : Collabora s'en sert pour savoir que le document a changé depuis son dernier chargement.
      */
     async infoWopi(s) {
+      if (s.texte_id) {
+        const { buffer, t } = await docxDuTexte(s);
+        const info = {
+          BaseFileName: nomFichierTexte(t),
+          Size: buffer.length,
+          Version: `${t.version_no}.0`,
+          UserId: s.username, UserFriendlyName: s.username, OwnerId: s.username,
+          UserCanWrite: true, UserCanNotWriteRelative: true,
+          SupportsUpdate: true, SupportsLocks: true, SupportsGetLock: true, SupportsExtendedLockLength: true,
+          SupportsRename: false, SupportsCoauth: false, IsAnonymousUser: false, LicenseCheckForEditIsEnabled: false,
+          LastModifiedTime: new Date(t.updated_at || Date.now()).toUTCString(),
+          BreadcrumbBrandName: 'VibeDélib', BreadcrumbDocName: nomFichierTexte(t), BreadcrumbFolderName: '',
+        };
+        if (config.publicBaseUrl) info.PostMessageOrigin = new URL(config.publicBaseUrl).origin;
+        return info;
+      }
       const x = await db.get(
         `SELECT x.version, x.titre, f.original_name, f.size, f.created_at FROM annexes x JOIN files f ON f.id = x.file_id WHERE x.id = $1`,
         [s.annexe_id]);
@@ -313,16 +401,46 @@ function createBureau({ db, audit, actes, annexes, access, settings, ports, conf
 
     /** GetFile : le document à éditer, tel qu'il est dans le dossier. */
     async fichierWopi(s) {
+      if (s.texte_id) {
+        const { buffer, t } = await docxDuTexte(s);
+        return { buffer, name: nomFichierTexte(t), mime: MIMES_BUREAU.docx };
+      }
       const f = await annexes.contenuParId(s.annexe_id);
       return { buffer: f.buffer, name: f.name, mime: f.mime };
     },
 
     /** PutFile : Collabora garde l'extension qu'il a reçue (pas de « enregistrer sous »), on relit donc le nom courant. */
     async enregistrerDepuisMoteurWopi(s, buffer) {
+      if (s.texte_id) return svc.enregistrerDepuisMoteur(s, buffer, 'docx');
       const x = await db.get('SELECT f.original_name FROM annexes a JOIN files f ON f.id = a.file_id WHERE a.id = $1', [s.annexe_id]);
       return svc.enregistrerDepuisMoteur(s, buffer, extDe(x?.original_name));
     },
   };
+
+  /**
+   * Écriture d'un texte suivi rapporté par le moteur : le .docx est reconverti en markdown, puis enregistré par le
+   * chemin ordinaire des textes (version, suivi des modifications, audit). La version ouverte fait foi : si le texte a
+   * changé entre-temps (édition interne, autre session), l'écriture est refusée plutôt qu'écrasée — comme pour une annexe.
+   */
+  async function enregistrerTexteDepuisMoteur(s, buffer) {
+    let markdown;
+    try { markdown = await docxVersMarkdown(buffer); }
+    catch (e) { log?.warn?.({ textId: s.texte_id, err: e.message }, 'document Word du texte illisible'); return { refuse: 'conversion' }; }
+    try {
+      const auteur = await access.loadContext(s.username, s.kind || 'ad');
+      const r = await late.texts.commit(auteur, s.organisme_id, s.acte_id, s.texte_id, { markdown, baseVersion: s.version, reason: 'bureau' });
+      await cloreSession(s, r.version);
+      log?.info?.({ textId: s.texte_id, version: r.version, moteur: s.moteur }, 'texte enregistré depuis le bureau en ligne');
+      const attente = attentes.get(s.cle);      // une demande « Sauvegarder et fermer » attend peut-être cette version
+      if (attente) attente(r.version);
+      return { version: r.version, changed: r.changed };
+    } catch (e) {
+      const motif = e?.code === 403 ? 'droit' : e?.code === 409 ? 'conflit' : 'erreur';
+      await audit.log({ username: s.username }, { organismeId: s.organisme_id, action: `bureau.refuse.${motif}`, entity: 'tracked_texts', entityId: s.texte_id, after: { versionOuverte: s.version } });
+      log?.warn?.({ textId: s.texte_id, code: e?.code }, 'enregistrement du texte depuis le bureau refusé');
+      return { refuse: motif };
+    }
+  }
 
   /** Le nom de fichier garde son identité : même nom, nouvelle version (ANN-04) ; l'extension suit ce que le moteur renvoie. */
   async function nomDepuis(annexeId, ext) {
