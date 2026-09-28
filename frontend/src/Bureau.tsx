@@ -52,8 +52,10 @@ export function peutEditer(capa: Capa | null, annexe: any) {
   return !!ext && capa.formats.includes(ext) && ext !== 'pdf';
 }
 
-export default function Bureau({ ouvrirUrl, enregistrerUrl, titre, version, onClose, onEnregistre, avertir }: {
+export default function Bureau({ ouvrirUrl, enregistrerUrl, titre, version, top, onClose, onEnregistre, avertir }: {
   ouvrirUrl: string; enregistrerUrl: string; titre: string; version?: number;
+  /** Décalage du haut (sous l'en-tête de l'application) : l'en-tête reste ainsi visible ; absent = plein écran. */
+  top?: number;
   onClose: () => void; onEnregistre: () => void; avertir: (m: string) => void;
 }) {
   const zone = useRef<HTMLDivElement>(null);
@@ -186,7 +188,7 @@ export default function Bureau({ ouvrirUrl, enregistrerUrl, titre, version, onCl
   fermerRef.current = fermer;   // Collabora peut demander la fermeture (Cmd/Ctrl+W) : il passe par ici.
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={`Édition de ${titre}`}>
+    <div className={`fixed z-[60] flex flex-col bg-white ${top ? 'inset-x-0 bottom-0' : 'inset-0'}`} style={top ? { top } : undefined} role="dialog" aria-modal="true" aria-label={`Édition de ${titre}`}>
       <div className="flex items-center gap-3 border-b border-line px-4 py-2">
         <strong className="min-w-0 truncate">{titre}</strong>
         <span className="text-[12px] text-mute">{version ? `v${version} · ` : ''}chaque enregistrement est conservé</span>

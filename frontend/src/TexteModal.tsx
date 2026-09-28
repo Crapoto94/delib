@@ -30,7 +30,7 @@ export function SpanView({ spans }: { spans: any[] }) {
 type Toast = (m: string, k?: 'ok' | 'ko') => void;
 
 /** Un texte dans la modale : chargement, enregistrement automatique avec contrôle de version, modifications suivies. */
-function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: any; t: any; editable: boolean; onChanged: () => void; toast: Toast; registerFlush: (fn: (() => Promise<void>) | null) => void }) {
+function Pane({ acte, t, editable, onChanged, toast, registerFlush, top }: { acte: any; t: any; editable: boolean; onChanged: () => void; toast: Toast; registerFlush: (fn: (() => Promise<void>) | null) => void; top: number }) {
   const { org } = useAuth(); const o = org!.id;
   const base = orgPath(o, `/actes/${acte.id}/textes/${t.id}`);
   const [view, setView] = useState<any>(null);
@@ -45,7 +45,6 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
   const capa = useBureau(o);
   const reglages = useLoad(async () => (await api.get(orgPath(o, '/settings'))).data.settings as Record<string, { value?: unknown }>, [o]);
   const [bureauOuvert, setBureauOuvert] = useState(false);
-  const [interneForce, setInterneForce] = useState(false); // repli ponctuel sur l'éditeur de l'outil
   const side = assistantOn ? side0 : 'suivi';
   const [drawer, setDrawer] = useState(false); // écran étroit : le panneau latéral s'ouvre en tiroir
   const timer = useRef<any>(null); const latest = useRef({ text: '', version: 1, dirty: false });
@@ -92,14 +91,22 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
       : await openPdf(() => api.post(orgPath(o, `/actes/${acte.id}/apercu`), { cible: t.kind === 'expose' ? 'expose' : 'deliberation', deliberationId: t.deliberationId ?? undefined, mode: view?.tracking ? 'suivi' : 'propre' }, { responseType: 'blob' }), titre);
     if (m) toast(`Aperçu impossible : ${m}`, 'ko');
   };
-  if (!view) return <Loading />;
-  const canEdit = editable && view.canEdit;
-  const tracking = view.tracking && view.changes?.length > 0;
+  const canEdit = editable && !!view?.canEdit;
+  const tracking = !!view?.tracking && view.changes?.length > 0;
   const editing = canEdit && mode === 'edition';
-  // Rédaction confiée au bureau en ligne : on propose de l'ouvrir plutôt que l'éditeur de l'outil (repli possible).
+  // Rédaction confiée au bureau en ligne : l'éditeur Word s'ouvre DIRECTEMENT à l'entrée en édition, sans écran
+  // intermédiaire. Le bouton « Bureau en ligne » de la barre d'outils permet de le rouvrir après fermeture.
   const externe = String(reglages.data?.[`redaction.editeur_${t.kind}`]?.value || 'interne') === 'externe';
-  const externePossible = editing && externe && !!capa?.enabled && !interneForce;
+  const bureauDispo = externe && !!capa?.enabled;
   const ouvrirBureau = async () => { await commit(); setBureauOuvert(true); };
+  const autoBureau = useRef(false);
+  useEffect(() => {
+    if (!editing || !bureauDispo) { autoBureau.current = false; return; }
+    if (autoBureau.current || bureauOuvert) return;
+    autoBureau.current = true;   // une seule ouverture automatique par entrée en édition
+    commit().catch(() => undefined).finally(() => setBureauOuvert(true));
+  }, [editing, bureauDispo, bureauOuvert, commit]);
+  if (!view) return <Loading />;
   const visas = t.kind === 'visas';
   const asideVisible = assistantOn || view.tracking || visas;
 
@@ -111,7 +118,8 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
             <button key={k} className={`rounded px-2 py-1 font-semibold ${mode === k ? 'bg-surface shadow-card' : ''}`} onClick={async () => { await commit(); setMode(k); }}>{l}</button>)}</div>}
           {canEdit && <span className={state === 'error' ? 'font-semibold text-ko' : 'text-mute'}>{state === 'saving' ? 'Enregistrement…' : state === 'dirty' ? 'Modifications en attente…' : state === 'error' ? 'Non enregistré' : `✓ Enregistré · version ${view.version}`}</span>}
           {!canEdit && <span className="text-mute">Lecture seule à ce stade du circuit.</span>}
-          <span className="ml-auto flex gap-2">{asideVisible && <button className="btn-secondary !py-1 lg:!hidden" onClick={() => setDrawer(!drawer)} aria-expanded={drawer}><Sparkles className="h-3.5 w-3.5" /> {assistantOn ? 'Assistant IA' : 'Bibliothèque de visas'}</button>}
+          <span className="ml-auto flex gap-2">{bureauDispo && canEdit && <button className="btn-secondary !py-1" onClick={ouvrirBureau}><Pencil className="h-3.5 w-3.5" /> Bureau en ligne</button>}
+          {asideVisible && <button className="btn-secondary !py-1 lg:!hidden" onClick={() => setDrawer(!drawer)} aria-expanded={drawer}><Sparkles className="h-3.5 w-3.5" /> {assistantOn ? 'Assistant IA' : 'Bibliothèque de visas'}</button>}
           <button className="btn-secondary !py-1" onClick={preview}><Eye className="h-3.5 w-3.5" /> Aperçu mis en page</button></span>
         </div>
         {conflict && <div role="alert" className="border-b border-warn/30 bg-warn-bg px-4 py-2 text-warn">Ce texte a été modifié par quelqu'un d'autre. <button className="font-semibold underline" onClick={async () => { latest.current.dirty = false; setConflict(false); await load(); }}>Recharger sa version</button> (vos dernières frappes seront perdues).</div>}
@@ -120,17 +128,7 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
           <span>Vos modifications sont <b>enregistrées automatiquement</b> au fil de la frappe — rien à valider. Cliquez sur <b>« Terminer »</b> (en haut à droite) quand le texte est vraiment fini.</span>
         </div>}
         <div className="min-h-0 flex-1">
-          {externePossible ? (
-            <div className="flex h-full items-center justify-center bg-soft p-6">
-              <div className="w-full max-w-md rounded-lg border border-line bg-surface p-6 text-center shadow-card">
-                <Info className="mx-auto mb-2 h-6 w-6 text-action" aria-hidden="true" />
-                <h3 className="mb-1">Rédaction dans le bureau en ligne</h3>
-                <p className="mb-4 text-[13px] text-mute">Ce texte est paramétré pour être rédigé dans un document Word. Chaque enregistrement crée une nouvelle version ; le suivi des modifications reste actif.</p>
-                <button className="btn-primary" onClick={ouvrirBureau}><Pencil className="h-4 w-4" /> Ouvrir dans le bureau</button>
-                <button className="mt-3 block w-full text-[12px] text-mute underline" onClick={() => setInterneForce(true)}>Utiliser l'éditeur de l'outil pour cette fois</button>
-              </div>
-            </div>
-          ) : editing ? <RichEditor value={text} onChange={change} mode={t.kind as EditorMode} placeholder={PLACEHOLDER[t.kind]} />
+          {editing ? <RichEditor value={text} onChange={change} mode={t.kind as EditorMode} placeholder={PLACEHOLDER[t.kind]} />
             : <div className="h-full overflow-auto bg-soft p-4 md:p-8"><div className="mx-auto min-h-[60vh] max-w-[820px] rounded-lg border border-line bg-surface px-6 py-8 md:px-14">
               {view.markdown ? (mode === 'suivi' && view.tracking ? <SpanView spans={view.spans} /> : <div className="whitespace-pre-wrap text-[16px] leading-[26px]">{mode === 'propre' ? view.markdown : view.markdown}</div>) : <span className="text-mute">Texte vide.</span>}</div></div>}
         </div>
@@ -158,12 +156,15 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush }: { acte: an
             </>)}
         </div>)}
       </aside>
+      {/* L'éditeur Word occupe tout l'écran SOUS l'en-tête principal (qui reste bleu et visible) : on l'aligne sur le
+          même `top` que la modale de texte, et sa barre « Sauvegarder et fermer » n'est donc jamais masquée. */}
       {bureauOuvert && (
         <Bureau
+          top={top}
           ouvrirUrl={orgPath(o, `/actes/${acte.id}/textes/${t.id}/ouvrir`)}
           enregistrerUrl={orgPath(o, `/actes/${acte.id}/textes/${t.id}/enregistrer`)}
           titre={textLabel(acte, t)} version={view.version}
-          onClose={() => { setBureauOuvert(false); setInterneForce(false); }}
+          onClose={() => setBureauOuvert(false)}
           onEnregistre={() => { latest.current.dirty = false; load(); onChanged(); }}
           avertir={(m) => toast(m, 'ko')} />
       )}
@@ -202,7 +203,7 @@ export default function TexteModal({ acte, texts, initialId, editable, onClose, 
         </nav>
         <button className="btn-primary" onClick={close}><X className="h-4 w-4" /> Terminer</button>
       </header>
-      <div className="min-h-0 flex-1"><Pane key={cur.id} acte={acte} t={cur} editable={editable} onChanged={onChanged} toast={toast} registerFlush={register} /></div>
+      <div className="min-h-0 flex-1"><Pane key={cur.id} acte={acte} t={cur} editable={editable} onChanged={onChanged} toast={toast} registerFlush={register} top={top} /></div>
     </div>
   );
 }
