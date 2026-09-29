@@ -1080,7 +1080,8 @@ function createAirs({ db, audit, dir, source, ad, storage }) {
       if (typeof source.fichiers !== 'function') return { ajoutes: 0 };
       let fichiers; try { fichiers = await avecDelai(source.fichiers({ docId, archive: true }), 20000, 'AIRS injoignable'); } catch { return { ajoutes: 0, erreur: 'AIRS injoignable' }; }
       // L'exposé des motifs et la délibération sont repris dans les textes de l'acte : on ne les remet pas en pièce jointe.
-      for (const f of (fichiers || [])) { if (f.tfp === 4 || f.tfp === 5) continue; liste.push({ nom: f.nom, cheminServ: f.cheminServ, titre: LIBELLE_FIC[f.tfp] || f.libelle || f.nom }); }
+      // `tfp` peut arriver en chaîne : on le compare numériquement, sinon ces sources étaient rattachées comme annexes.
+      for (const f of (fichiers || [])) { if (Number(f.tfp) === 4 || Number(f.tfp) === 5) continue; liste.push({ nom: f.nom, cheminServ: f.cheminServ, titre: LIBELLE_FIC[f.tfp] || f.libelle || f.nom }); }
     } else {
       const rapId = str(item.payload?.rap_id).trim();
       let anne = [];

@@ -96,7 +96,17 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       acte.nature_id ? db.get('SELECT code FROM ref_items WHERE id = $1', [acte.nature_id]) : null,
       acte.matiere_id ? db.get('SELECT code, libelle FROM ref_items WHERE id = $1', [acte.matiere_id]) : null,
     ]);
-    const annexes = await db.all(`SELECT a.id, a.titre, t.code AS type_code, f.original_name, f.mime, f.size, f.id AS file_id FROM annexes a JOIN files f ON f.id = a.file_id LEFT JOIN ref_items t ON t.id = a.type_id
+    // Pour la télétransmission, on joint la version PDF de l'annexe quand elle existe (AIRS importe le Word
+    // d'origine ET sa conversion PDF ; S²LOW n'accepte que PDF/JPG/PNG).
+    const annexes = await db.all(`SELECT a.id, a.titre, t.code AS type_code,
+                                    COALESCE(pf.original_name, f.original_name) AS original_name,
+                                    COALESCE(pf.mime, f.mime) AS mime,
+                                    COALESCE(pf.size, f.size) AS size,
+                                    COALESCE(a.pdf_file_id, a.file_id) AS file_id
+                                  FROM annexes a
+                                  JOIN files f ON f.id = a.file_id
+                                  LEFT JOIN files pf ON pf.id = a.pdf_file_id
+                                  LEFT JOIN ref_items t ON t.id = a.type_id
                                   WHERE a.acte_id = $1 AND a.transmissible ORDER BY a.ordre, a.id`, [acte.id]);
     return {
       natureCode: nature ? NATURE_CODES[nature.code] ?? null : null, natureLibelle: nature?.code ?? null,
