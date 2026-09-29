@@ -115,7 +115,9 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     if (!p.subject) add('bloquant', 'Objet de l’acte absent'); else if (p.subject.length > 500) add('bloquant', `Objet de ${p.subject.length} caractères : 500 au maximum`);
     if (!p.natureCode) add('bloquant', 'Nature de l’acte absente de la classification (délibération, acte réglementaire…)');
     if (p.classif.length < 2) add('bloquant', 'Matière absente ou trop peu détaillée : la classification doit comporter au moins deux niveaux');
-    if (p.annexes.some((a) => !/(pdf|jpe?g|png)/i.test(a.mime || ''))) add('bloquant', 'Une annexe n’est ni un PDF, ni une image JPG ou PNG');
+    // Le type MIME d'une pièce est parfois vide (fichier déposé sans type) : on retombe sur l'extension du nom.
+    const pieceAcceptee = (a) => /(pdf|jpe?g|png)/i.test(a.mime || '') || /\.(pdf|jpe?g|png)$/i.test(String(a.name || ''));
+    if (p.annexes.some((a) => !pieceAcceptee(a))) add('bloquant', 'Une annexe n’est ni un PDF, ni une image JPG ou PNG');
     if (!cfg.siren) add('avertissement', 'SIREN de la collectivité non renseigné (Paramètres de télétransmission)');
     if (p.annexes.some((a) => a.typePj === '99_AU')) add('avertissement', 'Des annexes n’ont pas de type précis : le type « autre document » sera utilisé');
     return out;
@@ -235,7 +237,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       for (const p of d.points.filter((x) => x.kind === 'deliberation' && x.statut === 'a_traiter')) {
         ordre++;
         const tx = await db.get("SELECT * FROM tlt_transactions WHERE acte_id = $1 AND etat IN ('prepare','poste') ORDER BY id DESC LIMIT 1", [p.acte.id]);
-        const base = { itemId: p.id, acteId: p.acte.id, numeroSuivi: p.acte.numeroSuivi, numero: p.numero, titre: p.titre, etatPoint: p.etat, resultat: p.resultat };
+        const base = { itemId: p.id, acteId: p.acte.id, position: p.position, numeroSuivi: p.acte.numeroSuivi, numero: p.numero, titre: p.titre, etatPoint: p.etat, resultat: p.resultat };
         if (tx) { items.push({ ...base, statut: 'en_cours', raison: null, transaction: toTx(tx), controles: [] }); continue; }
         if (p.etat !== 'traite') { items.push({ ...base, statut: 'exclu', raison: p.etat === 'en_cours' ? 'Point en cours de traitement' : p.etat === 'a_traiter' ? 'Point non traité' : p.etat === 'retire' ? 'Point retiré' : p.etat === 'ajourne' ? 'Point ajourné' : 'Point clos sans vote', transaction: null, controles: [] }); continue; }
         if (!ADOPTES.includes(p.resultat)) { items.push({ ...base, statut: 'exclu', raison: 'Délibération rejetée : elle n’est pas transmise', transaction: null, controles: [] }); continue; }
@@ -247,6 +249,8 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         if (d.tenue.statut !== 'close') ctl.push({ niveau: 'avertissement', message: 'La séance n’est pas encore close' });
         items.push({ ...base, statut: 'a_preparer', raison: null, numeroTransmis: numero, matiere: pk.matiere, natureCode: pk.natureCode, classif: pk.classif, annexes: pk.annexes.length, transaction: null, controles: ctl });
       }
+      // Ordre du conseil : les délibérations sont présentées comme à la séance (numéros croissants de l'ordre du jour).
+      items.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       return { seance: { id: s.id, instance: s.instance, dateSeance: s.dateSeance, statut: s.statut, tenue: d.tenue.statut }, cfg: { mode: cfg.mode, modeEnvoi: cfg.modeEnvoi, scenario: cfg.scenario, doubleValidation: cfg.doubleValidation }, items };
     },
 
