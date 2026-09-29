@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { api, deviceId, errMsg, session } from '../api';
 import { ThemeToggle } from '../theme';
 import EtatBackend, { PastilleBackend } from '../EtatBackend';
@@ -34,6 +35,7 @@ export function Connexion() {
   const memo = (() => { try { return localStorage.getItem('elus.email') || ''; } catch { return ''; } })();
   const [souvenir, setSouvenir] = useState(!!memo);
   const [email, setEmail] = useState(memo); const [mdp, setMdp] = useState('');
+  const [voirMdp, setVoirMdp] = useState(false);
   const [oubli, setOubli] = useState(false); const [challenge, setChallenge] = useState<string | null>(null); const [code, setCode] = useState('');
   const [err, setErr] = useState<string | null>(null); const [msg, setMsg] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const fin = (r: any) => { try { if (souvenir) localStorage.setItem('elus.email', email.trim()); else localStorage.removeItem('elus.email'); } catch { /* stockage indisponible */ } session.set({ token: r.token, expiresAt: r.expiresAt, elu: r.elu }); nav('/', { replace: true }); };
@@ -77,8 +79,19 @@ export function Connexion() {
             </form>
           )) : <form onSubmit={etape1} className="space-y-3">
             <p className="text-[13px] text-mute">Utilisez votre mot de passe Ville. Cette connexion vérifie vos identifiants auprès de l’Active Directory.</p>
-            <label className="block"><span className="label">Identifiant Ville ou adresse e-mail</span><input className={champ} type="text" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-            <label className="block"><span className="label">Mot de passe Ville</span><input className={champ} type="password" autoComplete="current-password" required value={mdp} onChange={(e) => setMdp(e.target.value)} /></label>
+            <label className="block"><span className="label">Identifiant Ville ou adresse e-mail</span><input className={champ} type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+            <label className="block">
+              <span className="label">Mot de passe Ville</span>
+              <div className="relative">
+                {/* Le clavier Android peut corriger ou capitaliser une saisie : on l'en empêche, et l'œil permet de
+                    relire ce qui a réellement été tapé (un mot de passe Ville refusé vient le plus souvent de là). */}
+                <input className={`${champ} pr-11`} type={voirMdp ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} required value={mdp} onChange={(e) => setMdp(e.target.value)} />
+                <button type="button" onClick={() => setVoirMdp((v) => !v)} aria-label={voirMdp ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} title={voirMdp ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-2 text-mute hover:bg-soft">
+                  {voirMdp ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </label>
             <label className="flex items-center gap-2 text-[14px]"><input type="checkbox" checked={souvenir} onChange={(e) => setSouvenir(e.target.checked)} /> Se souvenir de moi sur ce navigateur <span className="text-[12px] text-mute">(identifiant seulement)</span></label>
             <button className="btn-primary w-full !py-3 !text-[16px]" disabled={busy}>Se connecter</button>
             <button type="button" className="w-full text-center text-[13px] text-action" onClick={() => { setOubli(true); setErr(null); setMsg(null); }}>Mot de passe Ville oublié ? Recevoir un code par SMS</button>

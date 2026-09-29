@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "buildTime": "2026-09-29T13:24:32.876Z",
+  "buildTime": "2026-09-29T13:39:17.833Z",
   "url": "/apk/vibedelib-elus.apk",
-  "taille": 8070658,
-  "notes": "Corrige la page blanche (URL de l'instance) et propose cette mise à jour automatiquement."
+  "taille": 8071108,
+  "notes": "Ajoute l'affichage du mot de passe a la connexion (tablette)."
 }
