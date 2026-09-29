@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const multer = require('multer');
 const { SCENARIOS } = require('../../adapters/s2low-simulateur');
 
 const Id = z.coerce.number().int().positive();
@@ -33,14 +34,35 @@ const send = (res, f) => { res.setHeader('Content-Type', 'application/pdf'); res
 
 module.exports = ({ makeRouter, tlt }) => {
   const r = makeRouter('/api/v1/organismes/:orgId/teletransmission');
+  const certificat = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024, files: 1 } });
+  const pdf = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024, files: 1 } });
 
   r.get('/config', { summary: 'Paramètres de télétransmission (mode, envoi A/B, identifiants, motif du numéro, scénario de simulation)', tags: T, org: true, roles: ROLES, params: P,
     description: 'Tant que l’accès à S²LOW n’est pas obtenu (D20), le mode est « simulation » : le simulateur rejoue les réponses de S²LOW, dont les retours de la préfecture.' },
   async (req, res) => res.json(await tlt.config(req.org.id)));
   r.post('/test', { summary: 'Teste la connexion au tiers de télétransmission choisi', tags: T, org: true, roles: ['org_admin'], params: P,
     description: 'Ne lève pas d’erreur : renvoie `{ ok, message, fournisseur, mode }`.' }, async (req, res) => res.json(await tlt.tester(req.ctx, req.org.id)));
-  r.put('/config', { summary: 'Modifie les paramètres de télétransmission', tags: T, org: true, roles: ['org_admin'], params: P, body: Config },
+    r.put('/config', { summary: 'Modifie les paramètres de télétransmission', tags: T, org: true, roles: ['org_admin'], params: P, body: Config },
     async (req, res) => res.json(await tlt.setConfig(req.ctx, req.org.id, req.valid.body)));
+
+  // Certificat client : un par collectivité. Le fichier (.p12) est importé ; la phrase de passe est chiffrée au repos.
+  r.get('/certificat', { summary: 'Certificat S²LOW importé pour cette collectivité (métadonnées ; le fichier n’est jamais renvoyé)', tags: T, org: true, roles: ['org_admin'], params: P },
+    async (req, res) => res.json(await tlt.certificatInfo(req.ctx, req.org.id)));
+  r.post('/certificat', { summary: 'Importe le certificat client .p12 (une collectivité = un certificat)', tags: T, org: true, roles: ['org_admin'], params: P, formats: ['multipart/form-data'],
+    description: 'Champs : `certificat` (fichier .p12) et `motDePasse`. Le fichier est vérifié avant enregistrement.' },
+  certificat.single('certificat'), async (req, res) => res.json(await tlt.enregistrerCertificat(req.ctx, req.org.id, { buffer: req.file?.buffer, nom: req.file?.originalname, motDePasse: req.body?.motDePasse })));
+  r.delete('/certificat', { summary: 'Supprime le certificat S²LOW de la collectivité', tags: T, org: true, roles: ['org_admin'], params: P },
+    async (req, res) => res.json(await tlt.supprimerCertificat(req.ctx, req.org.id)));
+  r.post('/test-acte', { summary: 'Envoie un ACTE DE TEST : le PDF fourni, marqué TEST (refusé en production)', tags: T, org: true, roles: ['org_admin'], params: P, formats: ['multipart/form-data'],
+    description: 'Champ `fichier` : le PDF de l’acte. Permet de valider la chaîne complète (envoi, numéro S²LOW, statut) sur l’instance de test.' },
+  pdf.single('fichier'), async (req, res) => res.json(await tlt.acteEssai(req.ctx, req.org.id, { buffer: req.file?.buffer, nom: req.file?.originalname })));
+  r.get('/test-acte/:remoteId/statut', { summary: "Statut courant de l'acte de test", tags: T, org: true, roles: ['org_admin'], params: P.extend({ remoteId: z.string().regex(/^\d+$/) }) },
+    async (req, res) => res.json(await tlt.statutEssai(req.ctx, req.org.id, req.valid.params.remoteId)));
+  r.get('/test-acte/:remoteId/:type', { summary: "Document retourné par S²LOW pour l'acte de test (bordereau, ar, tampon)", tags: T, org: true, roles: ['org_admin'],
+    params: P.extend({ remoteId: z.string().regex(/^\d+$/), type: z.enum(['bordereau', 'ar', 'tampon']) }), responses: { 200: 'Fichier' } },
+  async (req, res) => { const f = await tlt.documentEssai(req.ctx, req.org.id, req.valid.params.remoteId, req.valid.params.type); res.setHeader('Content-Type', f.mime); res.setHeader('Content-Disposition', `inline; filename="${f.nom}"`); res.send(f.buffer); });
+
+
   r.get('/tableau', { summary: 'Tableau de bord : à préparer, en attente de confirmation, en attente d’AR, en erreur, documents de la préfecture à traiter', tags: T, org: true, roles: ROLES, params: P },
     async (req, res) => res.json(await tlt.tableau(req.ctx, req.org.id)));
 

@@ -7,9 +7,11 @@
  * (adaptateur `s2low-simulateur.js`), qui rejoue les réponses de S²LOW, dont les retours de la préfecture, pour tester toute la chaîne.
  * Les autres modes sont refusés avec un message clair jusqu'à l'obtention du certificat et de l'instance de test.
  */
+const crypto = require('crypto');
 const { createSecretBox } = require('../../shared/secretbox');
 const { E } = require('../../shared/errors');
 const tdt = require('../../adapters/tdt-catalogue');
+const { createS2lowHttp } = require('../../adapters/s2low-http');
 const { requireOrg } = require('../../db/pool');
 const { NUMERO, SCENARIOS, STATUS } = require('../../adapters/s2low-simulateur');
 
@@ -26,11 +28,22 @@ const day = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Europe/P
 
 function createTeletransmission({ db, audit, render, tenue, settings, storage, bus, adapter, adapters, log, config, access, pv }) {
   // le mot de passe du TDT est chiffré au repos (comme celui de la GED) et ne quitte jamais le serveur
-  const { chiffre } = createSecretBox(config?.jwt?.secret || 'dev', 'tdt');
+  const { chiffre, dechiffre } = createSecretBox(config?.jwt?.secret || 'dev', 'tdt');
+  // Certificat client de la collectivité : fichier .p12 importé (stockage) + phrase de passe chiffrée en base.
+  // À défaut, le connecteur retombe sur le certificat de l'environnement (S2LOW_P12_FILE).
+  const certificatDe = async (organismeId) => {
+    if (!organismeId) return null;
+    const c = await settings.resolve(organismeId);
+    const cle = c['tdt.s2low.certificat']?.value;
+    if (!cle) return null;
+    const passe = dechiffre(c['tdt.s2low.certificat_mot_de_passe']?.value) || null;
+    const pfx = await storage.get(String(cle));
+    return { pfx, passphrase: passe, empreinte: crypto.createHash('sha256').update(pfx).digest('hex').slice(0, 16) };
+  };
   // Deux moteurs : le simulateur (mode « simulation ») et le connecteur réel S²LOW (test/production, certificat P12).
   const SIM = adapters?.simulation || adapter;
-  const REEL = adapters?.reel || null;
-  const ad = (c) => (c?.mode && c.mode !== 'simulation' && REEL ? REEL : SIM);
+  const REEL = adapters?.reel || createS2lowHttp({ db, storage, config, log, settings, certificat: certificatDe });
+  const ad = (c) => (c?.mode && c.mode !== 'simulation' ? REEL : SIM);
   const { apposerTampon } = require('../../shared/pdfstamp');
   /** Champs de l'ARActe (XML) lus sans dépendance : identifiant, date de réception, acte reçu. */
   const lireArActe = (xml) => { const at = (nom) => new RegExp(`\\b${nom}="([^"]*)"`).exec(xml)?.[1]?.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') ?? null; return { idActe: at('IDActe'), dateReception: at('DateReception'), numero: at('actes:Numero'), dateActe: at('actes:Date'), codeNature: at('actes:CodeNatureActe'), codeMatiere: at('actes:CodeMatiere1'), objet: at('actes:Objet'), simulation: /SIMULATION/.test(xml) }; };
@@ -56,7 +69,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
   }
   const assertMode = (cfg) => {
     const f = tdt.FOURNISSEURS[cfg.fournisseur];
-    if (!f?.modes?.[cfg.mode]) throw E.conflict(`Le mode « ${cfg.mode} » de ${f?.nom || 'ce fournisseur'} n'est pas encore disponible (certificat et instance de test à obtenir) : seul le mode « simulation » de S²LOW l'est pour le moment`);
+    if (!f?.modes?.[cfg.mode]) throw E.conflict(`Le mode « ${cfg.mode} » de ${f?.nom || 'ce fournisseur'} n'est pas disponible.`);
   };
   /** Paramètres de connexion du fournisseur choisi (le mot de passe n'est jamais renvoyé). */
   async function connexionDe(org, fournisseur) {
@@ -145,7 +158,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         if (!tdt.disponible(f)) throw E.conflict(`${f.nom} : connecteur pas encore disponible. Le choix reste sur S²LOW.`);
       }
       const fournisseur = b.fournisseur ?? (await cfgOf(org)).fournisseur; const f = tdt.FOURNISSEURS[fournisseur];
-      if (b.mode !== undefined && b.mode !== 'simulation' && !f.modes[b.mode]) throw E.conflict(`Le mode « ${b.mode} » de ${f.nom} n'est pas encore disponible (certificat et instance de test à obtenir)`);
+      if (b.mode !== undefined && b.mode !== 'simulation' && !f.modes[b.mode]) throw E.conflict(`Le mode « ${b.mode} » de ${f.nom} n'est pas disponible.`);
       if (b.fournisseur !== undefined) await settings.put(ctx, { scope: 'organisme', organismeId: org, key: 'tdt.fournisseur', val: b.fournisseur });
       const conn = { url: 'url', utilisateur: 'utilisateur' };
       for (const [k, sub] of Object.entries(conn)) if (b[k] !== undefined) await settings.put(ctx, { scope: 'organisme', organismeId: org, key: `tdt.${fournisseur}.${sub}`, val: String(b[k]) });
@@ -153,6 +166,63 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       for (const [k, key] of Object.entries(map)) if (b[k] !== undefined) await settings.put(ctx, { scope: 'organisme', organismeId: org, key, val: b[k] });
       await audit.log(ctx, { organismeId: org, action: 'tlt.config', entity: 'settings', after: { fournisseur, mode: b.mode ?? undefined, motDePasseModifie: !!b.motDePasse } });
       return svc.config(org);
+    },
+
+    // ------------------------------------------------------------------ certificat client (une collectivité = un certificat)
+    /** Certificat importé pour cette collectivité (jamais renvoyé ; seulement ses métadonnées). */
+    async certificatInfo(ctx, organismeId) {
+      const org = requireOrg(organismeId); const c = await settings.resolve(org);
+      const cle = c['tdt.s2low.certificat']?.value;
+      if (!cle) return { configure: false };
+      let taille = null; try { taille = (await storage.get(String(cle))).length; } catch { /* fichier absent */ }
+      return { configure: true, nom: c['tdt.s2low.certificat_nom']?.value || 'certificat.p12', taille, deposeLe: c['tdt.s2low.certificat_depose']?.value || null, motDePasseDefini: !!c['tdt.s2low.certificat_mot_de_passe']?.value };
+    },
+    /** Import du certificat (.p12) et de sa phrase de passe. Vérifie que le fichier s'ouvre avant de l'enregistrer. */
+    async enregistrerCertificat(ctx, organismeId, { buffer, nom, motDePasse }) {
+      const org = requireOrg(organismeId);
+      if (!buffer?.length) throw E.badRequest('Fichier de certificat (.p12) requis');
+      if (nom && !/\.p12$/i.test(nom)) throw E.badRequest('Le certificat doit être un fichier .p12');
+      try { crypto.createSecureContext({ pfx: buffer, passphrase: motDePasse || undefined }); }
+      catch { throw E.badRequest('Certificat ou phrase de passe incorrects : le fichier .p12 n’a pas pu être ouvert'); }
+      const put = await storage.put(buffer, { organismeId: org, ext: 'p12', categorie: 'tdt', nom: nom || 'certificat.p12' });
+      await settings.put(ctx, { scope: 'organisme', organismeId: org, key: 'tdt.s2low.certificat', val: put.key });
+      await settings.put(ctx, { scope: 'organisme', organismeId: org, key: 'tdt.s2low.certificat_nom', val: nom || 'certificat.p12' });
+      await settings.put(ctx, { scope: 'organisme', organismeId: org, key: 'tdt.s2low.certificat_depose', val: new Date().toISOString() });
+      if (motDePasse !== undefined) await settings.put(ctx, { scope: 'organisme', organismeId: org, key: 'tdt.s2low.certificat_mot_de_passe', val: chiffre(motDePasse) });
+      await audit.log(ctx, { organismeId: org, action: 'tlt.certificat', entity: 'settings', after: { nom: nom || 'certificat.p12', taille: buffer.length } });
+      return svc.certificatInfo(ctx, org);
+    },
+    async supprimerCertificat(ctx, organismeId) {
+      const org = requireOrg(organismeId);
+      for (const k of ['tdt.s2low.certificat', 'tdt.s2low.certificat_nom', 'tdt.s2low.certificat_depose', 'tdt.s2low.certificat_mot_de_passe']) await settings.put(ctx, { scope: 'organisme', organismeId: org, key: k, val: null });
+      await audit.log(ctx, { organismeId: org, action: 'tlt.certificat.suppression', entity: 'settings' });
+      return { configure: false };
+    },
+    /** Envoie un ACTE DE TEST : le PDF fourni (un vrai acte), avec un numéro marqué TEST. Refusé en production. */
+    async acteEssai(ctx, organismeId, { buffer, nom }) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);
+      if (cfg.mode === 'production') throw E.conflict("L'acte de test n'est pas transmis en production (envoi irréversible à la préfecture) : utilisez le mode test.");
+      if (!buffer?.length) throw E.badRequest('Joignez le PDF de l’acte à envoyer (fichier .pdf)');
+      const numero = ('TEST' + new Date().toISOString().replace(/[-:TZ.]/g, '').slice(2, 14)).slice(0, 15);
+      const r = await ad(cfg).creer({ organismeId: org, number: numero, decisionDate: day(new Date()), subject: 'Acte de test VibeDélib (sans valeur juridique)', natureCode: 1, classif: ['1', '1'], typeActe: '99_DE', file: { name: nom || `test-${numero}.pdf`, mime: 'application/pdf', buffer } });
+      if (!r.ok) throw E.conflict(`S²LOW a refusé l'acte de test : ${r.message}`);
+      const st = await ad(cfg).statut(r.id, org).catch(() => null);
+      await audit.log(ctx, { organismeId: org, action: 'tlt.acte_test', entity: 'tlt_transactions', after: { remoteId: r.id, numero } });
+      return { remoteId: r.id, numero, status: st?.status ?? null, label: st?.label ?? null };
+    },
+    /** Document retourné par S²LOW pour l'acte de test : bordereau d'acquittement, ARActe (XML) ou acte tamponné. */
+    async documentEssai(ctx, organismeId, remoteId, type) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);
+      if (type === 'ar') { await ad(cfg).statut(remoteId, org).catch(() => null); const xml = await ad(cfg).arActe?.(remoteId); if (!xml) throw E.conflict("Accusé de réception pas encore reçu : relancez le statut dans un instant."); return { buffer: Buffer.from(xml, 'utf8'), nom: `ARActe-${remoteId}.xml`, mime: 'application/xml; charset=utf-8' }; }
+      if (type === 'bordereau') { const b = await ad(cfg).bordereau(remoteId, org); if (!b) throw E.conflict('Bordereau indisponible : l’accusé de réception n’est pas encore reçu.'); return { buffer: b, nom: `bordereau-${remoteId}.pdf`, mime: 'application/pdf' }; }
+      if (type === 'tampon') { const t = await ad(cfg).tampon?.(remoteId, org); if (!t) throw E.conflict('Acte tamponné indisponible.'); return { buffer: t, nom: `acte-tamponne-${remoteId}.pdf`, mime: 'application/pdf' }; }
+      throw E.badRequest('Type de document inconnu');
+    },
+    /** Statut courant de l'acte de test (pour rafraîchir l'affichage sans le renvoyer). */
+    async statutEssai(ctx, organismeId, remoteId) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);
+      const st = await ad(cfg).statut(remoteId, org);
+      return { remoteId, status: st?.status ?? null, label: st?.label ?? null };
     },
 
     // ------------------------------------------------------------------------------------------ lot d'une séance
