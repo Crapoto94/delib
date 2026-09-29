@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "buildTime": "2026-09-29T13:39:17.833Z",
+  "buildTime": "2026-09-29T13:47:49.503Z",
   "url": "/apk/vibedelib-elus.apk",
-  "taille": 8071108,
-  "notes": "Ajoute l'affichage du mot de passe a la connexion (tablette)."
+  "taille": 8071113,
+  "notes": "Connexion tablette : affichage du mot de passe, auto-correction et auto-remplissage desactives."
 }

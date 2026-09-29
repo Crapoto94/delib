@@ -83,9 +83,11 @@ export function Connexion() {
             <label className="block">
               <span className="label">Mot de passe Ville</span>
               <div className="relative">
-                {/* Le clavier Android peut corriger ou capitaliser une saisie : on l'en empêche, et l'œil permet de
-                    relire ce qui a réellement été tapé (un mot de passe Ville refusé vient le plus souvent de là). */}
-                <input className={`${champ} pr-11`} type={voirMdp ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} required value={mdp} onChange={(e) => setMdp(e.target.value)} />
+                {/* Le clavier et le gestionnaire de mots de passe Android peuvent modifier la saisie : on empêche
+                    l'auto-correction et l'auto-remplissage (un ancien mot de passe pré-rempli dans la WebView est la
+                    cause classique d'un « mot de passe refusé » alors qu'il fonctionne dans le navigateur), et l'œil
+                    permet de relire exactement ce qui sera envoyé. */}
+                <input name="elus-mdp" className={`${champ} pr-11`} type={voirMdp ? 'text' : 'password'} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} required value={mdp} onChange={(e) => setMdp(e.target.value)} />
                 <button type="button" onClick={() => setVoirMdp((v) => !v)} aria-label={voirMdp ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} title={voirMdp ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-2 text-mute hover:bg-soft">
                   {voirMdp ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
