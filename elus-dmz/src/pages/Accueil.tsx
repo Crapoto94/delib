@@ -30,7 +30,15 @@ export default function Accueil() {
   const v = useRafraichissement();
   useEffect(() => {
     chargerAvecCache('accueil', () => api.get('/elus/accueil').then((r) => r.data))
-      .then(({ data, horsLigne }) => { setA(data); setHorsLigne(horsLigne); const id = data.prochaine?.id ?? null; definirSeanceSuivie(id); armerReprise(() => seanceSuivie); if (id && !horsLigne) void prefetchSeance(id); })
+      .then(({ data, horsLigne }) => {
+        setA(data); setHorsLigne(horsLigne); const id = data.prochaine?.id ?? null; definirSeanceSuivie(id); armerReprise(() => seanceSuivie);
+        if (horsLigne) return;
+        if (id) void prefetchSeance(id);
+        // On conserve aussi la fiche de CHAQUE séance listée : sans cela, ouvrir une séance jamais consultée en
+        // ligne échouait hors réseau (« pas de connexion au serveur ») alors que ses documents étaient téléchargés.
+        const ids = [...new Set([id, ...(data.seances || []).map((s: any) => s.id)].filter(Boolean))];
+        for (const sid of ids) void chargerAvecCache(`seance:${sid}`, () => api.get(`/elus/seances/${sid}`).then((r) => r.data)).catch(() => undefined);
+      })
       .catch((e) => setErr(errMsg(e)));
   }, [v]);
   if (err) return <p className="p-6 text-ko">{err}</p>;

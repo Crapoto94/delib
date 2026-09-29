@@ -16,8 +16,15 @@ type PluginUpdater = { download: (o: { url: string }) => Promise<unknown>; insta
 
 /** Plugin natif exposé par le pont Capacitor (voir AppUpdaterPlugin.java). Absent dans un navigateur. */
 const pluginUpdater = (): PluginUpdater | null => {
-  try { const c = (window as any).Capacitor; return isNativeApp() && c?.Plugins?.AppUpdater ? (c.Plugins.AppUpdater as PluginUpdater) : null; } catch { return null; }
+  try { const c = (window as any).Capacitor; return c?.Plugins?.AppUpdater ? (c.Plugins.AppUpdater as PluginUpdater) : null; } catch { return null; }
 };
+
+/**
+ * Application installée (APK) par opposition au site web. On ne se fie pas uniquement au drapeau Capacitor, qui
+ * peut être injecté un peu après le premier rendu : une application installée sert ses fichiers depuis « localhost »
+ * alors que l'instance (l'API) est sur un autre hôte. C'est ce décalage d'origine qui la distingue du site.
+ */
+const estAppInstallee = () => { try { return isNativeApp() || new URL(apiBase, location.origin).origin !== location.origin; } catch { return isNativeApp(); } };
 
 const adresseManifeste = () => { try { return new URL('/apk/latest.json', new URL(apiBase, location.origin)).toString(); } catch { return '/apk/latest.json'; } };
 const adresseApk = (m: Manifeste) => { try { return new URL(m.url || '/apk/vibedelib-elus.apk', new URL(apiBase, location.origin)).toString(); } catch { return m.url || '/apk/vibedelib-elus.apk'; } };
@@ -30,7 +37,7 @@ export default function MiseAJour() {
   const [detail, setDetail] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isNativeApp()) return; // jamais de relance de mise à jour dans le navigateur
+    if (!estAppInstallee()) return; // jamais de relance de mise à jour depuis le navigateur
     let live = true;
     const verifier = async () => {
       try {
@@ -44,9 +51,10 @@ export default function MiseAJour() {
       } catch { /* hors ligne : nouvel essai au prochain retour au premier plan */ }
     };
     void verifier();
+    const minuteur = window.setInterval(() => { if (document.visibilityState === 'visible') void verifier(); }, 5 * 60 * 1000);
     const auRetour = () => { if (document.visibilityState === 'visible') void verifier(); };
     document.addEventListener('visibilitychange', auRetour);
-    return () => { live = false; document.removeEventListener('visibilitychange', auRetour); };
+    return () => { live = false; window.clearInterval(minuteur); document.removeEventListener('visibilitychange', auRetour); };
   }, []);
 
   if (!dispo || ignore === dispo.buildTime) return null;
