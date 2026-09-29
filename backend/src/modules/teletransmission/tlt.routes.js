@@ -68,6 +68,11 @@ module.exports = ({ makeRouter, tlt }) => {
 
   r.get('/seances/:id/lot', { summary: 'Lot de télétransmission d’une séance : délibérations adoptées (et exclues avec leur raison), numéro transmis, contrôles préalables', tags: T, org: true, roles: ROLES, params: PS },
     async (req, res) => res.json(await tlt.lot(req.ctx, req.org.id, req.valid.params.id)));
+  // Arrêtés et décisions signés par le maire : hors séance, même chaîne de transmission.
+  r.get('/hors-seance', { summary: 'Arrêtés et décisions signés (hors séance) à transmettre au contrôle de légalité', tags: T, org: true, roles: ROLES, params: P },
+    async (req, res) => res.json(await tlt.lotHorsSeance(req.ctx, req.org.id)));
+  r.post('/hors-seance/preparation', { summary: 'Prépare (et éventuellement envoie) des arrêtés/décisions hors séance', tags: T, org: true, roles: ROLES, params: P, body: z.object({ acteIds: z.array(Id).min(1).max(200), envoyer: z.boolean().default(false) }) },
+    async (req, res) => res.json(await tlt.preparerHorsSeance(req.ctx, req.org.id, req.valid.body.acteIds, { envoyer: req.valid.body.envoyer })));
   r.post('/seances/:id/preparation', { summary: 'Prépare la transmission de délibérations (PDF, numéro transmis, classification) — aucun envoi', tags: T, org: true, roles: ROLES, params: PS, body: Preparer,
     description: 'Les délibérations qui ont des contrôles bloquants sont refusées avec leurs raisons ; les autres sont préparées.' },
   async (req, res) => res.json(await tlt.preparer(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));

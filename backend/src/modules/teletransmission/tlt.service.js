@@ -291,6 +291,53 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     },
 
     // ------------------------------------------------------------------------------------------ préparation et envoi
+    /** Arrêtés et décisions signés par le maire (hors séance) à transmettre au contrôle de légalité. */
+    async lotHorsSeance(ctx, organismeId) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org);
+      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.*, t.code AS type_code, t.libelle AS type_libelle
+        FROM actes a JOIN ref_items t ON t.id = a.type_id
+        WHERE a.organisme_id = $1 AND a.statut = 'signe' AND (t.meta->>'signature')::boolean
+          AND a.statut NOT IN ('abandonne', 'retire')
+          AND NOT EXISTS (SELECT 1 FROM tlt_transactions x WHERE x.acte_id = a.id AND x.etat IN ('prepare', 'poste'))
+        ORDER BY a.id DESC LIMIT 200`, [org]);
+      const items = [];
+      for (const a of rows) {
+        const numero = String(a.numero_suivi || a.numero || `A${a.id}`).toUpperCase().replace(/[^A-Z0-9_]/g, '_').slice(0, 15);
+        const s = { dateSeance: a.signe_at || a.created_at, type: null };
+        const pk = await paquet(org, s, { id: null }, a, null, cfg, numero);
+        const ctl = await controles(org, cfg, pk, { acteId: a.id });
+        items.push({ acteId: a.id, itemId: null, horsSeance: true, numeroSuivi: a.numero_suivi, numero: a.numero, titre: a.titre, typeCode: a.type_code, typeLibelle: a.type_libelle, statut: 'a_preparer', numeroTransmis: numero, matiere: pk.matiere, natureCode: pk.natureCode, classif: pk.classif, annexes: pk.annexes.length, transaction: null, controles: ctl });
+      }
+      return { cfg: { mode: cfg.mode, modeEnvoi: cfg.modeEnvoi, doubleValidation: cfg.doubleValidation }, items };
+    },
+    /** Prépare (et éventuellement envoie) des arrêtés/décisions hors séance (même chaîne que les délibérations). */
+    async preparerHorsSeance(ctx, organismeId, acteIds, { envoyer = false } = {}) {
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);
+      const lot = await svc.lotHorsSeance(ctx, org);
+      const crees = []; const refuses = [];
+      for (const id of acteIds) {
+        const it = lot.items.find((x) => x.acteId === id);
+        if (!it) { refuses.push({ acteId: id, raisons: ['Acte introuvable ou déjà transmis'] }); continue; }
+        const bloquants = it.controles.filter((c) => c.niveau === 'bloquant').map((c) => c.message);
+        if (bloquants.length) { refuses.push({ acteId: id, raisons: bloquants }); continue; }
+        const acte = await db.get('SELECT * FROM actes WHERE id = $1', [id]);
+        await assurerPdfAnnexes(org, ctx, id);
+        const s = { dateSeance: acte.signe_at || acte.created_at, type: null };
+        const pk = await paquet(org, s, { id: null }, acte, null, cfg, it.numeroTransmis);
+        const pdf = await render.renderActe(ctx, org, acte.id, { cible: 'extrait', mode: 'propre', watermark: '' });
+        const fileId = await storePdf(org, ctx, pdf.buffer, `${it.numeroTransmis}.pdf`);
+        const pkg = { ...pk, file: { fileId, name: `${it.numeroTransmis}.pdf`, size: pdf.buffer.length }, scenario: cfg.scenario, enAttente: cfg.modeEnvoi === 'B' };
+        const r = await db.get(`INSERT INTO tlt_transactions (organisme_id, acte_id, numero_transmis, mode, package, file_id, prepared_by)
+                                VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7) RETURNING *`, [org, acte.id, it.numeroTransmis, cfg.mode, JSON.stringify(pkg), fileId, ctx.username]);
+        await db.run("UPDATE actes SET statut = 'pret_a_transmettre' WHERE id = $1 AND statut = 'signe'", [acte.id]);
+        await journal(r.id, ctx.username, 'prepare', { numero: it.numeroTransmis, horsSeance: true });
+        crees.push(toTx(r));
+      }
+      let envois = null;
+      if (crees.length && (envoyer || cfg.envoiAuto)) envois = await svc.envoyerLot(ctx, org, crees.map((c) => c.id), { confirmer: cfg.confirmationAuto });
+      return { crees, refuses, envois };
+    },
+
     /** Prépare la transmission : numéro transmis, PDF de la délibération, classification, annexes typées. Aucun envoi à ce stade. */
     async preparer(ctx, organismeId, seanceId, { itemIds, scenario, envoyer = false }) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);

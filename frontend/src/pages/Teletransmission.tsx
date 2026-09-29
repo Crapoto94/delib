@@ -91,6 +91,20 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
   useEffect(() => { if (sid === null && seances.data?.length) setSid(seances.data[0].id); }, [seances.data, sid]);
   const lot = useLoad(async () => (sid ? (await api.get(root(`/seances/${sid}/lot`))).data : null), [sid, o]);
   const items: any[] = lot.data?.items ?? [];
+  const hors = useLoad(async () => (await api.get(root('/hors-seance'))).data, [o]);
+  const [pickH, setPickH] = useState<Set<number>>(new Set());
+  const itemsH: any[] = hors.data?.items ?? [];
+  const toggleH = (id: number) => setPickH((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const pretsH = itemsH.filter((i) => i.statut === 'a_preparer' && !i.controles.some((c: any) => c.niveau === 'bloquant'));
+  const preparerH = async (envoyer = false) => {
+    setBusy(true);
+    try {
+      const r = (await api.post(root('/hors-seance/preparation'), { acteIds: [...pickH], envoyer })).data;
+      const env = r.envois ? ` ; ${resume(r.envois, cfg.modeEnvoi === 'B' && !cfg.confirmationAuto ? 'postée(s) en attente de confirmation' : 'envoyée(s)')}` : '';
+      toast(`${r.crees.length} transmission(s) préparée(s)${r.refuses.length ? `, ${r.refuses.length} refusée(s) : ${r.refuses.map((x: any) => x.raisons.join(' ; ')).join(' | ')}` : ''}${env}`, r.refuses.length || r.envois?.refusees ? 'ko' : 'ok');
+      setPickH(new Set()); hors.reload(); onDone();
+    } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
   const prets = items.filter((i) => i.statut === 'a_preparer' && !i.controles.some((c: any) => c.niveau === 'bloquant'));
   const toggle = (id: number) => setPick((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const preparer = async (envoyer = false) => {
@@ -113,6 +127,7 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
   if (seances.loading) return <Loading />;
   if (!seances.data?.length) return <div className="card p-8 text-center text-mute">Aucune séance tenue : le lot de télétransmission se construit à partir des résultats du suivi de séance.</div>;
   return (
+    <div className="space-y-4">
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-end gap-3 border-b border-line px-4 py-3">
         <Field label="Séance"><Select className="input !w-auto" value={sid ?? ''} onChange={(e) => { setSid(Number(e.target.value)); setPick(new Set()); }}>{seances.data.map((s) => <option key={s.id} value={s.id}>{s.instance} — {dt(s.dateSeance, { dateStyle: 'long' })}</option>)}</Select></Field>
@@ -149,6 +164,36 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
               </td>
             </tr>);
         })}</tbody></table>)}
+    </div>
+      <div className="card overflow-hidden">
+        <div className="flex flex-wrap items-end gap-3 border-b border-line px-4 py-3">
+          <div className="mr-auto"><h3 className="text-[15px]">Arrêtés et décisions (hors séance)</h3><p className="text-[12px] text-mute">Actes signés par le maire, à transmettre au contrôle de légalité.</p></div>
+          <button className="btn-secondary" onClick={() => setPickH(new Set(pretsH.map((i) => i.acteId)))} disabled={!pretsH.length}>Tout sélectionner</button>
+          <button className="btn-secondary" disabled={busy || !pickH.size} onClick={() => preparerH(false)}>{busy ? <Spinner /> : <Send className="h-4 w-4" />} Préparer {pickH.size || ''}</button>
+          {!cfg.doubleValidation && <button className="btn-primary" disabled={busy || !pickH.size} onClick={() => preparerH(true)}>{busy ? <Spinner /> : <Send className="h-4 w-4" />} Préparer et envoyer {pickH.size || ''}</button>}
+        </div>
+        {hors.loading ? <Loading /> : !itemsH.length ? <p className="p-6 text-mute">Aucun arrêté ni décision signé à transmettre.</p> : (
+          <table className="w-full"><thead><tr><th className="w-8" /><th>N°</th><th>Acte</th><th>Type</th><th>Numéro transmis</th><th>Contrôles</th></tr></thead><tbody>{itemsH.map((i) => {
+            const bloque = i.controles?.some((c: any) => c.niveau === 'bloquant');
+            return (
+              <tr key={i.acteId}>
+                <td><input type="checkbox" aria-label={`Sélectionner ${i.titre}`} disabled={bloque} checked={pickH.has(i.acteId)} onChange={() => toggleH(i.acteId)} /></td>
+                <td className="font-mono text-[12px]">{i.numero ?? i.numeroSuivi ?? '—'}</td>
+                <td className="font-semibold">{i.titre}</td>
+                <td className="text-[12px]">{i.typeLibelle ?? i.typeCode ?? '—'}</td>
+                <td className="font-mono text-[12px]">{i.numeroTransmis ?? '—'}</td>
+                <td className="text-[12px]">{i.controles.length ? <ul>{i.controles.map((c: any, k: number) => (
+                  <li key={k} className={c.niveau === 'bloquant' ? 'font-semibold text-ko' : 'text-warn'}>
+                    {c.niveau === 'bloquant' ? '⛔' : '⚠'} {c.message}
+                    {c.annexes?.length > 0 && (<ul className="mt-1 space-y-0.5 font-normal">{c.annexes.map((x: any) => (
+                      <li key={x.id} className="flex flex-wrap items-center gap-2"><span className="max-w-[240px] truncate" title={`${x.nom} (${x.mime || 'type inconnu'})`}>{x.nom}</span>
+                        <button type="button" className="text-action underline" onClick={() => telechargerAnnexe(i.acteId, x.id, x.nom)}>Télécharger</button>
+                        <label className="cursor-pointer text-action underline" title="Remplacer par un PDF, une image JPG ou PNG">Remplacer<input type="file" hidden accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void remplacerAnnexe(i.acteId, x.id, f); }} /></label>
+                      </li>))}</ul>)}
+                  </li>))}</ul> : <span className="text-ok">✓ Prête</span>}</td>
+              </tr>);
+          })}</tbody></table>)}
+      </div>
     </div>
   );
 }
