@@ -24,6 +24,7 @@ services:
       - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-false}
     volumes:
       - ./backend/storage:/app/storage
+      - ./backend/secrets:/secrets:ro   # certificats client (ex. S²LOW) — jamais versionnés
       - ./police:/police:ro
     ports: ["3121:3121"]
 

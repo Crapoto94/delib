@@ -33,6 +33,11 @@ const EnvSchema = z.object({
   HUBDSI_API_KEY: z.string().min(8),
   VILLE_CA_FILE: z.string().optional(),
   VILLE_ALLOW_SELF_SIGNED_CERTS: flag('false'),
+  // Télétransmission S²LOW réelle (contrôle de légalité) : instance + certificat client P12 (mutual TLS).
+  // L'URL peut aussi être saisie dans Paramétrage → Télétransmission (elle a alors la priorité).
+  S2LOW_URL: z.string().optional(),
+  S2LOW_P12_FILE: z.string().optional(),
+  S2LOW_P12_PASSPHRASE: z.string().optional(),
   JWT_SECRET: z.string().min(24, 'JWT_SECRET doit faire au moins 24 caractères'),
   JWT_TTL: z.string().default('8h'),
   SESSION_MAX_HOURS: z.coerce.number().positive().default(24),
@@ -128,6 +133,7 @@ function buildConfig(env = process.env) {
     apm: Object.freeze({ url: e.APM_API_URL.replace(/\/+$/, ''), key: e.APM_API_KEY }),
     hub: Object.freeze({ url: e.HUBDSI_API_URL.replace(/\/+$/, ''), key: e.HUBDSI_API_KEY }),
     tls: Object.freeze({ caFile: e.VILLE_CA_FILE || null, allowSelfSigned: e.VILLE_ALLOW_SELF_SIGNED_CERTS }),
+    s2low: Object.freeze({ url: (e.S2LOW_URL || '').replace(/\/+$/, ''), p12File: e.S2LOW_P12_FILE || null, p12Passphrase: e.S2LOW_P12_PASSPHRASE || null }),
     jwt: Object.freeze({ secret: e.JWT_SECRET, ttlSeconds, sessionMaxSeconds: Math.round(e.SESSION_MAX_HOURS * 3600), souvenirSeconds: e.SESSION_SOUVENIR_DAYS * 86400 }),
     bootstrapAdmins: csv(e.BOOTSTRAP_ADMINS),
     defaultOrganismeName: e.DEFAULT_ORGANISME_NAME,

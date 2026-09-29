@@ -67,6 +67,7 @@ const { createParapheur } = require('./modules/parapheur/parapheur.service');
 const { createDsihubParapheur } = require('./adapters/parapheur-dsihub');
 const { createParapheurSimulateur } = require('./adapters/parapheur-simulateur');
 const { createS2lowSimulateur } = require('./adapters/s2low-simulateur');
+const { createS2lowHttp } = require('./adapters/s2low-http');
 const { createApmO365 } = require('./adapters/apm-o365');
 const { createCollecteurs } = require('./modules/collecteurs/collecteurs.service');
 const { createOrganisation } = require('./modules/titulaires/organisation.service');
@@ -165,8 +166,11 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
   const pv = createPv({ db, audit, render, odj, tenue, actes, settings });
   const bibliotheque = createBibliotheque({ db, audit, render, pv, textes, storage });
-  // télétransmission : le simulateur S²LOW tient lieu d'accès tant que le certificat n'est pas obtenu (D20, TLT-19) ; un adaptateur réel peut être injecté
-  const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapter: teletransmission || createS2lowSimulateur({ db }), log, config, access, pv });
+  // télétransmission : le simulateur rejoue toute la chaîne ; le connecteur réel (s2low-http.js) dialogue avec
+  // l'instance S²LOW authentifiée par certificat P12. Le choix se fait selon le mode paramétré (test/production).
+  const tltSimulateur = createS2lowSimulateur({ db });
+  const tltReel = createS2lowHttp({ db, storage, config, log, settings });
+  const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapters: { simulation: teletransmission || tltSimulateur, reel: tltReel }, log, config, access, pv });
   acl.registerEditHook((ctx, a) => tlt.peutModifierTexte(ctx, a)); // le SCC modifie la délibération avant la transmission (TLT-32)
   const organisation = createOrganisation({ db, titulaires, dir });
   const organigramme = createOrganigramme({ db, dir, audit });

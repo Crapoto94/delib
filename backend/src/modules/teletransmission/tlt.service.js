@@ -24,9 +24,13 @@ const ACTE_TRANSMIS = ['adopte', 'texte_definitif_pret', 'pret_a_transmettre'];
 const fmt = (pattern, vars) => String(pattern).replace(/\{(\w+)(?::(\d+))?\}/g, (m, k, w) => String(vars[k] ?? '').padStart(Number(w) || 0, '0')).toUpperCase();
 const day = (d) => new Date(d).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
 
-function createTeletransmission({ db, audit, render, tenue, settings, storage, bus, adapter, log, config, access, pv }) {
+function createTeletransmission({ db, audit, render, tenue, settings, storage, bus, adapter, adapters, log, config, access, pv }) {
   // le mot de passe du TDT est chiffré au repos (comme celui de la GED) et ne quitte jamais le serveur
   const { chiffre } = createSecretBox(config?.jwt?.secret || 'dev', 'tdt');
+  // Deux moteurs : le simulateur (mode « simulation ») et le connecteur réel S²LOW (test/production, certificat P12).
+  const SIM = adapters?.simulation || adapter;
+  const REEL = adapters?.reel || null;
+  const ad = (c) => (c?.mode && c.mode !== 'simulation' && REEL ? REEL : SIM);
   const { apposerTampon } = require('../../shared/pdfstamp');
   /** Champs de l'ARActe (XML) lus sans dépendance : identifiant, date de réception, acte reçu. */
   const lireArActe = (xml) => { const at = (nom) => new RegExp(`\\b${nom}="([^"]*)"`).exec(xml)?.[1]?.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') ?? null; return { idActe: at('IDActe'), dateReception: at('DateReception'), numero: at('actes:Numero'), dateActe: at('actes:Date'), codeNature: at('actes:CodeNatureActe'), codeMatiere: at('actes:CodeMatiere1'), objet: at('actes:Objet'), simulation: /SIMULATION/.test(xml) }; };
@@ -115,14 +119,14 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     // ------------------------------------------------------------------------------------------ paramètres
     async config(organismeId) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org);
-      return { ...cfg, fournisseurs: tdt.liste().map((f) => ({ ...f, connexion: undefined })), connexionFournisseur: await connexionDe(org, cfg.fournisseur), scenarios: Object.entries(SCENARIOS).map(([code, s]) => ({ code, label: s.label })), classification: await adapter.classification(), connexion: cfg.mode === 'simulation' ? await adapter.testConnexion() : { ok: false, message: 'Accès à S²LOW non configuré' } };
+      return { ...cfg, fournisseurs: tdt.liste().map((f) => ({ ...f, connexion: undefined })), connexionFournisseur: await connexionDe(org, cfg.fournisseur), scenarios: Object.entries(SCENARIOS).map(([code, s]) => ({ code, label: s.label })), classification: await ad(cfg).classification(org), connexion: await ad(cfg).testConnexion(org) };
     },
 
     /** Teste la connexion au fournisseur choisi (la simulation répond toujours ; le réel n'est pas encore ouvert). */
     async tester(ctx, organismeId) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org); const f = tdt.FOURNISSEURS[cfg.fournisseur];
-      if (cfg.mode === 'simulation' && f.modes.simulation) return { ...(await adapter.testConnexion()), fournisseur: f.nom, mode: 'simulation' };
-      return { ok: false, fournisseur: f.nom, mode: cfg.mode, message: `Le mode « ${cfg.mode} » de ${f.nom} n'est pas encore disponible : le connecteur attend le certificat et l'instance de test.` };
+      if (cfg.mode === 'simulation' && f.modes.simulation) return { ...(await ad(cfg).testConnexion(org)), fournisseur: f.nom, mode: 'simulation' };
+      return { ...(await ad(cfg).testConnexion(org)), fournisseur: f.nom, mode: cfg.mode };
     },
     async setConfig(ctx, organismeId, b) {
       const org = requireOrg(organismeId);
@@ -227,7 +231,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       const modif = await db.get('SELECT max(updated_at) AS m FROM tracked_texts WHERE acte_id = $1', [tx.acte_id]);
       if (modif?.m && new Date(modif.m) > new Date(tx.prepared_at)) throw E.conflict("Le texte de la délibération a été modifié depuis la préparation : annulez cette transmission et préparez-la de nouveau (le PDF préparé n'est plus à jour)");
       const pkg = tx.package; const enAttente = cfg.modeEnvoi === 'B';
-      const r = await adapter.creer({ organismeId: org, ...pkg, enAttente });
+      const r = await ad(cfg).creer({ organismeId: org, ...pkg, enAttente });
       if (!r.ok) {
         await db.run("UPDATE tlt_transactions SET etat = 'erreur', error = $2, updated_at = now() WHERE id = $1", [id, r.message]);
         await journal(id, ctx.username, 'echec', { message: r.message });
@@ -248,7 +252,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       const tx = await svc._get(org, id);
       if (!peutEnvoyer(ctx, org, cfg)) throw E.forbidden("Votre rôle ne permet pas de confirmer une transmission (paramétrage du workflow d'envoi)");
       if (tx.etat !== 'poste' || tx.status !== 17) throw E.conflict('Cette transaction n’est pas en attente de confirmation');
-      const r = await adapter.confirmer(tx.remote_id);
+      const r = await ad(cfg).confirmer(tx.remote_id, org);
       if (!r.ok) throw E.conflict(`S²LOW : ${r.message}`);
       const row = await db.get('UPDATE tlt_transactions SET status = 1, status_label = $2, updated_at = now() WHERE id = $1 RETURNING *', [id, STATUS[1]]);
       await db.run("UPDATE actes SET statut = 'transmis' WHERE id = $1 AND statut IN ('adopte','texte_definitif_pret','pret_a_transmettre')", [tx.acte_id]);
@@ -319,7 +323,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         return toTx(row);
       }
       if (tx.etat !== 'poste') throw E.conflict('Cette transaction ne peut pas être annulée');
-      const r = await adapter.annuler(tx.remote_id);
+      const r = await ad(cfg).annuler(tx.remote_id, org);
       if (!r.ok) throw E.conflict(`S²LOW : ${r.message}`);
       const row = await db.get("UPDATE tlt_transactions SET etat = 'annule', status = 0, status_label = $2, updated_at = now() WHERE id = $1 RETURNING *", [id, STATUS[0]]);
       await db.run("UPDATE actes SET statut = 'adopte' WHERE id = $1 AND statut IN ('transmis', 'pret_a_transmettre')", [tx.acte_id]);
@@ -332,10 +336,9 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     /** Interroge S²LOW : statuts des transactions vivantes, ARActe, puis documents de la préfecture (marqués lus après enregistrement). */
     async suivre(organismeId, actor = 'systeme') {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org);
-      if (cfg.mode !== 'simulation') return { statuts: 0, documents: 0, ignore: 'mode' };
       let statuts = 0; let documents = 0;
       for (const tx of await db.all("SELECT * FROM tlt_transactions WHERE organisme_id = $1 AND etat = 'poste' AND remote_id IS NOT NULL", [org])) {
-        const st = await adapter.statut(tx.remote_id);
+        const st = await ad(cfg).statut(tx.remote_id, org);
         if (!st || st.status === tx.status) continue;
         const ar = st.status === 4 && st.ar ? st.ar : null;
         const row = await db.get(`UPDATE tlt_transactions SET status = $2, status_label = $3, error = $4, ar_id = COALESCE($5, ar_id), ar_at = COALESCE($6::timestamptz, ar_at), ar_content = COALESCE($7, ar_content), updated_at = now() WHERE id = $1 RETURNING *`,
@@ -347,7 +350,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
           await db.run("UPDATE actes SET statut = 'ar_recu' WHERE id = $1 AND statut IN ('adopte','texte_definitif_pret','pret_a_transmettre','transmis')", [tx.acte_id]);
           // l'ARActe (XML de la préfecture) est conservé, consultable et déposé en GED (TLT-35)
           try {
-            const xml = await adapter.arActe?.(tx.remote_id);
+            const xml = await ad(cfg).arActe?.(tx.remote_id, org);
             if (xml) {
               const put = await storage.put(Buffer.from(xml, 'utf8'), { organismeId: org, ext: 'xml', categorie: 'controle-legalite', nom: `ARActe-${tx.numero_transmis}.xml`, titre: `Accusé de réception — ${tx.numero_transmis}`, auteur: actor });
               const f = await db.get("INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by) VALUES ($1,$2,$3,'application/xml',$4,$5,$6) RETURNING id", [org, put.key, `ARActe-${tx.numero_transmis}.xml`, put.size, put.sha256, actor]);
@@ -359,11 +362,11 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         }
         void row;
       }
-      for (const doc of await adapter.documentsPrefecture(org)) {
+      for (const doc of await ad(cfg).documentsPrefecture(org)) {
         const tx = await db.get('SELECT * FROM tlt_transactions WHERE organisme_id = $1 AND remote_id = $2', [org, doc.remoteId]);
         if (!tx) continue;
         await db.run('INSERT INTO tlt_documents (organisme_id, transaction_id, remote_id, type, titre, contenu, received_at) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (transaction_id, remote_id) DO NOTHING', [org, tx.id, doc.id, doc.type, doc.titre, doc.contenu, doc.date]);
-        await adapter.marquerLu(doc.id); // obligatoire : sinon le document revient à chaque interrogation
+        await ad(cfg).marquerLu(doc.id, org); // obligatoire : sinon le document revient à chaque interrogation
         await journal(tx.id, actor, 'document', { type: doc.type, titre: doc.titre });
         documents++;
         if ([3, 4, 5].includes(doc.type)) await bus.emit('tlt.document', { organismeId: org, acteId: tx.acte_id, transactionId: tx.id, type: doc.type, titre: doc.titre, motif: doc.titre });
@@ -379,7 +382,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       if (doc.statut !== 'a_traiter') throw E.conflict('Ce document a déjà été traité');
       if (doc.type !== 3) throw E.conflict('Seule une demande de pièces complémentaires appelle une réponse dans l’outil');
       const tx = await svc._get(org, doc.transaction_id);
-      const r = await adapter.repondre(tx.remote_id, { typeEnvoie, message });
+      const r = await ad(cfg).repondre(tx.remote_id, { typeEnvoie, message }, org);
       if (!r.ok) throw E.conflict(`S²LOW : ${r.message}`);
       await db.run("UPDATE tlt_documents SET statut = 'repondu', reponse = $2::jsonb, traite_par = $3, traite_at = now() WHERE id = $1", [docId, JSON.stringify({ typeEnvoie, message: message || null }), ctx.username]);
       await journal(tx.id, ctx.username, 'reponse', { typeEnvoie, message: message || null });
@@ -429,9 +432,9 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
 
     // ------------------------------------------------------------------------------------------ pièces (TLT-10)
     async bordereau(ctx, organismeId, id) {
-      const org = requireOrg(organismeId); const tx = await svc._get(org, id);
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); const tx = await svc._get(org, id);
       if (!tx.ar_id) throw E.conflict('Pas encore d’accusé de réception : le bordereau n’existe pas');
-      const buf = await adapter.bordereau(tx.remote_id);
+      const buf = await ad(cfg).bordereau(tx.remote_id, org);
       if (!buf) throw E.conflict('Bordereau indisponible');
       return { buffer: buf, name: `bordereau-${tx.numero_transmis}.pdf` };
     },
@@ -475,14 +478,14 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     // ------------------------------------------------------------------------------------------ simulation
     async simulation(ctx, organismeId) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org);
-      return { actif: cfg.mode === 'simulation', serveur: cfg.mode === 'simulation' ? await adapter.etat(org) : [], scenarios: Object.entries(SCENARIOS).map(([code, s]) => ({ code, label: s.label, etapes: s.steps.length })) };
+      return { actif: cfg.mode === 'simulation', serveur: cfg.mode === 'simulation' ? await SIM.etat(org) : [], scenarios: Object.entries(SCENARIOS).map(([code, s]) => ({ code, label: s.label, etapes: s.steps.length })) };
     },
     /** Fait avancer le serveur factice (une étape par défaut, ou `pas`), puis rejoue le suivi : l'outil reçoit les statuts et les documents. */
     async avancer(ctx, organismeId, { transactionId, remoteId, pas = 1 } = {}) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org); assertMode(cfg);
       const tx = transactionId ? await svc._get(org, transactionId) : null;
       if (transactionId && !tx.remote_id) throw E.conflict('Cette transaction n’a pas encore été postée');
-      const changes = await adapter.avancer({ organismeId: org, remoteId: remoteId || tx?.remote_id, pas });
+      const changes = await SIM.avancer({ organismeId: org, remoteId: remoteId || tx?.remote_id, pas });
       const suivi = await svc.suivre(org, ctx.username);
       await audit.log(ctx, { organismeId: org, action: 'tlt.simulation', entity: 'tlt_transactions', entityId: transactionId ?? null, after: { pas, changes: changes.length } });
       return { changes, suivi };

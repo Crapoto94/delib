@@ -14,9 +14,9 @@ const FOURNISSEURS = {
   s2low: {
     code: 's2low', nom: 'S²LOW', editeur: 'ADULLACT', defaut: true,
     description: "Tiers de télétransmission open source (module ACTES), très répandu dans les collectivités.",
-    modes: { simulation: true, test: false, production: false },
+    modes: { simulation: true, test: true, production: true },
     champs: CHAMPS_STANDARD,
-    note: "Le mode « simulation » rejoue toute la chaîne (envoi, statuts, retours de la préfecture). Les modes « test » et « production » seront ouverts avec le certificat et l'instance de test S²LOW (D20).",
+    note: "Les modes « test » et « production » dialoguent avec une instance S²LOW réelle, authentifiée par CERTIFICAT CLIENT P12 (identifiant technique et mot de passe facultatifs). En « test », les actes partent sur l'instance de test ; en « production », ils sont transmis à la préfecture.",
   },
   fast: {
     code: 'fast', nom: 'FAST-Actes', editeur: 'Docaposte',
