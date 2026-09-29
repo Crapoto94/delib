@@ -63,5 +63,15 @@ server {
   # --- front statique ---
   location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; }
   location = /sw.js { add_header Cache-Control "no-cache"; }
+  # L'application est servie à la racine de son hôte ; l'adresse historique « …/elus/ » (liens déjà diffusés, copie
+  # LAN) sert exactement les mêmes fichiers. Sans cela, les ressources relatives (./assets/…) partent en 404 puis en
+  # repli SPA : le navigateur reçoit une page HTML à la place d'un script, refuse de l'exécuter (MIME strict) et
+  # affiche une page blanche. `expires -1` (et non add_header) pour ne pas annuler l'héritage des en-têtes de sécurité.
+  location = /elus { return 301 /elus/; }
+  location ^~ /elus/ {
+    alias /usr/share/nginx/html/;
+    index index.html;
+    expires -1;
+  }
   location / { try_files $uri /index.html; add_header Cache-Control "no-cache"; }
 }

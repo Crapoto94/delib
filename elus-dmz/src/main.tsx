@@ -3,9 +3,10 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import { appliquerTheme, themeChoisi } from './theme';
 import App from './App';
+import ErrorBoundary from './ErrorBoundary';
 
 appliquerTheme(themeChoisi());
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ErrorBoundary><App /></ErrorBoundary></React.StrictMode>);
 
 // coque de l'application hors ligne (l'API n'est jamais interceptée : les documents vivent dans le stockage propre à l'élu)
 if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !import.meta.env.DEV) {

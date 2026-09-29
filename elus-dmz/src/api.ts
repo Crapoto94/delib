@@ -19,7 +19,7 @@ export function apiBaseForInstance(value: string): string {
   if (!text) throw new Error('Saisissez l’adresse de l’instance.');
   if (!/^https?:\/\//i.test(text)) text = `https://${text}`;
   let url: URL;
-  try { url = new URL(text); } catch { throw new Error('Adresse invalide. Exemple : https://vibedelib.ivry94.fr/elus'); }
+  try { url = new URL(text); } catch { throw new Error('Adresse invalide. Exemple : https://vibedelib.ivry94.fr'); }
   if (url.protocol !== 'https:') throw new Error('L’instance doit utiliser HTTPS.');
   if (url.username || url.password || url.search || url.hash) throw new Error('Saisissez uniquement l’adresse du site, sans identifiants ni paramètres.');
   const path = url.pathname.replace(/\/+$/, '');

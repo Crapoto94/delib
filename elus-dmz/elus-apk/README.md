@@ -1,8 +1,8 @@
 # VibeDélib Élus pour tablette Android
 
-L’APK embarque le même frontend que l’espace élus web. Au premier lancement, il propose l’adresse de l’instance publiée, préremplie avec `https://vibedelib.ivry94.fr/elus`. L’adresse peut être modifiée depuis le bouton globe dans l’application. Elle est mémorisée sur la tablette et vérifiée avant utilisation.
+L’APK embarque le même frontend que l’espace élus web. Au premier lancement, il propose l’adresse de l’instance publiée, préremplie avec `https://vibedelib.ivry94.fr`. L’adresse peut être modifiée depuis le bouton globe dans l’application. Elle est mémorisée sur la tablette et vérifiée avant utilisation.
 
-L’application utilise l’API du même hôte (`/api/v1`). Pour `https://vibedelib.ivry94.fr/elus`, l’API appelée est donc `https://vibedelib.ivry94.fr/api/v1`.
+L’application utilise l’API du même hôte (`/api/v1`). Pour `https://vibedelib.ivry94.fr`, l’API appelée est donc `https://vibedelib.ivry94.fr/api/v1`.
 
 ## Prérequis de construction
 

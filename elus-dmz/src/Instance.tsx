@@ -5,7 +5,7 @@ import { purger } from './docs';
 import { OrgLogo } from './Brand';
 import { ThemeToggle } from './theme';
 
-const INSTANCE_PAR_DEFAUT = 'https://vibedelib.ivry94.fr/elus';
+const INSTANCE_PAR_DEFAUT = 'https://vibedelib.ivry94.fr';
 
 export default function Instance({ onSaved }: { onSaved: () => void }) {
   const [url, setUrl] = useState(instanceUrl() || INSTANCE_PAR_DEFAUT);
@@ -45,7 +45,7 @@ export default function Instance({ onSaved }: { onSaved: () => void }) {
             <span className="label">Adresse de l’instance</span>
             <input className="input !py-3 !text-[16px]" type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} required autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder={INSTANCE_PAR_DEFAUT} />
           </label>
-          <p className="text-[13px] text-mute">Exemple : <b>https://vibedelib.ivry94.fr/elus</b></p>
+          <p className="text-[13px] text-mute">Exemple : <b>https://vibedelib.ivry94.fr</b></p>
           <button className="btn-primary w-full !py-3 !text-[16px]" disabled={busy}>{busy ? 'Vérification…' : 'Vérifier et utiliser cette instance'}</button>
           {instanceUrl() && <button type="button" className="w-full py-2 text-center text-[14px] text-mute" onClick={() => nav(-1)}>Annuler</button>}
         </form>
