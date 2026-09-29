@@ -4,6 +4,7 @@ import { CalendarDays, CloudDownload, WifiOff } from 'lucide-react';
 import { api, errMsg } from '../api';
 import { chargerAvecCache } from '../cache';
 import { armerReprise, prefetchSeance, usePrefetch } from '../docs';
+import { useRafraichissement } from '../refresh';
 import { dt } from '../format';
 
 /** Pastille d'état du téléchargement en arrière-plan (« 34 / 40 documents prêts hors ligne »). */
@@ -26,11 +27,12 @@ export const definirSeanceSuivie = (id: number | null) => { seanceSuivie = id; }
 export default function Accueil() {
   const [a, setA] = useState<any>(null); const [err, setErr] = useState<string | null>(null);
   const [horsLigne, setHorsLigne] = useState(false);
+  const v = useRafraichissement();
   useEffect(() => {
     chargerAvecCache('accueil', () => api.get('/elus/accueil').then((r) => r.data))
       .then(({ data, horsLigne }) => { setA(data); setHorsLigne(horsLigne); const id = data.prochaine?.id ?? null; definirSeanceSuivie(id); armerReprise(() => seanceSuivie); if (id && !horsLigne) void prefetchSeance(id); })
       .catch((e) => setErr(errMsg(e)));
-  }, []);
+  }, [v]);
   if (err) return <p className="p-6 text-ko">{err}</p>;
   if (!a) return <p className="p-6 text-mute">Chargement…</p>;
   const pr = a.prochaine;

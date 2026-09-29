@@ -201,7 +201,7 @@ function Fiche({ a, onClose, onChange, onShare }: { a: Ann; onClose: () => void;
   );
 }
 
-export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotationsOpen = false, onToggleAnnotations, onZoomWheel }: { blob: Blob; doc: { key: string; version: string; titre: string }; seanceId: number; zoom?: number; annotationsOpen?: boolean; onToggleAnnotations?: () => void; onZoomWheel?: (deltaY: number) => void }) {
+export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotationsOpen = false, onToggleAnnotations, onZoomWheel, onZoomSet }: { blob: Blob; doc: { key: string; version: string; titre: string }; seanceId: number; zoom?: number; annotationsOpen?: boolean; onToggleAnnotations?: () => void; onZoomWheel?: (deltaY: number) => void; onZoomSet?: (zoom: number) => void }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null); const [erreur, setErreur] = useState<string | null>(null);
   const [anns, setAnns] = useState<Ann[]>([]); const [mode, setMode] = useState<Mode>('lire'); const [couleur, setCouleur] = useState(COULEURS[0]);
   const [sel, setSel] = useState<number | null>(null); const [partage, setPartage] = useState<null | { ann: Ann | null }>(null); const [localPanneau, setLocalPanneau] = useState(false);
@@ -221,6 +221,47 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
 
   const charger = useCallback(() => api.get(`/elus/seances/${seanceId}/annotations`, { params: { docKey: doc.key } }).then((r) => setAnns(r.data.items)).catch(() => undefined), [seanceId, doc.key]);
   useEffect(() => { void charger(); }, [charger]);
+
+  /**
+   * Pincement à deux doigts (tablette) : pendant le geste on applique une simple transformation CSS (fluide, GPU),
+   * et on ne fixe le zoom réel qu'au relâchement — sinon chaque déplacement re-rendait toutes les pages du PDF.
+   * Écouteur NATIF non passif : c'est le seul moyen fiable de bloquer le défilement/zoom du navigateur pendant le geste.
+   */
+  const defile = useRef<HTMLDivElement>(null);
+  const pince = useRef<{ d0: number; z0: number } | null>(null);
+  const facteur = useRef(1);
+  const [apercu, setApercu] = useState<{ echelle: number; origine: string } | null>(null);
+  useEffect(() => {
+    const el = defile.current; if (!el || !onZoomSet) return;
+    const ecart = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
+    const debut = (e: TouchEvent) => {
+      if (e.touches.length !== 2) { pince.current = null; return; }
+      const r = el.getBoundingClientRect();
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left + el.scrollLeft;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top + el.scrollTop;
+      pince.current = { d0: ecart(e.touches), z0: zoom };
+      facteur.current = 1;
+      setApercu({ echelle: 1, origine: `${mx}px ${my}px` });
+    };
+    const bouge = (e: TouchEvent) => {
+      if (!pince.current || e.touches.length !== 2) return;
+      e.preventDefault();
+      facteur.current = ecart(e.touches) / pince.current.d0;
+      const p = pince.current;
+      setApercu((a) => (a ? { ...a, echelle: (p.z0 * facteur.current) / zoom } : a));
+    };
+    const fin = () => {
+      if (!pince.current) return;
+      const z = Math.round(pince.current.z0 * facteur.current);
+      pince.current = null; facteur.current = 1; setApercu(null);
+      onZoomSet(z);
+    };
+    el.addEventListener('touchstart', debut, { passive: true });
+    el.addEventListener('touchmove', bouge, { passive: false });
+    el.addEventListener('touchend', fin);
+    el.addEventListener('touchcancel', fin);
+    return () => { el.removeEventListener('touchstart', debut); el.removeEventListener('touchmove', bouge); el.removeEventListener('touchend', fin); el.removeEventListener('touchcancel', fin); };
+  }, [onZoomSet, zoom]);
 
   // ELU-74 : le document a changé de version → on cherche la citation dans le nouveau texte, sinon « orpheline »
   const surTexte = useCallback((n: number, t: PageText) => {
@@ -298,10 +339,10 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
         {mode === 'surligner' && selTexte && <button className="rounded bg-surface px-2 py-0.5 font-semibold text-ink" onClick={surlignerSelection}>Surligner la sélection</button>}</div></div>}
       {msg && <p role="alert" className="flex items-center bg-ko-bg px-3 py-1 text-[12px] text-ko">{msg}<button className="ml-auto" onClick={() => setMsg(null)} aria-label="Fermer"><X className="h-3.5 w-3.5" /></button></p>}
       <div className="flex min-h-0 flex-1">
-        {/* molette normale = défilement (natif) ; Ctrl/Cmd+molette = zoom, comme le pinch au doigt sur tablette */}
-        <div className="min-h-0 flex-1 space-y-2 overflow-auto bg-slate-100 p-2" onWheel={(e) => { if (!onZoomWheel || !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); onZoomWheel(e.deltaY); }}>
-          <div className="space-y-2" style={{ width: `${zoom}%` }}>
-            {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => <Page key={`${n}-${zoom}`} pdf={pdf} num={n} anns={anns} mode={mode} couleur={couleur} selected={sel} onCreate={creer} onSelect={(id) => { setSel(id); if (!panneau) basculerPanneau(); }} onText={surTexte} onSelection={surlignerSelection} />)}
+        {/* molette normale = défilement (natif) ; Ctrl/Cmd+molette = zoom, comme le pincement à deux doigts */}
+        <div ref={defile} className="min-h-0 flex-1 space-y-2 overflow-auto bg-slate-100 p-2" style={{ touchAction: 'pan-x pan-y' }} onWheel={(e) => { if (!onZoomWheel || !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); onZoomWheel(e.deltaY); }}>
+          <div className="space-y-2" style={{ width: `${zoom}%`, transform: apercu ? `scale(${apercu.echelle})` : undefined, transformOrigin: apercu?.origine, transition: apercu ? 'none' : 'transform 120ms ease-out' }}>
+            {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => <Page key={n} pdf={pdf} num={n} anns={anns} mode={mode} couleur={couleur} selected={sel} onCreate={creer} onSelect={(id) => { setSel(id); if (!panneau) basculerPanneau(); }} onText={surTexte} onSelection={surlignerSelection} />)}
           </div>
         </div>
         {annotationsOpen && (

@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "buildTime": "2026-09-29T14:12:01.937Z",
+  "buildTime": "2026-09-29T14:17:42.364Z",
   "url": "/apk/vibedelib-elus.apk",
-  "taille": 8072157,
-  "notes": "Hors ligne : les donnees de seance sont conservees (plus de blocage sans reseau) ; statut backend moins d'alertes a tort."
+  "taille": 8262452,
+  "notes": "Bouton rafraichir, zoom par pincement, icone et ecran de demarrage aux couleurs d'Ivry."
 }

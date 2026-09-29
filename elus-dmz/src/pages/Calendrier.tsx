@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, CalendarPlus, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { api, errMsg } from '../api';
+import { chargerAvecCache } from '../cache';
+import { useRafraichissement } from '../refresh';
 import { dt } from '../format';
 
 type Lien = { actif: boolean; url?: string; webcal?: string; creeLe?: string; dernierAcces?: string | null; nbAcces?: number };
@@ -20,10 +22,11 @@ export default function Calendrier() {
 
   const chargerLien = () => api.get('/elus/calendrier/lien').then((r) => setLien(r.data)).catch((e) => setErr(errMsg(e)));
 
+  const v = useRafraichissement();
   useEffect(() => {
-    api.get('/elus/accueil').then((r) => setSeances(r.data.seances)).catch((e) => setErr(errMsg(e)));
+    chargerAvecCache('calendrier', () => api.get('/elus/accueil').then((r) => r.data.seances)).then(({ data }) => setSeances(data)).catch((e) => setErr(errMsg(e)));
     chargerLien();
-  }, []);
+  }, [v]);
 
   const agir = async (fn: () => Promise<any>, ok: string) => {
     setBusy(true); setErr(null); setMsg(null);

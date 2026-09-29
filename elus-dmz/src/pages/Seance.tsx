@@ -5,6 +5,7 @@ import LecteurAnnote from '../AnnotPdf';
 import { api, errMsg } from '../api';
 import { chargerAvecCache } from '../cache';
 import { armerReprise, noterLecture, ouvrirDoc, prefetchSeance, type Doc } from '../docs';
+import { useRafraichissement } from '../refresh';
 import { EtatTelechargement, definirSeanceSuivie } from './Accueil';
 import { dt } from '../format';
 import { Select } from '../Select';
@@ -48,7 +49,7 @@ function Lecteur({ doc, seanceId, documents, onSelectDoc }: { doc: Pick<Doc, 'ke
         <span className="w-10 text-center tabular-nums">{zoom} %</span>
         <button className="rounded p-2 hover:bg-slate-100" aria-label="Agrandir" onClick={() => setZoom((z) => Math.min(300, z + 15))}><Plus className="h-4 w-4" /></button>
       </div>
-      {err ? <p className="p-6 text-ko">{err}</p> : !blob ? <div className="flex flex-1 items-center justify-center p-10 text-mute"><Loader2 className="h-6 w-6 animate-spin" /></div> : <div className="flex min-h-0 flex-1 flex-col"><LecteurAnnote blob={blob} doc={{ key: doc.key, version: doc.version, titre: doc.titre }} seanceId={seanceId} zoom={zoom} annotationsOpen={annotationsOpen} onToggleAnnotations={() => setAnnotationsOpen((v) => !v)} onZoomWheel={surZoom} /></div>}
+      {err ? <p className="p-6 text-ko">{err}</p> : !blob ? <div className="flex flex-1 items-center justify-center p-10 text-mute"><Loader2 className="h-6 w-6 animate-spin" /></div> : <div className="flex min-h-0 flex-1 flex-col"><LecteurAnnote blob={blob} doc={{ key: doc.key, version: doc.version, titre: doc.titre }} seanceId={seanceId} zoom={zoom} annotationsOpen={annotationsOpen} onToggleAnnotations={() => setAnnotationsOpen((v) => !v)} onZoomWheel={surZoom} onZoomSet={(z) => setZoom(Math.min(300, Math.max(25, z)))} /></div>}
     </div>
   );
 }
@@ -116,7 +117,8 @@ export default function Seance() {
   const suivreRef = useRef(false); suivreRef.current = suivre;
 
   const charger = useCallback(async () => { try { const { data, horsLigne } = await chargerAvecCache(`seance:${sid}`, () => api.get(`/elus/seances/${sid}`).then((r) => r.data)); setS(data); setHorsLigne(horsLigne); } catch (e) { setErr(errMsg(e)); } }, [sid]);
-  useEffect(() => { void charger(); definirSeanceSuivie(sid); armerReprise(() => sid); void prefetchSeance(sid); }, [sid, charger]);
+  const v = useRafraichissement();
+  useEffect(() => { void charger(); definirSeanceSuivie(sid); armerReprise(() => sid); void prefetchSeance(sid); }, [sid, charger, v]);
 
   const points: any[] = useMemo(() => (s?.points ?? []).filter((p: any) => p.kind !== 'chapitre'), [s]);
   const navigables = useMemo(() => points.filter((p) => !p.retire), [points]);

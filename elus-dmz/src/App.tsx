@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { HashRouter, Link, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
-import { CalendarDays, Globe2, LogOut, Search, Settings } from 'lucide-react';
+import { CalendarDays, Globe2, LogOut, RefreshCw, Search, Settings } from 'lucide-react';
 import { api, instanceUrl, isNativeApp, session } from './api';
 import { purger } from './docs';
+import { rafraichir } from './refresh';
 import Accueil from './pages/Accueil';
 import Seance from './pages/Seance';
 import { Connexion, Invitation } from './pages/Acces';
@@ -11,7 +12,7 @@ import Preferences from './pages/Preferences';
 import Calendrier from './pages/Calendrier';
 import { ThemeToggle } from './theme';
 import Legal from './pages/Legal';
-import EtatBackend, { PastilleBackend } from './EtatBackend';
+import EtatBackend, { PastilleBackend, sonderBackend } from './EtatBackend';
 import { OrgLogo, useBranding, useFavicon } from './Brand';
 import GroupePopover from './GroupePopover';
 import MonParapheur from './MonParapheur';
@@ -26,6 +27,8 @@ function Cadre() {
   useFavicon(useBranding());
   useEffect(() => { if (!session.token()) nav('/connexion', { replace: true }); }, [nav]);
   const sortir = async () => { try { await api.post('/elus-auth/deconnexion'); } catch { /* déjà expirée */ } await purger(); session.clear(); nav('/connexion', { replace: true }); };
+  const [rafraichit, setRafraichit] = useState(false);
+  const rafraichirDonnees = async () => { setRafraichit(true); rafraichir(); try { await sonderBackend(); } finally { setRafraichit(false); } };
   if (!session.token()) return <Navigate to="/connexion" replace />;
   return (
     <div className="min-h-screen bg-page">
@@ -35,6 +38,7 @@ function Cadre() {
         <span className="ml-auto hidden shrink-0 text-[13px] text-white/80 sm:inline">{elu?.nom}</span>
         <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>
         <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/calendrier')} aria-label="Mon calendrier" title="Mon calendrier"><CalendarDays className="h-5 w-5" /></button>
+        <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={rafraichirDonnees} aria-label="Rafraîchir les données" title="Rafraîchir les données"><RefreshCw className={`h-5 w-5 ${rafraichit ? 'animate-spin' : ''}`} /></button>
         <MonParapheur />
         <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/preferences')} aria-label="Mes préférences" title="Mes préférences"><Settings className="h-5 w-5" /></button>
         {isNativeApp() && <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/instance')} aria-label="Changer d’instance" title={`Instance : ${instanceUrl() || ''}`}><Globe2 className="h-5 w-5" /></button>}
