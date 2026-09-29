@@ -33,7 +33,7 @@ function Cadre() {
   return (
     <div className="min-h-screen bg-page">
       <header className="border-b border-primary-deep/40 bg-gradient-to-r from-nav-from to-nav-to text-white shadow-lift"><div className="accent-bar" aria-hidden="true" /><div className="flex h-14 items-center gap-3 px-4">
-        <OrgLogo className="h-8 shrink-0" /><span className="hidden shrink-0 text-[13px] text-white/70 sm:inline">Espace élus</span>
+        <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Revenir à l’accueil" title="Revenir à l’accueil"><OrgLogo className="h-8" /><span className="hidden shrink-0 text-[13px] text-white/70 sm:inline">Espace élus</span></Link>
         {elu?.groupe && <GroupePopover groupe={elu.groupe} moi={elu.nom} delegation={elu.delegation} />}
         <span className="ml-auto hidden shrink-0 text-[13px] text-white/80 sm:inline">{elu?.nom}</span>
         <button className="shrink-0 rounded p-2 text-white/80 hover:bg-white/10 hover:text-white" onClick={() => nav('/recherche')} aria-label="Rechercher" title="Rechercher une délibération"><Search className="h-5 w-5" /></button>

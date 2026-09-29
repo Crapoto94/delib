@@ -200,13 +200,13 @@ function Fiche({ a, seanceId, docKey, onClose, onChange, onShare }: { a: Ann; se
 export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotationsOpen = false, onToggleAnnotations, onZoomWheel, onZoomSet }: { blob: Blob; doc: { key: string; version: string; titre: string }; seanceId: number; zoom?: number; annotationsOpen?: boolean; onToggleAnnotations?: () => void; onZoomWheel?: (deltaY: number) => void; onZoomSet?: (zoom: number) => void }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null); const [erreur, setErreur] = useState<string | null>(null);
   const [anns, setAnns] = useState<Ann[]>([]); const [mode, setMode] = useState<Mode>('lire'); const [couleur, setCouleur] = useState(COULEURS[0]);
-  const [sel, setSel] = useState<number | null>(null); const [partage, setPartage] = useState<null | { ann: Ann | null }>(null); const [localPanneau, setLocalPanneau] = useState(false); const [menu, setMenu] = useState(false);
+  const [sel, setSel] = useState<number | null>(null); const [partage, setPartage] = useState<null | { ann: Ann | null }>(null);   const [localPanneau, setLocalPanneau] = useState(false); const [menu, setMenu] = useState(false); const [liste, setListe] = useState(false);
   const [brouillon, setBrouillon] = useState<null | { page: number; kind: 'note' | 'signet'; rects: Rect[]; texte: string }>(null); const [msg, setMsg] = useState<string | null>(null);
   const panneau = annotationsOpen ?? localPanneau;
   const basculerPanneau = onToggleAnnotations ?? (() => setLocalPanneau((v) => !v));
   // Volet fermé = hors mode annotation : on repasse en lecture, sinon l'outil précédent (dessin, note, surlignage)
   // restait actif et le doigt annotait au lieu de faire défiler le document.
-  useEffect(() => { if (!panneau) { setMode('lire'); setBrouillon(null); } }, [panneau]);
+  useEffect(() => { if (!panneau) { setMode('lire'); setBrouillon(null); setListe(false); } }, [panneau]);
   const textes = useRef(new Map<number, PageText>()); const traites = useRef(new Set<number>());
 
   useEffect(() => {
@@ -227,7 +227,7 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
    * Écouteur NATIF non passif : c'est le seul moyen fiable de bloquer le défilement/zoom du navigateur pendant le geste.
    */
   const defile = useRef<HTMLDivElement>(null);
-  const pince = useRef<{ d0: number; z0: number } | null>(null);
+  const pince = useRef<{ d0: number; z0: number; vx: number; vy: number; cx: number; cy: number } | null>(null);
   const facteur = useRef(1);
   const [apercu, setApercu] = useState<{ echelle: number; origine: string } | null>(null);
   useEffect(() => {
@@ -236,11 +236,11 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
     const debut = (e: TouchEvent) => {
       if (e.touches.length !== 2) { pince.current = null; return; }
       const r = el.getBoundingClientRect();
-      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left + el.scrollLeft;
-      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top + el.scrollTop;
-      pince.current = { d0: ecart(e.touches), z0: zoom };
+      const vx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left;
+      const vy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+      pince.current = { d0: ecart(e.touches), z0: zoom, vx, vy, cx: vx + el.scrollLeft, cy: vy + el.scrollTop };
       facteur.current = 1;
-      setApercu({ echelle: 1, origine: `${mx}px ${my}px` });
+      setApercu({ echelle: 1, origine: `${vx + el.scrollLeft}px ${vy + el.scrollTop}px` });
     };
     const bouge = (e: TouchEvent) => {
       if (!pince.current || e.touches.length !== 2) return;
@@ -250,10 +250,18 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
       setApercu((a) => (a ? { ...a, echelle: (p.z0 * facteur.current) / zoom } : a));
     };
     const fin = () => {
-      if (!pince.current) return;
-      const z = Math.round(pince.current.z0 * facteur.current);
+      const p = pince.current; if (!p) return;
+      const cible = Math.min(300, Math.max(25, Math.round(p.z0 * facteur.current)));
+      const k = cible / p.z0;
       pince.current = null; facteur.current = 1; setApercu(null);
-      onZoomSet(z);
+      onZoomSet(cible);
+      // Le zoom change la largeur du contenu : on recale le défilement pour que le point pincé reste EXACTEMENT
+      // au même endroit à l'écran (sinon la vue « sautait » après le geste).
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const e2 = defile.current; if (!e2) return;
+        e2.scrollLeft = p.cx * k - p.vx;
+        e2.scrollTop = p.cy * k - p.vy;
+      }));
     };
     el.addEventListener('touchstart', debut, { passive: true });
     el.addEventListener('touchmove', bouge, { passive: false });
@@ -332,6 +340,8 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
         <div className="flex flex-wrap items-center gap-1 border-b border-line bg-surface px-2 py-1.5" role="toolbar" aria-label="Outils d’annotation">
           {panneau && OUTILS.map(([m, l, I]) => <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m} className={`inline-flex items-center gap-1 rounded px-2.5 py-2 text-[13px] font-semibold ${mode === m ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}><I className="h-4 w-4" /><span className="hidden sm:inline">{l}</span></button>)}
           {panneau && <span className="mx-1 flex items-center gap-1" role="group" aria-label="Couleur">{COULEURS.map((c) => <button key={c} aria-label={`Couleur ${c}`} aria-pressed={couleur === c} onClick={() => setCouleur(c)} className={`h-5 w-5 rounded-full border ${couleur === c ? 'ring-2 ring-slate-800 ring-offset-1' : ''}`} style={{ background: c }} />)}</span>}
+          {/* La liste et le détail des annotations ne s'affichent que sur demande : ils prenaient sinon la place du document. */}
+          {panneau && <button className="ml-auto inline-flex items-center gap-1 rounded px-2.5 py-2 text-[13px] font-semibold hover:bg-slate-100" onClick={() => setListe((v) => !v)} aria-pressed={liste}><PanelRight className="h-4 w-4" /> Annotations ({anns.length})</button>}
           {!onToggleAnnotations && <button className="ml-auto inline-flex items-center gap-1 rounded px-2.5 py-2 text-[13px] font-semibold hover:bg-slate-100" onClick={basculerPanneau} aria-expanded={panneau}><PanelRight className="h-4 w-4" /> Annotations ({anns.length})</button>}
         </div>
       )}
@@ -344,10 +354,10 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
         {/* molette normale = défilement (natif) ; Ctrl/Cmd+molette = zoom, comme le pincement à deux doigts */}
         <div ref={defile} className="min-h-0 flex-1 space-y-2 overflow-auto bg-slate-100 p-2" style={{ touchAction: 'pan-x pan-y' }} onWheel={(e) => { if (!onZoomWheel || !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); onZoomWheel(e.deltaY); }}>
           <div className="space-y-2" style={{ width: `${zoom}%`, transform: apercu ? `scale(${apercu.echelle})` : undefined, transformOrigin: apercu?.origine, transition: apercu ? 'none' : 'transform 120ms ease-out' }}>
-            {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => <Page key={n} pdf={pdf} num={n} anns={anns} mode={panneau ? mode : 'lire'} couleur={couleur} selected={sel} onCreate={creer} onSelect={(id) => { setSel(id); if (!panneau) basculerPanneau(); }} onText={surTexte} onSelection={surlignerSelection} />)}
+            {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => <Page key={n} pdf={pdf} num={n} anns={anns} mode={panneau ? mode : 'lire'} couleur={couleur} selected={sel} onCreate={creer} onSelect={(id) => { setSel(id); setListe(true); }} onText={surTexte} onSelection={surlignerSelection} />)}
           </div>
         </div>
-        {annotationsOpen && (
+        {liste && (
           <aside className="w-full max-w-sm shrink-0 space-y-2 overflow-y-auto border-l border-line bg-surface p-2 max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-30 max-sm:max-w-full" aria-label="Annotations du document">
             {/* « Partager » et « Mon dossier annoté » sont rangés dans un menu : affichés en permanence, ils
                 prenaient la place de la liste des annotations et réduisaient la lecture. */}
@@ -363,7 +373,7 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
                   </div>
                 </>)}
               </div>
-              <button className="rounded p-1 hover:bg-slate-100 sm:hidden" onClick={basculerPanneau} aria-label="Fermer"><X className="h-4 w-4" /></button>
+              <button className="rounded p-1 hover:bg-slate-100" onClick={() => setListe(false)} aria-label="Fermer la liste"><X className="h-4 w-4" /></button>
             </div>
             {courante && <Fiche a={courante} seanceId={seanceId} docKey={doc.key} onClose={() => setSel(null)} onChange={charger} onShare={() => setPartage({ ann: courante })} />}
             {!anns.length ? <p className="p-4 text-center text-[13px] text-mute">Aucune annotation sur ce document. Choisissez un outil ci-dessus.</p> : (

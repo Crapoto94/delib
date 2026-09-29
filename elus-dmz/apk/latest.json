@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "buildTime": "2026-09-29T14:51:33.947Z",
+  "buildTime": "2026-09-29T15:10:37.746Z",
   "url": "/apk/vibedelib-elus.apk",
-  "taille": 8396161,
-  "notes": "Annotations hors ligne (stockage local + synchro auto), volet annotations allege, geste = defilement hors mode annotation."
+  "taille": 8396285,
+  "notes": "Zoom par pincement sans deplacement, liste des annotations uniquement sur demande, logo cliquable pour revenir a l'accueil."
 }
