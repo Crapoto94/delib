@@ -10,6 +10,8 @@ RUN npm run build
 FROM nginx:1.27-alpine
 # le modèle est rendu au démarrage avec BACKEND_HOST / BACKEND_PORT (image officielle : /etc/nginx/templates)
 COPY --from=build /app/dist /usr/share/nginx/html
+# APK des tablettes (page d'installation + fichier publié par scripts/publier-apk.mjs), servi sous /apk/
+COPY apk /usr/share/nginx/html/apk
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 ENV BACKEND_HOST=backend BACKEND_PORT=3121
 EXPOSE 80

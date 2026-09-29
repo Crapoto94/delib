@@ -20,6 +20,9 @@ interstate/
 frontend/public/pdfjs/
 elus-dmz/public/pdfjs/
 
+# APK des tablettes : binaire volumineux reconstruit localement, copié vers la DMZ par pulldmz.ps1, jamais versionné
+elus-dmz/apk/*.apk
+
 # accès serveur : jamais versionnés
 SSH.txt
 pulldocker.ini

@@ -7,7 +7,7 @@ L’application utilise l’API du même hôte (`/api/v1`). Pour `https://vibede
 ## Prérequis de construction
 
 - Node.js 22 ou plus récent
-- JDK 17 ou plus récent
+- JDK 21 (exigé par Capacitor 8 ; celui embarqué dans Android Studio convient : `C:\Program Files\Android\Android Studio\jbr`)
 - Android SDK avec les plateformes et outils de compilation demandés par Capacitor
 
 ## Construire l’APK de débogage
@@ -21,10 +21,24 @@ cd elus-apk
 npm ci
 npx cap sync android
 cd android
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat assembleDebug
 ```
 
 L’APK installable est produit dans `elus-apk/android/app/build/outputs/apk/debug/app-debug.apk`.
+
+## Publier l’APK sur l’instance (téléchargement et mise à jour)
+
+Depuis `elus-dmz`, une fois l’APK construite :
+
+```powershell
+node scripts/publier-apk.mjs --notes "ce que corrige cette version"
+```
+
+Le script copie l’APK dans `apk/vibedelib-elus.apk` (binaire non versionné) et écrit `apk/latest.json`
+(versionné). Il refuse de publier si l’APK ne correspond pas au build web courant. Un `pulldmz.bat` copie
+ensuite le tout vers la DMZ : la page `https://<instance>/apk/` propose le téléchargement, et les tablettes
+déjà à jour via ce mécanisme affichent une proposition de mise à jour au lancement.
 
 Le backend doit autoriser l’origine WebView Capacitor `https://localhost` dans `CORS_ORIGINS`, en plus des origines web habituelles. Il doit aussi présenter un certificat HTTPS reconnu par Android.
 

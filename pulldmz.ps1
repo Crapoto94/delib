@@ -68,8 +68,17 @@ function Find-PuttyTool {
     param([string]$Name)
     $cmd = Get-Command $Name -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Path }
-    $fallback = "C:\Program Files\PuTTY\$Name"
-    if (Test-Path $fallback) { return $fallback }
+    # PuTTY s'installe soit pour tous les utilisateurs (Program Files), soit pour l'utilisateur courant
+    # (%LOCALAPPDATA%\Programs) : le paquet winget récent choisit le second, et l'installation « programme »
+    # peut ne contenir que pscp.exe. Chercher aux deux endroits évite l'échec « plink introuvable ».
+    $candidats = @(
+        (Join-Path $env:ProgramFiles 'PuTTY'),
+        (Join-Path ${env:ProgramFiles(x86)} 'PuTTY'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\PuTTY')
+    )
+    foreach ($dossier in $candidats) {
+        if ($dossier -and (Test-Path (Join-Path $dossier $Name))) { return (Join-Path $dossier $Name) }
+    }
     Write-Error "$Name introuvable (PuTTY). Installez PuTTY (winget install PuTTY.PuTTY)."
     exit 1
 }
@@ -99,6 +108,19 @@ try {
         Copy-Item -Path $src -Destination $dst -Force
     }
     Write-Host "Fichiers a copier : $($tracked.Count)" -ForegroundColor Cyan
+
+    # L'APK publiée n'est pas versionnée (binaire reconstruit localement) : on l'ajoute au vol si elle est présente,
+    # pour que l'image DMZ la serve sous /apk/ sans alourdir le dépôt git.
+    $apkSrc = Join-Path $ScriptDir 'elus-dmz\apk'
+    $apkFichiers = @(Get-ChildItem -Path $apkSrc -Filter *.apk -ErrorAction SilentlyContinue)
+    if ($apkFichiers.Count -gt 0) {
+        $apkDst = Join-Path $staging 'elus-dmz\apk'
+        if (-not (Test-Path $apkDst)) { New-Item -ItemType Directory -Path $apkDst -Force | Out-Null }
+        $apkFichiers | ForEach-Object { Copy-Item -Path $_.FullName -Destination $apkDst -Force }
+        Write-Host "APK ajoutee : $($apkFichiers.Name -join ', ')" -ForegroundColor Cyan
+    } else {
+        Write-Host "Aucune APK locale dans elus-dmz\apk : le telechargement sous /apk/ sera indisponible." -ForegroundColor Yellow
+    }
 
     # --- Etape 2 : creer le dossier distant puis copier (pscp -r) ---
     & $plinkPath -ssh -P $config.port -batch -pw $config.password "$($config.login)@$($config.ip)" "mkdir -p `"$($config.chemin)`""

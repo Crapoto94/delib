@@ -78,11 +78,19 @@ Write-Host ""
 $plinkCmd = Get-Command plink.exe -ErrorAction SilentlyContinue
 if ($plinkCmd) {
     $plinkPath = $plinkCmd.Path
-} elseif (Test-Path 'C:\Program Files\PuTTY\plink.exe') {
-    $plinkPath = 'C:\Program Files\PuTTY\plink.exe'
 } else {
-    Write-Error "plink.exe introuvable (PuTTY). Installez PuTTY, ou adaptez ce script pour utiliser ssh.exe avec une cle."
-    exit 1
+    # PuTTY peut être installé pour l'utilisateur courant (%LOCALAPPDATA%\Programs) et pas dans Program Files.
+    $candidats = @(
+        (Join-Path $env:ProgramFiles 'PuTTY\plink.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'PuTTY\plink.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\PuTTY\plink.exe')
+    ) | Where-Object { $_ -and (Test-Path $_) }
+    if ($candidats) {
+        $plinkPath = $candidats[0]
+    } else {
+        Write-Error "plink.exe introuvable (PuTTY). Installez PuTTY, ou adaptez ce script pour utiliser ssh.exe avec une cle."
+        exit 1
+    }
 }
 
 & $plinkPath -ssh -P $config.port -batch -pw $config.password "$($config.login)@$($config.ip)" $remoteCommand

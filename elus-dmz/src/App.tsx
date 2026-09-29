@@ -16,6 +16,7 @@ import { OrgLogo, useBranding, useFavicon } from './Brand';
 import GroupePopover from './GroupePopover';
 import MonParapheur from './MonParapheur';
 import Instance from './Instance';
+import MiseAJour from './MiseAJour';
 
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./dev/DevAnnot')) : null;
 
@@ -60,6 +61,9 @@ function AppRoutes() {
   const instanceEnregistree = () => { setInstanceChoisie(true); nav('/connexion', { replace: true }); };
   if (!instanceChoisie) return <Instance onSaved={instanceEnregistree} />;
   return (
+      <>
+      {/* APK installée : propose la nouvelle version dès qu'elle est publiée sur l'instance */}
+      <MiseAJour />
       <Routes>
         <Route path="/connexion" element={<Connexion />} />
         <Route path="/invitation/:token" element={<Invitation />} />
@@ -76,6 +80,7 @@ function AppRoutes() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </>
   );
 }
 

@@ -63,6 +63,17 @@ server {
   # --- front statique ---
   location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; }
   location = /sw.js { add_header Cache-Control "no-cache"; }
+  # --- APK des tablettes (ELU-66) : page d'installation et fichier de mise à jour ---
+  # Au-dessus de la racine : l'APK vit dans /apk/ (voir apk/ et scripts/publier-apk.mjs). Sans
+  # `Content-Disposition: attachment`, Android ouvrirait une page vide au lieu de proposer d'installer.
+  location = /apk { return 302 /apk/; }
+  location /apk/ { root /usr/share/nginx/html; index index.html; expires -1; }
+  location ~* ^/apk/.*\.apk$ {
+    root /usr/share/nginx/html;
+    default_type application/vnd.android.package-archive;
+    add_header Content-Disposition "attachment" always;
+    add_header Cache-Control "no-cache" always;
+  }
   # L'application est servie à la racine de son hôte ; l'adresse historique « …/elus/ » (liens déjà diffusés, copie
   # LAN) sert exactement les mêmes fichiers. Sans cela, les ressources relatives (./assets/…) partent en 404 puis en
   # repli SPA : le navigateur reçoit une page HTML à la place d'un script, refuse de l'exécuter (MIME strict) et
