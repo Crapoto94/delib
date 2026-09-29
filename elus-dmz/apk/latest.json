@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "buildTime": "2026-09-29T13:54:41.035Z",
+  "buildTime": "2026-09-29T14:01:35.268Z",
   "url": "/apk/vibedelib-elus.apk",
-  "taille": 8071179,
-  "notes": "Connexion tablette : normalise le mot de passe (apostrophes/accents du clavier mobile) ; mise a jour automatique reparee."
+  "taille": 8071537,
+  "notes": "Mise a jour quasi transparente : telechargement en arriere-plan puis un seul ecran d'installation, relance automatique."
 }
