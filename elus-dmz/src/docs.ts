@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { api, enLigne, session } from './api';
+import { viderCache } from './cache';
 
 /**
  * Documents de séance sur l'appareil + TÉLÉCHARGEMENT EN ARRIÈRE-PLAN (ELU-65).
@@ -35,7 +36,7 @@ async function ecrireLocal(key: string, version: string, blob: Blob) {
   try { await (await caches.open(cacheName())).put(fakeUrl(key), new Response(blob, { headers: { 'Content-Type': 'application/pdf', 'X-Document-Version': version } })); } catch { /* quota : le document reste lisible en ligne */ }
 }
 /** À la déconnexion : les documents nominatifs ne restent pas sur l'appareil. */
-export async function purger() { if (supporte()) { try { await caches.delete(cacheName()); } catch { /* */ } } try { localStorage.removeItem('elus.lectures'); } catch { /* */ } etat = { ...etat, seanceId: null, total: 0, prets: 0, echecs: 0, octets: 0 }; emit(); }
+export async function purger() { if (supporte()) { try { await caches.delete(cacheName()); } catch { /* */ } } try { localStorage.removeItem('elus.lectures'); } catch { /* */ } viderCache(); etat = { ...etat, seanceId: null, total: 0, prets: 0, echecs: 0, octets: 0 }; emit(); }
 
 async function telecharger(d: Doc): Promise<Blob> {
   // Délai plus long que le défaut de `api` (60 s) : un document volumineux peut être filigrané/rendu à la volée

@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "buildTime": "2026-09-29T14:01:35.268Z",
+  "buildTime": "2026-09-29T14:12:01.937Z",
   "url": "/apk/vibedelib-elus.apk",
-  "taille": 8071537,
-  "notes": "Mise a jour quasi transparente : telechargement en arriere-plan puis un seul ecran d'installation, relance automatique."
+  "taille": 8072157,
+  "notes": "Hors ligne : les donnees de seance sont conservees (plus de blocage sans reseau) ; statut backend moins d'alertes a tort."
 }

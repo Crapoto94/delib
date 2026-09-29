@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, ChevronLeft, File, FileText, ListOrdered, Loader2, MessageSquareText, Minus, Paperclip, Plus, Radio, Star, StickyNote, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, ChevronLeft, File, FileText, ListOrdered, Loader2, MessageSquareText, Minus, Paperclip, Plus, Radio, Star, StickyNote, Trash2, WifiOff } from 'lucide-react';
 import LecteurAnnote from '../AnnotPdf';
 import { api, errMsg } from '../api';
+import { chargerAvecCache } from '../cache';
 import { armerReprise, noterLecture, ouvrirDoc, prefetchSeance, type Doc } from '../docs';
 import { EtatTelechargement, definirSeanceSuivie } from './Accueil';
 import { dt } from '../format';
@@ -109,11 +110,12 @@ function Notes({ seanceId, itemId, moi }: { seanceId: number; itemId: number; mo
 export default function Seance() {
   const { id } = useParams(); const sid = Number(id);
   const [s, setS] = useState<any>(null); const [err, setErr] = useState<string | null>(null);
+  const [horsLigne, setHorsLigne] = useState(false);
   const [sel, setSel] = useState<Sel | null>(null); const [docKey, setDocKey] = useState<string | null>(null); const [rail, setRail] = useState(false); const [notes, setNotes] = useState(false);
   const [suivre, setSuivre] = useState(false); const [direct, setDirect] = useState<any>(null);
   const suivreRef = useRef(false); suivreRef.current = suivre;
 
-  const charger = useCallback(async () => { try { setS((await api.get(`/elus/seances/${sid}`)).data); } catch (e) { setErr(errMsg(e)); } }, [sid]);
+  const charger = useCallback(async () => { try { const { data, horsLigne } = await chargerAvecCache(`seance:${sid}`, () => api.get(`/elus/seances/${sid}`).then((r) => r.data)); setS(data); setHorsLigne(horsLigne); } catch (e) { setErr(errMsg(e)); } }, [sid]);
   useEffect(() => { void charger(); definirSeanceSuivie(sid); armerReprise(() => sid); void prefetchSeance(sid); }, [sid, charger]);
 
   const points: any[] = useMemo(() => (s?.points ?? []).filter((p: any) => p.kind !== 'chapitre'), [s]);
@@ -178,6 +180,7 @@ export default function Seance() {
             <button className={`rounded-lg p-2 ${notes ? 'bg-action/10 text-action' : 'hover:bg-slate-100'}`} aria-label="Mes notes" aria-pressed={notes} onClick={() => setNotes(!notes)}><StickyNote className="h-5 w-5" /></button>
           </div>}
         </div>
+        {horsLigne && <span className="inline-flex items-center gap-1 rounded-full bg-warn-bg px-2.5 py-1 text-[11px] font-semibold text-warn" title="Seules les données déjà enregistrées sur l’appareil sont affichées."><WifiOff className="h-3.5 w-3.5" /> hors ligne</span>}
         <EtatTelechargement />
         {s.suivreLaSeance && <button className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold ${suivre ? 'bg-ko-solid text-white' : 'bg-slate-100 text-slate-700'}`} onClick={() => setSuivre(!suivre)} aria-pressed={suivre}><Radio className="h-3.5 w-3.5" /> {suivre ? 'Je suis la séance' : 'Suivre la séance'}</button>}
         <button className="rounded p-2 hover:bg-slate-100 md:hidden" onClick={() => setRail(!rail)} aria-label="Ordre du jour"><BookOpen className="h-5 w-5" /></button>

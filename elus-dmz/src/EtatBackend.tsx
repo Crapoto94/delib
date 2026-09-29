@@ -1,22 +1,25 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
-import { api, apiBase } from './api';
+import { api, apiBase, enLigne } from './api';
 
 /**
  * Sonde de joignabilité du backend VibeDélib. Une seule requête toutes les 20 s vers
  * `/elus-auth/etat` (route publique, aucune donnée sensible), le résultat est partagé par tous les
  * appelants (bandeau + pastille) : un seul flux réseau, jamais de sonde supplémentaire.
  *
- * Le détail du dernier échec est conservé parce qu'il est ce qui distingue les causes réelles d'une
- * simple lenteur : 404 = route absente de la liste blanche nginx de la DMZ, 502/504 = la DMZ
- * n'atteint pas le backend, 429 = quota nginx, aucune réponse = DNS / pare-feu / TLS / CSP.
+ * Deux précautions contre les fausses alertes, qui faisaient afficher « backend KO » alors que tout allait bien :
+ *  - une réponse 429/503 (quota `limit_req` de nginx) est un état à part « limité », pas une panne — elle se
+ *    résorbe seule, et ce n'est jamais « maintenance » ;
+ *  - un échec isolé (réseau mobile qui hoquette, latence ponctuelle) déclenche UNE seconde tentative avant de
+ *    conclure ; l'appareil hors ligne est distingué d'un vrai backend injoignable.
  */
-export type Etat = 'verif' | 'ok' | 'ko';
+export type Etat = 'verif' | 'ok' | 'ko' | 'limite' | 'hors_ligne';
 
 type Mesure = { etat: Etat; detail: string; ms: number; quand: number };
 
 const PERIODE = 20000;   // même cadence que l'ancien bandeau
-const TIMEOUT = 5000;
+const TIMEOUT = 10000;   // marge suffisante pour un réseau lent : 5 s provoquaient des KO en trompe-l'œil
+const REPRISE_MS = 1500; // délai avant la seconde tentative
 const DELAI_CLIC = 5000; // nginx limite /api/v1/elus-auth/ à 10 requêtes/min : on bride les clics manuels
 
 const adresse = () => { try { return new URL(apiBase, location.origin).toString().replace(/\/+$/, ''); } catch { return apiBase; } };
@@ -27,27 +30,36 @@ const abonnes = new Set<() => void>();
 const snapshot = () => mesure;
 const publier = (m: Mesure) => { mesure = m; for (const f of abonnes) f(); };
 
+const panne = (detail: string, ms: number): Mesure => ({ etat: 'ko', detail, ms, quand: Date.now() });
+
 function diagnostiquer(e: any, ms: number): Mesure {
   const r = e?.response;
-  const ko = (detail: string): Mesure => ({ etat: 'ko', detail, ms, quand: Date.now() });
-  if (r?.status === 404) return ko('404 — /elus-auth/etat n’est pas relayé : vérifier la liste blanche nginx de la DMZ.');
-  if (r?.status === 502 || r?.status === 504) return ko(`${r.status} — la DMZ n’atteint pas le backend (BACKEND_HOST / BACKEND_PORT / pare-feu).`);
-  if (r?.status === 503) return ko('503 — nginx ne relaie pas la requête : quota limit_req dépassé (10 req/min sur /api/v1/elus-auth/) ou conteneur arrêté.');
-  if (r?.status === 429) return ko('429 — quota de requêtes dépassé (rate limit nginx ou du backend).');
-  if (r) return ko(`HTTP ${r.status}${r.data?.error ? ` — ${r.data.error}` : ' — réponse inattendue du backend'}.`);
-  if (e?.code === 'ECONNABORTED') return ko(`Délai dépassé (${TIMEOUT / 1000} s) sans réponse.`);
-  return ko('Aucune réponse du backend (DNS, pare-feu, TLS ou CSP).');
+  if (r?.status === 429 || r?.status === 503) return { etat: 'limite', detail: `${r.status} — quota de requêtes atteint (rate limit nginx). Nouvel essai automatique.`, ms, quand: Date.now() };
+  if (r?.status === 404) return panne('404 — /elus-auth/etat n’est pas relayé : vérifier la liste blanche nginx de la DMZ.', ms);
+  if (r?.status === 502 || r?.status === 504) return panne(`${r.status} — la DMZ n’atteint pas le backend (BACKEND_HOST / BACKEND_PORT / pare-feu).`, ms);
+  if (r) return panne(`HTTP ${r.status}${r.data?.error ? ` — ${r.data.error}` : ' — réponse inattendue du backend'}.`, ms);
+  if (!enLigne()) return { etat: 'hors_ligne', detail: 'Cet appareil est hors ligne. Les documents déjà téléchargés restent lisibles.', ms, quand: Date.now() };
+  if (e?.code === 'ECONNABORTED') return panne(`Délai dépassé (${TIMEOUT / 1000} s) sans réponse.`, ms);
+  return panne('Aucune réponse du backend (DNS, pare-feu, TLS ou CSP).', ms);
 }
+
+const reussite = (r: any, ms: number): Mesure => r.data?.ok === true
+  ? { etat: 'ok', detail: 'Backend joignable.', ms, quand: Date.now() }
+  : { etat: 'ko', detail: `Réponse inattendue du backend : ${JSON.stringify(r.data)}`, ms, quand: Date.now() };
 
 let enCours: Promise<void> | null = null;
 /** Un clic manuel et la sonde périodique ne peuvent pas se chevaucher. */
 export function sonderBackend(): Promise<void> {
   if (enCours) return enCours;
   const t0 = performance.now();
-  enCours = api
-    .get('/elus-auth/etat', { timeout: TIMEOUT, params: { _t: Date.now() } })
-    .then((r) => publier({ etat: r.data?.ok === true ? 'ok' : 'ko', detail: r.data?.ok === true ? 'Backend joignable.' : `Réponse inattendue du backend : ${JSON.stringify(r.data)}`, ms: Math.round(performance.now() - t0), quand: Date.now() }))
-    .catch((e) => publier(diagnostiquer(e, Math.round(performance.now() - t0))))
+  const ms = () => Math.round(performance.now() - t0);
+  const tenter = () => api.get('/elus-auth/etat', { timeout: TIMEOUT, params: { _t: Date.now() } });
+  enCours = tenter()
+    .then((r) => publier(reussite(r, ms())), async (e) => {
+      if (!enLigne()) { publier(diagnostiquer(e, ms())); return; }   // hors ligne : inutile d'insister
+      await new Promise((res) => setTimeout(res, REPRISE_MS));       // un aléa isolé ne doit pas faire clignoter l'état
+      try { publier(reussite(await tenter(), ms())); } catch (e2) { publier(diagnostiquer(e2, ms())); }
+    })
     .then(() => { enCours = null; });
   return enCours;
 }
@@ -58,6 +70,8 @@ function abonner(f: () => void): () => void {
   if (abonnes.size === 1) {
     void sonderBackend();
     setInterval(() => { if (document.visibilityState === 'visible') void sonderBackend(); }, PERIODE);
+    window.addEventListener('online', () => void sonderBackend());
+    window.addEventListener('offline', () => publier({ etat: 'hors_ligne', detail: 'Cet appareil est hors ligne. Les documents déjà téléchargés restent lisibles.', ms: 0, quand: Date.now() }));
   }
   return () => { abonnes.delete(f); };
 }
@@ -67,12 +81,9 @@ export function useEtatBackend(): Mesure {
 }
 
 /**
- * Bandeau discret, jamais bloquant : l'espace élus permet de lire hors ligne les
- * documents déjà téléchargés (docs.ts), donc l'indisponibilité du backend ne doit
- * jamais empêcher l'accès à l'application, seulement le signaler.
- * Il faut DEUX échecs consécutifs avant d'afficher le bandeau : un simple aléa
- * réseau (timeout ponctuel, seconde de latence) ne doit pas déclencher une
- * fausse alerte « maintenance » alors que le reste de l'application fonctionne.
+ * Bandeau discret, jamais bloquant — et jamais affiché pour un simple quota ou un appareil hors ligne : l'espace
+ * élus permet de lire hors ligne les documents déjà téléchargés (docs.ts), donc l'indisponibilité du backend ne
+ * doit jamais empêcher l'accès. Il faut DEUX échecs consécutifs avant d'afficher « maintenance ».
  */
 export default function EtatBackend() {
   const { etat, detail } = useEtatBackend();
@@ -111,8 +122,11 @@ export function PastilleBackend() {
     ? 'border-ok/40 bg-ok-bg text-ok-text'
     : etat === 'ko'
       ? 'border-ko/40 bg-ko-bg text-ko'
-      : 'border-line bg-soft text-mute';
-  const etiquette = etat === 'ok' ? 'Backend joignable' : etat === 'ko' ? 'Backend injoignable' : 'Vérification du backend';
+      : etat === 'limite'
+        ? 'border-warn/40 bg-warn-bg text-warn'
+        : 'border-line bg-soft text-mute';
+  const etiquette = etat === 'ok' ? 'Backend joignable' : etat === 'ko' ? 'Backend injoignable' : etat === 'limite' ? 'Backend limité' : etat === 'hors_ligne' ? 'Appareil hors ligne' : 'Vérification du backend';
+  const libelle = etat === 'ok' ? 'OK' : etat === 'ko' ? 'KO' : etat === 'limite' ? 'limité' : etat === 'hors_ligne' ? 'hors ligne' : '…';
 
   return (
     <button
@@ -125,7 +139,7 @@ export function PastilleBackend() {
       {enAttente || etat === 'verif'
         ? <RefreshCw className={`h-3 w-3 ${enAttente ? 'animate-spin' : 'opacity-60'}`} />
         : etat === 'ok' ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-      <span>Backend {etat === 'ok' ? 'OK' : etat === 'ko' ? 'KO' : '…'}</span>
+      <span>Backend {libelle}</span>
     </button>
   );
 }

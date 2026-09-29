@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarDays, CloudDownload, WifiOff } from 'lucide-react';
 import { api, errMsg } from '../api';
+import { chargerAvecCache } from '../cache';
 import { armerReprise, prefetchSeance, usePrefetch } from '../docs';
 import { dt } from '../format';
 
@@ -24,8 +25,11 @@ export const definirSeanceSuivie = (id: number | null) => { seanceSuivie = id; }
 
 export default function Accueil() {
   const [a, setA] = useState<any>(null); const [err, setErr] = useState<string | null>(null);
+  const [horsLigne, setHorsLigne] = useState(false);
   useEffect(() => {
-    api.get('/elus/accueil').then((r) => { setA(r.data); const id = r.data.prochaine?.id ?? null; definirSeanceSuivie(id); armerReprise(() => seanceSuivie); if (id) void prefetchSeance(id); }).catch((e) => setErr(errMsg(e)));
+    chargerAvecCache('accueil', () => api.get('/elus/accueil').then((r) => r.data))
+      .then(({ data, horsLigne }) => { setA(data); setHorsLigne(horsLigne); const id = data.prochaine?.id ?? null; definirSeanceSuivie(id); armerReprise(() => seanceSuivie); if (id && !horsLigne) void prefetchSeance(id); })
+      .catch((e) => setErr(errMsg(e)));
   }, []);
   if (err) return <p className="p-6 text-ko">{err}</p>;
   if (!a) return <p className="p-6 text-mute">Chargement…</p>;
@@ -33,6 +37,7 @@ export default function Accueil() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-8">
       <h1 className="text-[26px]">Bonjour {String(a.elu.nom).split(' ')[0]}</h1>
+      {horsLigne && <p className="flex items-center gap-2 rounded border border-warn/30 bg-warn-bg px-3 py-2 text-[13px] text-warn"><WifiOff className="h-4 w-4 shrink-0" /> Hors ligne : dernière version enregistrée sur l’appareil. Vos documents déjà téléchargés restent lisibles.</p>}
       {pr ? (
         <section className="rounded-xl bg-primary p-5 text-white shadow-lift">
           <div className="text-[12px] font-semibold uppercase tracking-widest text-white/70">Prochaine séance</div>
