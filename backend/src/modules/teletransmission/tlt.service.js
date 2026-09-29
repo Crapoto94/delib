@@ -12,6 +12,7 @@ const { createSecretBox } = require('../../shared/secretbox');
 const { E } = require('../../shared/errors');
 const tdt = require('../../adapters/tdt-catalogue');
 const { createS2lowHttp } = require('../../adapters/s2low-http');
+const { convertirEnPdf, EXT_CONVERTIBLES } = require('../../shared/convert');
 const { requireOrg } = require('../../db/pool');
 const { NUMERO, SCENARIOS, STATUS } = require('../../adapters/s2low-simulateur');
 
@@ -125,17 +126,41 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     if (!p.subject) add('bloquant', 'Objet de l’acte absent'); else if (p.subject.length > 500) add('bloquant', `Objet de ${p.subject.length} caractères : 500 au maximum`);
     if (!p.natureCode) add('bloquant', 'Nature de l’acte absente de la classification (délibération, acte réglementaire…)');
     if (p.classif.length < 2) add('bloquant', 'Matière absente ou trop peu détaillée : la classification doit comporter au moins deux niveaux');
-    // Le type MIME d'une pièce est parfois vide (fichier déposé sans type) : on retombe sur l'extension du nom.
-    const pieceAcceptee = (a) => /(pdf|jpe?g|png)/i.test(a.mime || '') || /\.(pdf|jpe?g|png)$/i.test(String(a.name || ''));
-    const mauvaises = p.annexes.filter((a) => !pieceAcceptee(a));
+    // S²LOW n'accepte pas le Word/Excel : on convertit les annexes convertibles en PDF (avertissement, non bloquant).
+    const extension = (nom) => String(nom || '').split('.').pop().toLowerCase();
+    const acceptable = (a) => /(pdf|jpe?g|png)/i.test(a.mime || '') || /\.(pdf|jpe?g|png)$/i.test(String(a.name || ''));
+    const convertible = (a) => EXT_CONVERTIBLES.has(extension(a.name));
+    const mauvaises = p.annexes.filter((a) => !acceptable(a) && !convertible(a));
     if (mauvaises.length) add('bloquant', `Une annexe n’est ni un PDF, ni une image JPG ou PNG : ${mauvaises.map((a) => a.name).join(', ')}`, { annexes: mauvaises.map((a) => ({ id: a.id, nom: a.name, mime: a.mime })) });
+    else if (p.annexes.some((a) => !acceptable(a) && convertible(a))) add('avertissement', 'Une annexe Word/Excel sera convertie en PDF avant l’envoi.');
     if (!cfg.siren) add('avertissement', 'SIREN de la collectivité non renseigné (Paramètres de télétransmission)');
     if (p.annexes.some((a) => a.typePj === '99_AU')) add('avertissement', 'Des annexes n’ont pas de type précis : le type « autre document » sera utilisé');
     return out;
   }
 
-  async function storePdf(org, ctx, buffer, name) {
-    const put = await storage.put(buffer, { organismeId: org, ext: 'pdf', categorie: 'controle-legalite', nom: name, titre: name, auteur: ctx.username });
+  /**
+   * S²LOW n'accepte que PDF/JPG/PNG (vérifié dans la source : ActesTransaction.class.php). Une annexe Word/Excel
+   * /présentation est donc convertie en PDF (moteur LibreOffice du backend) AVANT l'envoi, et le PDF est mémorisé
+   * comme version PDF de l'annexe : la transmission joint alors ce PDF.
+   */
+  async function assurerPdfAnnexes(org, ctx, acteId) {
+    const rows = await db.all(`SELECT a.id, a.pdf_file_id, f.original_name, f.storage_key FROM annexes a JOIN files f ON f.id = a.file_id
+                               WHERE a.acte_id = $1 AND a.transmissible AND a.pdf_file_id IS NULL`, [acteId]);
+    for (const a of rows) {
+      const e = String(a.original_name || '').split('.').pop().toLowerCase();
+      if (!EXT_CONVERTIBLES.has(e)) continue;
+      try {
+        const pdf = await convertirEnPdf(await storage.get(a.storage_key), e);
+        if (!pdf) continue;
+        const nomPdf = `${a.original_name}.pdf`;
+        const put = await storage.put(pdf, { organismeId: org, ext: 'pdf', categorie: 'controle-legalite', nom: nomPdf, titre: `${a.original_name} (PDF)`, auteur: ctx.username });
+        const pf = await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6) RETURNING id`, [org, put.key, nomPdf, put.size, put.sha256, ctx.username]);
+        await db.run('UPDATE annexes SET pdf_file_id = $2 WHERE id = $1', [a.id, pf.id]);
+      } catch (err) { log?.warn?.({ err: err.message, annexe: a.id }, 'conversion PDF de l’annexe impossible'); }
+    }
+  }
+
+  async function storePdf(org, ctx, buffer, name) {    const put = await storage.put(buffer, { organismeId: org, ext: 'pdf', categorie: 'controle-legalite', nom: name, titre: name, auteur: ctx.username });
     return (await db.get(`INSERT INTO files (organisme_id, storage_key, original_name, mime, size, sha256, created_by) VALUES ($1,$2,$3,'application/pdf',$4,$5,$6) RETURNING id`, [org, put.key, name, put.size, put.sha256, ctx.username])).id;
   }
 
@@ -280,6 +305,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         if (bloquants.length) { refuses.push({ itemId: id, raisons: bloquants }); continue; }
         const acte = await db.get('SELECT * FROM actes WHERE id = $1', [it.acteId]);
         const delib = await db.get('SELECT * FROM deliberations WHERE id = (SELECT deliberation_id FROM seance_items WHERE id = $1)', [id]);
+        await assurerPdfAnnexes(org, ctx, it.acteId); // Word/Excel → PDF avant d'assembler le paquet
         const pk = await paquet(org, d.seance, it, acte, delib, cfg, it.numeroTransmis);
         const pdf = await render.renderActe(ctx, org, acte.id, { cible: 'deliberation', deliberationId: delib.id, mode: 'propre', watermark: '' });
         const fileId = await storePdf(org, ctx, pdf.buffer, `deliberation-${it.numeroTransmis}.pdf`);
