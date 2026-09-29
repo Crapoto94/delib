@@ -1,19 +1,15 @@
 import { PointerEvent as RPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bookmark, Download, Highlighter, Loader2, MessageSquare, MousePointer2, PanelRight, Pencil, Share2, StickyNote, Trash2, X } from 'lucide-react';
+import { Bookmark, Download, Highlighter, Loader2, MessageSquare, MoreVertical, MousePointer2, PanelRight, Pencil, Share2, StickyNote, Trash2, X } from 'lucide-react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
-import { api, errMsg } from './api';
+import { api, enLigne, errMsg } from './api';
+import { ancrer as ancrerAnn, creer as creerAnn, enAttente, modifier as modifierAnn, repondre as repondreAnn, supprimer as supprimerAnn, synchroniser, surSynchro, type Ann, type Rect } from './annotations';
+export type { Ann };
 
 /**
  * Lecteur PDF annoté de l'espace élus (ELU-71 à ELU-75) : surlignage sur sélection de texte, note, dessin au doigt / au stylet, signet.
  * Coordonnées relatives à la page (0..1, origine en haut à gauche) : indépendantes du zoom et de l'appareil.
  * Privé par défaut ; partage par annotation, document ou séance ; ré-ancrage par citation quand le document change de version.
  */
-type Rect = { x: number; y: number; w: number; h: number };
-export type Ann = {
-  id: number; docKey: string; docVersion: string; page: number; kind: 'surlignage' | 'note' | 'dessin' | 'signet'; rects: Rect[]; trace: [number, number][][]; couleur: string;
-  citation: string; contenu: string; orpheline: boolean; miennes: boolean; auteur: string | null; destinataires?: { eluId: number; nom: string | null; via: string }[];
-  reponses: { id: number; auteur: string | null; miennes: boolean; contenu: string; le: string }[];
-};
 type Mode = 'lire' | 'surligner' | 'note' | 'dessin' | 'signet';
 type TextItem = { str: string; x: number; y: number; w: number; h: number };
 type PageText = { W: number; H: number; items: TextItem[] };
@@ -167,35 +163,35 @@ function PartageModal({ seanceId, docKey, ann, onClose, onDone }: { seanceId: nu
   );
 }
 
-function Fiche({ a, onClose, onChange, onShare }: { a: Ann; onClose: () => void; onChange: () => void; onShare: () => void }) {
-  const [rep, setRep] = useState(''); const [texte, setTexte] = useState(a.contenu); const [err, setErr] = useState<string | null>(null);
+function Fiche({ a, seanceId, docKey, onClose, onChange, onShare }: { a: Ann; seanceId: number; docKey: string; onClose: () => void; onChange: () => void; onShare: () => void }) {
+  const [rep, setRep] = useState(''); const [texte, setTexte] = useState(a.contenu);
   useEffect(() => setTexte(a.contenu), [a.id, a.contenu]);
   const Icone = ICONE[a.kind];
-  const agir = async (f: () => Promise<unknown>) => { setErr(null); try { await f(); onChange(); } catch (e) { setErr(errMsg(e)); } };
+  const agir = (f: () => void) => { f(); onChange(); };   // écriture locale d'abord : la transmission suit toute seule
   return (
     <div className="rounded-lg border border-line bg-surface p-3 text-[14px]">
       <div className="flex items-center gap-2 text-[12px] text-mute"><Icone className="h-4 w-4" style={{ color: a.couleur }} /><span className="font-semibold text-ink">{LIBELLE[a.kind]}</span><span>page {a.page}</span>
         {a.orpheline && <span className="rounded bg-warn-bg px-1.5 py-0.5 font-semibold text-warn">orpheline</span>}
+        {a.id < 0 && <span className="rounded bg-warn-bg px-1.5 py-0.5 font-semibold text-warn">à synchroniser</span>}
         <button className="ml-auto rounded p-1 hover:bg-slate-100" onClick={onClose} aria-label="Fermer la fiche"><X className="h-4 w-4" /></button></div>
       {a.citation && <blockquote className="mt-2 border-l-2 pl-2 text-[13px] italic text-slate-600" style={{ borderColor: a.couleur }}>{a.citation}</blockquote>}
       {a.orpheline && <p className="mt-1 text-[12px] text-warn">Ce passage n’existe plus dans la version actuelle du document ; l’annotation est conservée.</p>}
       {!a.miennes && <p className="mt-2 text-[12px] text-mute">Partagée par <b>{a.auteur}</b></p>}
       {a.miennes && (a.kind === 'note' || a.kind === 'signet')
-        ? <div className="mt-2 flex gap-2"><textarea className="input !text-[14px]" rows={2} value={texte} onChange={(e) => setTexte(e.target.value)} /><button className="btn-secondary !py-1" disabled={texte === a.contenu || !texte.trim()} onClick={() => agir(() => api.put(`/elus/annotations/${a.id}`, { contenu: texte }))}>OK</button></div>
+        ? <div className="mt-2 flex gap-2"><textarea className="input !text-[14px]" rows={2} value={texte} onChange={(e) => setTexte(e.target.value)} /><button className="btn-secondary !py-1" disabled={texte === a.contenu || !texte.trim()} onClick={() => agir(() => modifierAnn(seanceId, docKey, a.id, { contenu: texte }))}>OK</button></div>
         : a.contenu && <p className="mt-2 whitespace-pre-wrap">{a.contenu}</p>}
-      {err && <p className="mt-1 text-[12px] text-ko">{err}</p>}
       {a.miennes && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px]">
-          <span className="flex items-center gap-1">{COULEURS.map((c) => <button key={c} aria-label={`Couleur ${c}`} className={`h-4 w-4 rounded-full border ${a.couleur === c ? 'ring-2 ring-slate-800' : ''}`} style={{ background: c }} onClick={() => agir(() => api.put(`/elus/annotations/${a.id}`, { couleur: c }))} />)}</span>
+          <span className="flex items-center gap-1">{COULEURS.map((c) => <button key={c} aria-label={`Couleur ${c}`} className={`h-4 w-4 rounded-full border ${a.couleur === c ? 'ring-2 ring-slate-800' : ''}`} style={{ background: c }} onClick={() => agir(() => modifierAnn(seanceId, docKey, a.id, { couleur: c }))} />)}</span>
           <span className="text-mute">{a.destinataires?.length ? `Partagée avec ${a.destinataires.map((d) => d.nom).join(', ')}` : 'Privée'}</span>
           <button className="ml-auto inline-flex items-center gap-1 rounded px-2 py-1 hover:bg-slate-100" onClick={onShare}><Share2 className="h-3.5 w-3.5" /> Partager</button>
-          <button className="inline-flex items-center gap-1 rounded px-2 py-1 text-ko hover:bg-slate-100" onClick={() => window.confirm('Supprimer cette annotation ?') && agir(() => api.delete(`/elus/annotations/${a.id}`).then(onClose))}><Trash2 className="h-3.5 w-3.5" /> Supprimer</button>
+          <button className="inline-flex items-center gap-1 rounded px-2 py-1 text-ko hover:bg-slate-100" onClick={() => window.confirm('Supprimer cette annotation ?') && agir(() => { supprimerAnn(seanceId, docKey, a.id); onClose(); })}><Trash2 className="h-3.5 w-3.5" /> Supprimer</button>
         </div>)}
       {(a.reponses.length > 0 || !a.miennes || (a.destinataires?.length ?? 0) > 0) && (
         <div className="mt-3 space-y-1 border-t border-line pt-2">
           {a.reponses.map((r) => <p key={r.id} className="rounded bg-soft px-2 py-1 text-[13px]"><b>{r.miennes ? 'Moi' : r.auteur}</b> : {r.contenu}</p>)}
           <div className="flex gap-2"><input className="input !py-1.5 !text-[13px]" placeholder="Répondre…" value={rep} onChange={(e) => setRep(e.target.value)} />
-            <button className="btn-secondary !py-1" disabled={!rep.trim()} onClick={() => agir(async () => { await api.post(`/elus/annotations/${a.id}/reponses`, { contenu: rep }); setRep(''); })}><MessageSquare className="h-4 w-4" /></button></div>
+            <button className="btn-secondary !py-1" disabled={!rep.trim()} onClick={() => agir(() => { repondreAnn(seanceId, docKey, a.id, rep); setRep(''); })}><MessageSquare className="h-4 w-4" /></button></div>
         </div>)}
     </div>
   );
@@ -204,10 +200,13 @@ function Fiche({ a, onClose, onChange, onShare }: { a: Ann; onClose: () => void;
 export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotationsOpen = false, onToggleAnnotations, onZoomWheel, onZoomSet }: { blob: Blob; doc: { key: string; version: string; titre: string }; seanceId: number; zoom?: number; annotationsOpen?: boolean; onToggleAnnotations?: () => void; onZoomWheel?: (deltaY: number) => void; onZoomSet?: (zoom: number) => void }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null); const [erreur, setErreur] = useState<string | null>(null);
   const [anns, setAnns] = useState<Ann[]>([]); const [mode, setMode] = useState<Mode>('lire'); const [couleur, setCouleur] = useState(COULEURS[0]);
-  const [sel, setSel] = useState<number | null>(null); const [partage, setPartage] = useState<null | { ann: Ann | null }>(null); const [localPanneau, setLocalPanneau] = useState(false);
+  const [sel, setSel] = useState<number | null>(null); const [partage, setPartage] = useState<null | { ann: Ann | null }>(null); const [localPanneau, setLocalPanneau] = useState(false); const [menu, setMenu] = useState(false);
   const [brouillon, setBrouillon] = useState<null | { page: number; kind: 'note' | 'signet'; rects: Rect[]; texte: string }>(null); const [msg, setMsg] = useState<string | null>(null);
   const panneau = annotationsOpen ?? localPanneau;
   const basculerPanneau = onToggleAnnotations ?? (() => setLocalPanneau((v) => !v));
+  // Volet fermé = hors mode annotation : on repasse en lecture, sinon l'outil précédent (dessin, note, surlignage)
+  // restait actif et le doigt annotait au lieu de faire défiler le document.
+  useEffect(() => { if (!panneau) { setMode('lire'); setBrouillon(null); } }, [panneau]);
   const textes = useRef(new Map<number, PageText>()); const traites = useRef(new Set<number>());
 
   useEffect(() => {
@@ -219,8 +218,8 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
     return () => { annule = true; };
   }, [blob]);
 
-  const charger = useCallback(() => api.get(`/elus/seances/${seanceId}/annotations`, { params: { docKey: doc.key } }).then((r) => setAnns(r.data.items)).catch(() => undefined), [seanceId, doc.key]);
-  useEffect(() => { void charger(); }, [charger]);
+  const charger = useCallback(() => synchroniser(seanceId, doc.key).then(setAnns).catch(() => undefined), [seanceId, doc.key]);
+  useEffect(() => { void charger(); return surSynchro((e) => { if (e.seanceId === seanceId && e.docKey === doc.key) setAnns(e.items); }); }, [charger, seanceId, doc.key]);
 
   /**
    * Pincement à deux doigts (tablette) : pendant le geste on applique une simple transformation CSS (fluide, GPU),
@@ -275,16 +274,16 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
         let trouve: { page: number; rects: Rect[] } | null = null;
         const ordre = [a.page, ...Array.from(textes.current.keys()).filter((p) => p !== a.page)];
         for (const p of ordre) { const r = textes.current.get(p) ? retrouver(a.citation, textes.current.get(p)!) : null; if (r) { trouve = { page: p, rects: r }; break; } }
-        try { await api.put(`/elus/annotations/${a.id}/ancrage`, trouve ? { docVersion: doc.version, page: trouve.page, rects: a.kind === 'note' ? [trouve.rects[0]] : trouve.rects } : { orpheline: true }); } catch { /* réessayé à la prochaine ouverture */ }
+        try { ancrerAnn(seanceId, doc.key, a.id, trouve ? { docVersion: doc.version, page: trouve.page, rects: a.kind === 'note' ? [trouve.rects[0]] : trouve.rects } : { orpheline: true }); } catch { /* réessayé à la prochaine ouverture */ }
       }
       void charger();
     })();
-  }, [pdf, anns, doc.version, charger]);
+  }, [pdf, anns, doc.version, charger, seanceId, doc.key]);
 
   /** Surligne le texte actuellement sélectionné (la page est celle où commence la sélection). */
   const enSelection = useRef(false);
   const surlignerSelection = () => {
-    if (mode !== 'surligner' || enSelection.current) return;
+    if (!panneau || mode !== 'surligner' || enSelection.current) return;
     const sel = window.getSelection(); if (!sel || sel.isCollapsed || !sel.rangeCount) return;
     const r0 = sel.getRangeAt(0); const el = (r0.startContainer.nodeType === 1 ? r0.startContainer : r0.startContainer.parentElement) as Element | null;
     const pageEl = el?.closest('[data-page]') as HTMLElement | null; if (!pageEl) return;
@@ -295,7 +294,7 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
     }
     if (!rects.length) return;
     const citation = sel.toString().replace(/\s+/g, ' ').trim().slice(0, 1500); sel.removeAllRanges(); setSelTexte('');
-    enSelection.current = true; void creer({ page: Number(pageEl.dataset.page), kind: 'surlignage', rects, citation }).finally(() => { enSelection.current = false; });
+    enSelection.current = true; creer({ page: Number(pageEl.dataset.page), kind: 'surlignage', rects, citation }); enSelection.current = false;
   };
   // au doigt, la sélection se fait avec les poignées du système : un bouton confirme le surlignage
   const [selTexte, setSelTexte] = useState('');
@@ -305,15 +304,18 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
     document.addEventListener('selectionchange', h); return () => document.removeEventListener('selectionchange', h);
   }, [mode]);
 
-  const creer = async (b: { page: number; kind: Ann['kind']; rects?: Rect[]; trace?: [number, number][][]; citation?: string }) => {
+  const creer = (b: { page: number; kind: Ann['kind']; rects?: Rect[]; trace?: [number, number][][]; citation?: string }) => {
     if (b.kind === 'note' || b.kind === 'signet') { setBrouillon({ page: b.page, kind: b.kind, rects: b.rects || [], texte: '' }); return; }
-    try { const a = (await api.post(`/elus/seances/${seanceId}/annotations`, { docKey: doc.key, docVersion: doc.version, couleur, ...b })).data; setAnns((x) => [...x, a]); setSel(a.id); if (b.kind === 'surlignage') setMode('lire'); } catch (e) { setMsg(errMsg(e)); }
+    const a = creerAnn(seanceId, doc.key, { page: b.page, kind: b.kind, couleur, docVersion: doc.version, rects: b.rects, trace: b.trace, citation: b.citation });
+    setAnns((x) => [...x, a]); setSel(a.id); if (b.kind === 'surlignage') setMode('lire');
   };
-  const enregistrerNote = async () => {
+  const enregistrerNote = () => {
     if (!brouillon || !brouillon.texte.trim()) return;
-    try { const a = (await api.post(`/elus/seances/${seanceId}/annotations`, { docKey: doc.key, docVersion: doc.version, couleur, page: brouillon.page, kind: brouillon.kind, rects: brouillon.rects, contenu: brouillon.texte })).data; setAnns((x) => [...x, a]); setSel(a.id); setBrouillon(null); setMode('lire'); } catch (e) { setMsg(errMsg(e)); }
+    const a = creerAnn(seanceId, doc.key, { page: brouillon.page, kind: brouillon.kind, couleur, docVersion: doc.version, rects: brouillon.rects, contenu: brouillon.texte });
+    setAnns((x) => [...x, a]); setSel(a.id); setBrouillon(null); setMode('lire');
   };
   const exporter = async () => {
+    if (!enLigne()) { setMsg('L’export du dossier annoté nécessite le réseau.'); return; }
     try { const r = await api.get(`/elus/seances/${seanceId}/dossier-annote`, { responseType: 'blob' }); const u = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = u; a.download = `dossier-annote-seance-${seanceId}.pdf`; a.click(); URL.revokeObjectURL(u); }
     catch (e) { setMsg(e && (e as any).response?.status === 403 ? 'L’export du dossier annoté est désactivé.' : errMsg(e)); }
   };
@@ -342,17 +344,28 @@ export default function LecteurAnnote({ blob, doc, seanceId, zoom = 100, annotat
         {/* molette normale = défilement (natif) ; Ctrl/Cmd+molette = zoom, comme le pincement à deux doigts */}
         <div ref={defile} className="min-h-0 flex-1 space-y-2 overflow-auto bg-slate-100 p-2" style={{ touchAction: 'pan-x pan-y' }} onWheel={(e) => { if (!onZoomWheel || !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); onZoomWheel(e.deltaY); }}>
           <div className="space-y-2" style={{ width: `${zoom}%`, transform: apercu ? `scale(${apercu.echelle})` : undefined, transformOrigin: apercu?.origine, transition: apercu ? 'none' : 'transform 120ms ease-out' }}>
-            {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => <Page key={n} pdf={pdf} num={n} anns={anns} mode={mode} couleur={couleur} selected={sel} onCreate={creer} onSelect={(id) => { setSel(id); if (!panneau) basculerPanneau(); }} onText={surTexte} onSelection={surlignerSelection} />)}
+            {Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((n) => <Page key={n} pdf={pdf} num={n} anns={anns} mode={panneau ? mode : 'lire'} couleur={couleur} selected={sel} onCreate={creer} onSelect={(id) => { setSel(id); if (!panneau) basculerPanneau(); }} onText={surTexte} onSelection={surlignerSelection} />)}
           </div>
         </div>
         {annotationsOpen && (
           <aside className="w-full max-w-sm shrink-0 space-y-2 overflow-y-auto border-l border-line bg-surface p-2 max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-30 max-sm:max-w-full" aria-label="Annotations du document">
-            <div className="flex flex-wrap gap-2">
-              <button className="btn-secondary !py-1.5 text-[12px]" onClick={() => setPartage({ ann: null })}><Share2 className="h-3.5 w-3.5" /> Partager…</button>
-              <button className="btn-secondary !py-1.5 text-[12px]" onClick={exporter}><Download className="h-3.5 w-3.5" /> Mon dossier annoté</button>
-              <button className="ml-auto rounded p-1 hover:bg-slate-100 sm:hidden" onClick={basculerPanneau} aria-label="Fermer"><X className="h-4 w-4" /></button>
+            {/* « Partager » et « Mon dossier annoté » sont rangés dans un menu : affichés en permanence, ils
+                prenaient la place de la liste des annotations et réduisaient la lecture. */}
+            <div className="flex items-center gap-2">
+              {enAttente(anns) && <span className="rounded bg-warn-bg px-2 py-0.5 text-[11px] font-semibold text-warn" title="Ces annotations seront transmises dès que le réseau sera revenu.">À synchroniser</span>}
+              <div className="relative ml-auto">
+                <button className="rounded p-1.5 hover:bg-slate-100" aria-label="Autres actions" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)}><MoreVertical className="h-4 w-4" /></button>
+                {menu && (<>
+                  <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
+                  <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-line bg-surface p-1 text-[13px] shadow-float">
+                    <button role="menuitem" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-soft" onClick={() => { setMenu(false); setPartage({ ann: null }); }}><Share2 className="h-3.5 w-3.5" /> Partager…</button>
+                    <button role="menuitem" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-soft" onClick={() => { setMenu(false); void exporter(); }}><Download className="h-3.5 w-3.5" /> Mon dossier annoté</button>
+                  </div>
+                </>)}
+              </div>
+              <button className="rounded p-1 hover:bg-slate-100 sm:hidden" onClick={basculerPanneau} aria-label="Fermer"><X className="h-4 w-4" /></button>
             </div>
-            {courante && <Fiche a={courante} onClose={() => setSel(null)} onChange={charger} onShare={() => setPartage({ ann: courante })} />}
+            {courante && <Fiche a={courante} seanceId={seanceId} docKey={doc.key} onClose={() => setSel(null)} onChange={charger} onShare={() => setPartage({ ann: courante })} />}
             {!anns.length ? <p className="p-4 text-center text-[13px] text-mute">Aucune annotation sur ce document. Choisissez un outil ci-dessus.</p> : (
               <ul className="space-y-1">{anns.map((a) => { const I = ICONE[a.kind]; return (
                 <li key={a.id}><button onClick={() => allerA(a)} className={`flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-[13px] hover:bg-soft ${sel === a.id ? 'bg-soft' : ''}`}>
