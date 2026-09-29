@@ -29,6 +29,17 @@ const Cadre = ({ titre, children }: { titre: string; children: ReactNode }) => {
 const Err = ({ msg }: { msg: string | null }) => (msg ? <div role="alert" className="mb-3 rounded border border-ko/30 bg-ko-bg px-3 py-2 text-[14px] text-ko">{msg}</div> : null);
 const champ = 'input !py-3 !text-[16px]';
 
+/**
+ * Les claviers mobiles transforment la saisie : « ' » devient une apostrophe typographique « ’ » (U+2019) et la
+ * composition Unicode de « é » peut changer (NFC ↔ NFD). L'AD, lui, compare octet à octet : le mot de passe saisi
+ * sur une tablette différait alors de celui tapé sur un clavier d'ordinateur, et était refusé. On rétablit la forme
+ * attendue (NFC, apostrophes et guillemets ASCII) avant l'envoi — sans jamais conserver ni afficher le mot de passe.
+ */
+const motDePasseNormalise = (m: string) => m.normalize('NFC')
+  .replace(/[\u2018\u2019\u201B\u2032\u02BC]/g, "'")
+  .replace(/[\u201C\u201D]/g, '"')
+  .replace(/\u00A0/g, ' ');
+
 /** Connexion directe avec l'identifiant et le mot de passe Ville. */
 export function Connexion() {
   const nav = useNavigate();
@@ -42,7 +53,7 @@ export function Connexion() {
   const etape1 = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr(null); setMsg(null);
     try {
-      const r = (await api.post('/elus-auth/connexion', { identifiant: email, motDePasse: mdp, appareil: deviceId() })).data;
+      const r = (await api.post('/elus-auth/connexion', { identifiant: email, motDePasse: motDePasseNormalise(mdp), appareil: deviceId() })).data;
       fin(r.session || r);
     }
     catch (x) { setErr(errMsg(x)); } finally { setBusy(false); }

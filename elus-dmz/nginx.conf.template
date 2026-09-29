@@ -67,6 +67,13 @@ server {
   # Au-dessus de la racine : l'APK vit dans /apk/ (voir apk/ et scripts/publier-apk.mjs). Sans
   # `Content-Disposition: attachment`, Android ouvrirait une page vide au lieu de proposer d'installer.
   location = /apk { return 302 /apk/; }
+  # Manifeste de version lu par l'APK, dont l'origine WebView est https://localhost : sans en-tête CORS, la WebView
+  # bloque la réponse et l'application ne peut pas proposer la mise à jour. Document public, sans donnée sensible.
+  location = /apk/latest.json {
+    root /usr/share/nginx/html;
+    add_header Access-Control-Allow-Origin "*" always;
+    add_header Cache-Control "no-cache" always;
+  }
   location /apk/ { root /usr/share/nginx/html; index index.html; expires -1; }
   location ~* ^/apk/.*\.apk$ {
     root /usr/share/nginx/html;
