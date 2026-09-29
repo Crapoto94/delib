@@ -17,6 +17,8 @@ const { E } = require('../shared/errors');
 const { SCENARIOS, STATUS } = require('./s2low-simulateur');
 
 const TYPES_PJ = [['99_DE', 'Délibération'], ['99_AU', 'Autre document'], ['22_AN', 'Annexe'], ['99_CO', 'Convention'], ['99_PL', 'Plan']];
+const NATURES = [[1, 'Délibérations'], [2, 'Actes réglementaires'], [3, 'Actes individuels'], [4, 'Contrats, conventions et avenants'], [5, 'Documents budgétaires et financiers'], [6, 'Autres']];
+const CLASSIFICATION_TTL_MS = 60 * 60 * 1000; // la classification change rarement : on la garde une heure
 
 /** « OK\n… » ou « KO\n<message> » → { ok, lignes } */
 function reponseTexte(corps) {
@@ -40,6 +42,7 @@ function createS2lowHttp({ db, storage, config, log, settings }) {
   const ca = config.tls?.caFile ? fs.readFileSync(config.tls.caFile) : undefined;
   const agent = new https.Agent({ pfx: pfx || undefined, passphrase: cfg.p12Passphrase || undefined, ca, rejectUnauthorized: !!ca || !config.tls?.allowSelfSigned });
   const arParTransaction = new Map(); // ARActe renvoyé avec le statut 4 (l'API le fournit là, pas séparément)
+  let cacheClassif = null; // { quand, valeur }
 
   // Adresse de l'instance : celle du paramétrage (par organisme) prime sur S2LOW_URL.
   const connexion = async (organismeId) => {
@@ -83,15 +86,18 @@ function createS2lowHttp({ db, storage, config, log, settings }) {
 
     /** Classification officielle : la demande est créée puis le fichier XML est récupéré et analysé. */
     async classification(organismeId) {
+      if (cacheClassif && Date.now() - cacheClassif.quand < CLASSIFICATION_TTL_MS) return cacheClassif.valeur;
       try {
         await appel(organismeId, 'POST', '/modules/actes/actes_classification_request.php', { api: 1 });
         const url = await base(organismeId);
         const r = await http().get(url + '/modules/actes/actes_classification_fetch.php?api=1');
         const c = lireClassification(r.data);
-        if (c.natures.length) return c;
-        log?.warn?.('classification S²LOW illisible : listes statiques utilisées');
-      } catch (e) { log?.warn?.({ err: e.message }, 'classification S²LOW indisponible : listes statiques utilisées'); }
-      return { natures: [], typesPj: TYPES_PJ.map(([code, label]) => ({ code, label })) };
+        if (c.natures.length) { cacheClassif = { quand: Date.now(), valeur: c }; return c; }
+        log?.warn?.('classification S²LOW illisible : listes de référence utilisées');
+      } catch (e) { log?.warn?.({ err: e.message }, 'classification S²LOW indisponible : listes de référence utilisées'); }
+      const valeur = { natures: NATURES.map(([code, label]) => ({ code, label })), typesPj: TYPES_PJ.map(([code, label]) => ({ code, label })) };
+      cacheClassif = { quand: Date.now(), valeur };
+      return valeur;
     },
 
     /** POST multipart actes_transac_create.php. Renvoie l'identifiant de transaction S²LOW. */
