@@ -112,14 +112,14 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       natureCode: nature ? NATURE_CODES[nature.code] ?? null : null, natureLibelle: nature?.code ?? null,
       matiere: matiere ? { code: matiere.code, libelle: matiere.libelle } : null, classif: matiere ? String(matiere.code).split('.').filter(Boolean).slice(0, 5) : [],
       number: numero, decisionDate: day(s.dateSeance), subject: String(delib?.titre || acte.titre || '').trim(), typeActe: '99_DE',
-      annexes: annexes.map((a) => ({ fileId: a.file_id, name: a.original_name, mime: a.mime, size: a.size, typePj: TYPE_PJ[a.type_code] || '99_AU', titre: a.titre })),
+      annexes: annexes.map((a) => ({ id: a.id, fileId: a.file_id, name: a.original_name, mime: a.mime, size: a.size, typePj: TYPE_PJ[a.type_code] || '99_AU', titre: a.titre })),
       siren: cfg.siren, departement: cfg.departement, arrondissement: cfg.arrondissement,
     };
   }
 
   /** Contrôles préalables (TLT-06) : bloquants (l'envoi est refusé) et avertissements. */
   async function controles(org, cfg, p, { acteId, txId } = {}) {
-    const out = []; const add = (niveau, message) => out.push({ niveau, message });
+    const out = []; const add = (niveau, message, extra) => out.push({ niveau, message, ...(extra || {}) });
     if (!NUMERO.test(p.number || '')) add('bloquant', `Numéro transmis « ${p.number || ''} » invalide : 15 caractères au plus, majuscules, chiffres ou « _ »`);
     else if (await db.get("SELECT 1 AS x FROM tlt_transactions WHERE organisme_id = $1 AND numero_transmis = $2 AND etat <> 'annule' AND id <> COALESCE($3, 0) AND acte_id <> COALESCE($4, 0)", [org, p.number, txId ?? null, acteId ?? null])) add('bloquant', `Le numéro transmis ${p.number} est déjà utilisé`);
     if (!p.subject) add('bloquant', 'Objet de l’acte absent'); else if (p.subject.length > 500) add('bloquant', `Objet de ${p.subject.length} caractères : 500 au maximum`);
@@ -127,7 +127,8 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     if (p.classif.length < 2) add('bloquant', 'Matière absente ou trop peu détaillée : la classification doit comporter au moins deux niveaux');
     // Le type MIME d'une pièce est parfois vide (fichier déposé sans type) : on retombe sur l'extension du nom.
     const pieceAcceptee = (a) => /(pdf|jpe?g|png)/i.test(a.mime || '') || /\.(pdf|jpe?g|png)$/i.test(String(a.name || ''));
-    if (p.annexes.some((a) => !pieceAcceptee(a))) add('bloquant', 'Une annexe n’est ni un PDF, ni une image JPG ou PNG');
+    const mauvaises = p.annexes.filter((a) => !pieceAcceptee(a));
+    if (mauvaises.length) add('bloquant', `Une annexe n’est ni un PDF, ni une image JPG ou PNG : ${mauvaises.map((a) => a.name).join(', ')}`, { annexes: mauvaises.map((a) => ({ id: a.id, nom: a.name, mime: a.mime })) });
     if (!cfg.siren) add('avertissement', 'SIREN de la collectivité non renseigné (Paramètres de télétransmission)');
     if (p.annexes.some((a) => a.typePj === '99_AU')) add('avertissement', 'Des annexes n’ont pas de type précis : le type « autre document » sera utilisé');
     return out;

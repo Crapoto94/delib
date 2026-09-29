@@ -85,9 +85,7 @@ export default function PdfViewer({ docs, index = 0, onClose }: { docs: PdfDoc[]
             </div>
           )}
           {many
-            ? <select value={i} onChange={(e) => setI(Number(e.target.value))} title="Choisir la pièce" style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 14, color: '#1e293b', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 8px', background: '#fff' }}>
-                {docs.map((d, k) => <option key={k} value={k}>{d.title}</option>)}
-              </select>
+            ? <span style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 14, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cur?.title || 'Document'}</span>
             : <span style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 14, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cur?.title || 'Document'}</span>}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, border: '1px solid #e2e8f0', borderRadius: 8, padding: 2 }}>
             <button onClick={() => setPct(level - 25)} disabled={level <= 50} title="Réduire" aria-label="Réduire" style={zoomBtn(level <= 50)}><ZoomOut size={15} /></button>
@@ -97,12 +95,24 @@ export default function PdfViewer({ docs, index = 0, onClose }: { docs: PdfDoc[]
           <button onClick={() => setZoom('page-width')} title="Ajuster à la largeur" aria-label="Ajuster à la largeur" style={{ ...zoomTextBtn, background: zoom === 'page-width' ? '#ede9fe' : '#fff', color: zoom === 'page-width' ? '#6d28d9' : '#475569' }}><Maximize2 size={14} /></button>
           <button onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}><X size={20} /></button>
         </div>
-        <div style={{ flex: 1, minHeight: 0, background: '#f1f5f9', display: 'flex', flexDirection: 'column' }}>
-          {error && <div style={{ margin: 16, padding: 16, background: '#fef2f2', color: '#b91c1c', borderRadius: 8, fontSize: 13 }}>{error}</div>}
-          {!error && !blob && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 280, color: '#64748b' }}><Loader2 className="animate-spin" size={28} /></div>}
-          {!error && blob && (mobile || safari
-            ? <CanvasPdfViewer source={blob} zoom={level} />
-            : <iframe key={`${blobUrl}-${zoom}`} src={src} title={cur?.title || 'Document PDF'} style={{ width: '100%', height: '80vh', border: 'none', display: 'block' }} />)}
+        <div style={{ flex: 1, minHeight: 0, background: '#f1f5f9', display: 'flex' }}>
+          {/* Plusieurs pièces : liste à gauche, aperçu à droite (comme la visionneuse AppDSI). */}
+          {many && (
+            <nav aria-label="Pièces" style={{ width: 260, flexShrink: 0, borderRight: '1px solid #e2e8f0', background: '#f8fafc', overflowY: 'auto', maxWidth: '45%' }}>
+              <div style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Pièces ({docs.length})</div>
+              {docs.map((d, k) => (
+                <button key={k} onClick={() => setI(k)} title={d.title} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: 'none', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', fontSize: 13, color: '#374151', background: k === i ? '#eef2ff' : 'transparent', borderLeft: k === i ? '3px solid #4a6cf7' : '3px solid transparent' }}>
+                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title || `Document ${k + 1}`}</span>
+                </button>))}
+            </nav>
+          )}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            {error && <div style={{ margin: 16, padding: 16, background: '#fef2f2', color: '#b91c1c', borderRadius: 8, fontSize: 13 }}>{error}</div>}
+            {!error && !blob && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 280, color: '#64748b' }}><Loader2 className="animate-spin" size={28} /></div>}
+            {!error && blob && (mobile || safari
+              ? <CanvasPdfViewer source={blob} zoom={level} />
+              : <iframe key={`${blobUrl}-${zoom}`} src={src} title={cur?.title || 'Document PDF'} style={{ width: '100%', height: '80vh', border: 'none', display: 'block' }} />)}
+          </div>
         </div>
       </div>
     </div>

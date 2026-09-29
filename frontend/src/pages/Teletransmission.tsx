@@ -102,6 +102,14 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
       setPick(new Set()); lot.reload(); onDone();
     } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
   };
+  const telechargerAnnexe = async (acteId: number, annexeId: number, nom: string) => {
+    try { const r = await api.get(orgPath(o, `/actes/${acteId}/annexes/${annexeId}/file`), { responseType: 'blob' }); const u = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = u; a.download = nom; a.click(); URL.revokeObjectURL(u); }
+    catch (e) { toast(errMsg(e), 'ko'); }
+  };
+  const remplacerAnnexe = async (acteId: number, annexeId: number, file: File) => {
+    try { const fd = new FormData(); fd.append('file', file); await api.put(orgPath(o, `/actes/${acteId}/annexes/${annexeId}/file`), fd); toast('Annexe remplacée : relancez la préparation'); lot.reload(); onDone(); }
+    catch (e) { toast(errMsg(e), 'ko'); }
+  };
   if (seances.loading) return <Loading />;
   if (!seances.data?.length) return <div className="card p-8 text-center text-mute">Aucune séance tenue : le lot de télétransmission se construit à partir des résultats du suivi de séance.</div>;
   return (
@@ -125,7 +133,19 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
               <td className="text-[12px]">
                 {i.statut === 'exclu' && <span>Exclue : {i.raison}</span>}
                 {i.statut === 'en_cours' && <span className="text-ok">Déjà préparée ou transmise <StatusBadge tx={i.transaction} /></span>}
-                {i.statut === 'a_preparer' && (i.controles.length ? <ul>{i.controles.map((c: any, k: number) => <li key={k} className={c.niveau === 'bloquant' ? 'font-semibold text-ko' : 'text-warn'}>{c.niveau === 'bloquant' ? '⛔' : '⚠'} {c.message}</li>)}</ul> : <span className="text-ok">✓ Prête</span>)}
+                {i.statut === 'a_preparer' && (i.controles.length ? <ul>{i.controles.map((c: any, k: number) => (
+                  <li key={k} className={c.niveau === 'bloquant' ? 'font-semibold text-ko' : 'text-warn'}>
+                    {c.niveau === 'bloquant' ? '⛔' : '⚠'} {c.message}
+                    {c.annexes?.length > 0 && (
+                      <ul className="mt-1 space-y-0.5 font-normal">
+                        {c.annexes.map((x: any) => (
+                          <li key={x.id} className="flex flex-wrap items-center gap-2">
+                            <span className="max-w-[240px] truncate" title={`${x.nom} (${x.mime || 'type inconnu'})`}>{x.nom}</span>
+                            <button type="button" className="text-action underline" onClick={() => telechargerAnnexe(i.acteId, x.id, x.nom)}>Télécharger</button>
+                            <label className="cursor-pointer text-action underline" title="Remplacer par un PDF, une image JPG ou PNG">Remplacer<input type="file" hidden accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void remplacerAnnexe(i.acteId, x.id, f); }} /></label>
+                          </li>))}
+                      </ul>)}
+                  </li>))}</ul> : <span className="text-ok">✓ Prête</span>)}
               </td>
             </tr>);
         })}</tbody></table>)}

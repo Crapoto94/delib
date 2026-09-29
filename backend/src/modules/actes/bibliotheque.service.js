@@ -176,11 +176,9 @@ const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) 
         expose: pick('expose'), visas: pick('visas'), dispositif: pick('dispositif'),
         annexes: annexes.map((x) => ({ id: x.id, titre: x.titre || x.original_name, nom: x.original_name, mime: x.mime, taille: Number(x.size), pdf: x.pdf_name ? { nom: x.pdf_name, mime: x.pdf_mime, taille: Number(x.pdf_size) } : null })),
         airs: !!full.custom?.airs, archive: !!a.est_archive, courant: !!a.airs_courant,
-        // Acte importé d'AIRS non archivé (origine « courant ») : pas d'extrait du registre, mais les deux parties du
-        // texte — visas et considérants, et le délibéré. Acte archivé (ou créé dans l'appli) : extrait du registre.
-        documents: a.airs_courant
-          ? [{ cible: 'expose', label: 'Exposé des motifs' }, { cible: 'visas', label: 'Visas et considérants' }, { cible: 'dispositif', label: 'Délibéré' }]
-          : [{ cible: 'expose', label: 'Exposé des motifs' }, { cible: 'extrait', label: 'Extrait du registre' }],
+        // La bibliothèque ne propose que le document officiel : l'extrait du registre (l'exposé des motifs et le
+        // délibéré ne sont plus téléchargeables ici).
+        documents: [{ cible: 'extrait', label: 'Extrait du registre' }],
         informations,
       };
     },

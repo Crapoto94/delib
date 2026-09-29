@@ -127,10 +127,7 @@ export default function Bibliotheque() {
             <td className="text-[12px]">{r.rapporteur ?? '—'}</td>
             <td className="text-[12px]">{dt(r.dateSeance, { dateStyle: 'medium' })}<div className="text-mute">{r.instance}</div></td><td><Badge tone="ok">{r.resultatLabel}</Badge></td>
             <td className="whitespace-nowrap text-right">
-              <button className="btn-secondary mr-1 !px-2 !py-1" title="Exposé des motifs" aria-label="Exposé des motifs" onClick={() => pdfActe(r.acteId, 'expose', `Exposé des motifs — ${r.titre}`)}><FileText className="h-3.5 w-3.5" /></button>
-              {!r.archive
-                ? <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibération — visas et considérants, délibéré (au modèle)" aria-label="Délibération" onClick={() => pdfActe(r.acteId, 'deliberation', `Délibération — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>
-                : <button className="btn-secondary mr-1 !px-2 !py-1" title="Délibération (extrait du registre)" aria-label="Extrait du registre" onClick={() => pdfActe(r.acteId, 'extrait', `Extrait du registre — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>}
+              <button className="btn-secondary mr-1 !px-2 !py-1" title="Extrait du registre" aria-label="Extrait du registre" onClick={() => pdfActe(r.acteId, 'extrait', `Extrait du registre — ${r.titre}`)}><ScrollText className="h-3.5 w-3.5" /></button>
               {r.annexesCount > 0 && <button className="btn-secondary mr-1 !px-2 !py-1" title={`Voir les ${r.annexesCount} annexe(s)${r.annexesNonPubliables ? ` dont ${r.annexesNonPubliables} non publiable(s)` : ''}`} onClick={() => ouvrirPj(r.acteId)}><Paperclip className="h-3.5 w-3.5" /> {r.annexesCount}{r.annexesNonPubliables > 0 && <span className="ml-1 font-semibold text-ko">({r.annexesNonPubliables})</span>}</button>}
               <button className="btn-secondary !px-2 !py-1" title="Consulter la fiche" aria-label="Consulter" onClick={() => setOuvert(r.acteId)}><BookOpen className="h-3.5 w-3.5" /></button>
             </td></tr>))}</tbody></table>
