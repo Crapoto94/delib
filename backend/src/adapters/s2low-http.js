@@ -11,6 +11,7 @@
  */
 const fs = require('fs');
 const https = require('https');
+const crypto = require('crypto');
 const axios = require('axios');
 const { E } = require('../shared/errors');
 const { SCENARIOS, STATUS } = require('./s2low-simulateur');
@@ -33,6 +34,35 @@ function lireClassification(xml) {
   const natures = elements('Nature').map((b) => ({ code: Number(attribut(b, ['Code', 'CodeNature'])) || attribut(b, ['Code', 'CodeNature']), label: attribut(b, ['Libelle', 'Label']) || '' })).filter((n) => n.code != null);
   const typesPj = elements('TypePJ').map((b) => ({ code: attribut(b, ['Code', 'CodeTypePJ']), label: attribut(b, ['Libelle', 'Label']) || '' })).filter((t) => t.code);
   return { natures, typesPj };
+}
+
+/**
+ * Corps multipart/form-data construit à la main.
+ * Raison : S²LOW lit les champs POST en ISO-8859-1 (il applique `utf8_encode()` côté PHP). Envoyés en UTF-8, les
+ * accents se retrouvent doublés (« VibeDélib » devient « VibeDÃ©lib »). On encode donc les champs texte en Latin-1
+ * et les fichiers en binaire, sans passer par FormData (qui impose l'UTF-8).
+ */
+const versLatin1 = (s) => String(s)
+  .replace(/[\u2018\u2019\u201B]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\u2026/g, '...').replace(/\u00A0/g, ' ')
+  .replace(/\u0153/g, 'oe').replace(/\u0152/g, 'OE').replace(/\u20AC/g, 'EUR')
+  .replace(/[^\x00-\xFF]/g, '?'); // hors ISO-8859-1 : remplacé plutôt que tronqué
+
+function corpsMultipart(parties, frontiere) {
+  const morceaux = [];
+  for (const p of parties) {
+    if (p.fichier) {
+      const nom = String(p.fichier.nom || 'fichier').replace(/[\r\n"]/g, '');
+      morceaux.push(Buffer.from(`--${frontiere}\r\nContent-Disposition: form-data; name="${p.nom}"; filename="${nom}"\r\nContent-Type: ${p.fichier.mime || 'application/octet-stream'}\r\n\r\n`, 'utf8'));
+      morceaux.push(p.fichier.buffer);
+      morceaux.push(Buffer.from('\r\n', 'utf8'));
+    } else if (p.valeur !== undefined && p.valeur !== null) {
+      morceaux.push(Buffer.from(`--${frontiere}\r\nContent-Disposition: form-data; name="${p.nom}"\r\n\r\n`, 'utf8'));
+      morceaux.push(Buffer.from(String(versLatin1(p.valeur)), 'latin1'));
+      morceaux.push(Buffer.from('\r\n', 'utf8'));
+    }
+  }
+  morceaux.push(Buffer.from(`--${frontiere}--\r\n`, 'utf8'));
+  return Buffer.concat(morceaux);
 }
 
 function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
@@ -114,24 +144,25 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
     /** POST multipart actes_transac_create.php → identifiant de transaction S²LOW. */
     async creer(p) {
       const { url, agent } = await contexte(p.organismeId);
-      const forme = new FormData();
-      forme.set('api', '1');
       const cl = (p.classif || []).map((x) => String(x));
-      if (p.natureCode != null) forme.set('nature_code', String(p.natureCode));
-      for (let i = 1; i <= 5; i++) if (cl[i - 1] != null && cl[i - 1] !== '') forme.set('classif' + i, String(Number(cl[i - 1])));
-      forme.set('number', String(p.number));
-      forme.set('decision_date', String(p.decisionDate));
-      forme.set('subject', String(p.subject).slice(0, 500));
-      forme.set('type_acte', String(p.typeActe || '99_DE'));
-      if (p.enAttente) forme.set('en_attente', '1');
+      const parties = [{ nom: 'api', valeur: '1' }];
+      if (p.natureCode != null) parties.push({ nom: 'nature_code', valeur: String(p.natureCode) });
+      for (let i = 1; i <= 5; i++) if (cl[i - 1] != null && cl[i - 1] !== '') parties.push({ nom: 'classif' + i, valeur: String(Number(cl[i - 1])) });
+      parties.push({ nom: 'number', valeur: String(p.number) });
+      parties.push({ nom: 'decision_date', valeur: String(p.decisionDate) });
+      parties.push({ nom: 'subject', valeur: String(p.subject).slice(0, 500) });
+      parties.push({ nom: 'type_acte', valeur: String(p.typeActe || '99_DE') });
+      if (p.enAttente) parties.push({ nom: 'en_attente', valeur: '1' });
       const principal = await piece(p.file);
-      forme.set('acte_pdf_file', new Blob([principal.buffer], { type: mimeDe(principal.nom, principal.mime) }), principal.nom);
+      parties.push({ nom: 'acte_pdf_file', fichier: { nom: principal.nom, buffer: principal.buffer, mime: mimeDe(principal.nom, principal.mime) } });
       for (const a of p.annexes || []) {
         const f = await piece(a);
-        forme.append('acte_attachments[]', new Blob([f.buffer], { type: mimeDe(f.nom, f.mime) }), f.nom);
-        forme.append('type_pj[]', String(a.typePj || '99_AU'));
+        parties.push({ nom: 'acte_attachments[]', fichier: { nom: f.nom, buffer: f.buffer, mime: mimeDe(f.nom, f.mime) } });
+        parties.push({ nom: 'type_pj[]', valeur: String(a.typePj || '99_AU') });
       }
-      const r = await http(agent).post(url + '/modules/actes/actes_transac_create.php', forme);
+      const frontiere = '----VibeDelib' + crypto.randomBytes(12).toString('hex');
+      const corps = corpsMultipart(parties, frontiere);
+      const r = await http(agent).post(url + '/modules/actes/actes_transac_create.php', corps, { headers: { 'Content-Type': `multipart/form-data; boundary=${frontiere}`, 'Content-Length': corps.length } });
       const t = reponseTexte(r.data);
       if (!t.ok) return { ok: false, message: (t.lignes[1] || 'refus de S²LOW').trim() };
       return { ok: true, id: (t.lignes[1] || '').trim() };
@@ -178,10 +209,11 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
     async repondre(remoteId, { typeEnvoie, message, file } = {}, organismeId) {
       const { url, agent } = await contexte(organismeId);
       void message;
-      const forme = new FormData();
-      forme.set('api', '1'); forme.set('id', String(remoteId)); forme.set('type_envoie', String(typeEnvoie));
-      if (file) { const f = await piece(file); forme.set('acte_pdf_file', new Blob([f.buffer], { type: mimeDe(f.nom, f.mime) }), f.nom); }
-      const r = await http(agent).post(url + '/modules/actes/actes_transac_reponse_create.php', forme);
+      const parties = [{ nom: 'api', valeur: '1' }, { nom: 'id', valeur: String(remoteId) }, { nom: 'type_envoie', valeur: String(typeEnvoie) }];
+      if (file) { const f = await piece(file); parties.push({ nom: 'acte_pdf_file', fichier: { nom: f.nom, buffer: f.buffer, mime: mimeDe(f.nom, f.mime) } }); }
+      const frontiere = '----VibeDelib' + crypto.randomBytes(12).toString('hex');
+      const corps = corpsMultipart(parties, frontiere);
+      const r = await http(agent).post(url + '/modules/actes/actes_transac_reponse_create.php', corps, { headers: { 'Content-Type': `multipart/form-data; boundary=${frontiere}`, 'Content-Length': corps.length } });
       const t = reponseTexte(r.data);
       return t.ok ? { ok: true } : { ok: false, message: (t.lignes[1] || 'réponse refusée').trim() };
     },
