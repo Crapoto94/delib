@@ -101,11 +101,16 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
   }
 
   /**
-   * Sessions S²LOW, indispensables pour le nonce : `SimpleCertificateAuthenticator` et `NounceAuthenticator`
-   * refusent toute requête portant un header `Authorization: Basic` (test sur PHP_AUTH_USER), et
-   * `/api/get-nounce.php` n'est atteint que si une session est DÉJÀ authentifiée — sans quoi Symfony
-   * redirige vers `/`. On ouvre donc une session par `POST /login.php` (login + mot de passe du compte S²LOW
-   * de la collectivité), puis on la réutilise pour demander le nonce.
+   * Session S²LOW : ouverte par `POST /login.php` (login + mot de passe du compte S²LOW de la
+   * collectivité). Elle ne sert PAS à obtenir le nonce — `/api/get-nounce.php` s'authentifie par
+   * certificat client + `Authorization: Basic` (voir `confirmer`) — mais à valider les identifiants
+   * dès l'ouverture et à renvoyer un message clair s'ils sont refusés. Un cookie périmé est sans
+   * effet sur `get-nounce`, qui n'en dépend pas.
+   *
+   * Historique : cette session avait été introduite parce que `get-nounce` répondait « 302 → / ».
+   * La cause réelle était applicative côté S²LOW (`#[IsGranted('ROLE_USER')]` insatisfiable, puis
+   * redirections de `ExceptionSubscriber` et des authentificateurs sur les chemins d'API) et non un
+   * besoin de session. Voir `docs/S2LOW-bug-nonce-confirmation.md`.
    */
   const sessions = new Map();
   async function sessionS2low(organismeId, agent, url, login, password) {
@@ -201,12 +206,15 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
 
     /**
      * Mode B : ordonne la télétransmission d'un acte « en attente d'être postée ».
-     * S²LOW n'authentifie CETTE route que par NONCE (NounceAuthenticator), et exige en plus un certificat
-     * valide ainsi qu'une session déjà ouverte. Flux : `POST /login.php` (session) → `GET /api/get-nounce.php`
-     * (Basic login:mot de passe + cookie de session) → `GET …/actes_transac_post_confirm_api.php` avec
-     * `nounce`, `login` et `hash = sha256("motdepasse:nounce")` (sans Basic ni cookie : route « stateless »).
-     * S²LOW répond toujours par une redirection vers `url_return`, avec `%%ERROR%%` (0 = succès, 1 = échec) et
-     * `%%MESSAGE%%` (motif).
+     * S²LOW n'authentifie CETTE route que par NONCE (`NounceAuthenticator`, pare-feu stateless) et
+     * exige un certificat client valide. Flux : `GET /api/get-nounce.php` avec certificat client +
+     * `Authorization: Basic login:mot de passe` → `GET …/actes_transac_post_confirm_api.php` avec
+     * `nounce`, `login` et `hash = sha256("motdepasse:nounce")`.
+     * ATTENTION : ne PAS joindre l'en-tête `Authorization` à l'appel de confirmation — le
+     * `NounceAuthenticator` renvoie alors `supports() === false` (l'authentification par nonce
+     * REMPLACE l'HTTP Basic, elle ne s'y ajoute pas) et la confirmation échoue.
+     * S²LOW répond toujours par une redirection vers `url_return`, avec `%%ERROR%%` (0 = succès, 1 = échec)
+     * et `%%MESSAGE%%` (motif).
      */
     async confirmer(remoteId, organismeId, identifiants) {
       const { url, agent } = await contexte(organismeId);
@@ -215,7 +223,7 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
       const { cookie, oublier } = await sessionS2low(organismeId, agent, url, login, password);
       const n = await http(agent).get(url + '/api/get-nounce.php', { headers: { Authorization: 'Basic ' + Buffer.from(`${login}:${password}`).toString('base64'), Cookie: cookie } });
       let nounce = null; try { nounce = (typeof n.data === 'string' ? JSON.parse(n.data) : n.data)?.nounce || null; } catch { nounce = null; }
-      if (!nounce) { oublier(); return { ok: false, message: `Nonce S²LOW indisponible (HTTP ${n.status}) : la session n’a pas pu être ouverte.` }; }
+      if (!nounce) { oublier(); return { ok: false, message: `Nonce S²LOW indisponible (HTTP ${n.status}) : /api/get-nounce.php n’a pas livré de nonce.` }; }
       const hash = crypto.createHash('sha256').update(`${password}:${nounce}`).digest('hex');
       const retour = 'https://vibedelib.invalid/retour?e=%%ERROR%%&m=%%MESSAGE%%';
       const q = new URLSearchParams({ id: String(remoteId), url_return: retour, nounce, login, hash });
