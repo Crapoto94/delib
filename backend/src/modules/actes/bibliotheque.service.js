@@ -13,7 +13,7 @@ const { analyser } = require('../recherche/recherche.service');
 const CLOSES = "s.statut IN ('close', 'tenue') AND EXISTS (SELECT 1 FROM seance_tenue t WHERE t.seance_id = s.id AND t.statut = 'close')";
 const RESULTATS = { adopte_unanimite: 'Adoptée à l’unanimité', adopte_majorite: 'Adoptée à la majorité', adopte_preponderante: 'Adoptée (voix prépondérante)', rejete: 'Rejetée', rejete_preponderante: 'Rejetée (voix prépondérante)', signe: 'Signé par le maire' };
 
-function createBibliotheque({ db, audit, render, pv, textes, storage }) {
+function createBibliotheque({ db, audit, render, pv, textes, storage, tlt }) {
   /** Contexte technique : la bibliothèque ouvre des actes que la personne ne peut pas voir autrement ; l'accès est contrôlé ici, et journalisé au nom de la personne. */
   const sys = (ctx) => ({ ...ctx, isPlatformAdmin: true });
 
@@ -191,6 +191,9 @@ const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) 
       if (!a) throw E.notFound("Cet acte n'est pas dans la bibliothèque");
       const s = sys(ctx);
       await audit.log(ctx, { organismeId: org, action: 'bibliotheque.pdf', entity: 'actes', entityId: a.id, after: { cible } });
+      // Extrait du registre transmis au contrôle de légalité et acquitté : le document officiel est l'acte
+      // TAMPONNÉ PAR S²LOW (récupéré auprès de S²LOW en mode réel ; repli local en simulation).
+      if (cible === 'extrait' && tlt) { const t = await tlt.extraitTamponne(ctx, org, a.id).catch(() => null); if (t) return t; }
       // Extrait du registre transmis au contrôle de légalité : le document officiel porte le tampon de la préfecture
       // (identifiant de l'AR + dates d'envoi et de réception), apposé automatiquement dès que l'AR est reçu.
       const ar = cible === 'extrait' ? await db.get("SELECT sent_at, ar_at, ar_id, mode FROM tlt_transactions WHERE acte_id = $1 AND ar_at IS NOT NULL ORDER BY id DESC LIMIT 1", [a.id]) : null;

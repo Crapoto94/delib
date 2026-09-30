@@ -232,6 +232,26 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
       if (r.status !== 200 || !r.data?.byteLength) return null;
       return Buffer.from(r.data);
     },
+
+    /**
+     * PDF de l'acte TAMPONNÉ PAR S²LOW (le tampon est émis par S²LOW, pas par nous) :
+     * récupère la liste des fichiers de la transaction (l'« acquittement » doit être reçu) puis télécharge le
+     * fichier principal avec `tampon=true`. C'est la version qui fait foi dans la bibliothèque.
+     */
+    async fichierTamponne(remoteId, organismeId, dateAffichage) {
+      const { url, agent } = await contexte(organismeId);
+      const l = await http(agent).get(url + `/modules/actes/actes_transac_get_files_list.php?transaction=${encodeURIComponent(remoteId)}`);
+      const corps = String(l.data || '');
+      if (!/^OK/.test(corps.trim())) return null; // « KO\nPas d'acquittement recu »
+      let liste; try { liste = JSON.parse(corps.replace(/^OK\n?/, '')); } catch { return null; }
+      if (!Array.isArray(liste) || !liste.length) return null;
+      const principal = liste.find((f) => String(f.code_pj || '').startsWith('99_DE')) || liste[0];
+      const q = new URLSearchParams({ file: String(principal.id), tampon: 'true' });
+      if (dateAffichage) q.set('date_affichage', String(dateAffichage));
+      const p = await http(agent).get(url + '/modules/actes/actes_download_file.php?' + q.toString(), { responseType: 'arraybuffer' });
+      if (p.status !== 200 || !p.data?.byteLength) return null;
+      return Buffer.from(p.data);
+    },
   };
 }
 

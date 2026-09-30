@@ -164,11 +164,11 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const calendrier = createCalendrier({ db, audit, access, config });
   const tenue = createTenue({ db, audit, acl, access, seances, odj, bus });
   const pv = createPv({ db, audit, render, odj, tenue, actes, settings });
-  const bibliotheque = createBibliotheque({ db, audit, render, pv, textes, storage });
-  // télétransmission : le simulateur rejoue toute la chaîne ; le connecteur réel S²LOW (s2low-http.js) est construit
-  // par le service, car le certificat client dépend de la collectivité (importé dans Paramétrage → Télétransmission).
+  // télétransmission : le simulateur rejoue la chaîne ; le connecteur réel dialogue avec S²LOW (certificat par
+  // collectivité). Créé AVANT la bibliothèque, qui a besoin de lui pour servir l'extrait tamponné par S²LOW.
   const tltSimulateur = createS2lowSimulateur({ db });
   const tlt = createTeletransmission({ db, audit, actes, render, tenue, settings, storage, bus, adapters: { simulation: teletransmission || tltSimulateur }, log, config, access, pv });
+  const bibliotheque = createBibliotheque({ db, audit, render, pv, textes, storage, tlt });
   acl.registerEditHook((ctx, a) => tlt.peutModifierTexte(ctx, a)); // le SCC modifie la délibération avant la transmission (TLT-32)
   const organisation = createOrganisation({ db, titulaires, dir });
   const organigramme = createOrganigramme({ db, dir, audit });

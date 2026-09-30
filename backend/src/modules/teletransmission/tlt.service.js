@@ -598,8 +598,13 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     },
     /** Acte tamponné avec la date de publication (`tampon=true&date_affichage=`). */
     async acteTamponne(ctx, organismeId, id, dateAffichage) {
-      const org = requireOrg(organismeId); const tx = await svc._get(org, id);
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); const tx = await svc._get(org, id);
       if (!tx.ar_id) throw E.conflict('Pas encore d’accusé de réception : l’acte ne peut pas être tamponné');
+      // Le tampon est ÉMIS PAR S²LOW : en mode réel, on récupère l'acte tamponné auprès de S²LOW (source de vérité).
+      if (cfg.mode !== 'simulation') {
+        try { const b = await ad(cfg).fichierTamponne?.(tx.remote_id, org, dateAffichage || tx.date_affichage); if (b) return { buffer: b, name: `acte-tamponne-${tx.numero_transmis}.pdf` }; }
+        catch (e) { log?.warn?.({ err: e.message, tx: tx.id }, 'récupération du tampon S²LOW impossible : repli local'); }
+      }
       const f = await db.get('SELECT storage_key FROM files WHERE id = $1', [tx.file_id]);
       const src = await storage.get(f.storage_key);
       void dateAffichage; // l'encadré porte l'AR (TLT-34) ; la publication figure dans les mentions de l'extrait du registre
@@ -629,9 +634,21 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     },
     /** Extrait du registre de la délibération transmise, avec le tampon de la préfecture (TLT-34, TLT-36). */
     async extrait(ctx, organismeId, id) {
-      const org = requireOrg(organismeId); const tx = await svc._get(org, id);
+      const org = requireOrg(organismeId); const cfg = await cfgOf(org); const tx = await svc._get(org, id);
+      // Extrait du registre transmis et acquitté : c'est l'acte TAMPONNÉ PAR S²LOW qui fait foi (mode réel).
+      if (tx.ar_id && cfg.mode !== 'simulation') {
+        try { const b = await ad(cfg).fichierTamponne?.(tx.remote_id, org, tx.date_affichage); if (b) return { buffer: b, name: `extrait-tamponne-${tx.numero_transmis}.pdf` }; }
+        catch (e) { log?.warn?.({ err: e.message }, 'extrait tamponné S²LOW indisponible : repli'); }
+      }
       if (!tx.item_id) throw E.conflict("Cette transmission n'est pas rattachée à un point de séance");
       return pv.extrait(ctx, org, tx.seance_id, tx.item_id);
+    },
+    /** Extrait du registre d'un acte transmis, tamponné par S²LOW dès que l'AR est reçu (sinon null). */
+    async extraitTamponne(ctx, organismeId, acteId) {
+      const org = requireOrg(organismeId);
+      const tx = await db.get('SELECT id FROM tlt_transactions WHERE acte_id = $1 AND ar_at IS NOT NULL ORDER BY id DESC LIMIT 1', [acteId]);
+      if (!tx) return null;
+      return svc.extrait(ctx, org, tx.id).catch(() => null);
     },
     // ------------------------------------------------------------------------------------------ simulation
     async simulation(ctx, organismeId) {
