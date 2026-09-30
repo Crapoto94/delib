@@ -21,7 +21,9 @@ function createBibliotheque({ db, audit, render, pv, textes, storage }) {
    * Acte de la bibliothèque, non confidentiel : une **délibération adoptée** (séance close, point traité, résultat
    * positif) ou un **acte signé par le maire** (arrêté, décision), qui n'a pas de séance et entre dès la signature.
    */
-  const eligible = (org, acteId, staff = false) => db.get(`
+  const { apposerTampon } = require('../../shared/pdfstamp');
+
+const eligible = (org, acteId, staff = false) => db.get(`
     SELECT a.id, a.numero_suivi, a.titre, a.statut, a.type_id, a.matiere_id, a.direction_label, a.direction_code, a.confidentialite, a.montant, a.incidence_financiere,
            (CASE WHEN a.custom->'airs'->>'origine' IS NOT NULL THEN a.custom->'airs'->>'origine' = 'archive' ELSE a.statut = 'archive' END) AS est_archive,
            (a.custom->'airs'->>'origine' = 'courant') AS airs_courant,
@@ -189,11 +191,15 @@ const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) 
       if (!a) throw E.notFound("Cet acte n'est pas dans la bibliothèque");
       const s = sys(ctx);
       await audit.log(ctx, { organismeId: org, action: 'bibliotheque.pdf', entity: 'actes', entityId: a.id, after: { cible } });
+      // Extrait du registre transmis au contrôle de légalité : le document officiel porte le tampon de la préfecture
+      // (identifiant de l'AR + dates d'envoi et de réception), apposé automatiquement dès que l'AR est reçu.
+      const ar = cible === 'extrait' ? await db.get("SELECT sent_at, ar_at, ar_id, mode FROM tlt_transactions WHERE acte_id = $1 AND ar_at IS NOT NULL ORDER BY id DESC LIMIT 1", [a.id]) : null;
+      const avecTampon = async (r) => { if (!ar) return r; try { return { buffer: await apposerTampon(r.buffer, { arId: ar.ar_id, dateTransmission: ar.sent_at, dateReception: ar.ar_at, simulation: ar.mode === 'simulation' }), name: r.name }; } catch { return r; } };
       // Acte signé : le document officiel est celui revenu du parapheur (signé, avec le QR de vérification). Il est
       // servi tel quel, avant toute autre source : c'est lui qui fait foi dans la bibliothèque.
       if (cible === 'extrait' || cible === 'deliberation') {
         const signe = await render.documentSigne(org, a.id).catch(() => null);
-        if (signe) return { buffer: signe.buffer, name: signe.name };
+        if (signe) { const r = { buffer: signe.buffer, name: signe.name }; return cible === 'extrait' ? avecTampon(r) : r; }
       }
       // Document d'origine importé (AIRS) : on sert le PDF de l'import plutôt que la recréation.
       // « Exposé des motifs » → rapport (r… / rap_) ; « Extrait du registre » → délibération (d… / del_).
@@ -204,9 +210,9 @@ const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) 
           FROM annexes an JOIN files f ON f.id = an.file_id LEFT JOIN files pf ON pf.id = an.pdf_file_id
           WHERE an.acte_id = $1 AND (pf.id IS NOT NULL OR f.mime = 'application/pdf') AND (an.titre ILIKE $2 OR f.original_name ~* $3)
           ORDER BY (an.titre ILIKE $2) DESC, an.ordre LIMIT 1`, [a.id, motif, prefixe]);
-        if (fichier) return { buffer: await storage.get(fichier.storage_key), name: fichier.original_name };
+        if (fichier) { const r = { buffer: await storage.get(fichier.storage_key), name: fichier.original_name }; return cible === 'extrait' ? avecTampon(r) : r; }
       }
-      if (cible === 'extrait') return pv.extrait(s, org, a.seance_id, a.item_id);
+      if (cible === 'extrait') return avecTampon(await pv.extrait(s, org, a.seance_id, a.item_id));
       if (cible === 'expose') { const r = await render.renderActe(s, org, a.id, { cible: 'expose', mode: 'propre' }); return { buffer: r.buffer, name: `expose-des-motifs-${a.numero || a.numero_suivi}.pdf` }; }
       if (cible === 'deliberation') { const r = await render.renderActe(s, org, a.id, { cible: 'deliberation', deliberationId: a.deliberation_id, mode: 'propre' }); return { buffer: r.buffer, name: `deliberation-${a.numero || a.numero_suivi}.pdf` }; }
       if (cible === 'visas') { const r = await render.renderActe(s, org, a.id, { cible: 'visas', deliberationId: a.deliberation_id, mode: 'propre' }); return { buffer: r.buffer, name: `visas-considerants-${a.numero || a.numero_suivi}.pdf` }; }

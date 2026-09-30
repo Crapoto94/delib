@@ -1,4 +1,5 @@
-import { FormEvent, Fragment, useState } from 'react';
+import { FormEvent, Fragment, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BookOpen, FileText, Paperclip, ScrollText, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { showDocs } from '../PdfViewer';
@@ -23,6 +24,7 @@ function Fiche({ acteId, onClose, onDone }: { acteId: number; onClose: () => voi
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
             <Badge tone="ok">{f.resultatLabel}</Badge><span className="text-mute">{f.seance?.instance ? `Séance du ${dt(f.seance.dateSeance, { dateStyle: 'long' })} · ${f.seance.instance}` : `Signé le ${dt(f.seance?.dateSeance, { dateStyle: 'long' })}`}{f.matiere ? ` · ${f.matiere}` : ''}{f.direction ? ` · ${f.direction}` : ''}</span>
           </div>
+          {(() => { const t = (f.transmissions ?? []).find((x: any) => x.envoyee || x.arLe); return t ? <p className="text-[12px] text-mute">Contrôle de légalité : {t.envoyee ? `transmis le ${dt(t.envoyee, { dateStyle: 'long' })}` : ''}{t.arLe ? `${t.envoyee ? ' · ' : ''}accusé de réception le ${dt(t.arLe, { dateStyle: 'long' })}` : ''}{t.arId ? ` (${t.arId})` : ''}</p> : null; })()}
           <div className="flex flex-wrap gap-2">{f.documents.map((x: any) => <button key={x.cible} className="btn-secondary" onClick={() => pdf(x.cible, `${x.label} — ${f.titre}`)}><FileText className="h-4 w-4" /> {x.label}</button>)}</div>
           {f.informations?.filter((x: any) => x.valeur !== null && x.valeur !== undefined && String(x.valeur).trim() !== '').length > 0 && (
             <section>
@@ -57,6 +59,9 @@ export default function Bibliotheque() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const [f, setF] = useState<Filtres>(VIDES); const [applique, setApplique] = useState<Filtres>(VIDES);
   const [avance, setAvance] = useState(false); const [ouvert, setOuvert] = useState<number | null>(null);
+  // Ouverture directe d'une fiche depuis un lien (?acte=…) — par exemple depuis le suivi de télétransmission.
+  const [params] = useSearchParams();
+  useEffect(() => { const a = Number(params.get('acte')); if (a) setOuvert(a); }, [params]);
   const [page, setPage] = useState(1); const LIMIT = 50;
   const matieres = useLoad(async () => (await api.get(orgPath(o, '/referentiels/matiere'))).data.items as any[], [o]);
   const natures = useLoad(async () => (await api.get(orgPath(o, '/referentiels/nature'))).data.items as any[], [o]);

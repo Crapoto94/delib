@@ -231,7 +231,7 @@ function Suivi({ root, rev, cfg, act, busy }: { root: (p?: string) => string; re
           <tr key={x.id}>
             <td>{(x.etat === 'prepare' || (x.etat === 'poste' && x.status === 17)) && <input type="checkbox" aria-label={`Sélectionner ${x.numeroTransmis}`} checked={pick.has(x.id)} onChange={() => toggle(x.id)} />}</td>
             <td className="font-mono text-[12px]">{x.numeroTransmis}<div className="font-sans text-[11px] text-mute">{x.mode === 'simulation' ? 'simulation' : x.mode} · {x.enAttente ? 'mode B' : 'mode A'}</div></td>
-            <td><b>{x.titre}</b><div className="text-[11px] text-mute">Dossier #{x.numeroSuivi} · acte : {x.acteStatut.replace(/_/g, ' ')}</div></td>
+            <td><Link to={`/bibliotheque?acte=${x.acteId}`} className="font-bold text-head hover:underline" title="Voir la fiche dans la bibliothèque">{x.titre}</Link><div className="text-[11px] text-mute">Dossier #{x.numeroSuivi} · acte : {x.acteStatut.replace(/_/g, ' ')}</div></td>
             <td><StatusBadge tx={x} />{x.erreur && <div className="mt-1 text-[11px] text-ko">{x.erreur}</div>}</td>
             <td className="font-mono text-[12px]">{x.remoteId ?? '—'}</td>
             <td className="text-[12px]">{x.arLe ? <><CheckCircle2 className="mr-1 inline h-3.5 w-3.5 text-ok" />{dt(x.arLe)}<div className="font-mono text-[10px] text-mute">{x.arId}</div></> : '—'}</td>
