@@ -91,6 +91,37 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
   };
   const http = (agent) => axios.create({ httpsAgent: agent, timeout: 60000, validateStatus: () => true, maxRedirects: 0, responseType: 'text', transformResponse: (x) => x });
 
+  /** Cookie PHPSESSID d'une réponse S²LOW. */
+  function extraireCookie(setCookie) {
+    return (Array.isArray(setCookie) ? setCookie : [setCookie])
+      .filter(Boolean)
+      .map((c) => String(c).split(';')[0])
+      .filter((c) => c.startsWith('PHPSESSID='))
+      .join('; ');
+  }
+
+  /**
+   * Sessions S²LOW, indispensables pour le nonce : `SimpleCertificateAuthenticator` et `NounceAuthenticator`
+   * refusent toute requête portant un header `Authorization: Basic` (test sur PHP_AUTH_USER), et
+   * `/api/get-nounce.php` n'est atteint que si une session est DÉJÀ authentifiée — sans quoi Symfony
+   * redirige vers `/`. On ouvre donc une session par `POST /login.php` (login + mot de passe du compte S²LOW
+   * de la collectivité), puis on la réutilise pour demander le nonce.
+   */
+  const sessions = new Map();
+  async function sessionS2low(organismeId, agent, url, login, password) {
+    const cle = `${organismeId || 0}|${login}`;
+    const oublier = () => sessions.delete(cle);
+    if (sessions.has(cle)) return { cookie: sessions.get(cle), oublier };
+    const r = await http(agent).post(url + '/login.php', new URLSearchParams({ login, password }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    const cookie = extraireCookie(r.headers['set-cookie']);
+    if (!cookie) {
+      const err = /error=([^&]+)/.exec(String(r.headers.location || ''));
+      throw E.conflict(`Connexion au compte S²LOW « ${login} » refusée${err ? ` : ${decodeURIComponent(err[1].replace(/\+/g, ' '))}` : ''}.`);
+    }
+    sessions.set(cle, cookie);
+    return { cookie, oublier };
+  }
+
   async function appel(organismeId, methode, chemin, params) {
     const { url, agent } = await contexte(organismeId);
     const r = await http(agent).request({ method: methode, url: url + chemin, data: params ? new URLSearchParams(params).toString() : undefined, headers: params ? { 'Content-Type': 'application/x-www-form-urlencoded' } : undefined });
@@ -170,19 +201,21 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
 
     /**
      * Mode B : ordonne la télétransmission d'un acte « en attente d'être postée ».
-     * S²LOW authentifie CETTE route par NONCE (et non par certificat seul, cf. NounceAuthenticator) : il faut
-     * d'abord `GET /api/get-nounce.php` en HTTP Basic (login:mot de passe) — le certificat identifiant la
-     * collectivité — puis rappeler la confirmation avec `nounce`, `login` et `hash = sha256("password:nounce")`.
-     * S²LOW répond TOUJOURS par une redirection vers `url_return`, avec `%%ERROR%%` (0 = succès, 1 = échec) et
+     * S²LOW n'authentifie CETTE route que par NONCE (NounceAuthenticator), et exige en plus un certificat
+     * valide ainsi qu'une session déjà ouverte. Flux : `POST /login.php` (session) → `GET /api/get-nounce.php`
+     * (Basic login:mot de passe + cookie de session) → `GET …/actes_transac_post_confirm_api.php` avec
+     * `nounce`, `login` et `hash = sha256("motdepasse:nounce")` (sans Basic ni cookie : route « stateless »).
+     * S²LOW répond toujours par une redirection vers `url_return`, avec `%%ERROR%%` (0 = succès, 1 = échec) et
      * `%%MESSAGE%%` (motif).
      */
     async confirmer(remoteId, organismeId, identifiants) {
       const { url, agent } = await contexte(organismeId);
       const login = identifiants?.login; const password = identifiants?.password;
       if (!login || !password) throw E.conflict("La confirmation exige l’identifiant technique et le mot de passe S²LOW (authentification par nonce) : renseignez-les dans Paramétrage → Télétransmission.");
-      const n = await http(agent).get(url + '/api/get-nounce.php', { headers: { Authorization: 'Basic ' + Buffer.from(`${login}:${password}`).toString('base64') } });
+      const { cookie, oublier } = await sessionS2low(organismeId, agent, url, login, password);
+      const n = await http(agent).get(url + '/api/get-nounce.php', { headers: { Authorization: 'Basic ' + Buffer.from(`${login}:${password}`).toString('base64'), Cookie: cookie } });
       let nounce = null; try { nounce = (typeof n.data === 'string' ? JSON.parse(n.data) : n.data)?.nounce || null; } catch { nounce = null; }
-      if (!nounce) return { ok: false, message: `Nonce S²LOW refusé (HTTP ${n.status}) : vérifiez l’identifiant technique et le mot de passe.` };
+      if (!nounce) { oublier(); return { ok: false, message: `Nonce S²LOW indisponible (HTTP ${n.status}) : la session n’a pas pu être ouverte.` }; }
       const hash = crypto.createHash('sha256').update(`${password}:${nounce}`).digest('hex');
       const retour = 'https://vibedelib.invalid/retour?e=%%ERROR%%&m=%%MESSAGE%%';
       const q = new URLSearchParams({ id: String(remoteId), url_return: retour, nounce, login, hash });
