@@ -7,14 +7,17 @@ import { dt } from '../format';
 import { Badge, ErrorBox, Field, Loading, MailSwitch, Modal, PageTitle, Spinner, useLoad, useToast } from '../ui';
 import { Select } from '../Select';
 
-const STATUS_TONE: Record<string, 'ok' | 'ko' | 'warn' | 'blue' | 'gray'> = { '-1': 'ko', '0': 'gray', '1': 'blue', '2': 'blue', '3': 'blue', '4': 'ok', '5': 'ok', '6': 'ko', '17': 'warn' };
+const STATUS_TONE: Record<string, 'ok' | 'ko' | 'warn' | 'blue' | 'gray'> = { '-1': 'ko', '0': 'gray', '1': 'blue', '2': 'blue', '3': 'blue', '4': 'ok', '5': 'ok', '6': 'ko', '7': 'warn', '10': 'ko', '14': 'ko', '16': 'gray', '17': 'warn', '20': 'ko', '21': 'warn', '22': 'ko' };
+/** Libellés des statuts S²LOW (actes_status) : repli quand la base porte encore le numéro brut comme libellé. */
+const STATUS_LABEL: Record<string, string> = { '-1': 'Erreur', '0': 'Annulé', '1': 'Posté', '2': 'En attente de transmission', '3': 'Transmis', '4': 'Accusé de réception reçu', '5': 'Validé', '6': 'Refusé', '7': 'Document reçu', '8': 'Accusé de réception envoyé', '9': 'Document envoyé', '10': "Refus d'envoi", '11': 'Accusé de réception de document reçu', '12': 'Envoyé au SAE', '13': 'Archivé par le SAE', '14': "Erreur lors de l'archivage", '15': 'Reçu par le SAE', '16': 'Détruit', '17': "En attente d'être postée", '18': "En attente d'être signé", '19': 'En attente de transmission au SAE', '20': "Erreur lors de l'envoi au SAE", '21': "Document reçu (sans accusé de réception)", '22': "Impossible d'envoyer au SAE (documents indisponibles)" };
+const libelleStatut = (tx: any) => { const n = tx.status === null || tx.status === undefined ? null : String(tx.status); const l = tx.statusLabel; return !l || l === n ? (n ? STATUS_LABEL[n] ?? tx.etat : tx.etat) : l; };
 const DOC_LABEL: Record<number, string> = { 2: 'Courrier simple', 3: 'Demande de pièces complémentaires', 4: 'Lettre d’observations', 5: 'Déféré au tribunal administratif' };
 const JOURNAL: Record<string, string> = { prepare: 'Préparée', poste: 'Postée à S²LOW', confirme: 'Confirmée', statut: 'Changement de statut', document: 'Document de la préfecture reçu', reponse: 'Réponse à la préfecture', annule: 'Annulée', echec: 'Refus de S²LOW' };
 const TABS = [['lot', 'À transmettre'], ['suivi', 'Suivi'], ['documents', 'Documents de la préfecture'], ['simulation', 'Simulation'], ['params', 'Paramètres']] as const;
 type Tab = typeof TABS[number][0];
 
 const StatusBadge = ({ tx }: { tx: any }) => (tx.etat === 'prepare' ? <Badge tone="warn">Préparée — à envoyer</Badge> : tx.etat === 'erreur' ? <Badge tone="ko">Refusée par S²LOW</Badge>
-  : <Badge tone={STATUS_TONE[String(tx.status)] ?? 'gray'}>{tx.status !== null ? `${tx.status} · ` : ''}{tx.statusLabel ?? tx.etat}</Badge>);
+  : <Badge tone={STATUS_TONE[String(tx.status)] ?? 'gray'}>{tx.status !== null ? `${tx.status} · ` : ''}{libelleStatut(tx)}</Badge>);
 
 /** Résumé d'un envoi ou d'une confirmation en masse : combien sont passées, et pour chaque refus le numéro et la raison. */
 const resume = (r: any, verbe: string) => `${r.envoyees} transmission(s) ${verbe}${r.refusees ? `, ${r.refusees} refusée(s) : ${r.items.filter((i: any) => !i.ok).map((i: any) => `${i.numeroTransmis ?? `n° ${i.id}`} — ${i.erreur}`).join(' | ')}` : ''}`;
@@ -84,10 +87,73 @@ export default function Teletransmission() {
 }
 
 /* ----------------------------------------------------------------------------------------------------- lot d'une séance */
+/** Fiche d'un acte de l'onglet « À transmettre » : texte, extrait du registre et annexes, avec le choix
+ *  des annexes réellement jointes à l'envoi (drapeau « transmissible »). */
+function FicheActe({ acteId, onClose, onChanged }: { acteId: number; onClose: () => void; onChanged: () => void }) {
+  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const f = useLoad(async () => (await api.get(orgPath(o, `/bibliotheque/actes/${acteId}`))).data, [acteId]);
+  const an = useLoad(async () => (await api.get(orgPath(o, `/actes/${acteId}/annexes`))).data.items as any[], [acteId]);
+  const [busy, setBusy] = useState<number | null>(null);
+  const pdf = async (cible: string, titre: string) => { const m = await openPdf(() => api.get(orgPath(o, `/bibliotheque/actes/${acteId}/pdf`), { params: { cible }, responseType: 'blob' }), titre); if (m) toast(m, 'ko'); };
+  const fichier = (a: any) => api.get(orgPath(o, `/actes/${acteId}/annexes/${a.id}/file`), { params: a.pdf ? { format: 'pdf' } : {}, responseType: 'blob' });
+  const voir = async (a: any) => { const m = await openPdf(() => fichier(a), a.titre || a.fichier?.nom); if (m) toast(m, 'ko'); };
+  const telecharger = async (a: any) => { try { const r = await fichier(a); const u = URL.createObjectURL(r.data); const l = document.createElement('a'); l.href = u; l.download = a.titre || a.fichier?.nom || 'annexe'; l.click(); URL.revokeObjectURL(u); } catch (e) { toast(errMsg(e), 'ko'); } };
+  const basculer = async (a: any) => { setBusy(a.id); try { await api.put(orgPath(o, `/actes/${acteId}/annexes/${a.id}`), { transmissible: !a.transmissible }); await an.reload(); onChanged(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); } };
+  const d = f.data;
+  const infos = (d?.informations ?? []).filter((x: any) => x.valeur !== null && x.valeur !== undefined && String(x.valeur).trim() !== '');
+  return (
+    <Modal title={d ? `${d.numero ? `${d.numero} — ` : ''}${d.titre}` : 'Fiche de l’acte'} onClose={onClose} wide>
+      {f.loading ? <Loading /> : (
+        <div className="space-y-4">
+          {!d ? (
+            <div className="space-y-3"><ErrorBox msg={f.error || 'Fiche de consultation indisponible pour cet acte.'} />
+              <p className="text-[13px] text-mute">Cet acte n’est pas (ou plus) consultable en bibliothèque : séance non close, ou acte déjà engagé dans une transmission. Le choix des annexes reste possible ci-dessous.</p>
+              <Link className="btn-secondary" to={`/dossiers/${acteId}`}>Ouvrir le dossier</Link></div>
+          ) : (<>
+            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+              <Badge tone="ok">{d.resultatLabel}</Badge>
+              <span className="text-mute">{d.seance?.instance ? `Séance du ${dt(d.seance.dateSeance, { dateStyle: 'long' })} · ${d.seance.instance}` : `Signé le ${dt(d.seance?.dateSeance, { dateStyle: 'long' })}`}{d.matiere ? ` · ${d.matiere}` : ''}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">{d.documents.map((x: any) => <button key={x.cible} className="btn-secondary" onClick={() => pdf(x.cible, `${x.label} — ${d.titre}`)}><FileText className="h-4 w-4" /> {x.label}</button>)}</div>
+            {infos.length > 0 && (
+              <section>
+                <h3 className="mb-2">Informations</h3>
+                <div className="overflow-x-auto rounded border border-line"><table className="w-full text-[13px]"><tbody>
+                  {infos.map((x: any, i: number, arr: any[]) => (
+                    <Fragment key={i}>
+                      {(i === 0 || arr[i - 1].groupe !== x.groupe) && <tr><td colSpan={2} className="bg-soft px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-head">{x.groupe}</td></tr>}
+                      <tr><td className="w-56 px-3 py-1 font-semibold text-mute">{x.label}</td><td className="px-3 py-1">{x.label === 'Date' || x.label === 'Date limite' ? dt(x.valeur, { dateStyle: 'long' }) : String(x.valeur)}</td></tr>
+                    </Fragment>))}
+                </tbody></table></div>
+              </section>)}
+            {[['Exposé des motifs', d.expose], ['Visas et considérants', d.visas], ['Dispositif', d.dispositif]].map(([t, md]) => md ? (
+              <section key={t}><h3 className="mb-1">{t}</h3><div className="whitespace-pre-wrap rounded border border-line bg-soft/40 p-3 text-[13px] leading-6">{md}</div></section>) : null)}
+          </>)}
+          <section>
+            <h3 className="mb-1">Annexes</h3>
+            <p className="mb-2 text-[12px] text-mute">Décochez une annexe pour ne pas la joindre à la télétransmission. Une transmission déjà préparée doit être annulée puis préparée de nouveau pour en tenir compte.</p>
+            {an.loading ? <Loading /> : !an.data?.length ? <p className="text-[13px] text-mute">Aucune annexe.</p> : (
+              <ul className="divide-y divide-line rounded border border-line">
+                {an.data.map((a: any) => (
+                  <li key={a.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-[13px]">
+                    <input type="checkbox" aria-label={`Joindre ${a.titre || a.fichier?.nom}`} title="Joindre cette annexe à la télétransmission" checked={!!a.transmissible} disabled={busy === a.id} onChange={() => basculer(a)} />
+                    <span className={a.transmissible ? 'font-semibold' : 'text-mute line-through'}>{a.titre || a.fichier?.nom}</span>
+                    {a.pdf && <span className="rounded bg-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-mute">PDF</span>}
+                    <span className="ml-auto flex gap-2"><button type="button" className="text-action underline" onClick={() => voir(a)}>Voir</button><button type="button" className="text-action underline" onClick={() => telecharger(a)}>Télécharger</button></span>
+                  </li>))}
+              </ul>)}
+          </section>
+        </div>)}
+      {node}
+    </Modal>
+  );
+}
+
 function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: any; onDone: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth(); const o = org!.id;
   const seances = useLoad(async () => ((await api.get(orgPath(o, '/seances'), { params: { limit: 100, kind: 'conseil' } })).data.items as any[]).filter((s) => ['tenue', 'close'].includes(s.statut)), [o]);
   const [sid, setSid] = useState<number | null>(null); const [pick, setPick] = useState<Set<number>>(new Set()); const [scenario, setScenario] = useState(''); const [busy, setBusy] = useState(false);
+  const [fiche, setFiche] = useState<number | null>(null);
   useEffect(() => { if (sid === null && seances.data?.length) setSid(seances.data[0].id); }, [seances.data, sid]);
   const lot = useLoad(async () => (sid ? (await api.get(root(`/seances/${sid}/lot`))).data : null), [sid, o]);
   const items: any[] = lot.data?.items ?? [];
@@ -120,6 +186,12 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
     try { const r = await api.get(orgPath(o, `/actes/${acteId}/annexes/${annexeId}/file`), { responseType: 'blob' }); const u = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = u; a.download = nom; a.click(); URL.revokeObjectURL(u); }
     catch (e) { toast(errMsg(e), 'ko'); }
   };
+  const annulerPrep = async (txId: number, numero: string) => {
+    if (!window.confirm(`Annuler la préparation de la transmission ${numero} ? L’acte repassera « à transmettre » (rien n’est envoyé à S²LOW).`)) return;
+    setBusy(true);
+    try { await api.post(root(`/transactions/${txId}/annulation`), {}); toast('Préparation annulée'); lot.reload(); hors.reload(); onDone(); }
+    catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(false); }
+  };
   const remplacerAnnexe = async (acteId: number, annexeId: number, file: File) => {
     try { const fd = new FormData(); fd.append('file', file); await api.put(orgPath(o, `/actes/${acteId}/annexes/${annexeId}/file`), fd); toast('Annexe remplacée : relancez la préparation'); lot.reload(); onDone(); }
     catch (e) { toast(errMsg(e), 'ko'); }
@@ -141,8 +213,9 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
           const bloque = i.controles?.some((c: any) => c.niveau === 'bloquant');
           return (
             <tr key={i.itemId} className={i.statut === 'exclu' ? 'bg-slate-50 text-mute' : ''}>
-              <td>{i.statut === 'a_preparer' && <input type="checkbox" aria-label={`Sélectionner ${i.titre}`} disabled={bloque} checked={pick.has(i.itemId)} onChange={() => toggle(i.itemId)} />}</td>
-              <td className="font-mono text-[12px]">{i.numero ?? '—'}</td><td className="font-semibold">{i.titre}{cfg.modificationTexte && i.statut !== 'exclu' && <Link to={`/dossiers/${i.acteId}`} className="ml-2 inline-flex items-center gap-1 text-[12px] font-semibold text-action" title="Ouvrir la délibération pour corriger son texte avant la transmission"><Pencil className="h-3 w-3" /> Modifier le texte</Link>}</td>
+              <td>{i.statut === 'a_preparer' && <input type="checkbox" aria-label={`Sélectionner ${i.titre}`} disabled={bloque} checked={pick.has(i.itemId)} onChange={() => toggle(i.itemId)} />}
+                {i.statut === 'en_cours' && i.transaction?.etat === 'prepare' && <input type="checkbox" aria-label={`Annuler la préparation de ${i.titre}`} title="Décocher : annuler la préparation de cette transmission" checked disabled={busy} onChange={() => annulerPrep(i.transaction.id, i.numeroTransmis ?? i.transaction?.numeroTransmis)} />}</td>
+              <td className="font-mono text-[12px]">{i.numero ?? '—'}</td><td className="font-semibold"><button type="button" className="text-left font-semibold text-head hover:underline" title="Voir la fiche, l’extrait du registre et les annexes" onClick={() => setFiche(i.acteId)}>{i.titre}</button>{cfg.modificationTexte && i.statut !== 'exclu' && <Link to={`/dossiers/${i.acteId}`} className="ml-2 inline-flex items-center gap-1 text-[12px] font-semibold text-action" title="Ouvrir la délibération pour corriger son texte avant la transmission"><Pencil className="h-3 w-3" /> Modifier le texte</Link>}</td>
               <td>{i.resultat ? <Badge tone={i.resultat.startsWith('adopte') ? 'ok' : 'ko'}>{i.resultat.startsWith('adopte') ? 'Adoptée' : 'Rejetée'}</Badge> : <Badge>{i.etatPoint}</Badge>}</td>
               <td className="font-mono text-[12px]">{i.numeroTransmis ?? i.transaction?.numeroTransmis ?? '—'}</td>
               <td className="text-[12px]">
@@ -177,12 +250,13 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
             const bloque = i.controles?.some((c: any) => c.niveau === 'bloquant');
             return (
               <tr key={i.acteId}>
-                <td><input type="checkbox" aria-label={`Sélectionner ${i.titre}`} disabled={bloque} checked={pickH.has(i.acteId)} onChange={() => toggleH(i.acteId)} /></td>
+                <td>{i.statut === 'a_preparer' && <input type="checkbox" aria-label={`Sélectionner ${i.titre}`} disabled={bloque} checked={pickH.has(i.acteId)} onChange={() => toggleH(i.acteId)} />}
+                  {i.statut === 'en_cours' && i.transaction?.etat === 'prepare' && <input type="checkbox" aria-label={`Annuler la préparation de ${i.titre}`} title="Décocher : annuler la préparation de cette transmission" checked disabled={busy} onChange={() => annulerPrep(i.transaction.id, i.numeroTransmis ?? i.transaction?.numeroTransmis)} />}</td>
                 <td className="font-mono text-[12px]">{i.numero ?? i.numeroSuivi ?? '—'}</td>
-                <td className="font-semibold">{i.titre}</td>
+                <td className="font-semibold"><button type="button" className="text-left font-semibold text-head hover:underline" title="Voir la fiche, l’extrait du registre et les annexes" onClick={() => setFiche(i.acteId)}>{i.titre}</button></td>
                 <td className="text-[12px]">{i.typeLibelle ?? i.typeCode ?? '—'}</td>
                 <td className="font-mono text-[12px]">{i.numeroTransmis ?? '—'}</td>
-                <td className="text-[12px]">{i.controles.length ? <ul>{i.controles.map((c: any, k: number) => (
+                <td className="text-[12px]">{i.statut === 'en_cours' ? <span className="text-ok">Déjà préparé <StatusBadge tx={i.transaction} /></span> : i.controles.length ? <ul>{i.controles.map((c: any, k: number) => (
                   <li key={k} className={c.niveau === 'bloquant' ? 'font-semibold text-ko' : 'text-warn'}>
                     {c.niveau === 'bloquant' ? '⛔' : '⚠'} {c.message}
                     {c.annexes?.length > 0 && (<ul className="mt-1 space-y-0.5 font-normal">{c.annexes.map((x: any) => (
@@ -194,6 +268,7 @@ function Lot({ root, cfg, onDone, toast }: { root: (p?: string) => string; cfg: 
               </tr>);
           })}</tbody></table>)}
       </div>
+      {fiche && <FicheActe acteId={fiche} onClose={() => setFiche(null)} onChanged={() => { lot.reload(); hors.reload(); onDone(); }} />}
     </div>
   );
 }

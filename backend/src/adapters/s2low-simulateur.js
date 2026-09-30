@@ -11,7 +11,13 @@
  */
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 
-const STATUS = { '-1': 'Erreur', 0: 'Annulé', 1: 'Posté', 2: 'En attente de transmission', 3: 'Transmis', 4: 'Acquittement reçu', 5: 'Validé', 6: 'Refusé', 17: "En attente d'être postée" };
+const STATUS = {
+  '-1': 'Erreur', 0: 'Annulé', 1: 'Posté', 2: 'En attente de transmission', 3: 'Transmis', 4: 'Acquittement reçu', 5: 'Validé', 6: 'Refusé',
+  7: 'Document reçu', 8: 'Acquittement envoyé', 9: 'Document envoyé', 10: "Refus d'envoi", 11: 'Acquittement de document reçu',
+  12: 'Envoyé au SAE', 13: 'Archivé par le SAE', 14: "Erreur lors de l'archivage", 15: 'Reçu par le SAE', 16: 'Détruite',
+  17: "En attente d'être postée", 18: "En attente d'être signé", 19: 'En attente de transmission au SAE',
+  20: "Erreur lors de l'envoi au SAE", 21: "Document reçu (pas d'AR)", 22: "Impossible d'envoyer au SAE (documents indisponibles)",
+};
 const DOC_TYPE = { 2: 'Courrier simple', 3: 'Demande de pièces complémentaires', 4: "Lettre d'observations", 5: 'Déféré au tribunal administratif' };
 const NATURES = [[1, 'Délibérations'], [2, 'Actes réglementaires'], [3, 'Actes individuels'], [4, 'Contrats, conventions et avenants'], [5, 'Documents budgétaires et financiers'], [6, 'Autres']];
 const TYPES_PJ = [['99_DE', 'Délibération'], ['99_AU', 'Autre document'], ['22_AN', 'Annexe'], ['99_CO', 'Convention'], ['99_PL', 'Plan']];

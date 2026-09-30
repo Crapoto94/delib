@@ -119,10 +119,15 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
   }
 
   /** Contrôles préalables (TLT-06) : bloquants (l'envoi est refusé) et avertissements. */
-  async function controles(org, cfg, p, { acteId, txId } = {}) {
+  async function controles(org, cfg, p, { txId } = {}) {
     const out = []; const add = (niveau, message, extra) => out.push({ niveau, message, ...(extra || {}) });
     if (!NUMERO.test(p.number || '')) add('bloquant', `Numéro transmis « ${p.number || ''} » invalide : 15 caractères au plus, majuscules, chiffres ou « _ »`);
-    else if (await db.get("SELECT 1 AS x FROM tlt_transactions WHERE organisme_id = $1 AND numero_transmis = $2 AND etat <> 'annule' AND id <> COALESCE($3, 0) AND acte_id <> COALESCE($4, 0)", [org, p.number, txId ?? null, acteId ?? null])) add('bloquant', `Le numéro transmis ${p.number} est déjà utilisé`);
+    // Doit refléter EXACTEMENT l'index partiel tlt_transactions_numero_uq (migration 0084) : un numéro
+    // est pris tant que la transaction est vivante (prepare/poste) ou a atteint S²LOW (remote_id) ;
+    // il est libre si la transaction est morte sans avoir été postée (annule/erreur + remote_id NULL).
+    // (Ne pas exclure les transactions du MÊME acte : une tentative précédente en erreur gardait sinon
+    // le numéro et faisait échouer la nouvelle préparation sur une violation d'unicité — erreur 500.)
+    else if (await db.get("SELECT 1 AS x FROM tlt_transactions WHERE organisme_id = $1 AND numero_transmis = $2 AND NOT (etat IN ('annule', 'erreur') AND remote_id IS NULL) AND id <> COALESCE($3, 0)", [org, p.number, txId ?? null])) add('bloquant', `Le numéro transmis ${p.number} est déjà utilisé`);
     if (!p.subject) add('bloquant', 'Objet de l’acte absent'); else if (p.subject.length > 500) add('bloquant', `Objet de ${p.subject.length} caractères : 500 au maximum`);
     if (!p.natureCode) add('bloquant', 'Nature de l’acte absente de la classification (délibération, acte réglementaire…)');
     if (p.classif.length < 2) add('bloquant', 'Matière absente ou trop peu détaillée : la classification doit comporter au moins deux niveaux');
@@ -294,14 +299,22 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     /** Arrêtés et décisions signés par le maire (hors séance) à transmettre au contrôle de légalité. */
     async lotHorsSeance(ctx, organismeId) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org);
-      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.*, t.code AS type_code, t.libelle AS type_libelle
+      // Les actes signés À PRÉPARER, et ceux DÉJÀ PRÉPARÉS (transaction créée, non envoyée). Les seconds
+      // sont présentés cochés dans « À transmettre » pour pouvoir être décochés (annulation de la préparation).
+      const rows = await db.all(`SELECT DISTINCT ON (a.id) a.*, t.code AS type_code, t.libelle AS type_libelle, x.id AS tx_id, x.etat AS tx_etat
         FROM actes a JOIN ref_items t ON t.id = a.type_id
-        WHERE a.organisme_id = $1 AND a.statut = 'signe' AND (t.meta->>'signature')::boolean
+        LEFT JOIN LATERAL (SELECT id, etat FROM tlt_transactions x WHERE x.acte_id = a.id AND x.etat IN ('prepare', 'poste') ORDER BY id DESC LIMIT 1) x ON true
+        WHERE a.organisme_id = $1 AND (t.meta->>'signature')::boolean
           AND a.statut NOT IN ('abandonne', 'retire')
-          AND NOT EXISTS (SELECT 1 FROM tlt_transactions x WHERE x.acte_id = a.id AND x.etat IN ('prepare', 'poste'))
+          AND (a.statut = 'signe' OR x.etat = 'prepare')
         ORDER BY a.id DESC LIMIT 200`, [org]);
       const items = [];
       for (const a of rows) {
+        if (a.tx_etat === 'prepare') {
+          const tx = await db.get('SELECT * FROM tlt_transactions WHERE id = $1', [a.tx_id]);
+          items.push({ acteId: a.id, itemId: null, horsSeance: true, numeroSuivi: a.numero_suivi, numero: a.numero, titre: a.titre, typeCode: a.type_code, typeLibelle: a.type_libelle, statut: 'en_cours', raison: null, numeroTransmis: tx.numero_transmis, matiere: null, natureCode: null, classif: [], annexes: 0, transaction: toTx(tx), controles: [] });
+          continue;
+        }
         const numero = String(a.numero_suivi || a.numero || `A${a.id}`).toUpperCase().replace(/[^A-Z0-9_]/g, '_').slice(0, 15);
         const s = { dateSeance: a.signe_at || a.created_at, type: null };
         const pk = await paquet(org, s, { id: null }, a, null, cfg, numero);
@@ -318,6 +331,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       for (const id of acteIds) {
         const it = lot.items.find((x) => x.acteId === id);
         if (!it) { refuses.push({ acteId: id, raisons: ['Acte introuvable ou déjà transmis'] }); continue; }
+        if (it.statut !== 'a_preparer') { refuses.push({ acteId: id, raisons: [it.raison || 'Déjà préparé : décochez-le dans « À transmettre » pour annuler la préparation'] }); continue; }
         const bloquants = it.controles.filter((c) => c.niveau === 'bloquant').map((c) => c.message);
         if (bloquants.length) { refuses.push({ acteId: id, raisons: bloquants }); continue; }
         const acte = await db.get('SELECT * FROM actes WHERE id = $1', [id]);
@@ -327,8 +341,14 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         const pdf = await render.renderActe(ctx, org, acte.id, { cible: 'extrait', mode: 'propre', watermark: '' });
         const fileId = await storePdf(org, ctx, pdf.buffer, `${it.numeroTransmis}.pdf`);
         const pkg = { ...pk, file: { fileId, name: `${it.numeroTransmis}.pdf`, size: pdf.buffer.length }, scenario: cfg.scenario, enAttente: cfg.modeEnvoi === 'B' };
-        const r = await db.get(`INSERT INTO tlt_transactions (organisme_id, acte_id, numero_transmis, mode, package, file_id, prepared_by)
-                                VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7) RETURNING *`, [org, acte.id, it.numeroTransmis, cfg.mode, JSON.stringify(pkg), fileId, ctx.username]);
+        let r;
+        try {
+          r = await db.get(`INSERT INTO tlt_transactions (organisme_id, acte_id, numero_transmis, mode, package, file_id, prepared_by)
+                                  VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7) RETURNING *`, [org, acte.id, it.numeroTransmis, cfg.mode, JSON.stringify(pkg), fileId, ctx.username]);
+        } catch (e) {
+          if (e.code === '23505') throw E.conflict(`Le numéro transmis ${it.numeroTransmis} est déjà utilisé (aucun envoi n'a été fait pour cette tentative)`);
+          throw e;
+        }
         await db.run("UPDATE actes SET statut = 'pret_a_transmettre' WHERE id = $1 AND statut = 'signe'", [acte.id]);
         await journal(r.id, ctx.username, 'prepare', { numero: it.numeroTransmis, horsSeance: true });
         crees.push(toTx(r));
@@ -357,8 +377,14 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         const pdf = await render.renderActe(ctx, org, acte.id, { cible: 'deliberation', deliberationId: delib.id, mode: 'propre', watermark: '' });
         const fileId = await storePdf(org, ctx, pdf.buffer, `deliberation-${it.numeroTransmis}.pdf`);
         const pkg = { ...pk, file: { fileId, name: `deliberation-${it.numeroTransmis}.pdf`, size: pdf.buffer.length }, scenario: SCENARIOS[scenario] ? scenario : cfg.scenario, enAttente: cfg.modeEnvoi === 'B' };
-        const r = await db.get(`INSERT INTO tlt_transactions (organisme_id, acte_id, seance_id, item_id, numero_transmis, mode, package, file_id, prepared_by)
-                                VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9) RETURNING *`, [org, acte.id, seanceId, id, it.numeroTransmis, cfg.mode, JSON.stringify(pkg), fileId, ctx.username]);
+        let r;
+        try {
+          r = await db.get(`INSERT INTO tlt_transactions (organisme_id, acte_id, seance_id, item_id, numero_transmis, mode, package, file_id, prepared_by)
+                                  VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9) RETURNING *`, [org, acte.id, seanceId, id, it.numeroTransmis, cfg.mode, JSON.stringify(pkg), fileId, ctx.username]);
+        } catch (e) {
+          if (e.code === '23505') throw E.conflict(`Le numéro transmis ${it.numeroTransmis} est déjà utilisé (aucun envoi n'a été fait pour cette tentative)`);
+          throw e;
+        }
         await db.run("UPDATE actes SET statut = 'pret_a_transmettre' WHERE id = $1 AND statut IN ('adopte','texte_definitif_pret')", [acte.id]);
         await journal(r.id, ctx.username, 'prepare', { numero: r.numero_transmis, scenario: pkg.scenario });
         await audit.log(ctx, { organismeId: org, action: 'tlt.prepare', entity: 'tlt_transactions', entityId: r.id, after: { acteId: acte.id, numero: r.numero_transmis } });
@@ -477,7 +503,9 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       const tx = await svc._get(org, id);
       if (tx.etat === 'prepare') {
         const row = await db.get("UPDATE tlt_transactions SET etat = 'annule', updated_at = now() WHERE id = $1 RETURNING *", [id]);
-        await db.run("UPDATE actes SET statut = 'adopte' WHERE id = $1 AND statut = 'pret_a_transmettre'", [tx.acte_id]);
+        // Rétablit l'état d'avant préparation : une délibération redevient « adoptée », un acte signé
+        // hors séance redevient « signé » (sans quoi il disparaîtrait de « À transmettre » et de la bibliothèque).
+        await db.run("UPDATE actes SET statut = $2 WHERE id = $1 AND statut IN ('pret_a_transmettre', 'transmis')", [tx.acte_id, tx.seance_id ? 'adopte' : 'signe']);
         await journal(id, ctx.username, 'annule', { motif });
         return toTx(row);
       }
@@ -485,7 +513,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       const r = await ad(cfg).annuler(tx.remote_id, org);
       if (!r.ok) throw E.conflict(`S²LOW : ${r.message}`);
       const row = await db.get("UPDATE tlt_transactions SET etat = 'annule', status = 0, status_label = $2, updated_at = now() WHERE id = $1 RETURNING *", [id, STATUS[0]]);
-      await db.run("UPDATE actes SET statut = 'adopte' WHERE id = $1 AND statut IN ('transmis', 'pret_a_transmettre')", [tx.acte_id]);
+      await db.run("UPDATE actes SET statut = $2 WHERE id = $1 AND statut IN ('transmis', 'pret_a_transmettre')", [tx.acte_id, tx.seance_id ? 'adopte' : 'signe']);
       await journal(id, ctx.username, 'annule', { motif });
       await audit.log(ctx, { organismeId: org, action: 'tlt.annulation', entity: 'tlt_transactions', entityId: id, after: { motif: motif || null } });
       return toTx(row);
