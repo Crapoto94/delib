@@ -410,7 +410,8 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
       const tx = await svc._get(org, id);
       if (!peutEnvoyer(ctx, org, cfg)) throw E.forbidden("Votre rôle ne permet pas de confirmer une transmission (paramétrage du workflow d'envoi)");
       if (tx.etat !== 'poste' || tx.status !== 17) throw E.conflict('Cette transaction n’est pas en attente de confirmation');
-      const r = await ad(cfg).confirmer(tx.remote_id, org);
+      const c = await settings.resolve(org);
+      const r = await ad(cfg).confirmer(tx.remote_id, org, { login: c['tdt.s2low.utilisateur']?.value, password: dechiffre(c['tdt.s2low.mot_de_passe']?.value) });
       if (!r.ok) throw E.conflict(`S²LOW : ${r.message}`);
       const row = await db.get('UPDATE tlt_transactions SET status = 1, status_label = $2, updated_at = now() WHERE id = $1 RETURNING *', [id, STATUS[1]]);
       await db.run("UPDATE actes SET statut = 'transmis' WHERE id = $1 AND statut IN ('adopte','texte_definitif_pret','pret_a_transmettre')", [tx.acte_id]);

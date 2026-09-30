@@ -168,12 +168,25 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
       return { ok: true, id: (t.lignes[1] || '').trim() };
     },
 
-    async confirmer(remoteId, organismeId) {
-      // S²LOW répond TOUJOURS par une redirection vers `url_return`, en y encodant le résultat :
-      // %%ERROR%%=0 en succès, =1 en échec, et %%MESSAGE%% porte le motif (ex. certificat RGS manquant).
-      const retour = 'https://vibedelib.invalid/retour?e=%%ERROR%%&m=%%MESSAGE%%';
+    /**
+     * Mode B : ordonne la télétransmission d'un acte « en attente d'être postée ».
+     * S²LOW authentifie CETTE route par NONCE (et non par certificat seul, cf. NounceAuthenticator) : il faut
+     * d'abord `GET /api/get-nounce.php` en HTTP Basic (login:mot de passe) — le certificat identifiant la
+     * collectivité — puis rappeler la confirmation avec `nounce`, `login` et `hash = sha256("password:nounce")`.
+     * S²LOW répond TOUJOURS par une redirection vers `url_return`, avec `%%ERROR%%` (0 = succès, 1 = échec) et
+     * `%%MESSAGE%%` (motif).
+     */
+    async confirmer(remoteId, organismeId, identifiants) {
       const { url, agent } = await contexte(organismeId);
-      const r = await http(agent).get(url + `/modules/actes/actes_transac_post_confirm_api.php?id=${encodeURIComponent(remoteId)}&url_return=${encodeURIComponent(retour)}`);
+      const login = identifiants?.login; const password = identifiants?.password;
+      if (!login || !password) throw E.conflict("La confirmation exige l’identifiant technique et le mot de passe S²LOW (authentification par nonce) : renseignez-les dans Paramétrage → Télétransmission.");
+      const n = await http(agent).get(url + '/api/get-nounce.php', { headers: { Authorization: 'Basic ' + Buffer.from(`${login}:${password}`).toString('base64') } });
+      let nounce = null; try { nounce = (typeof n.data === 'string' ? JSON.parse(n.data) : n.data)?.nounce || null; } catch { nounce = null; }
+      if (!nounce) return { ok: false, message: `Nonce S²LOW refusé (HTTP ${n.status}) : vérifiez l’identifiant technique et le mot de passe.` };
+      const hash = crypto.createHash('sha256').update(`${password}:${nounce}`).digest('hex');
+      const retour = 'https://vibedelib.invalid/retour?e=%%ERROR%%&m=%%MESSAGE%%';
+      const q = new URLSearchParams({ id: String(remoteId), url_return: retour, nounce, login, hash });
+      const r = await http(agent).get(url + '/modules/actes/actes_transac_post_confirm_api.php?' + q.toString());
       const loc = String(r.headers?.location || '');
       const drapeau = /[?&]e=(\d+)/.exec(loc);
       if (drapeau && drapeau[1] === '0') return { ok: true };
