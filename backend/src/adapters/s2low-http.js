@@ -169,8 +169,17 @@ function createS2lowHttp({ db, storage, config, log, settings, certificat }) {
     },
 
     async confirmer(remoteId, organismeId) {
-      const t = await appel(organismeId, 'GET', `/modules/actes/actes_transac_post_confirm_api.php?id=${encodeURIComponent(remoteId)}&url_return=${encodeURIComponent('about:blank')}`);
-      return t.ok || (t.status >= 300 && t.status < 400) ? { ok: true } : { ok: false, message: (t.lignes[1] || 'confirmation refusée').trim() };
+      // S²LOW répond TOUJOURS par une redirection vers `url_return`, en y encodant le résultat :
+      // %%ERROR%%=0 en succès, =1 en échec, et %%MESSAGE%% porte le motif (ex. certificat RGS manquant).
+      const retour = 'https://vibedelib.invalid/retour?e=%%ERROR%%&m=%%MESSAGE%%';
+      const { url, agent } = await contexte(organismeId);
+      const r = await http(agent).get(url + `/modules/actes/actes_transac_post_confirm_api.php?id=${encodeURIComponent(remoteId)}&url_return=${encodeURIComponent(retour)}`);
+      const loc = String(r.headers?.location || '');
+      const drapeau = /[?&]e=(\d+)/.exec(loc);
+      if (drapeau && drapeau[1] === '0') return { ok: true };
+      const brut = (/[?&]m=([^&]*)/.exec(loc) || [])[1] || reponseTexte(r.data).lignes[1] || '';
+      const message = decodeURIComponent(String(brut).replace(/\+/g, ' ')).replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+      return { ok: false, message: message || 'confirmation refusée par S²LOW' };
     },
 
     async statut(remoteId, organismeId) {
