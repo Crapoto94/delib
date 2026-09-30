@@ -89,8 +89,8 @@ export default function AdminTdt() {
         </Field>
         <div className="grid gap-3 md:grid-cols-3">
           <Field label="Adresse du serveur"><input className="input" type="url" value={f.url} placeholder="https://…" onChange={(e) => setF({ ...f, url: e.target.value })} /></Field>
-          <Field label="Identifiant technique"><input className="input" autoComplete="off" value={f.utilisateur} onChange={(e) => setF({ ...f, utilisateur: e.target.value })} /></Field>
-          <Field label="Mot de passe" hint={conn?.motDePasseDefini ? 'Enregistré (chiffré) : laissez vide pour le conserver.' : 'Chiffré au repos, jamais affiché.'}>
+          <Field label="Identifiant technique" hint="Login du compte S²LOW de la collectivité (celui de l’interface web S²LOW). Obligatoire pour confirmer une transmission : S²LOW authentifie cette étape par nonce."><input className="input" autoComplete="off" value={f.utilisateur} onChange={(e) => setF({ ...f, utilisateur: e.target.value })} /></Field>
+          <Field label="Mot de passe" hint={conn?.motDePasseDefini ? 'Enregistré (chiffré) : laissez vide pour le conserver. Celui du compte S²LOW, utilisé pour la confirmation par nonce.' : 'Mot de passe du compte S²LOW (chiffré au repos, jamais affiché).'} >
             <input className="input" type="password" autoComplete="new-password" value={f.motDePasse} placeholder={conn?.motDePasseDefini ? '••••••••••' : ''} onChange={(e) => setF({ ...f, motDePasse: e.target.value })} /></Field>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
