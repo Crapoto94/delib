@@ -348,6 +348,7 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
     /** Supprime un acte HORS circuit (confirmation côté interface). Un acte déjà passé au conseil n'est supprimable que par l'administrateur ou le SCC. */
     async supprimer(ctx, organismeId, id) {
       const a = await svc.load(ctx, organismeId, id);
+      if (a.site) throw E.conflict('Cet arrêté vient du site de la Ville : il est conservé et ne peut pas être supprimé');
       const PASSE_CM = ['adopte', 'archive', 'executoire', 'publie', 'transmis', 'ar_recu', 'rejete', 'retire'];
       if (PASSE_CM.includes(a.statut)) {
         if (!acl.isAdmin(ctx, a.organisme_id)) throw E.forbidden("Seuls l'administrateur et le SCC peuvent supprimer un acte déjà passé au conseil");

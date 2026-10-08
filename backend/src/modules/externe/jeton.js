@@ -29,7 +29,7 @@ function createJetons(secret) {
         const d = crypto.createDecipheriv('aes-256-gcm', cle, b.subarray(0, 12));
         d.setAuthTag(b.subarray(12, 28));
         const [type, acteId, annexeId] = JSON.parse(Buffer.concat([d.update(b.subarray(28)), d.final()]).toString());
-        if (!['p', 'a'].includes(type) || !Number.isInteger(acteId) || !Number.isInteger(annexeId)) return null;
+        if (!['p', 'a', 'r'].includes(type) || !Number.isInteger(acteId) || !Number.isInteger(annexeId)) return null;
         return { type, acteId, annexeId };
       } catch { return null; }
     },

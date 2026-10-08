@@ -53,6 +53,9 @@ const { createConfiguration } = require('./modules/parametrage/configuration.ser
 const { createSauvegarde } = require('./modules/sauvegarde/sauvegarde.service');
 const { createApiKeys } = require('./modules/externe/apikeys.service');
 const { createExterne } = require('./modules/externe/externe.service');
+const { createArretesSite } = require('./modules/arretes-site/arretes-site.service');
+const { createArretesSignes } = require('./modules/arretes-signes/arretes-signes.service');
+const { createArretesPublics } = require('./modules/arretes-publics/arretes-publics.service');
 const { createSms } = require('./adapters/sms');
 const { createRecherche } = require('./modules/recherche/recherche.service');
 const { createAlertes } = require('./modules/recherche/alertes.service');
@@ -218,6 +221,9 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const alertes = createAlertes({ db, access, recherche, log, notifications, config });
   const apiKeys = createApiKeys({ db, audit, log });
   const externe = createExterne({ db, render, storage, config, bibliotheque });
+  const arretesSignes = createArretesSignes({ db, audit, actes, annexes, render, refs, acl, bus }); // arrêté déjà signé hors de l'application : saisie, dépôt, bibliothèque, contrôle de légalité
+  const arretesPublics = createArretesPublics({ db, storage, render, config }); // arrêtés signés publiés sans connexion (page publique en DMZ)
+  const arretesSite = createArretesSite({ db, audit, storage, refs, settings, log, bus }); // reprise des arrêtés du site internet de la Ville (actes « site »)
   const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
   const airs = createAirs({ db, audit, dir, source: airsSource, ad, storage }); // import de l'historique AIRS DELIB (section 25 bis, D111)
   // collecteurs d'arrêtés : moisson mail Graph / dossier, analyse IA, envoi en signature (parapheur) — créé après le parapheur, la messagerie et l'IA.
@@ -232,7 +238,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   scheduler.register('recherche', async (orgId) => (await recherche.balayer(orgId)).n); // rattrapage de l'index de recherche (REC-20)
   scheduler.register('collecteurs', (orgId) => collecteurs.runDt(orgId)); // collecteurs d'arrêtés : passages selon leur intervalle (1h/4h/24h)
   scheduler.register('teletransmission', async (orgId) => { const r = await tlt.suivre(orgId); return r.statuts + r.documents; }); // suivi périodique des statuts S²LOW (TLT-07)
-  return { relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, uploadLimit, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, bureau, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, eluCalendrier, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs, bureauPorts };
+  return { arretesPublics, arretesSignes, arretesSite, relance, synthese, calendrier, bibliotheque, parcours, visas, config, log, db, ad, directoryAdapter, mail, aiAdapter, meeting, audit, access, sessions, dir, organismes, settings, uploadLimit, onboarding, auth, bus, storage, late, refs, titulaires, redaction, acl, actes, annexes, bureau, comments, textes, render, docs, delegations, engine, circuits, notifications, scheduler, elus, commissions, seances, deadlines, odj, cahier, kpis, tenue, pv, tlt, ged, recherche, annotations, champs, configuration, rgpd, entrainement, amendements, sms, sauvegarde, apiKeys, externe, alertes, eluAuth, espace, eluCalendrier, organisation, organigramme, convocations, users, ai, aiQueue, aiPrompts, airs, parapheur, collecteurs, bureauPorts };
 }
 
 module.exports = { buildContainer };

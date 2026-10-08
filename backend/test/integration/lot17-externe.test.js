@@ -247,7 +247,7 @@ describe('API publique : périmètre de la clé, recherche et spécification', (
     expect(r.status).toBe(200);
     const chemins = Object.keys(r.body.paths);
     expect(chemins.length).toBeGreaterThan(5);
-    expect(chemins.every((c) => c.startsWith('/api/v1/externe/') || c.startsWith('/api/v1/public/deliberations'))).toBe(true);   // l'API externe et l'API publique des délibérations, rien d'autre
+    expect(chemins.every((c) => c.startsWith('/api/v1/externe/') || c.startsWith('/api/v1/public/deliberations') || c.startsWith('/api/v1/public/arretes'))).toBe(true);   // l'API externe et l'API publique (délibérations, arrêtés), rien d'autre
     expect(chemins).toEqual(expect.arrayContaining(['/api/v1/externe/actes', '/api/v1/externe/seances', '/api/v1/externe/rapporteurs', '/api/v1/externe/actes/{id}/expose']));
     expect(chemins).not.toContain('/api/v1/externe/openapi.json');
     expect(chemins).toEqual(expect.arrayContaining(['/api/v1/public/deliberations', '/api/v1/public/deliberations/recherche', '/api/v1/public/deliberations/recherche/filtres', '/api/v1/public/deliberations/f/{jeton}']));

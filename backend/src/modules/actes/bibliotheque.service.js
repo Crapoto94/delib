@@ -71,7 +71,7 @@ const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) 
       if (an.numero) {
         if (an.numero.suivi !== null) communFiltres.push(`a.numero_suivi = ${add(an.numero.suivi)}`);
         else wSeance.push(`upper(it.numero) = ${add(an.numero.ref.toUpperCase())}`);  // le n° de délibération n'existe pas pour un arrêté
-      } else if (an.tsq) { const t = add(an.tsq); const raw = add(`%${String(q).trim().replace(/[%_]/g, '')}%`); communFiltres.push(`(si.tsv @@ to_tsquery('fr_unaccent', ${t}) OR a.titre ILIKE ${raw})`); rang = `ts_rank(si.tsv, to_tsquery('fr_unaccent', ${t}))`; }
+      } else if (an.tsq) { const t = add(an.tsq); const raw = add(`%${String(q).trim().replace(/[%_]/g, '')}%`); communFiltres.push(`(si.tsv @@ to_tsquery('fr_unaccent', ${t}) OR a.titre ILIKE ${raw} OR replace(COALESCE(a.custom->'site'->>'numero', a.custom->'dejaSigne'->>'numeroArrete', ''), '_', '') ILIKE ${raw})`); rang = `ts_rank(si.tsv, to_tsquery('fr_unaccent', ${t}))`; }
       if (annee) { wSeance.push(`EXTRACT(year FROM s.date_seance AT TIME ZONE 'Europe/Paris') = ${add(Number(annee))}`); wSigne.push(`EXTRACT(year FROM a.signe_at AT TIME ZONE 'Europe/Paris') = ${add(Number(annee))}`); }
       if (matiereId) communFiltres.push(`a.matiere_id = ${add(Number(matiereId))}`);
       if (natureId) communFiltres.push(`a.nature_id = ${add(Number(natureId))}`);
@@ -97,7 +97,7 @@ const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) 
         LEFT JOIN ref_items m ON m.id = a.matiere_id LEFT JOIN elus ra ON ra.id = a.rapporteur_id WHERE ${where}`;
       const total = (await db.get(`SELECT count(DISTINCT a.id)::int AS n ${from}`, p)).n;
       const rows = await db.all(`SELECT DISTINCT ON (a.id) a.id, a.numero_suivi, a.titre, a.statut, a.type_id, t.code AS type_code, t.libelle AS type_libelle,
-          ${EST_ARCHIVE} AS est_archive, (a.custom ? 'airs') AS airs_imp, (a.custom->'airs'->>'origine' = 'courant') AS airs_courant, a.direction_label, a.direction_code, m.libelle AS matiere, it.numero,
+          ${EST_ARCHIVE} AS est_archive, (a.custom ? 'airs') AS airs_imp, (a.custom->'airs'->>'origine' = 'courant') AS airs_courant, a.direction_label, a.direction_code, m.libelle AS matiere, COALESCE(it.numero, a.custom->'site'->>'numero', a.custom->'dejaSigne'->>'numeroArrete') AS numero,
           COALESCE(s.date_seance, a.signe_at) AS date_seance, i.nom AS instance, COALESCE(sp.resultat, CASE WHEN a.statut = 'signe' THEN 'signe' END) AS resultat, NULLIF(trim(ra.prenom || ' ' || ra.nom), '') AS rapporteur,
           (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id AND an.titre NOT LIKE '%document d''origine%') AS annexes_n,
           (SELECT count(*)::int FROM annexes an WHERE an.acte_id = a.id AND NOT an.publiable AND an.titre NOT LIKE '%document d''origine%') AS annexes_np,

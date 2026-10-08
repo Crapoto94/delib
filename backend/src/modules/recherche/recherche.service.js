@@ -139,7 +139,9 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
     const objet = brut(a.commentaire_initial);
     const numeros = [String(a.numero_suivi), ...points.map((p) => p.numero).filter(Boolean)].join(' ');
     const A = [a.titre, ...delibs.map((d) => d.titre), numeros].join(' . ');
-    const dispositif = txt('dispositif');
+    const documentActe = a.document_source_pdf_file_id
+      ? (await db.get('SELECT texte FROM search_annexes WHERE file_id = $1', [a.document_source_pdf_file_id]))?.texte || '' : '';   // arrêté signé : le PDF EST l'acte
+    const dispositif = [txt('dispositif'), documentActe].filter(Boolean).join(' ');
     const B = [objet, rubrique, matiere, nature, type, rapp ? `${rapp.prenom} ${rapp.nom}` : '', dispositif].filter(Boolean).join(' . ');
     const C = [txt('expose'), txt('visas'), a.direction_label, ...avis.map((v) => `${AVIS[v.avis] || v.avis} ${brut(v.avis_commentaire)}`),
       ...points.map((p) => RESULTATS[p.resultat] || '')].filter(Boolean).join(' . ');
@@ -159,6 +161,8 @@ function createRecherche({ db, audit, acl, settings, storage, bus, log }) {
   /** Lit le texte des annexes d'un acte qui n'ont pas encore été lues, puis reconstruit l'entrée. */
   async function traiterActe(acteId) {
     for (const f of await db.all('SELECT DISTINCT COALESCE(pdf_file_id, file_id) AS file_id FROM annexes WHERE acte_id = $1', [acteId])) await texteDuFichier(f.file_id);
+    const src = await db.get('SELECT document_source_pdf_file_id AS f FROM actes WHERE id = $1', [acteId]);
+    if (src?.f) await texteDuFichier(src.f);
     return reindexerActe(acteId);
   }
 

@@ -9,6 +9,7 @@ import { Empty, ErrorBox, Field, Loading, Modal, Pagination, PageTitle, Spinner,
 import { AgentName } from '../AgentName';
 import { Select } from '../Select';
 import { AVATAR_NOM, Mascotte } from '../DossierAssiste';
+import ArreteSigne, { ChoixParcours } from './ArreteSigne';
 
 /** REC-08 : des actes proches existent déjà (dans la limite de mes droits) — consulter avant de rédiger. */
 function Similaires({ titre }: { titre: string }) {
@@ -64,6 +65,8 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
   const [serviceLibre, setServiceLibre] = useState('');
   const [mots, setMots] = useState(''); const [props, setProps] = useState<any[]>([]);
   const [assister] = useState(assisterParDefaut);
+  const [parcours, setParcours] = useState<'parcours' | 'signe'>('parcours');   // arrêté : suit un parcours, ou déjà signé
+  const estArrete = sel?.code === 'arrete'; const dejaSigne = estArrete && parcours === 'signe';
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [busyModele, setBusyModele] = useState<number | null>(null);
   useEffect(() => { if (types.data?.length && !typeId) setTypeId(types.data[0].id); }, [types.data]);
   const cles = mots.split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
@@ -94,7 +97,7 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
   ].filter(Boolean).join('\n');
   return (
     <Modal title="Nouveau dossier" onClose={onClose} wide>
-      <form onSubmit={submit} className="space-y-4">
+      <div className="space-y-4">
         <ErrorBox msg={err} />
         <Field label="Type d'acte"><Select className="input" value={typeId} onChange={(e) => setTypeId(Number(e.target.value))}>{types.data?.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}</Select></Field>
         <details className="rounded border border-line bg-soft p-3 text-[13px]" open>
@@ -118,6 +121,9 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
             <p className="text-mute">{sel.meta?.aide}</p>
           </div>
         )}
+        {estArrete && <ChoixParcours valeur={parcours} onChange={setParcours} />}
+        {dejaSigne ? <ArreteSigne onClose={onClose} /> : (
+      <form onSubmit={submit} className="space-y-4">
         <Field label="Titre explicite de l'acte" hint="Ce titre apparaîtra sur l'ordre du jour officiel."><input className="input" autoFocus required minLength={3} value={titre} onChange={(e) => setTitre(e.target.value)} /></Field>
         <Field label="Mots-clés" hint="Séparez par des virgules (ex. subvention, association). Les acronymes sont reconnus (RIFSEEP trouve R.I.F.S.E.E.P). Ils mémorisent le dossier et proposent des délibérations passées."><input className="input" value={mots} onChange={(e) => setMots(e.target.value)} placeholder="rifseep, subvention, association" /></Field>
         {props.length > 0 && (
@@ -148,7 +154,8 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
           <input className="input" value={serviceLibre} onChange={(e) => setServiceLibre(e.target.value)} maxLength={120} placeholder="chargé de mission…" />
         </Field>
         <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || !typeId}>{busy && <Spinner />} Créer le brouillon</button></div>
-      </form>
+      </form>)}
+      </div>
     </Modal>
   );
 }

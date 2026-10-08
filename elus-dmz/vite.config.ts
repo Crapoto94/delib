@@ -37,6 +37,6 @@ export default defineConfig({
   build: { outDir: 'dist', emptyOutDir: true },
   server: { port: 5161, strictPort: true, proxy: {
     // Même liste blanche que nginx.conf.template : un préfixe '/api' attraperait aussi /api-docs (Swagger complet du backend).
-    '^/api/v1/(elus|elus-auth|externe)/|^/api/v1/elus-auth/etat$|^/api/v1/public/(deliberations|branding$|organismes/[0-9]+/logo$)': { target: process.env.VITE_API_TARGET || 'http://localhost:3121', changeOrigin: true },
+    '^/api/v1/(elus|elus-auth|externe)/|^/api/v1/elus-auth/etat$|^/api/v1/public/(deliberations|arretes|branding$|organismes/[0-9]+/logo$)': { target: process.env.VITE_API_TARGET || 'http://localhost:3121', changeOrigin: true },
   } },
 });

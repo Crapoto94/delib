@@ -306,7 +306,7 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
         LEFT JOIN LATERAL (SELECT id, etat FROM tlt_transactions x WHERE x.acte_id = a.id AND x.etat IN ('prepare', 'poste') ORDER BY id DESC LIMIT 1) x ON true
         WHERE a.organisme_id = $1 AND (t.meta->>'signature')::boolean
           AND a.statut NOT IN ('abandonne', 'retire')
-          AND (a.statut = 'signe' OR x.etat = 'prepare')
+          AND ((a.statut = 'signe' AND NOT a.site AND COALESCE(a.custom->'controleLegalite'->>'etat', '') <> 'deja_envoye') OR x.etat = 'prepare')   -- ni les arrêtés du site, ni ceux déjà envoyés
         ORDER BY a.id DESC LIMIT 200`, [org]);
       const items = [];
       for (const a of rows) {
