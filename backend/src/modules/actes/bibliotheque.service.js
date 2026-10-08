@@ -204,6 +204,12 @@ const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) 
         const signe = await render.documentSigne(org, a.id).catch(() => null);
         if (signe) { const r = { buffer: signe.buffer, name: signe.name }; return cible === 'extrait' ? avecTampon(r) : r; }
       }
+      // Arrêté sans séance dont le document est joint au dossier (repris du site de la Ville, ou déjà signé hors de l'application) : son PDF EST l'acte, et
+      // l'extrait du registre n'a pas de séance dont le tirer. On le sert tel quel.
+      if ((cible === 'extrait' || cible === 'deliberation') && !a.seance_id) {
+        const src = await db.get('SELECT f.storage_key, f.original_name FROM actes x JOIN files f ON f.id = x.document_source_pdf_file_id WHERE x.id = $1', [a.id]);
+        if (src && storage) { const r = { buffer: await storage.get(src.storage_key), name: src.original_name }; return cible === 'extrait' ? avecTampon(r) : r; }
+      }
       // Document d'origine importé (AIRS) : on sert le PDF de l'import plutôt que la recréation.
       // « Exposé des motifs » → rapport (r… / rap_) ; « Extrait du registre » → délibération (d… / del_).
       // On préfère le PDF associé (annexe Word convertie), sinon le fichier lui-même s'il est déjà PDF.

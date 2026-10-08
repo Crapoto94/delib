@@ -85,6 +85,18 @@ describe('arrêtés du site : reprise', () => {
     expect(trouve).toContain('Fermeture Ossuaire');
   });
 
+  it("affiche l’extrait du registre (le PDF de l’arrêté) et la fiche dans la bibliothèque", async () => {
+    const dupont = await loginAs(env, 'dupont', 'pw-dupont');
+    const id = (await env.db.get("SELECT id FROM actes WHERE site AND titre = 'Plan communal de sauvegarde'")).id;
+    const fiche = await env.http().get(`/api/v1/organismes/${ville.id}/bibliotheque/actes/${id}`).set(bearer(dupont));
+    expect(fiche.status).toBe(200);
+    for (const cible of ['extrait', 'deliberation']) {
+      const r = await env.http().get(`/api/v1/organismes/${ville.id}/bibliotheque/actes/${id}/pdf?cible=${cible}`).set(bearer(dupont)).buffer(true).parse((res, cb) => { const c = []; res.on('data', (d) => c.push(d)); res.on('end', () => cb(null, Buffer.concat(c))); });
+      expect({ cible, status: r.status }).toEqual({ cible, status: 200 });
+      expect(r.body.subarray(0, 5).toString()).toBe('%PDF-');
+    }
+  });
+
   it('est rejouable : un arrêté déjà repris est ignoré', async () => {
     const job = await attendre(await svc.lancer({ username: 'admin' }, ville.id, { url: PAGE }));
     expect(job).toMatchObject({ etat: 'termine', nouveaux: 0, ignores: 2 });
