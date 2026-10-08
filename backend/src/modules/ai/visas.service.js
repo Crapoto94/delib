@@ -275,6 +275,15 @@ function createVisas({ db, audit, actes, settings, log, ai, prompts }) {
       return [...par.values()];
     },
 
+    /** Délibérations de l'historique (AIRS) qui citent ce texte : les plus récentes d'abord, paginées. */
+    async delibsHistorique(organismeId, id, { limit = 50, offset = 0 } = {}) {
+      const org = requireOrg(organismeId); await svc.get(org, id);
+      const total = Number((await db.get('SELECT count(*)::int AS n FROM visa_historique_delibs WHERE visa_id = $1 AND organisme_id = $2', [id, org])).n);
+      const items = (await db.all('SELECT fichier, date_delib AS "date", objet FROM visa_historique_delibs WHERE visa_id = $1 AND organisme_id = $2 ORDER BY date_delib DESC NULLS LAST, id LIMIT $3 OFFSET $4', [id, org, limit, offset]))
+        .map((x) => ({ fichier: x.fichier, date: x.date instanceof Date ? x.date.toISOString().slice(0, 10) : x.date, objet: x.objet }));
+      return { total, items };
+    },
+
     /** Notifie les rédacteurs des actes en cours qui citent un texte devenu abrogé ou modifié. */
     async veille(ctx, organismeId, entree) {
       const org = requireOrg(organismeId); const concernes = await svc.concernes(org, entree);

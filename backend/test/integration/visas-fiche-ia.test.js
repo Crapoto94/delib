@@ -98,3 +98,14 @@ describe('règles de contrôle issues de l\'usage constaté', () => {
     expect(encore.body).toMatchObject({ crees: 0, dejaPresentes: 2 });
   });
 });
+
+describe('délibérations de l\'historique qui citent un texte', () => {
+  it('les liste, les plus récentes d\'abord, paginées, réservées au juridique', async () => {
+    await env.db.run('INSERT INTO visa_historique_delibs (visa_id, organisme_id, fichier, date_delib, objet) VALUES ($1,$2,$3,$4,$5),($1,$2,$6,$7,$8)',
+      [art.id, ville.id, 'd1.pdf', '2020-03-01', 'FINANCES Budget 2020', 'd2.pdf', '2022-06-15', 'URBANISME Cession']);
+    expect((await as(dupont).get(V(`/${art.id}/delibs-historique`))).status).toBe(403);
+    const r = (await as(admin).get(V(`/${art.id}/delibs-historique?limit=1`))).body;
+    expect(r.total).toBe(2); expect(r.items).toEqual([{ fichier: 'd2.pdf', date: '2022-06-15', objet: 'URBANISME Cession' }]);
+    expect((await as(admin).get(V(`/${art.id}/delibs-historique?limit=1&offset=1`))).body.items[0].fichier).toBe('d1.pdf');
+  });
+});

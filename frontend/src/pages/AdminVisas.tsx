@@ -76,6 +76,23 @@ function Bonbon({ e, onClick, busy }: { e: any; onClick?: () => void; busy?: boo
   );
 }
 
+/** Délibérations de l'historique (AIRS) qui citent ce texte, les plus récentes d'abord, par tranches de 50. */
+function DelibsHistorique({ id, total }: { id: number; total: number }) {
+  const { org } = useAuth(); const o = org!.id;
+  const [items, setItems] = useState<any[]>([]); const [n, setN] = useState<number | null>(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null);
+  const charger = async () => {
+    setBusy(true); setErr(null);
+    try { const r = (await api.get(orgPath(o, `/visas/${id}/delibs-historique?limit=50&offset=${items.length}`))).data; setItems([...items, ...r.items]); setN(r.total); } catch (x) { setErr(errMsg(x)); } finally { setBusy(false); }
+  };
+  if (n === null) return <button className="btn-secondary !py-1" disabled={busy || total === 0} onClick={charger}>{busy ? <Spinner /> : <BookOpen className="h-4 w-4" />} Voir les délibérations qui le citent</button>;
+  return (
+    <div className="space-y-1"><ErrorBox msg={err} />
+      <p className="text-[12px] text-mute">{n === 0 ? 'Aucune délibération référencée (relancer l’outil d’historique).' : `${items.length} sur ${n}, les plus récentes d’abord.`}</p>
+      <ul className="max-h-56 divide-y divide-line overflow-y-auto rounded border border-line bg-white text-[12px]">{items.map((x) => <li key={x.fichier} className="flex gap-2 px-2 py-1"><span className="w-20 shrink-0 text-mute">{x.date ? jour(x.date) : '—'}</span><span className="min-w-0 flex-1">{x.objet ?? <i className="text-mute">objet non lu</i>}</span></li>)}</ul>
+      {items.length < n && <button className="btn-secondary !py-1" disabled={busy} onClick={charger}>{busy && <Spinner />} Voir les suivantes</button>}
+    </div>);
+}
+
 /** Fiche d'un texte : ce qu'il est, quand le viser, usage constaté dans l'historique, verdict de l'IA. */
 function FicheTexte({ entree, onClose, onChanged }: { entree: any; onClose: () => void; onChanged: () => void }) {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
@@ -107,6 +124,7 @@ function FicheTexte({ entree, onClose, onChanged }: { entree: any; onClose: () =
               {u.formulation && <p className="italic text-mute">Formulation habituelle : « {u.formulation} »</p>}
             </>
           ) : <p className="text-mute">Aucune citation relevée dans l’historique des délibérations.</p>}
+          <DelibsHistorique id={e.id} total={e.citations} />
         </section>
 
         <section className="space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2">Vérification par l’IA <Bonbon e={e} /></h3>

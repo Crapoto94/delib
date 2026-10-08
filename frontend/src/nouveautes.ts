@@ -11,9 +11,15 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.53.0';
+export const VERSION = '0.53.1';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.53.1', type: 'patch', titre: "Textes de la bibliothèque : délibérations qui les citent",
+    items: [
+      "La fiche d'un texte liste les délibérations de l'historique qui le citent (date et objet), les plus récentes d'abord, par tranches de 50.",
+    ],
+  },
   {
     version: '0.53.0', type: 'minor', titre: "Bibliothèque de textes : descriptions, vérification IA et règles issues de l'historique",
     items: [

@@ -80,6 +80,10 @@ module.exports = ({ makeRouter, visas, ai }) => {
   r.get('/:id/actes-concernes', { summary: 'Actes en cours qui citent ce texte (veille : texte devenu obsolète)', tags: T, org: true, roles: ECRITURE, params: IdP },
     async (req, res) => res.json({ items: await visas.concernes(req.org.id, req.valid.params.id) }));
 
+  r.get('/:id/delibs-historique', { summary: "Délibérations de l'historique (AIRS) qui citent ce texte, les plus récentes d'abord", tags: T, org: true, roles: ECRITURE, params: IdP,
+    query: z.object({ limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0) }) },
+    async (req, res) => res.json(await visas.delibsHistorique(req.org.id, req.valid.params.id, req.valid.query)));
+
   // sur un dossier
   const a = makeRouter('/api/v1/organismes/:orgId/actes/:id');
   a.get('/visas/usuels', { summary: 'Bibliothèque des vus et considérants les plus utilisés, avec pastille de vérification', tags: T, org: true, params: IdP, query: z.object({ limit: z.coerce.number().int().min(1).max(50).default(15) }),

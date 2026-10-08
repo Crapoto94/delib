@@ -9,6 +9,10 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.53.1 — Textes de la bibliothèque : délibérations qui les citent
+
+- Référencement des délibérations de l'historique (AIRS) par texte : table `visa_historique_delibs` (migration 0089), alimentée à chaque passage de `visas-depuis-airs.js --importer` (liste remplacée), exposée par `GET /visas/:id/delibs-historique` (paginée, plus récentes d'abord) et affichée dans la fiche du texte.
+
 ## 0.53.0 — Bibliothèque de textes : descriptions, vérification IA, règles issues de l'historique
 
 - **Fiche d'un texte** : description, emploi (quand le viser) et usage constaté dans l'historique AIRS (citations, période, rubriques, formulation) — migration 0088. Saisie par le juridique (`PUT /visas/:id/fiche`) ou rédigée par l'IA (`POST /visas/:id/description-ia`, marquée « IA, à relire », l'emploi déjà saisi n'est jamais écrasé).

@@ -67,10 +67,11 @@ function rubriqueDuTexte(texte, rubriques) {
 function creerCumul() {
   const m = new Map();
   return {
-    ajouter(refs, annee = null, rubrique = null) {
+    ajouter(refs, annee = null, rubrique = null, delib = null) {
       for (const r of refs) {
-        const e = m.get(r.cle) || { cle: r.cle, type: r.type, code: r.code, article: r.article, libelle: r.libelle, delibs: 0, premiere: null, derniere: null, exemple: r.exemple, rubriques: {} };
+        const e = m.get(r.cle) || { cle: r.cle, type: r.type, code: r.code, article: r.article, libelle: r.libelle, delibs: 0, premiere: null, derniere: null, exemple: r.exemple, rubriques: {}, liste: [] };
         e.delibs++;
+        if (delib) e.liste.push(delib);
         if (rubrique) e.rubriques[rubrique] = (e.rubriques[rubrique] || 0) + 1;
         if (annee) { e.premiere = e.premiere === null ? annee : Math.min(e.premiere, annee); e.derniere = e.derniere === null ? annee : Math.max(e.derniere, annee); }
         if (r.exemple.length < e.exemple.length) e.exemple = r.exemple;   // la formulation la plus courte : la plus lisible
@@ -83,6 +84,12 @@ function creerCumul() {
 }
 
 /** Usage constaté d'un candidat dans l'historique (stocké dans `usage_stats` : factuel, jamais réécrit par l'IA). */
+/** « OBJET : … » d'une délibération (au plus 200 caractères, espaces normalisés) ; null si absent. */
+function objetDuTexte(texte) {
+  const m = /OBJET\s*:\s*([^]{1,200})/i.exec(String(texte || ''));
+  return m ? m[1].replace(/\s+/g, ' ').split(/ (?:Mairie Esplanade|Esplanade Georges|ETAT DE PR)/i)[0].trim().slice(0, 160) || null : null;   // coupé avant l'en-tête de la mairie qui suit parfois
+}
+
 function statsUsage(c, total) {
   return {
     total, citations: c.delibs, de: c.premiere, a: c.derniere, formulation: c.exemple.slice(0, 400),
@@ -99,4 +106,4 @@ function entreeBibliotheque(c) {
   };
 }
 
-module.exports = { rubriqueDuTexte, statsUsage, reparerEspaces, paragraphesVu, referencesDuTexte, creerCumul, entreeBibliotheque, TYPES_BIBLIOTHEQUE };
+module.exports = { objetDuTexte, rubriqueDuTexte, statsUsage, reparerEspaces, paragraphesVu, referencesDuTexte, creerCumul, entreeBibliotheque, TYPES_BIBLIOTHEQUE };

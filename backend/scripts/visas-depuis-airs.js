@@ -91,8 +91,9 @@ async function ecrireSorties(cumul, stats) {
       `SELECT f.FIC_CHEMIN_SERV AS CH, f.FIC_NOM AS NOM FROM AIRSUSER.FIC_PRIMAIRE f WHERE f.TFP_ID = 5 AND f.CTY_ID = 7 AND lower(f.FIC_NOM) LIKE '%.pdf' ORDER BY f.FIC_ID`,
       {}, { outFormat: oracledb.OUT_FORMAT_OBJECT });
     await conn.close(); conn = null;
+    const dateDe = (nom) => { const m = /^d(\d{13})\./.exec(String(nom || '')); return m ? new Date(Number(m[1])).toISOString().slice(0, 10) : null; };
     const anneeDe = (nom) => { const m = /^d(\d{13})\./.exec(String(nom || '')); const a = m ? new Date(Number(m[1])).getUTCFullYear() : null; return a && a >= 2000 && a <= 2100 ? a : null; };
-    let docs = q.rows.map((x) => ({ CH: x.CH, an: anneeDe(x.NOM) })); const limite = Number(arg('limite', 0)); if (limite > 0) docs = docs.slice(0, limite);
+    let docs = q.rows.map((x) => ({ CH: x.CH, an: anneeDe(x.NOM), nom: String(x.NOM), date: dateDe(x.NOM) })); const limite = Number(arg('limite', 0)); if (limite > 0) docs = docs.slice(0, limite);
     console.log(`${docs.length} délibérations archivées (PDF « Délibération ») à analyser — partage : ${share}`);
 
     const rubriques = (await db.all("SELECT DISTINCT libelle FROM ref_items WHERE kind = 'rubrique' AND actif")).map((x) => x.libelle);
@@ -102,7 +103,7 @@ async function ecrireSorties(cumul, stats) {
         const buf = await fs.promises.readFile(path.join(share, String(d.CH).replace(/^\//, '').split('/').join(path.sep)));
         const texte = await texteDuPdf(buf); const refs = V.referencesDuTexte(texte); const rub = V.rubriqueDuTexte(texte, rubriques);
         stats.lus++; if (!refs.length) stats.sansVisa++; if (!rub) stats.sansRubrique++;
-        cumul.ajouter(refs, d.an, rub);
+        cumul.ajouter(refs, d.an, rub, { fichier: d.nom, date: d.date, objet: V.objetDuTexte(texte) });
       } catch { stats.illisibles++; }
       if ((k + 1) % 100 === 0) process.stdout.write(`\r${k + 1}/${docs.length}  (${stats.illisibles} illisibles)   `);
     });
@@ -127,6 +128,16 @@ async function ecrireSorties(cumul, stats) {
         // l'usage constaté (factuel) est rafraîchi pour toute entrée, y compris celles que le juridique a rédigées ; le reste de la fiche n'est jamais touché
         const m = await t.run('UPDATE visa_library SET citations = $3, cite_de = $4, cite_a = $5, usage_stats = $6::jsonb WHERE organisme_id = $1 AND cle = $2', [org, e.cle, c.delibs, c.premiere, c.derniere, us]);
         if (!res.changes && m.changes) maj++;
+        // référencement : les délibérations de l'historique qui citent ce texte (remplacées à chaque import)
+        const vid = (await t.get('SELECT id FROM visa_library WHERE organisme_id = $1 AND cle = $2', [org, e.cle]))?.id;
+        if (vid) {
+          await t.run('DELETE FROM visa_historique_delibs WHERE visa_id = $1', [vid]);
+          for (let i = 0; i < c.liste.length; i += 500) {
+            const lot = c.liste.slice(i, i + 500);
+            await t.run('INSERT INTO visa_historique_delibs (visa_id, organisme_id, fichier, date_delib, objet) SELECT $1, $2, f, d, o FROM unnest($3::text[], $4::date[], $5::text[]) AS u(f, d, o)',
+              [vid, org, lot.map((x) => x.fichier), lot.map((x) => x.date), lot.map((x) => x.objet)]);
+          }
+        }
       }
       await t.run(`INSERT INTO settings (scope, scope_id, key, value, updated_by) VALUES ('organisme', $1, 'visas.historique', $2::jsonb, '@historique')
         ON CONFLICT (scope, scope_id, key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`, [String(org), JSON.stringify({ total: stats.lus, de, a, le: new Date().toISOString() })]);
