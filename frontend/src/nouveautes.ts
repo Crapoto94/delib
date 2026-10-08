@@ -15,7 +15,7 @@ export const VERSION = '0.53.0';
 
 export const VERSIONS: Version[] = [
   {
-    version: '0.53.0', type: 'minor', titre: 'Bibliothèque de textes : descriptions, vérification IA et règles issues de l'historique',
+    version: '0.53.0', type: 'minor', titre: "Bibliothèque de textes : descriptions, vérification IA et règles issues de l'historique",
     items: [
       "Chaque texte de la bibliothèque des visas a une fiche : ce qu'il est, quand le viser, et son usage constaté dans l'historique (nombre de délibérations, période, rubriques, formulation habituelle).",
       "Un « bonbon » IA (vert, orange ou gris) indique si l'entrée est cohérente ; le bouton « Vérifier par l'IA » le met à jour, texte par texte ou en lot. L'IA ne se prononce jamais sur l'état en vigueur : seule la vérification à la source du juridique fait foi.",
