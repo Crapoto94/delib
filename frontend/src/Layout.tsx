@@ -1,4 +1,5 @@
 import { AgentName } from './AgentName';
+import BandeauInfo from './BandeauInfo';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, Eye, LogOut, Search } from 'lucide-react';
@@ -79,6 +80,7 @@ export default function Layout() {
   if (!me || !org) return null;
   return (
     <div className="min-h-screen pb-16">
+      <BandeauInfo orgId={org.id} />
       {me.impersonation && (
         <div role="status" className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-3 bg-warn-solid px-4 py-2 text-[13px] font-semibold text-white">
           <Eye className="h-4 w-4" /> Vous voyez VibeDélib en tant que <AgentName u={me.username} /> — vos actions sont faites avec ses droits et journalisées à votre nom.
@@ -92,7 +94,7 @@ export default function Layout() {
             <span className="leading-tight"><span className="block text-[16px] font-bold text-head">VibeDélib</span><span className="block text-[10px] uppercase tracking-wider text-mute">{org.nom}</span></span>
           </NavLink>
           <form data-tour="recherche" className="ml-auto flex min-w-0 max-w-sm flex-1 items-center rounded bg-soft px-3" onSubmit={(e) => { e.preventDefault(); nav(`/recherche?q=${encodeURIComponent(q)}`); }}>
-            <Search className="h-4 w-4 text-mute" /><input id="recherche-globale" aria-label="Rechercher un acte" title="Raccourci : /" className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher (raccourci /)…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Search className="h-4 w-4 text-mute" /><input id="recherche-globale" aria-label="Rechercher un acte" title="Raccourci clavier : touche /" className="w-full min-w-0 bg-transparent px-2 py-2 outline-none" placeholder="Rechercher un acte… (touche /)" value={q} onChange={(e) => setQ(e.target.value)} />
           </form>
           {me.organismes.length > 1 && (
             <Select aria-label="Organisme" className="input w-auto" value={org.id} onChange={(e) => { setOrg(Number(e.target.value)); nav('/'); }}>

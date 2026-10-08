@@ -11,9 +11,20 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.51.2';
+export const VERSION = '0.52.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.52.0', type: 'minor', titre: 'Sites autorisés à intégrer les pages publiques',
+    items: [
+      "Les sites qui peuvent intégrer les pages publiques (délibérations, arrêtés) ou lire leurs données se règlent dans Paramétrage, Mise à disposition et affichage : par défaut ivry94.fr et ses sous-domaines, et ivry.local.",
+      "Nouvel article d'aide « Raccourcis clavier » : la touche / place le curseur dans la recherche, Échap ferme les fenêtres, les flèches changent de document.",
+      "Bandeau d'information : le SCC et les administrateurs affichent un message rouge défilant à tous (agents et élus) entre deux dates, depuis Paramétrage, Bandeau d'information.",
+      "Visas et références : la bibliothèque est nourrie par l'historique des délibérations (références les plus citées, à faire vérifier par le juridique).",
+      "Contrôle de légalité : un bouton « Ouvrir S²LOW » mène à l'instance réglée dans Paramétrage, Télétransmission (test ou production).",
+      "Contrôle de légalité : l'écran reste utilisable quand le service S²LOW ne répond pas ou que le certificat est absent, au lieu de s'arrêter.",
+    ],
+  },
   {
     version: '0.51.2', type: 'patch', titre: "Reprendre la rédaction d'un dossier rappelé",
     items: [

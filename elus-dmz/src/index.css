@@ -151,3 +151,9 @@ aside nav::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.
 .doc-md li > p { margin: 0; }
 .doc-md strong { font-weight: 700; color: rgb(var(--c-ink)); }
 .doc-md > *:last-child { margin-bottom: 0; }
+
+/* Bandeau d'information : texte qui défile de droite à gauche, en pause au survol ; fixe si l'utilisateur réduit les animations. */
+@keyframes vd-defile { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.vd-bandeau-piste { display: inline-block; white-space: nowrap; padding-left: 100%; animation: vd-defile var(--vd-duree, 30s) linear infinite; }
+.vd-bandeau:hover .vd-bandeau-piste { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .vd-bandeau-piste { animation: none; padding-left: 0; white-space: normal; } }

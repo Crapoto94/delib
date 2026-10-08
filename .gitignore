@@ -41,3 +41,5 @@ elus-dmz/.env
 elus-dmz/public/api-docs/swagger-ui-bundle.js
 elus-dmz/public/api-docs/swagger-ui.css
 elus-dmz/public/api-docs/favicon-32x32.png
+# propositions de visas issues de l historique AIRS (scripts/visas-depuis-airs.js) : fichiers de travail, non versionnes
+backend/visas-candidats.*

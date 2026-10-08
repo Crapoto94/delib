@@ -43,7 +43,7 @@ Quatre pages nues, à incruster dans le site de la collectivité, et leurs pages
 | `/arretes` | `/arretes-code` | arrêtés signés des derniers mois, une rupture par mois, annexes |
 | `/arretes-recherche` | `/arretes-recherche-code` | moteur : texte de l'objet ou numéro, année, dates (sans limite de durée) |
 
-Le nginx ne relaie que `/api/v1/public/deliberations` et `/api/v1/public/arretes` (GET/HEAD, quota dédié) et autorise le cadrage de ces seules pages (`ELUS_FRAME_ANCESTORS`).
+Le nginx ne relaie que `/api/v1/public/deliberations` et `/api/v1/public/arretes` (GET/HEAD, quota dédié) et autorise le cadrage de ces seules pages. **Les sites autorisés à les intégrer** (iframe) **et à lire l'API publique** (script d'intégration) sont un réglage de Paramétrage › Mise à disposition et affichage (`publication.sites_autorises`, par défaut `ivry94.fr`, `*.ivry94.fr` et `*.ivry.local`) : le nginx les lit auprès du backend (`auth_request` sur `/_origines`, mis en cache 30 s ; seul ce site peut intégrer si l'information manque) et le backend répond le CORS. Rien à régler dans le `.env` de la DMZ. C'est une protection de navigateur : un programme qui appelle l'API directement lit les mêmes données publiques.
 Chaque publication est **désactivée par défaut** : elle s'active dans Paramétrage › Mise à disposition et affichage. Les liens de documents sont des jetons chiffrés (aucun numéro d'acte n'est exposé).
 
 ## Construire et lancer

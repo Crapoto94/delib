@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Download, FastForward, FileCode2, FileText, FlaskConical, Pencil, RefreshCw, Send, Stamp, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, ExternalLink, FastForward, FileCode2, FileText, FlaskConical, Pencil, RefreshCw, Send, Stamp, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api, errMsg, openPdf, org as orgPath } from '../api';
 import { useAuth } from '../auth';
@@ -54,6 +54,8 @@ export default function Teletransmission() {
   const tab$ = useLoad(async () => (await api.get(root('/tableau'))).data, [o]);
   const [rev, setRev] = useState(0); const bump = () => { setRev((n) => n + 1); tab$.reload(); };
   const sim = cfg.data?.mode === 'simulation';
+  // Lien vers l'instance S²LOW : l'adresse est celle réglée dans Paramétrage › Télétransmission (instance de test ou de production) ; jamais en simulation.
+  const urlS2low: string | null = (() => { const u = String(cfg.data?.connexionFournisseur?.url || '').trim(); try { return !sim && /^https?:$/.test(new URL(u).protocol) ? new URL(u).href : null; } catch { return null; } })();
 
   const act = async (key: string, fn: () => Promise<unknown>, ok: string) => { setBusy(key); try { await fn(); toast(ok); bump(); } catch (e) { toast(errMsg(e), 'ko'); } finally { setBusy(null); } };
   const suivre = () => act('suivi', () => api.post(root('/suivi')), 'Suivi effectué : statuts et documents à jour');
@@ -62,7 +64,7 @@ export default function Teletransmission() {
   const t = tab$.data;
   return (
     <div>
-      <PageTitle title="Contrôle de légalité" sub="Télétransmission des délibérations adoptées à la préfecture, via S²LOW." actions={<button className="btn-secondary" disabled={busy === 'suivi'} onClick={suivre}>{busy === 'suivi' ? <Spinner /> : <RefreshCw className="h-4 w-4" />} Interroger S²LOW</button>} />
+      <PageTitle title="Contrôle de légalité" sub="Télétransmission des délibérations adoptées à la préfecture, via S²LOW." actions={<>{urlS2low ? <a className="btn-secondary" href={urlS2low} target="_blank" rel="noopener noreferrer" title={`Ouvrir l’instance S²LOW (${cfg.data.mode === 'production' ? 'production' : 'test'}) : ${urlS2low}`}><ExternalLink className="h-4 w-4" /> Ouvrir S²LOW{cfg.data.mode === 'production' ? '' : ` (${cfg.data.mode})`}</a> : !sim && isAdmin ? <Link className="text-[12px] text-action underline" to="/admin/tdt">Renseigner l’adresse de S²LOW</Link> : null}<button className="btn-secondary" disabled={busy === 'suivi'} onClick={suivre}>{busy === 'suivi' ? <Spinner /> : <RefreshCw className="h-4 w-4" />} Interroger S²LOW</button></>} />
       {sim && (
         <div className="mb-4 flex items-start gap-3 rounded-lg border border-warn/40 bg-warn-bg p-3 text-[13px] text-warn" role="status">
           <FlaskConical className="mt-0.5 h-5 w-5 shrink-0" />

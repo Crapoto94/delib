@@ -2517,7 +2517,16 @@ Quatre pages **nues**, sans connexion, destinées à une iframe, et leurs pages 
 - **Moteur de recherche** : sans limite de durée. Délibérations : séance, rapporteur, thématique (rubrique), dates, texte du titre et/ou du corps. Arrêtés : texte de l'objet ou numéro,
   année, dates.
 - **nginx** (`elus-dmz/nginx.conf.template`) : seuls `/api/v1/public/deliberations` et `/api/v1/public/arretes` sont relayés (GET/HEAD, quota `pub`, CORS ouvert en lecture) ; le cadrage
-  est autorisé sur les quatre pages seulement (`ELUS_FRAME_ANCESTORS`, `*` par défaut) ; `/api-docs/` sert Swagger UI en local.
+  est autorisé sur les quatre pages seulement, pour les **sites autorisés** (réglage `publication.sites_autorises`, §38.3 bis) ; `/api-docs/` sert Swagger UI en local.
+
+### 38.3 bis Sites autorisés
+Réglage d'organisme `publication.sites_autorises` (Paramétrage › Mise à disposition et affichage) : une entrée par ligne — `https://ivry94.fr`, `https://*.ivry94.fr` (tous les sous-domaines, pas le domaine nu),
+`http://*.ivry.local` ; port facultatif ; défaut `ivry94.fr`, `*.ivry94.fr`, `*.ivry.local` (https et http pour `.local`). Deux usages, une seule liste (`backend/src/modules/publication/origines.service.js`) :
+- **iframe** : le nginx de la DMZ interroge le backend (`auth_request /_origines` → `GET /api/v1/public/publication/origines`, non relayé à l'extérieur), met la réponse en cache 30 s et pose
+  `frame-ancestors` avec la liste ; liste absente ou invalide → `'self'` (jamais « tous ») ;
+- **script d'intégration** : le backend répond `Access-Control-Allow-Origin` (et la pré-vérification `OPTIONS`) seulement pour une origine de la liste ; `Vary: Origin`.
+Les entrées invalides sont ignorées à la lecture (jamais recopiées dans un en-tête). Protection de **navigateur** : un programme qui appelle l'API publique lit les mêmes données publiques ; pour réserver l'accès,
+utiliser l'API à clé et sa liste d'adresses IP (§38.2).
 
 ### 38.4 Arrêtés « site »
 `actes.site` (migration 0086) marque les arrêtés repris du site internet de la Ville. Un déclencheur `BEFORE DELETE` ignore la suppression de ces lignes : un effacement général
@@ -2544,3 +2553,16 @@ en cas d'échec le dossier à moitié créé est supprimé. Pas de circuit, pas 
   une ré-indexation (Paramétrage › Recherche).
 - **Schémas de test** : les tests d'intégration créent un schéma `vibedelib_test_<8 hex>` dans la base ; un test interrompu le laisse. `node scripts/purge-schemas-test.js` liste (essai
   à blanc) puis, avec `--apply`, supprime ceux qui correspondent exactement au motif et ont plus de 15 minutes.
+
+### 38.7 Bandeau d'information
+Table `bandeaux_info` (migration 0087) : `message` (3 à 500 caractères), `debut`, `fin` (postérieure au début), `actif`. Un message est affiché si `actif` et si l'instant présent est entre `debut` et `fin` ; plusieurs messages défilent à la suite.
+- Agents : `GET /organismes/:orgId/bandeaux/actifs` (tout utilisateur), composant `frontend/src/BandeauInfo.tsx` en tête de page (rouge vif `#dc2626`, défilement `vd-defile`, pause au survol, texte fixe si `prefers-reduced-motion`), rafraîchi toutes les 5 minutes et au retour sur l'onglet.
+- Élus : `GET /api/v1/elus/bandeaux` (jeton d'élu), même composant dans `elus-dmz/src/BandeauInfo.tsx` ; la route fait partie des préfixes déjà relayés par la DMZ.
+- Administration (SCC et administrateur d'organisme) : `GET|POST|PUT|DELETE /organismes/:orgId/bandeaux`, écran Paramétrage › Bandeau d'information (aperçu, état programmé / affiché / terminé / désactivé). Chaque action est journalisée (`bandeau.creation|modification|suppression`).
+
+### 38.8 Visas et références nourris par l'historique
+`backend/scripts/visas-depuis-airs.js` : lit dans la base Oracle d'AIRS (lecture seule) la liste des PDF « Délibération » archivés (`FIC_PRIMAIRE`, `TFP_ID = 5`, `CTY_ID = 7`), les ouvre sur le partage de fichiers d'AIRS (monté sous Windows, réglage `airs.fichiers`),
+en extrait le texte des 8 premières pages (pdfjs), puis les paragraphes « vu … » (`backend/src/modules/ai/visas-historique.js` : minuscules ou majuscules, mots coupés par l'extraction recollés dans le vocabulaire juridique seulement, arrêt à la décision) et leurs références
+(`references.js`). Les références sont regroupées par clé de bibliothèque avec le nombre de délibérations, la période et la formulation la plus courte ; l'année vient de l'horodatage du nom de fichier AIRS. Essai par défaut (écrit `visas-candidats.json` et `.csv`, rien en base) ;
+`--importer --min N` crée les entrées manquantes de `visa_library` (`created_by = '@historique'`, **jamais vérifiées** : `verifie_le` vide, source « Historique des délibérations (AIRS) »), sans jamais modifier une entrée existante. Aucun fichier n'est stocké.
+Premier import (1 799 PDF lus, 719 références, 403 citées au moins 2 fois) : 56 entrées citées au moins 20 fois.

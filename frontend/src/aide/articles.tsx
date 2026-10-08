@@ -3,6 +3,7 @@ import { Article, Intro } from './ui';
 import { redaction } from './redaction';
 import { scc } from './scc';
 import { parametrage } from './parametrage';
+import { raccourcis } from './raccourcis';
 
 export const documents: Article = {
   code: 'documents',
@@ -19,7 +20,7 @@ export const documents: Article = {
   sections: [],
 };
 
-export const ARTICLES: Article[] = [redaction, scc, parametrage, documents];
+export const ARTICLES: Article[] = [redaction, scc, parametrage, raccourcis, documents];
 
 export function peutVoir(article: Article, isScc: boolean, isAdmin: boolean): boolean {
   if (article.acces === 'admin') return isAdmin;

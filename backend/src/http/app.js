@@ -56,6 +56,8 @@ const MODULES = [
   require('../modules/arretes-site/arretes-site.routes'),
   require('../modules/arretes-signes/arretes-signes.routes'),
   require('../modules/arretes-publics/arretes-publics.routes'),
+  require('../modules/publication/origines.routes'),
+  require('../modules/bandeaux/bandeaux.routes'),
   require('../modules/titulaires/organisation.routes'),
   require('../modules/organigramme/organigramme.routes'),
   require('../modules/convocations/convocations.routes'),
@@ -98,6 +100,21 @@ function createApp(c) {
   // tel quel ; il est posé APRÈS, donc seulement pour ce chemin, et le format du protocole garantit qu'il n'y a rien à
   // désamorcer (PutFile est le seul appel WOPI avec un corps, et il est binaire).
   app.use('/api/v1/public/bureau/wopi', express.raw({ type: '*/*', limit: '64mb' }));
+
+  // API publique lue depuis un navigateur (script d'intégration) : seuls les sites autorisés (réglage « sites autorisés ») reçoivent l'en-tête CORS.
+  // Protection de navigateur : le contenu est public, un programme qui appelle l'API directement le lit quand même.
+  app.use(['/api/v1/public/deliberations', '/api/v1/public/arretes'], async (req, res, next) => {
+    const origine = req.headers.origin;
+    if (origine) {
+      res.append('Vary', 'Origin');
+      if (c.origines.autorise(origine, await c.origines.liste())) {
+        res.setHeader('Access-Control-Allow-Origin', origine);
+        if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS'); res.setHeader('Access-Control-Max-Age', '600'); }
+      }
+    }
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    return next();
+  });
 
   const mw = createAuthMiddleware({ config, sessions: c.sessions, access: c.access, organismes: c.organismes });
   mw.authenticateElu = c.eluAuth.authenticate;

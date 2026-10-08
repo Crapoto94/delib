@@ -9,6 +9,16 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.52.0 — Sites autorisés à intégrer les pages publiques
+
+- **Sites autorisés** : un réglage de Paramétrage › Mise à disposition et affichage (`publication.sites_autorises`) fixe les sites qui peuvent **intégrer les pages publiques** (iframe) et **lire l'API publique avec le script d'intégration**. Par défaut : `ivry94.fr`, `*.ivry94.fr` et `*.ivry.local`. Plus rien à régler dans le `.env` de la DMZ (la variable `ELUS_FRAME_ANCESTORS` disparaît) : le nginx lit la liste auprès du backend (`auth_request`, cache 30 s) ; liste absente → seul le site lui-même peut intégrer. Le backend répond le CORS (et `OPTIONS`) seulement pour ces origines ; les entrées invalides sont ignorées. Protection de navigateur : l'API publique reste lisible par programme.
+- **Aide** : nouvel article « Raccourcis clavier » (touche `/` pour la recherche, `Échap`, flèches, listes, assistant) ; le champ de recherche dit « Rechercher un acte… (touche /) ».
+- **Contrôle de légalité — lien vers S²LOW** : bouton « Ouvrir S²LOW » (avec le mode, test ou production) vers l'instance réglée dans Paramétrage › Télétransmission, donc l'adresse de test ou de développement ; absent en simulation.
+- **Contrôle de légalité** : l'écran ne plante plus quand S²LOW est injoignable ou que le certificat client est absent — l'échec est affiché dans l'état de connexion, et l'écran de configuration reste utilisable pour le corriger.
+
+- **Bandeau d'information** : le SCC et les administrateurs définissent (Paramétrage › Bandeau d'information) un message avec une date de début et une date de fin, affiché à **tous les utilisateurs, agents et élus**, en **bandeau rouge défilant** en haut de l'écran (pause au survol, texte fixe si les animations sont réduites). Interrupteur « actif », plusieurs messages à la suite, journal d'audit — migration 0087.
+- **Visas et références — nourris par l'historique** : outil `scripts/visas-depuis-airs.js` qui lit les PDF « Délibération » des délibérations archivées d'AIRS (1 799, 2019-2023), en extrait les « vu… » (y compris les mots coupés par l'extraction PDF) et regroupe les références juridiques citées avec leur nombre de délibérations. 56 entrées citées au moins 20 fois créées dans la bibliothèque, **jamais vérifiées** : le juridique les contrôle à la source. Essai par défaut (aucune écriture), `--importer` pour créer ; une entrée déjà présente n'est jamais modifiée.
+
 ## 0.51.2 — Reprendre la rédaction d'un dossier rappelé
 
 - **« Reprendre la rédaction »** : un dossier rappelé du circuit peut être remis en brouillon par son rédacteur, l'administrateur ou le SCC (bouton du bandeau « Dossier rappelé », `POST /actes/:id/reprendre`). Il est alors à compléter puis à renvoyer au circuit ; le motif du rappel et la reprise restent au journal de l'acte.

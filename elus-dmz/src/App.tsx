@@ -18,6 +18,7 @@ import GroupePopover from './GroupePopover';
 import MonParapheur from './MonParapheur';
 import Instance from './Instance';
 import MiseAJour from './MiseAJour';
+import BandeauInfo from './BandeauInfo';
 
 const DevAnnot = import.meta.env.DEV ? lazy(() => import('./dev/DevAnnot')) : null;
 
@@ -32,6 +33,7 @@ function Cadre() {
   if (!session.token()) return <Navigate to="/connexion" replace />;
   return (
     <div className="min-h-screen bg-page">
+      <BandeauInfo />
       <header className="border-b border-primary-deep/40 bg-gradient-to-r from-nav-from to-nav-to text-white shadow-lift"><div className="accent-bar" aria-hidden="true" /><div className="flex h-14 items-center gap-3 px-4">
         <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Revenir à l’accueil" title="Revenir à l’accueil"><OrgLogo className="h-8" /><span className="hidden shrink-0 text-[13px] text-white/70 sm:inline">Espace élus</span></Link>
         {elu?.groupe && <GroupePopover groupe={elu.groupe} moi={elu.nom} delegation={elu.delegation} />}

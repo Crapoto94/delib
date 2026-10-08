@@ -26,6 +26,27 @@ function Periode({ label, hint, cle, v, set }: { label: string; hint: string; cl
   );
 }
 
+const SITES_DEFAUT = ['https://ivry94.fr', 'https://*.ivry94.fr', 'https://*.ivry.local', 'http://*.ivry.local'];
+const SITE = /^(https?):\/\/(\*\.)?[a-z0-9-]+(\.[a-z0-9-]+)*(:\d{1,5})?$/;
+
+/** Liste des sites autorisés (réglage `publication.sites_autorises`) : saisie libre, contrôle des entrées à l'enregistrement. */
+function SitesAutorises({ v, set }: { v: Reglage; set: Enregistrer }) {
+  const enregistre = String(v('publication.sites_autorises', '') || '');
+  const [texte, setTexte] = useState(enregistre || SITES_DEFAUT.join('\n'));
+  const entrees = texte.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const invalides = entrees.filter((e) => !SITE.test(e));
+  return (
+    <>
+      <textarea className="input h-32 font-mono text-[12px]" aria-label="Sites autorisés" value={texte} onChange={(e) => setTexte(e.target.value)} spellCheck={false} />
+      {invalides.length > 0 && <p role="alert" className="text-[12px] text-ko">Ignorées (format invalide) : {invalides.join(', ')}</p>}
+      <div className="flex gap-2">
+        <button className="btn-primary" disabled={texte.trim() === enregistre.trim() || (entrees.length > 0 && entrees.length === invalides.length)} onClick={() => set('publication.sites_autorises', entrees.filter((e) => SITE.test(e)).join('\n'), 'Sites autorisés enregistrés')}>Enregistrer</button>
+        <button className="btn-secondary" onClick={() => setTexte(SITES_DEFAUT.join('\n'))}>Valeurs par défaut</button>
+      </div>
+    </>
+  );
+}
+
 /** Arrêtés pris par le Maire repris du site de la Ville : état, lancement de la reprise, progression et erreurs. */
 function ArretesSite({ o, toast }: { o: number; toast: (m: string, t?: 'ok' | 'ko') => void }) {
   const d = useLoad(async () => (await api.get(orgPath(o, '/arretes-site'))).data, [o]);
@@ -95,6 +116,11 @@ export default function AdminMiseADisposition() {
             hint="<adresse de l’espace des élus>/arretes-recherche. Sans limite de durée : texte de l’objet ou numéro, année, dates." />
           <Periode label="Période affichée sur la page publique des arrêtés" cle="publication.arretes_mois" v={v} set={setSetting} hint="Arrêtés des N derniers mois." />
         </div>
+      </section>
+
+      <section className="card space-y-3 p-5"><h3>Sites autorisés à intégrer les pages publiques</h3>
+        <p className="text-[13px] text-mute">Seuls ces sites peuvent intégrer les pages publiques (iframe) et lire les données avec le script d'intégration. Une adresse par ligne : <code>https://ivry94.fr</code> (le site seul), <code>https://*.ivry94.fr</code> (tous ses sous-domaines, pas le domaine nu), <code>http://*.ivry.local</code>. Les adresses invalides sont ignorées. Vide : valeurs par défaut (ivry94.fr, *.ivry94.fr, *.ivry.local).</p>
+        <SitesAutorises v={v} set={setSetting} />
       </section>
 
       <ArretesSite o={o} toast={toast} />

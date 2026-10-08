@@ -73,6 +73,8 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     if (!f?.modes?.[cfg.mode]) throw E.conflict(`Le mode « ${cfg.mode} » de ${f?.nom || 'ce fournisseur'} n'est pas disponible.`);
   };
   /** Paramètres de connexion du fournisseur choisi (le mot de passe n'est jamais renvoyé). */
+  /** Appel au fournisseur dont l'échec ne doit pas faire échouer l'appelant : renvoie le repli. */
+  const sansEchec = async (f, repli) => { try { return await f(); } catch (e) { log?.warn?.({ err: e.message }, 'télétransmission : le fournisseur ne répond pas'); return repli(e); } };
   async function connexionDe(org, fournisseur) {
     const c = await settings.resolve(org); const k = (x) => c[`tdt.${fournisseur}.${x}`]?.value;
     return { url: String(k('url') || ''), utilisateur: String(k('utilisateur') || ''), motDePasseDefini: !!k('mot_de_passe') };
@@ -173,9 +175,13 @@ function createTeletransmission({ db, audit, render, tenue, settings, storage, b
     SCENARIOS, STATUS,
 
     // ------------------------------------------------------------------------------------------ paramètres
+    /**
+     * Paramètres de télétransmission. L'écran qui les affiche sert justement à CORRIGER un fournisseur injoignable ou un certificat absent : le dialogue avec le
+     * fournisseur (classification, test de connexion) ne doit donc jamais faire échouer la lecture — l'échec est rendu dans `connexion`.
+     */
     async config(organismeId) {
       const org = requireOrg(organismeId); const cfg = await cfgOf(org);
-      return { ...cfg, fournisseurs: tdt.liste().map((f) => ({ ...f, connexion: undefined })), connexionFournisseur: await connexionDe(org, cfg.fournisseur), scenarios: Object.entries(SCENARIOS).map(([code, s]) => ({ code, label: s.label })), classification: await ad(cfg).classification(org), connexion: await ad(cfg).testConnexion(org) };
+      return { ...cfg, fournisseurs: tdt.liste().map((f) => ({ ...f, connexion: undefined })), connexionFournisseur: await connexionDe(org, cfg.fournisseur), scenarios: Object.entries(SCENARIOS).map(([code, s]) => ({ code, label: s.label })), classification: await sansEchec(() => ad(cfg).classification(org), () => null), connexion: await sansEchec(() => ad(cfg).testConnexion(org), (e) => ({ ok: false, message: e.message })) };
     },
 
     /** Teste la connexion au fournisseur choisi (la simulation répond toujours ; le réel n'est pas encore ouvert). */
