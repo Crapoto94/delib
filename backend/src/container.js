@@ -217,7 +217,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   late.recherche = recherche;
   const alertes = createAlertes({ db, access, recherche, log, notifications, config });
   const apiKeys = createApiKeys({ db, audit, log });
-  const externe = createExterne({ db, render, storage, config });
+  const externe = createExterne({ db, render, storage, config, bibliotheque });
   const sauvegarde = createSauvegarde({ db, audit, config, log, transport: sauvegardeTransport });
   const airs = createAirs({ db, audit, dir, source: airsSource, ad, storage }); // import de l'historique AIRS DELIB (section 25 bis, D111)
   // collecteurs d'arrêtés : moisson mail Graph / dossier, analyse IA, envoi en signature (parapheur) — créé après le parapheur, la messagerie et l'IA.

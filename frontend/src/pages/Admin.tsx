@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ArrowLeftRight, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileSignature, FileText, GitBranch, HardDrive, Inbox, KeyRound, Landmark, ListPlus, Menu, Network, Paperclip, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Timer, Trash2, Upload, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Globe2, Bell, BookMarked, Building2, CalendarDays, ChevronDown, ChevronRight, DatabaseBackup, FileSignature, FileText, GitBranch, HardDrive, Inbox, KeyRound, Landmark, ListPlus, Menu, Network, Paperclip, RefreshCw, Scale, Search, Send, Settings2, ShieldCheck, Smartphone, Sparkles, Timer, Trash2, Upload, Users, type LucideIcon } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -12,6 +12,7 @@ import AdminParapheur from './AdminParapheur';
 import AdminMembres from './AdminMembres';
 import AdminSauvegarde from './AdminSauvegarde';
 import AdminCles from './AdminCles';
+import AdminMiseADisposition from './AdminMiseADisposition';
 import AdminRgpd from './AdminRgpd';
 import AdminVisas from './AdminVisas';
 import { AdminChamps, AdminConfiguration } from './AdminParametrage';
@@ -176,7 +177,8 @@ export function menu(isAdmin: boolean, plateforme: boolean, scc = false): Groupe
       { k: 'notifications', label: 'Notifications & relances', icon: Bell }, { k: 'ia', label: 'Assistant IA', icon: Sparkles },
       { k: 'visas', label: 'Visas et références', icon: BookMarked }] },
     { titre: 'Séances et élus', entrees: [
-      { k: 'elus', label: 'Élus', icon: Landmark }, { k: 'espace-elus', label: 'Espace élus', icon: Smartphone }] },
+      { k: 'elus', label: 'Élus', icon: Landmark }, { k: 'espace-elus', label: 'Espace élus', icon: Smartphone },
+      ...(isAdmin ? [{ k: 'mise-a-disposition', label: 'Mise à disposition et affichage', icon: Globe2 }] : [])] },
     { titre: 'Intégrations', entrees: [
       { k: 'tdt', label: 'Télétransmission (TDT)', icon: Send }, { k: 'ged', label: 'GED (Alfresco)', icon: HardDrive },
       ...(isAdmin || scc ? [{ k: 'parapheur', label: 'Parapheur (signature)', icon: FileSignature }] : []),
@@ -234,7 +236,7 @@ export default function Admin() {
         <Route index element={<Navigate to="utilisateurs" replace />} />
         <Route path="identite" element={<Identite />} /><Route path="ia" element={<AdminIa />} /><Route path="utilisateurs" element={<Utilisateurs />} /><Route path="gabarits" element={<Gabarits />} />
         <Route path="titulaires" element={<Titulaires />} /><Route path="organisation" element={<AdminOrganisation />} /><Route path="retroplanning" element={<AdminRetroplanning />} /><Route path="pieces-jointes" element={<AdminPieces />} /><Route path="circuits" element={<Circuits />} /><Route path="notifications" element={<Regles />} />
-        <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="parapheur" element={<AdminParapheur />} /><Route path="collecteurs" element={<AdminCollecteurs />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} />        <Route path="visas" element={<AdminVisas />} /><Route path="calendrier" element={<Calendrier />} /><Route path="import-airs" element={<AdminImportAirs />} />
+        <Route path="collectivites" element={<Collectivites />} /><Route path="sauvegarde" element={<AdminSauvegarde />} /><Route path="cles" element={<AdminCles />} /><Route path="elus" element={<AdminMembres />} /><Route path="espace-elus" element={<AdminElus />} /><Route path="mise-a-disposition" element={<AdminMiseADisposition />} /><Route path="ged" element={<AdminGed />} /><Route path="tdt" element={<AdminTdt />} /><Route path="parapheur" element={<AdminParapheur />} /><Route path="collecteurs" element={<AdminCollecteurs />} /><Route path="champs" element={<AdminChamps />} /><Route path="configuration" element={<AdminConfiguration />} /><Route path="recherche" element={<AdminRecherche />} /><Route path="rgpd" element={<AdminRgpd />} />        <Route path="visas" element={<AdminVisas />} /><Route path="calendrier" element={<Calendrier />} /><Route path="import-airs" element={<AdminImportAirs />} />
       </Routes>
         </div>
       </div>

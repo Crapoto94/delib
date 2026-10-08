@@ -76,9 +76,13 @@ module.exports = ({ makeRouter, externe, apiKeys, db, settings }) => {
   // Spécification publique : uniquement l'API externe (jamais les routes internes), pour le Swagger publié en DMZ.
   x.get('/openapi.json', { summary: 'Spécification OpenAPI de l’API externe (sans authentification)', tags: T, auth: false }, (req, res) => {
     const full = req.app.locals.spec;
-    const paths = Object.fromEntries(Object.entries(full.paths).filter(([k]) => k.startsWith('/api/v1/externe/')).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).filter(([, op]) => op.security?.length))]).filter(([, v]) => Object.keys(v).length));
+    // API externe (clé d'API, hors la spécification elle-même) + API publique des délibérations (sans authentification). Rien d'autre : jamais les routes internes.
+    const externe = ([k]) => k.startsWith('/api/v1/externe/');
+    const publique = ([k]) => k.startsWith('/api/v1/public/deliberations');
+    const paths = Object.fromEntries(Object.entries(full.paths).filter((e) => externe(e) || publique(e))
+      .map(([k, v]) => [k, Object.fromEntries(Object.entries(v).filter(([, op]) => (k.startsWith('/api/v1/public/') ? op.tags?.includes('publication') : op.security?.length)))]).filter(([, v]) => Object.keys(v).length));
     res.setHeader('Cache-Control', 'public, max-age=300');
-    res.json({ ...full, info: { title: 'VibeDélib — API publique des actes', version: full.info.version, description: 'Lecture seule des actes (liste, recherche, téléchargement). Authentification par clé d’API : en-tête `Authorization: Bearer vd_…` ou `X-API-Key`. Le périmètre (types, durée, contenus) est fixé par la clé.' }, servers: [{ url: '/' }], paths, tags: [{ name: T[0] }],
+    res.json({ ...full, info: { title: 'VibeDélib — API des actes et des délibérations publiques', version: full.info.version, description: 'Lecture seule des actes (liste, recherche, téléchargement). Authentification par clé d’API : en-tête `Authorization: Bearer vd_…` ou `X-API-Key`. Le périmètre (types, durée, contenus) est fixé par la clé.\n\nLa rubrique « publication » est l’API publique des délibérations exécutoires, **sans authentification** : liste des derniers mois, moteur de recherche (séance, rapporteur, thématique, dates, texte du titre et/ou du corps), extrait du registre et annexes publiables. Les liens renvoyés (`/f/{jeton}`) sont chiffrés et ne se devinent pas. Ces routes sont désactivées tant que l’administrateur ne les a pas activées (Paramétrage › Mise à disposition et affichage) ; jamais l’exposé des motifs.' }, servers: [{ url: '/' }], paths, tags: [{ name: T[0] }, { name: 'publication', description: 'API publique des délibérations exécutoires, sans authentification' }],
       components: { ...full.components, securitySchemes: { apiKeyAuth: full.components.securitySchemes.apiKeyAuth } } });
   });
 
@@ -86,24 +90,55 @@ module.exports = ({ makeRouter, externe, apiKeys, db, settings }) => {
   // Désactivée par défaut : l'administrateur l'active (réglage `publication.deliberations_actif`). Délibérations exécutoires seulement,
   // non confidentielles, annexes publiables seulement, jamais l'exposé des motifs. Organisme = organisme par défaut.
   const pub = makeRouter('/api/v1/public/deliberations');
-  const PubQ = z.object({ mois: z.coerce.number().int().min(1).max(24).optional(), page: z.coerce.number().int().min(1).max(10000).default(1), limit: z.coerce.number().int().min(1).max(50).default(10) });
+  const PubQ = z.object({ mois: z.coerce.number().int().min(1).max(1200).optional(), page: z.coerce.number().int().min(1).max(10000).default(1), limit: z.coerce.number().int().min(1).max(50).default(10) });
   const PubJeton = z.object({ jeton: z.string().min(20).max(300).regex(/^[A-Za-z0-9_-]+$/) });
-  const publication = async () => {
+  const reglages = async () => {
     const o = await db.get('SELECT id, nom FROM organismes WHERE is_default AND actif');
     const cfg = o ? await settings.resolve(o.id) : {};
-    if (!o || cfg['publication.deliberations_actif']?.value !== true) throw E.notFound('Publication non activée');
-    return { org: o, mois: Math.min(24, Math.max(1, Number(cfg['publication.deliberations_mois']?.value) || 6)) };
+    return { org: o, liste: !!o && cfg['publication.deliberations_actif']?.value === true, recherche: !!o && cfg['publication.recherche_actif']?.value === true,
+      mois: Math.min(1200, Math.max(1, Number(cfg['publication.deliberations_mois']?.value) || 6)) };
+  };
+  const publication = async () => {
+    const c = await reglages();
+    if (!c.liste) throw E.notFound('Publication non activée');
+    return { org: c.org, mois: c.mois };
+  };
+  // Moteur de recherche : sans limite de durée, activé séparément (réglage `publication.recherche_actif`).
+  const moteur = async () => {
+    const c = await reglages();
+    if (!c.recherche) throw E.notFound('Recherche non activée');
+    return c.org;
   };
   pub.get('/', { summary: 'Délibérations exécutoires des derniers mois (publiques), paginées, avec liens chiffrés vers le PDF et les annexes', tags: ['publication'], auth: false, query: PubQ,
-    description: '404 tant que la publication n’est pas activée par l’administrateur. `mois` ne dépasse jamais la durée réglée (24 au plus). Les liens sont des jetons chiffrés : aucun numéro d’acte n’est exposé.' },
+    description: '404 tant que la publication n’est pas activée par l’administrateur. `mois` ne dépasse jamais la durée réglée. Les liens sont des jetons chiffrés : aucun numéro d’acte n’est exposé.' },
   async (req, res) => {
     const { org, mois } = await publication(); const q = req.valid.query;
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.json({ organisme: org.nom, ...(await externe.publication(org.id, Math.min(mois, q.mois ?? mois), { limit: q.limit, offset: (q.page - 1) * q.limit })) });
   });
+  const Rech = z.object({
+    q: z.string().trim().min(2).max(200).optional().describe('Texte recherché (sans accents, insensible à la casse)'),
+    portee: z.enum(['titre', 'corps', 'tout']).default('titre').describe('Où chercher : le titre, le corps (visas et dispositif) ou les deux'),
+    seanceId: Id.optional().describe('Séance (liste : /recherche/filtres)'), rapporteurId: Id.optional().describe('Rapporteur (liste : /recherche/filtres)'),
+    thematique: z.string().trim().max(40).optional().describe('Thématique, code fourni par /recherche/filtres'),
+    dateDebut: z.iso.date().optional().describe('Séance à partir du jour indiqué (AAAA-MM-JJ)'), dateFin: z.iso.date().optional().describe('Séance jusqu’au jour indiqué inclus (AAAA-MM-JJ)'),
+    page: z.coerce.number().int().min(1).max(10000).default(1), limit: z.coerce.number().int().min(1).max(50).default(10),
+  });
+  pub.get('/recherche/filtres', { summary: 'Listes de choix du moteur de recherche : séances, rapporteurs, thématiques', tags: ['publication'], auth: false,
+    description: '404 tant que la recherche n’est pas activée. Délibérations exécutoires, sans limite de durée.' },
+  async (req, res) => { const org = await moteur(); res.setHeader('Cache-Control', 'public, max-age=300'); res.json(await externe.filtresPublics(org.id)); });
+  pub.get('/recherche', { summary: 'Moteur de recherche des délibérations exécutoires, sans limite de durée : séance, rapporteur, thématique, dates, texte du titre et/ou du corps', tags: ['publication'], auth: false, query: Rech,
+    description: 'Jamais l’exposé des motifs (ni dans les résultats, ni dans la recherche). Résultats paginés, liens chiffrés vers le PDF et les annexes publiables.' },
+  async (req, res) => {
+    const org = await moteur(); const { page, limit, thematique, ...f } = req.valid.query;
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.json({ organisme: org.nom, ...(await externe.publication(org.id, null, { limit, offset: (page - 1) * limit, filtres: { ...f, rubrique: thematique } })) });
+  });
   pub.get('/f/:jeton', { summary: 'Document (délibération ou annexe) désigné par un lien chiffré de la liste', tags: ['publication'], auth: false, params: PubJeton, responses: { 200: 'PDF' } }, async (req, res) => {
-    const { org, mois } = await publication();
-    const f = await externe.documentPublic(org.id, mois, req.valid.params.jeton);
+    const c = await reglages();
+    if (!c.liste && !c.recherche) throw E.notFound('Publication non activée');
+    // Le moteur de recherche publie sans limite de durée ; sinon, la fenêtre réglée pour la liste des derniers mois.
+    const f = await externe.documentPublic(c.org.id, c.recherche ? null : c.mois, req.valid.params.jeton);
     res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', `inline; filename="${String(f.name).replace(/[^\w.-]+/g, '_')}"`); res.setHeader('Cache-Control', 'public, max-age=300'); res.send(f.buffer);
   });
 

@@ -186,11 +186,11 @@ const estStaff = (ctx) => !!ctx?.isPlatformAdmin || (ctx?.roles || []).some((r) 
     },
 
     /** PDF consultable : exposé des motifs, délibération ou extrait du registre (avec le tampon de la préfecture quand l'AR est reçu). */
-    async pdf(ctx, organismeId, acteId, cible) {
+    async pdf(ctx, organismeId, acteId, cible, { journal = true } = {}) {
       const org = requireOrg(organismeId); const a = await eligible(org, acteId, estStaff(ctx));
       if (!a) throw E.notFound("Cet acte n'est pas dans la bibliothèque");
       const s = sys(ctx);
-      await audit.log(ctx, { organismeId: org, action: 'bibliotheque.pdf', entity: 'actes', entityId: a.id, after: { cible } });
+      if (journal) await audit.log(ctx, { organismeId: org, action: 'bibliotheque.pdf', entity: 'actes', entityId: a.id, after: { cible } });
       // Extrait du registre transmis au contrôle de légalité et acquitté : le document officiel est l'acte
       // TAMPONNÉ PAR S²LOW (récupéré auprès de S²LOW en mode réel ; repli local en simulation).
       if (cible === 'extrait' && tlt) { const t = await tlt.extraitTamponne(ctx, org, a.id).catch(() => null); if (t) return t; }

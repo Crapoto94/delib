@@ -17,7 +17,7 @@ const RESULTATS = { adopte_unanimite: 'Adoptée à l\'unanimité', adopte_majori
 const SYS = (org) => ({ username: 'api-externe', kind: 'system', isPlatformAdmin: true, organismes: [], roles: [], orgIds: [org], agent: null, displayName: 'API externe' });
 const categorieDe = (statut) => Object.entries(CATEGORIES).find(([, c]) => c.statuts.includes(statut))?.[0] || null;
 
-function createExterne({ db, render, storage, config }) {
+function createExterne({ db, render, storage, config, bibliotheque }) {
   const jetons = createJetons(config?.jwt?.secret);
   /** Catégories accessibles à la clé, d'après ses portées. */
   /** Contenus téléchargeables de la clé ; une clé ancienne (sans réglage) expose tout. */
@@ -38,7 +38,7 @@ function createExterne({ db, render, storage, config }) {
     LEFT JOIN LATERAL (SELECT max(x.ar_at) AS ar_at, max(x.sent_at) AS envoye_le FROM tlt_transactions x WHERE x.acte_id = a.id) tx ON true`;
 
   /** FROM commun aux listes de choix (type t, matière m, dernière séance d). */
-  const DEPUIS = `FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id LEFT JOIN ref_items m ON m.id = a.matiere_id
+  const DEPUIS = `FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id LEFT JOIN ref_items m ON m.id = a.matiere_id LEFT JOIN ref_items ru ON ru.id = a.rubrique_id
     LEFT JOIN LATERAL (SELECT it.numero, se.id AS seance_id, se.date_seance, i.nom AS instance_nom FROM seance_items it JOIN seances se ON se.id = it.seance_id JOIN instances i ON i.id = se.instance_id WHERE it.acte_id = a.id AND it.statut = 'a_traiter' ORDER BY se.date_seance DESC LIMIT 1) d ON true`;
 
   /** Annexes servies en PDF : le PDF de consultation déjà produit (Word converti), sinon le fichier s'il est lui-même un PDF. Aucune conversion à la demande. */
@@ -64,7 +64,7 @@ function createExterne({ db, render, storage, config }) {
       const p = [key.organismeId, cats.flatMap((c) => CATEGORIES[c].statuts)]; const add = (v) => { p.push(v); return `$${p.length}`; };
       const w = ['a.organisme_id = $1', "a.confidentialite = 'normale'", 'a.statut = ANY($2::text[])'];
       if (key.types?.length) w.push(`t.code = ANY(${add(key.types)}::text[])`);
-      w.push(`COALESCE(d.date_seance, a.created_at) >= now() - make_interval(months => ${add(key.dureeMois ?? 24)})`);
+      if (key.dureeMois !== null) w.push(`COALESCE(d.date_seance, a.created_at) >= now() - make_interval(months => ${add(key.dureeMois ?? 24)})`);
       return { p, w, add };
     },
     categories(key, categorie) {
@@ -81,6 +81,7 @@ function createExterne({ db, render, storage, config }) {
       if (f.type) w.push(`t.code = ${add(f.type)}`);
       if (f.matiere) w.push(`m.code = ${add(f.matiere)}`);
       if (f.rapporteurId) w.push(`a.rapporteur_id = ${add(f.rapporteurId)}`);
+      if (f.rubrique) w.push(`ru.code = ${add(f.rubrique)}`);
       if (f.dateDebut) w.push(`(COALESCE(d.date_seance, a.created_at) AT TIME ZONE 'Europe/Paris')::date >= ${add(f.dateDebut)}::date`);
       if (f.dateFin) w.push(`(COALESCE(d.date_seance, a.created_at) AT TIME ZONE 'Europe/Paris')::date <= ${add(f.dateFin)}::date`);
       if (f.motCle) {
@@ -88,10 +89,15 @@ function createExterne({ db, render, storage, config }) {
         w.push(`(EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(a.custom->'motsCles') = 'array' THEN a.custom->'motsCles' ELSE '[]'::jsonb END) k WHERE unaccent(lower(k)) = unaccent(lower(${mot})))
           OR unaccent(lower(COALESCE(m.libelle, ''))) = unaccent(lower(${mot})))`);
       }
-      // Recherche plein texte dans le titre (lexèmes français sans accents) ; à défaut, sous-chaîne sans accents ; n° de suivi ou n° de délibération exact.
+      // Recherche plein texte (lexèmes français sans accents ; à défaut, sous-chaîne sans accents). `portee` : titre (défaut), corps (visas et
+      // dispositif de la délibération : jamais l'exposé des motifs) ou tout. Le n° de suivi ou de délibération exact fonctionne dans le titre.
       if (f.q) {
+        const portee = f.portee || 'titre';
         const q = add(String(f.q).trim()); const like = add(`%${String(f.q).trim().replace(/[%_\\]/g, '\\$&')}%`);
-        w.push(`(to_tsvector('fr_unaccent', a.titre) @@ websearch_to_tsquery('fr_unaccent', ${q}) OR unaccent(a.titre) ILIKE unaccent(${like}) OR a.numero_suivi::text = ${q} OR d.numero = ${q})`);
+        const titre = `(to_tsvector('fr_unaccent', a.titre) @@ websearch_to_tsquery('fr_unaccent', ${q}) OR unaccent(a.titre) ILIKE unaccent(${like}) OR a.numero_suivi::text = ${q} OR d.numero = ${q})`;
+        const corps = `EXISTS (SELECT 1 FROM tracked_texts tt WHERE tt.acte_id = a.id AND tt.kind IN ('visas', 'dispositif')
+          AND (to_tsvector('fr_unaccent', tt.markdown) @@ websearch_to_tsquery('fr_unaccent', ${q}) OR unaccent(tt.markdown) ILIKE unaccent(${like})))`;
+        w.push(portee === 'corps' ? corps : portee === 'tout' ? `(${titre} OR ${corps})` : titre);
       }
       if (f.modifieDepuis) w.push(`a.updated_at >= ${add(f.modifieDepuis)}`);
       const where = w.join(' AND ');
@@ -128,13 +134,13 @@ function createExterne({ db, render, storage, config }) {
     // ------------------------------------------------------------------------------------------------ publication sans authentification (page publique de la DMZ)
     /** Clé « publique » interne : exécutoires seulement, acte et annexes publiables, JAMAIS l'exposé des motifs. Ne sort jamais du serveur. */
     clePublique(organismeId, mois) {
-      return { id: 0, nom: 'publication', organismeId, portees: ['actes:executoires'], types: [], dureeMois: Math.min(24, Math.max(1, Number(mois) || 6)), contenus: { acte: true, expose: false, annexes: true } };
+      return { id: 0, nom: 'publication', organismeId, portees: ['actes:executoires'], types: [], dureeMois: mois === null ? null : Math.min(1200, Math.max(1, Number(mois) || 6)), contenus: { acte: true, expose: false, annexes: true } };
     },
 
     /** Délibérations exécutoires des derniers mois, de la plus récente à la plus ancienne. Aucun identifiant interne : les liens sont des jetons chiffrés. */
-    async publication(organismeId, mois, { limit = 20, offset = 0 } = {}) {
+    async publication(organismeId, mois, { limit = 20, offset = 0, filtres = {} } = {}) {
       const key = svc.clePublique(organismeId, mois);
-      const l = await svc.lister(key, { categorie: 'executoires', tri: 'seance_desc', limit, offset });
+      const l = await svc.lister(key, { categorie: 'executoires', tri: 'seance_desc', limit, offset, ...filtres });
       const ids = l.items.map((i) => i.id);
       const annexes = ids.length ? await db.all(`${ANNEXES_PDF} WHERE x.acte_id = ANY($1::int[]) AND x.publiable AND ${SEUL_PDF} ORDER BY x.ordre, x.id`, [ids]) : [];
       const lien = (j) => `/api/v1/public/deliberations/f/${j}`;
@@ -149,12 +155,21 @@ function createExterne({ db, render, storage, config }) {
       };
     },
 
+    /** Listes de choix de la recherche publique (séances, rapporteurs, thématiques) : celles des délibérations exécutoires publiables, sans limite de durée. */
+    async filtresPublics(organismeId) {
+      const key = svc.clePublique(organismeId, null);
+      const [seances, rapporteurs] = await Promise.all([svc.seances(key, { categorie: 'executoires' }), svc.rapporteurs(key, { categorie: 'executoires' })]);
+      const { p, w } = svc.cadre(key, ['executoires']); w.push('ru.code IS NOT NULL');
+      const rub = await db.all(`SELECT ru.code, ru.libelle, count(*)::int AS nb ${DEPUIS} WHERE ${w.join(' AND ')} GROUP BY ru.code, ru.libelle ORDER BY ru.libelle`, p);
+      return { seances: seances.items.map((x) => ({ id: x.id, date: x.date, instance: x.instance })), rapporteurs: rapporteurs.items.map((x) => ({ id: x.id, nom: x.nom })), thematiques: rub.map((x) => ({ code: x.code, libelle: x.libelle })) };
+    },
+
     /** Document désigné par un lien public (jeton) : délibération ou annexe ; 404 si le jeton est invalide ou hors du périmètre publié. */
     async documentPublic(organismeId, mois, jeton) {
       const j = jetons.lire(jeton);
       if (!j) throw E.notFound('Document introuvable');
       const key = svc.clePublique(organismeId, mois);
-      return j.type === 'p' ? svc.pdf(key, j.acteId) : svc.annexe(key, j.acteId, j.annexeId);
+      return j.type === 'p' ? svc.extraitRegistre(key, j.acteId) : svc.annexe(key, j.acteId, j.annexeId);
     },
 
     /** Un acte : 404 s'il n'existe pas OU si la clé n'a pas le droit de le voir (on ne révèle pas son existence). */
@@ -162,7 +177,7 @@ function createExterne({ db, render, storage, config }) {
       const r = await db.get(`${SELECT} WHERE a.id = $1 AND a.organisme_id = $2 AND a.confidentialite = 'normale'`, [id, key.organismeId]);
       const cat = r && categorieDe(r.statut);
       const debut = new Date(); debut.setMonth(debut.getMonth() - (key.dureeMois ?? 24));
-      const horsPerimetre = r && ((key.types?.length && !key.types.includes(r.type_code)) || new Date(r.date_seance || r.created_at) < debut);
+      const horsPerimetre = r && ((key.types?.length && !key.types.includes(r.type_code)) || (key.dureeMois !== null && new Date(r.date_seance || r.created_at) < debut));
       if (!r || !cat || !permises(key).includes(cat) || horsPerimetre) throw E.notFound('Acte introuvable');
       return { r, cat };
     },
@@ -207,10 +222,14 @@ function createExterne({ db, render, storage, config }) {
         : await db.get('SELECT id FROM deliberations WHERE acte_id = $1 ORDER BY ordre, id LIMIT 1', [id]);
       if (!d) throw E.notFound('Délibération introuvable');
       const nom = `deliberation-${r.numero || r.numero_suivi}.pdf`;
-      // 1. le document signé revenu du parapheur ; 2. le PDF de la délibération déjà figé ; 3. le document source joint (PDF).
+      // 1. le document signé revenu du parapheur ; 2. le PDF transmis à la préfecture ; 3. le PDF déjà figé ; 4. le document source joint (PDF).
       // Aucune conversion Word -> PDF à la demande : ce qui est publié est le document déjà produit.
       const signe = await render.documentSigne(r.organisme_id, id).catch(() => null);
       if (signe) return { buffer: signe.buffer, name: nom };
+      // Le PDF de la délibération tel que transmis au contrôle de légalité (acte exécutoire : c'est le document envoyé à la préfecture).
+      const transmis = await db.get(`SELECT f.storage_key FROM tlt_transactions t JOIN files f ON f.id = t.file_id
+        WHERE t.acte_id = $1 AND t.etat <> 'annule' AND f.mime = 'application/pdf' ORDER BY (t.ar_at IS NOT NULL) DESC, t.id DESC LIMIT 1`, [id]);
+      if (transmis) return { buffer: await storage.get(transmis.storage_key), name: nom };
       const fige = await db.get(`SELECT f.storage_key FROM actes_documents_figes g JOIN files f ON f.id = g.file_id
         WHERE g.acte_id = $1 AND g.cible = 'deliberation' AND g.deliberation_id IS NOT DISTINCT FROM $2 ORDER BY g.id DESC LIMIT 1`, [id, d.id]);
       if (fige) return { buffer: await storage.get(fige.storage_key), name: nom };
@@ -221,6 +240,20 @@ function createExterne({ db, render, storage, config }) {
         const out = await render.renderActe(SYS(r.organisme_id), r.organisme_id, id, { cible: 'deliberation', deliberationId: d.id, mode: 'propre', watermark: '' });
         return { buffer: out.buffer, name: nom };
       } catch (e) { throw E.notFound('Document non disponible'); }
+    },
+
+    /**
+     * Document public d'une délibération : l'EXTRAIT DU REGISTRE (avec le tampon de la préfecture quand l'accusé de réception est reçu,
+     * ou le document officiel retourné par S²LOW) tel que le produit la bibliothèque. À défaut (aucun extrait possible), le PDF de la délibération.
+     */
+    async extraitRegistre(key, id) {
+      const { r, cat } = await svc.charger(key, id);
+      if (!CATEGORIES[cat].contenu) throw E.forbidden('Le document n\'est pas disponible pour un acte en cours de rédaction');
+      if (!contenus(key).acte) throw E.forbidden('Cette clé n\'a pas le droit de télécharger l\'acte');
+      try {
+        const out = await bibliotheque.pdf(SYS(r.organisme_id), r.organisme_id, id, 'extrait', { journal: false });
+        return { buffer: out.buffer, name: `extrait-registre-${r.numero || r.numero_suivi}.pdf` };
+      } catch { return svc.pdf(key, id); }
     },
 
     /** Annexe publiable d'un acte exécutoire ou adopté. */

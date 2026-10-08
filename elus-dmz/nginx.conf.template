@@ -61,6 +61,7 @@ server {
   # quota dédié (la génération d'un PDF coûte) ; aucun autre chemin /api/v1/public/ n'est relayé.
   location ^~ /api/v1/public/deliberations {
     limit_except GET HEAD { deny all; }
+    add_header Access-Control-Allow-Origin "*" always;   # lecture publique depuis le site qui intègre deliberations-widget.js
     limit_req zone=pub burst=20 nodelay;
     proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT};
     proxy_connect_timeout 5s;
@@ -71,7 +72,7 @@ server {
   # Page publique des délibérations, faite pour être incrustée dans un autre site (iframe) : seul endroit où le cadrage est permis.
   # FRAME_ANCESTORS (compose : ELUS_FRAME_ANCESTORS) liste les sites autorisés à l'incruster (« * » par défaut : contenu public).
   # Les en-têtes de sécurité du serveur sont répétés ici (add_header d'un bloc remplace ceux hérités), sans X-Frame-Options.
-  location = /deliberations {
+  location ~ ^/deliberations(-recherche)?$ {
     root /usr/share/nginx/html;
     try_files /index.html =404;
     add_header Cache-Control "no-cache" always;
