@@ -46,6 +46,13 @@ module.exports = ({ makeRouter, visas, ai }) => {
     description: "CSV : en-tête `cle;type;code;article;intitule;statut;date_debut;date_fin;verifie_le;source`. Renvoie le nombre d'entrées créées et mises à jour, et les lignes en erreur (les autres sont importées)." },
   async (req, res) => res.json(await visas.importer(req.ctx, req.org.id, req.valid.body)));
 
+  // règles issues de l'usage constaté dans l'historique (déclarées avant « /:id »)
+  r.get('/controles/historique', { summary: "Règles de contrôle proposées d'après l'usage constaté dans l'historique des délibérations (visa habituel)", tags: T, org: true, roles: ECRITURE, params: OrgP,
+    description: 'Un visa cité dans au moins 50 % des délibérations est « habituel » ; à 80 % et plus son absence est « à revoir », sinon « information ». Aucune règle de droit posée de mémoire.' },
+  async (req, res) => res.json(await visas.reglesHistorique(req.org.id)));
+  r.post('/controles/historique', { summary: "Crée les règles de contrôle issues de l'historique (celles qui n'existent pas déjà)", tags: T, org: true, roles: ECRITURE, params: OrgP, body: z.object({ cles: z.array(z.string().max(120)).max(500).optional() }).optional(), responses: { 201: 'Créées' } },
+    async (req, res) => res.status(201).json(await visas.creerReglesHistorique(req.ctx, req.org.id, req.valid.body || {})));
+
   // listes de contrôle (déclarées avant « /:id » pour ne pas être prises pour un identifiant)
   r.get('/controles', { summary: "Listes de contrôle : visas et mentions attendus par type d'acte et matière", tags: T, org: true, params: OrgP },
     async (req, res) => res.json({ items: await visas.controles(req.org.id) }));
@@ -56,6 +63,14 @@ module.exports = ({ makeRouter, visas, ai }) => {
   r.delete('/controles/:id', { summary: 'Supprime une règle de contrôle', tags: T, org: true, roles: ECRITURE, params: IdP },
     async (req, res) => res.json(await visas.supprimerControle(req.ctx, req.org.id, req.valid.params.id)));
 
+  r.put('/:id/fiche', { summary: "Saisit la description et l'emploi d'un texte (service juridique)", tags: T, org: true, roles: ECRITURE, params: IdP, body: z.object({ description: z.string().max(1500).nullable().optional(), emploi: z.string().max(1500).nullable().optional() }) },
+    async (req, res) => res.json(await visas.redigerFiche(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
+  r.post('/:id/description-ia', { summary: "Description et emploi du texte rédigés par l'IA (marqués « IA », à relire)", tags: T, org: true, roles: ECRITURE, params: IdP,
+    description: "Appuyée sur l'usage constaté dans l'historique ; ne se prononce jamais sur l'état en vigueur. Usage désactivable (Paramétrage › Assistant IA)." },
+  async (req, res) => res.json(await visas.decrireParIA(req.ctx, req.org.id, req.valid.params.id)));
+  r.post('/:id/verification-ia', { summary: "Vérification de COHÉRENCE de l'entrée par l'IA (le « bonbon » : cohérente / à revoir)", tags: T, org: true, roles: ECRITURE, params: IdP,
+    description: "Clé, type, code, article, intitulé. Ne remplace pas la vérification à la source du juridique (« Vérifié aujourd'hui »)." },
+  async (req, res) => res.json(await visas.verifierParIA(req.ctx, req.org.id, req.valid.params.id)));
   r.put('/:id', { summary: 'Modifie une entrée ; le passage à « abrogé » ou « modifié » prévient les rédacteurs des actes en cours qui la citent', tags: T, org: true, roles: ECRITURE, params: IdP, body: EntreeMaj },
     async (req, res) => res.json(await visas.update(req.ctx, req.org.id, req.valid.params.id, req.valid.body)));
   r.delete('/:id', { summary: 'Supprime une entrée', tags: T, org: true, roles: ECRITURE, params: IdP },

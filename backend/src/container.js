@@ -180,7 +180,7 @@ function buildContainer({ config, log, db, ad, directoryAdapter, mail, ai: aiAda
   const convocations = createConvocations({ db, audit, render, odj, seances, storage, mail, settings, config, log, dir });
   const aiQueue = createAiQueue({ db, settings, access, bus, log });
   const aiPrompts = createPrompts({ settings, ai: aiAdapter, log });
-  const visas = createVisas({ db, audit, actes, settings, log });
+  const visas = createVisas({ db, audit, actes, settings, log, ai: aiAdapter, prompts: aiPrompts });
   const ai = createAi({ db, audit, ai: aiAdapter, actes, textes, acl, log, queue: aiQueue, prompts: aiPrompts, visas, late });
   const users = createUsers({ db, audit, dir, organismes, access, log, settings, acl });
   const delegations = createDelegations({ db, audit, access, titulaires, dir, bus });

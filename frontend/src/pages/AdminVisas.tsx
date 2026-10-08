@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BadgeCheck, Pencil, Plus, Trash2, Upload, Users } from 'lucide-react';
+import { BadgeCheck, BookOpen, Pencil, Plus, Sparkles, Trash2, Upload, Users } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -63,6 +63,91 @@ function Importer({ onClose, onDone }: { onClose: () => void; onDone: () => void
   );
 }
 
+/** « Bonbon » : pastille de la vérification de cohérence par l'IA (verte : cohérente, orange : à revoir, grise : pas encore vérifiée). Ne vaut jamais vérification à la source. */
+function Bonbon({ e, onClick, busy }: { e: any; onClick?: () => void; busy?: boolean }) {
+  const etat = e.ia?.etat as string | null;
+  const style = etat === 'coherent' ? 'bg-ok-solid' : etat === 'a_revoir' ? 'bg-warn-solid' : 'bg-slate-300';
+  const titre = etat === 'coherent' ? `Cohérente selon l’IA (${jour(e.ia.le)}) — ne vaut pas vérification à la source` : etat === 'a_revoir' ? `À revoir selon l’IA : ${e.ia.avis ?? ''}` : 'Pas encore vérifiée par l’IA — cliquer pour lancer';
+  return (
+    <button type="button" className="inline-flex items-center gap-1 rounded-full px-1.5 py-1 hover:bg-slate-100" title={titre} aria-label={`Vérification IA de ${e.cle} : ${etat === 'coherent' ? 'cohérente' : etat === 'a_revoir' ? 'à revoir' : 'non faite'}`} disabled={busy || !onClick} onClick={onClick}>
+      {busy ? <Spinner /> : <span className={`h-3.5 w-3.5 rounded-full ${style} shadow-inner ring-2 ring-white`} />}
+      <span className="text-[11px] font-semibold text-mute">IA</span>
+    </button>
+  );
+}
+
+/** Fiche d'un texte : ce qu'il est, quand le viser, usage constaté dans l'historique, verdict de l'IA. */
+function FicheTexte({ entree, onClose, onChanged }: { entree: any; onClose: () => void; onChanged: () => void }) {
+  const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
+  const [e, setE] = useState<any>(entree); const [busy, setBusy] = useState<string | null>(null);
+  const [description, setDescription] = useState<string>(entree.description ?? ''); const [emploi, setEmploi] = useState<string>(entree.emploi ?? '');
+  const u = e.usage || {}; const part = u.total ? Math.round((e.citations / u.total) * 100) : null;
+  const appel = async (cle: string, fn: () => Promise<any>, ok: string) => {
+    setBusy(cle);
+    try { const r = (await fn()).data; setE(r); setDescription(r.description ?? ''); setEmploi(r.emploi ?? ''); onChanged(); toast(r.propose === false ? r.message : ok); } catch (x) { toast(errMsg(x), 'ko'); } finally { setBusy(null); }
+  };
+  return (
+    <Modal title={<span>{e.intitule} <code className="text-[12px] font-normal text-mute">{e.cle}</code></span>} onClose={onClose} wide>
+      <div className="space-y-4">
+        <section className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3>Ce texte</h3>
+            <button className="btn-secondary !py-1" disabled={!!busy} onClick={() => appel('desc', () => api.post(orgPath(o, `/visas/${e.id}/description-ia`)), 'Description rédigée par l’IA — à relire')}>{busy === 'desc' ? <Spinner /> : <Sparkles className="h-4 w-4" />} Décrire par l’IA</button></div>
+          <label className="block"><span className="label">Description</span><textarea className="input h-20" value={description} maxLength={1500} onChange={(x) => setDescription(x.target.value)} placeholder="Ce qu’est ce texte, en une ou deux phrases." /></label>
+          {e.descriptionPar === 'ia' && <p className="text-[12px] text-warn">Rédigée par l’IA : à relire par le juridique avant de s’y fier. Elle ne dit rien de l’état en vigueur.</p>}
+          <label className="block"><span className="label">Quand le viser (emploi)</span><textarea className="input h-20" value={emploi} maxLength={1500} onChange={(x) => setEmploi(x.target.value)} placeholder="Dans quels cas une délibération doit le citer." /></label>
+          <div className="flex justify-end"><button className="btn-primary !py-1" disabled={!!busy || (description === (e.description ?? '') && emploi === (e.emploi ?? ''))}
+            onClick={() => appel('fiche', () => api.put(orgPath(o, `/visas/${e.id}/fiche`), { description: description || null, emploi: emploi || null }), 'Fiche enregistrée')}>{busy === 'fiche' && <Spinner />} Enregistrer ma rédaction</button></div>
+        </section>
+
+        <section className="space-y-1 rounded border border-line bg-soft p-3 text-[13px]"><h3>Usage constaté dans l’historique</h3>
+          {e.citations > 0 ? (
+            <>
+              <p>Cité dans <b>{e.citations}</b> délibération{e.citations > 1 ? 's' : ''}{part !== null && <> sur {u.total} (<b>{part} %</b>)</>}{e.citeDe && <>, de {e.citeDe} à {e.citeA}</>}.</p>
+              {u.rubriques?.length > 0 && <p>Surtout dans les rubriques : {u.rubriques.map((r: any) => `${r.libelle} (${r.n})`).join(', ')}.</p>}
+              {u.formulation && <p className="italic text-mute">Formulation habituelle : « {u.formulation} »</p>}
+            </>
+          ) : <p className="text-mute">Aucune citation relevée dans l’historique des délibérations.</p>}
+        </section>
+
+        <section className="space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2">Vérification par l’IA <Bonbon e={e} /></h3>
+          <button className="btn-secondary !py-1" disabled={!!busy} onClick={() => appel('verif', () => api.post(orgPath(o, `/visas/${e.id}/verification-ia`)), 'Vérification faite')}>{busy === 'verif' ? <Spinner /> : <Sparkles className="h-4 w-4" />} Vérifier par l’IA</button></div>
+          {e.ia?.etat ? (
+            <p className={`rounded px-3 py-2 text-[13px] ${e.ia.etat === 'coherent' ? 'bg-ok-bg text-ok-text' : 'bg-warn-bg text-warn'}`}>
+              {e.ia.etat === 'coherent' ? 'Entrée cohérente (clé, type, article, intitulé).' : 'À revoir :'} <span className="whitespace-pre-line">{e.ia.avis}</span>
+              <span className="block text-[11px] text-mute">le {jour(e.ia.le)}{e.ia.modele ? ` · ${e.ia.modele}` : ''}</span>
+            </p>) : <p className="text-[13px] text-mute">Pas encore vérifiée.</p>}
+          <p className="text-[12px] text-mute">L’IA contrôle seulement la cohérence de l’entrée. Elle ne se prononce jamais sur l’état en vigueur du texte : c’est la vérification à la source du juridique (« Vérifié aujourd’hui ») qui fait foi.</p>
+        </section>
+        <div className="flex justify-end"><button className="btn-secondary" onClick={onClose}>Fermer</button></div>
+      </div>
+      {node}
+    </Modal>
+  );
+}
+
+/** Règles de contrôle issues de l'usage constaté : un visa cité dans la moitié des délibérations ou plus est « habituel ». */
+function ReglesHistorique({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const { org } = useAuth(); const o = org!.id;
+  const d = useLoad(async () => (await api.get(orgPath(o, '/visas/controles/historique'))).data, [o]);
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null); const [res, setRes] = useState<any>(null);
+  const aCreer = (d.data?.items ?? []).filter((i: any) => !i.existe);
+  const creer = async () => { setBusy(true); setErr(null); try { setRes((await api.post(orgPath(o, '/visas/controles/historique'))).data); onDone(); d.reload(); } catch (x) { setErr(errMsg(x)); } finally { setBusy(false); } };
+  return (
+    <Modal title="Règles issues de l’historique" onClose={onClose} wide>
+      <div className="space-y-3">
+        <ErrorBox msg={err} />
+        <p className="text-[13px] text-mute">Un visa cité dans <b>au moins la moitié</b> des délibérations de l’historique est un visa <b>habituel</b>. À <b>80 % et plus</b>, son absence est signalée « à revoir » ; en dessous, « information ». Ces règles s’appliquent aux <b>délibérations</b> et reprennent l’usage constaté : le juridique les ajuste (type d’acte, matière, gravité) ou les supprime.</p>
+        {d.loading && !d.data ? <Loading /> : !d.data?.items?.length ? <Empty>{d.data?.total ? 'Aucun visa n’atteint 50 % des délibérations.' : 'Aucun historique n’a encore alimenté la bibliothèque (outil « visas-depuis-airs »).'}</Empty> : (
+          <table className="w-full"><thead><tr><th>Visa</th><th>Cité dans</th><th>Si absent</th><th /></tr></thead><tbody>{d.data.items.map((i: any) => (
+            <tr key={i.cle}><td><div className="font-semibold">{i.intitule}</div><div className="font-mono text-[11px] text-mute">{i.cle}</div></td><td>{i.pourcentage} % <span className="text-[12px] text-mute">({i.citations} / {d.data.total})</span></td>
+              <td><Badge tone={GRAVITE[i.gravite].tone}>{GRAVITE[i.gravite].label}</Badge></td><td>{i.existe && <Badge tone="ok">Règle existante</Badge>}</td></tr>))}</tbody></table>)}
+        {res && <p className="rounded bg-ok-bg px-3 py-2 text-[13px] text-ok-text"><b>{res.crees}</b> règle(s) créée(s){res.dejaPresentes > 0 && `, ${res.dejaPresentes} déjà présente(s)`}.</p>}
+        <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={onClose}>Fermer</button><button className="btn-primary" disabled={busy || !aCreer.length} onClick={creer}>{busy && <Spinner />} Créer {aCreer.length || ''} règle{aCreer.length > 1 ? 's' : ''}</button></div>
+      </div>
+    </Modal>
+  );
+}
+
 function Concernes({ entree, onClose }: { entree: any; onClose: () => void }) {
   const { org } = useAuth(); const o = org!.id;
   const d = useLoad(async () => (await api.get(orgPath(o, `/visas/${entree.id}/actes-concernes`))).data.items as any[], [entree.id]);
@@ -79,23 +164,35 @@ function Bibliotheque() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const [q, setQ] = useState(''); const [statut, setStatut] = useState('');
   const d = useLoad(async () => (await api.get(orgPath(o, '/visas'), { params: { q: q || undefined, statut: statut || undefined } })).data.items as any[], [o, q, statut]);
-  const [edit, setEdit] = useState<any | 'nouvelle' | null>(null); const [imp, setImp] = useState(false); const [conc, setConc] = useState<any | null>(null);
+  const [edit, setEdit] = useState<any | 'nouvelle' | null>(null); const [imp, setImp] = useState(false); const [conc, setConc] = useState<any | null>(null); const [fiche, setFiche] = useState<any | null>(null);
+  const [verif, setVerif] = useState<number | null>(null); const [lot, setLot] = useState<{ fait: number; total: number; quoi: string } | null>(null);
+  /** Applique une action IA à chaque texte qui n'en a pas encore bénéficié, un par un (l'IA répond en quelques secondes) ; une erreur arrête le lot. */
+  const enLot = async (quoi: 'verification' | 'description') => {
+    const cibles = (d.data ?? []).filter((e) => (quoi === 'verification' ? !e.ia?.etat : !e.description));
+    if (!cibles.length) { toast(quoi === 'verification' ? 'Tous les textes ont déjà été vérifiés par l’IA' : 'Tous les textes ont déjà une description'); return; }
+    if (!window.confirm(`${quoi === 'verification' ? 'Faire vérifier' : 'Faire décrire'} ${cibles.length} texte(s) par l’IA, un par un ?`)) return;
+    setLot({ fait: 0, total: cibles.length, quoi });
+    try { for (let i = 0; i < cibles.length; i++) { await api.post(orgPath(o, `/visas/${cibles[i].id}/${quoi === 'verification' ? 'verification-ia' : 'description-ia'}`)); setLot({ fait: i + 1, total: cibles.length, quoi }); } toast('Terminé'); }
+    catch (x) { toast(errMsg(x), 'ko'); } finally { setLot(null); d.reload(); }
+  };
   const agir = async (fn: () => Promise<any>, ok: string) => { try { await fn(); toast(ok); d.reload(); } catch (e) { toast(errMsg(e), 'ko'); } };
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <input className="input max-w-xs" placeholder="Rechercher (clé, intitulé)…" aria-label="Rechercher" value={q} onChange={(e) => setQ(e.target.value)} />
         <Select className="input w-auto" aria-label="Statut" value={statut} onChange={(e) => setStatut(e.target.value)}><option value="">Tous les statuts</option>{Object.entries(STATUT).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select>
-        <span className="ml-auto flex gap-2"><button className="btn-secondary" onClick={() => setImp(true)}><Upload className="h-4 w-4" /> Importer</button><button className="btn-primary" onClick={() => setEdit('nouvelle')}><Plus className="h-4 w-4" /> Ajouter un texte</button></span>
+        <span className="ml-auto flex flex-wrap gap-2"><button className="btn-secondary" disabled={!!lot} onClick={() => enLot('verification')} title="Vérifie la cohérence de chaque texte pas encore vérifié par l’IA"><Sparkles className="h-4 w-4" /> Vérifier par l’IA</button><button className="btn-secondary" disabled={!!lot} onClick={() => enLot('description')} title="Rédige la description des textes qui n’en ont pas (à relire)"><BookOpen className="h-4 w-4" /> Décrire par l’IA</button><button className="btn-secondary" onClick={() => setImp(true)}><Upload className="h-4 w-4" /> Importer</button><button className="btn-primary" onClick={() => setEdit('nouvelle')}><Plus className="h-4 w-4" /> Ajouter un texte</button></span>
       </div>
+      {lot && <p role="status" className="rounded bg-action/10 px-3 py-2 text-[13px]"><Spinner /> {lot.quoi === 'verification' ? 'Vérification' : 'Description'} par l’IA : {lot.fait} / {lot.total}…</p>}
       <div className="card overflow-x-auto">
         {d.loading && !d.data ? <Loading /> : !d.data?.length ? <Empty>{q || statut ? 'Aucun texte ne correspond.' : 'La bibliothèque est vide : ajoutez les textes que vos délibérations visent habituellement (ou importez-les). Tant qu\'elle est vide, les références ne peuvent pas être vérifiées.'}</Empty> : (
-          <table className="w-full"><thead><tr><th>Texte</th><th>Type</th><th>Statut</th><th>Validité</th><th>Dernière vérification</th><th /></tr></thead><tbody>{d.data.map((e) => (
+          <table className="w-full"><thead><tr><th>Texte</th><th>Type</th><th>Statut</th><th>Cité</th><th>IA</th><th>Dernière vérification</th><th /></tr></thead><tbody>{d.data.map((e) => (
             <tr key={e.id}>
-              <td><div className="font-semibold">{e.intitule}</div><div className="font-mono text-[11px] text-mute">{e.cle}{e.source ? ` · ${e.source}` : ''}</div></td>
+              <td><button type="button" className="text-left font-semibold text-action hover:underline" onClick={() => setFiche(e)}>{e.intitule}</button><div className="font-mono text-[11px] text-mute">{e.cle}{e.source ? ` · ${e.source}` : ''}</div>{e.description && <div className="mt-0.5 max-w-md text-[12px] text-slate-600">{e.description}{e.descriptionPar === 'ia' && <span className="text-warn"> (IA, à relire)</span>}</div>}</td>
               <td>{TYPE[e.type] ?? e.type}</td>
               <td><Badge tone={STATUT[e.statut].tone}>{STATUT[e.statut].label}</Badge></td>
-              <td className="text-[12px]">{e.dateDebut || e.dateFin ? `${jour(e.dateDebut)} → ${e.dateFin ? jour(e.dateFin) : 'sans fin'}` : '—'}</td>
+              <td className="whitespace-nowrap text-[12px]">{e.citations > 0 ? <><b>{e.citations}</b> délib.{e.citeDe && <div className="text-mute">{e.citeDe}–{e.citeA}</div>}</> : '—'}</td>
+              <td><Bonbon e={e} busy={verif === e.id} onClick={async () => { setVerif(e.id); try { await api.post(orgPath(o, `/visas/${e.id}/verification-ia`)); d.reload(); } catch (x) { toast(errMsg(x), 'ko'); } finally { setVerif(null); } }} /></td>
               <td className="text-[12px]">{e.verifieLe ? <>{jour(e.verifieLe)}{e.verifiePar && <div className="text-mute">par <AgentName u={e.verifiePar} /></div>}</> : <span className="text-warn">jamais vérifié</span>}</td>
               <td className="whitespace-nowrap text-right">
                 <button className="rounded p-2 hover:bg-slate-100" title="Vérifié aujourd'hui" aria-label={`Marquer ${e.cle} vérifié aujourd'hui`} onClick={() => agir(() => api.post(orgPath(o, `/visas/${e.id}/verification`), {}), 'Marqué comme vérifié aujourd’hui')}><BadgeCheck className="h-4 w-4 text-ok" /></button>
@@ -108,6 +205,7 @@ function Bibliotheque() {
       {edit && <FormEntree entree={edit === 'nouvelle' ? null : edit} onClose={() => setEdit(null)} onSaved={(r) => { setEdit(null); d.reload(); toast(r?.veille?.actesConcernes ? `Enregistré — ${r.veille.actesConcernes} rédacteur(s) prévenu(s)` : 'Enregistré'); }} />}
       {imp && <Importer onClose={() => setImp(false)} onDone={d.reload} />}
       {conc && <Concernes entree={conc} onClose={() => setConc(null)} />}
+      {fiche && <FicheTexte entree={fiche} onClose={() => setFiche(null)} onChanged={d.reload} />}
       {node}
     </div>
   );
@@ -156,13 +254,13 @@ function Controles() {
     const [t, m] = await Promise.all([api.get(orgPath(o, '/referentiels/type_acte')), api.get(orgPath(o, '/referentiels/matiere'))]);
     return { types: t.data.items as any[], matieres: m.data.items as any[] };
   }, [o]);
-  const [edit, setEdit] = useState<any | 'nouvelle' | null>(null);
+  const [edit, setEdit] = useState<any | 'nouvelle' | null>(null); const [hist, setHist] = useState(false);
   const lib = (id: number | null, list: any[] | undefined, none: string) => (id ? list?.find((x) => x.id === id)?.libelle ?? `#${id}` : none);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-3xl text-mute">Les <b>règles</b> du juridique : quels <b>visas</b> et quelles <b>mentions</b> sont attendus selon le type d'acte, la matière et le montant. Elles sont appliquées par <b>« Vérifier les références »</b> et par le contrôle complet, sans IA.</p>
-        <button className="btn-primary" onClick={() => setEdit('nouvelle')}><Plus className="h-4 w-4" /> Nouvelle règle</button>
+        <span className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setHist(true)} title="Visas habituels d’après l’historique des délibérations"><BookOpen className="h-4 w-4" /> Règles issues de l’historique</button><button className="btn-primary" onClick={() => setEdit('nouvelle')}><Plus className="h-4 w-4" /> Nouvelle règle</button></span>
       </div>
       <div className="card overflow-x-auto">
         {d.loading && !d.data ? <Loading /> : !d.data?.length ? <Empty>Aucune règle : aucun visa ni aucune mention n'est exigé automatiquement.</Empty> : (
@@ -178,6 +276,7 @@ function Controles() {
               </td>
             </tr>))}</tbody></table>)}
       </div>
+      {hist && <ReglesHistorique onClose={() => setHist(false)} onDone={d.reload} />}
       {edit && refs.data && <FormControle regle={edit === 'nouvelle' ? null : edit} types={refs.data.types} matieres={refs.data.matieres} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); d.reload(); toast('Règle enregistrée'); }} />}
       {node}
     </div>

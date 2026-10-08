@@ -20,6 +20,9 @@ const LIB_STATUT = { en_vigueur: 'en vigueur', modifie: 'modifié', abroge: 'abr
 const toEntry = (r) => ({
   id: r.id, cle: r.cle, type: r.type, code: r.code, article: r.article, intitule: r.intitule, statut: r.statut, dateDebut: r.date_debut, dateFin: r.date_fin,
   verifieLe: r.verifie_le, verifiePar: r.verifie_par, source: r.source, note: r.note, matieres: r.matieres, typesActe: r.types_acte, updatedAt: r.updated_at,
+  description: r.description ?? null, emploi: r.emploi ?? null, descriptionPar: r.description_par ?? null,
+  citations: r.citations ?? 0, citeDe: r.cite_de ?? null, citeA: r.cite_a ?? null, usage: r.usage_stats ?? {},
+  ia: { etat: r.ia_etat ?? null, avis: r.ia_avis ?? null, le: r.ia_le ?? null, modele: r.ia_modele ?? null },
 });
 const toControle = (r) => ({
   id: r.id, nom: r.nom, typeActeId: r.type_acte_id, matiereId: r.matiere_id, regle: r.regle, cle: r.cle, motif: r.motif, estRegex: r.est_regex,
@@ -50,7 +53,15 @@ function lireCsv(texte) {
 }
 const CHAMPS_CSV = { cle: 'cle', type: 'type', code: 'code', article: 'article', intitule: 'intitule', statut: 'statut', date_debut: 'dateDebut', datedebut: 'dateDebut', date_fin: 'dateFin', datefin: 'dateFin', verifie_le: 'verifieLe', verifiele: 'verifieLe', source: 'source', note: 'note' };
 
-function createVisas({ db, audit, actes, settings, log }) {
+/** Premier objet JSON d'une réponse de l'IA (tolère un texte autour ou un bloc de code). */
+function extraireJson(texte) {
+  const m = /\{[\s\S]*\}/.exec(String(texte || ''));
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch { return null; }
+}
+const SEUIL_REGLE = 0.5; const SEUIL_A_REVOIR = 0.8;
+
+function createVisas({ db, audit, actes, settings, log, ai, prompts }) {
   const clean = (b, cur = {}) => {
     const o = { ...cur };
     if (b.cle !== undefined) o.cle = normaliserCle(b.cle);
@@ -91,6 +102,92 @@ function createVisas({ db, audit, actes, settings, log }) {
     TYPES, STATUTS, EN_COURS, normaliserCle, lireCsv,
 
     // -------------------------------------------------------------------------------------------------- bibliothèque (IA-38)
+    // ------------------------------------------------------------------------------------------------ fiche : description, emploi, vérification IA
+    /** Contexte donné à l'IA : l'entrée et l'usage constaté dans l'historique des délibérations (jamais d'état en vigueur). */
+    contexteIA(e) {
+      const u = e.usage_stats || {};
+      return { cle: e.cle, type: e.type, code: e.code, article: e.article, intitule: e.intitule, citations: e.citations || 0, anneeDebut: e.cite_de ?? null, anneeFin: e.cite_a ?? null,
+        partDesDeliberations: u.total ? Math.round(((e.citations || 0) / u.total) * 100) : null, rubriques: (u.rubriques || []).slice(0, 5).map((r) => `${r.libelle} (${r.n})`), formulationHabituelle: u.formulation ?? null };
+    },
+
+    /** Saisie manuelle de la description et de l'emploi (service juridique). */
+    async redigerFiche(ctx, organismeId, id, { description, emploi }) {
+      const org = requireOrg(organismeId); await svc.get(org, id);
+      const net = (v) => (v === undefined ? undefined : v === null || String(v).trim() === '' ? null : String(v).trim().slice(0, 1500));
+      const d = net(description); const e = net(emploi);
+      const r = await db.get(`UPDATE visa_library SET description = CASE WHEN $3::boolean THEN $4 ELSE description END, emploi = CASE WHEN $5::boolean THEN $6 ELSE emploi END,
+        description_par = CASE WHEN $3::boolean AND $4 IS NOT NULL THEN 'manuel' WHEN $3::boolean THEN NULL ELSE description_par END WHERE id = $1 AND organisme_id = $2 RETURNING *`,
+      [id, org, d !== undefined, d ?? null, e !== undefined, e ?? null]);
+      await audit.log(ctx, { organismeId: org, action: 'visa.fiche', entity: 'visa_library', entityId: id, after: { description: d !== undefined, emploi: e !== undefined } });
+      return toEntry(r);
+    },
+
+    /** Description et emploi rédigés par l'IA d'après l'usage constaté ; marqués « IA » (à relire), jamais d'état en vigueur. */
+    async decrireParIA(ctx, organismeId, id) {
+      const org = requireOrg(organismeId); const e = await svc.get(org, id);
+      await prompts.assertActif(org, 'visas_description');
+      const { system, modele } = await prompts.resolve(org, 'visas_description');
+      let r;
+      try { r = await ai.query({ system, prompt: `Texte à décrire :\n${JSON.stringify(svc.contexteIA(e), null, 2)}`, maxTokens: 600, temperature: 0.1, model: modele || undefined }); }
+      catch (err) { throw E.upstream(`IA indisponible : ${err.message}`); }
+      const j = extraireJson(r.text); if (!j) throw E.incomplete('Réponse de l\'IA illisible : réessayez');
+      const net = (v) => (typeof v === 'string' && v.trim().length > 3 ? v.trim().slice(0, 1500) : null);
+      const description = net(j.description); const emploi = net(j.emploi);
+      if (!description && !emploi) return { ...toEntry(e), propose: false, message: 'L\'IA ne connaît pas ce texte avec certitude : aucune description proposée.' };
+      const out = await db.get(`UPDATE visa_library SET description = COALESCE($3, description), description_par = CASE WHEN $3 IS NOT NULL THEN 'ia' ELSE description_par END, emploi = COALESCE(emploi, $4)
+        WHERE id = $1 AND organisme_id = $2 RETURNING *`, [id, org, description, emploi]);
+      await audit.log(ctx, { organismeId: org, action: 'visa.description_ia', entity: 'visa_library', entityId: id, after: { cle: e.cle, modele: r.model || modele || null } });
+      return { ...toEntry(out), propose: true };
+    },
+
+    /** « Bonbon » : vérification de COHÉRENCE de l'entrée par l'IA (clé, type, article, intitulé) ; ne remplace jamais la vérification à la source du juridique. */
+    async verifierParIA(ctx, organismeId, id) {
+      const org = requireOrg(organismeId); const e = await svc.get(org, id);
+      await prompts.assertActif(org, 'visas_verification');
+      const { system, modele } = await prompts.resolve(org, 'visas_verification');
+      let r;
+      try { r = await ai.query({ system, prompt: `Entrée à contrôler :\n${JSON.stringify(svc.contexteIA(e), null, 2)}`, maxTokens: 500, temperature: 0, model: modele || undefined }); }
+      catch (err) { throw E.upstream(`IA indisponible : ${err.message}`); }
+      const j = extraireJson(r.text); if (!j || !['coherent', 'a_revoir'].includes(j.etat)) throw E.incomplete('Réponse de l\'IA illisible : réessayez');
+      const obs = (Array.isArray(j.observations) ? j.observations : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 8);
+      const etat = j.etat === 'coherent' && !obs.length ? 'coherent' : 'a_revoir';
+      const out = await db.get('UPDATE visa_library SET ia_etat = $3, ia_avis = $4, ia_le = now(), ia_modele = $5 WHERE id = $1 AND organisme_id = $2 RETURNING *', [id, org, etat, obs.join('\n') || null, r.model || modele || null]);
+      await audit.log(ctx, { organismeId: org, action: 'visa.verification_ia', entity: 'visa_library', entityId: id, after: { cle: e.cle, etat } });
+      return toEntry(out);
+    },
+
+    // ------------------------------------------------------------------------------------------------ règles issues de l'usage constaté
+    /**
+     * Règles de contrôle proposées d'après l'historique : un visa cité dans au moins la moitié des délibérations est un visa habituel. À 80 % et plus, son absence est « à revoir » ;
+     * en dessous, « information ». Aucune règle de droit n'est posée de mémoire : elles reprennent l'usage constaté, à ajuster par le juridique.
+     */
+    async reglesHistorique(organismeId) {
+      const org = requireOrg(organismeId);
+      const hist = (await settings.resolve(org))['visas.historique']?.value;
+      const total = Number(hist?.total) || 0;
+      const type = await db.get("SELECT id FROM ref_items WHERE kind = 'type_acte' AND code = 'deliberation' AND (organisme_id IS NULL OR organisme_id = $1) ORDER BY organisme_id NULLS LAST LIMIT 1", [org]);
+      if (!total || !type) return { total, typeActeId: type?.id ?? null, items: [] };
+      const lignes = await db.all('SELECT cle, intitule, citations FROM visa_library WHERE organisme_id = $1 AND citations > 0 ORDER BY citations DESC, cle', [org]);
+      const existantes = new Set((await db.all("SELECT cle FROM visa_controles WHERE organisme_id = $1 AND regle = 'visa' AND (type_acte_id = $2 OR type_acte_id IS NULL)", [org, type.id])).map((x) => x.cle));
+      const items = lignes.filter((l) => l.citations / total >= SEUIL_REGLE).map((l) => {
+        const part = l.citations / total; const pct = Math.round(part * 100);
+        return { cle: l.cle, intitule: l.intitule, citations: l.citations, pourcentage: pct, gravite: part >= SEUIL_A_REVOIR ? 'a_revoir' : 'info', existe: existantes.has(l.cle),
+          message: `Visa habituel : cité dans ${pct} % des délibérations (${l.citations} sur ${total}${hist?.de && hist?.a ? `, ${hist.de}-${hist.a}` : ''}). Vérifiez qu'il est bien visé.` };
+      });
+      return { total, typeActeId: type.id, items };
+    },
+
+    async creerReglesHistorique(ctx, organismeId, { cles } = {}) {
+      const org = requireOrg(organismeId); const prop = await svc.reglesHistorique(org);
+      const choisies = prop.items.filter((i) => !i.existe && (!cles || cles.includes(i.cle)));
+      const crees = [];
+      for (const i of choisies) {
+        crees.push(await svc.creerControle(ctx, org, { nom: `Visa habituel : ${i.intitule}`.slice(0, 120), typeActeId: prop.typeActeId, regle: 'visa', cle: i.cle, gravite: i.gravite, message: i.message, actif: true }));
+      }
+      await audit.log(ctx, { organismeId: org, action: 'visa.regles_historique', entity: 'visa_controles', after: { crees: crees.length, ignorees: prop.items.length - choisies.length } });
+      return { crees: crees.length, dejaPresentes: prop.items.filter((i) => i.existe).length, regles: crees };
+    },
+
     async list(organismeId, { q, statut, type } = {}) {
       const org = requireOrg(organismeId); const p = [org]; const w = ['organisme_id = $1'];
       if (statut) { p.push(statut); w.push(`statut = $${p.length}`); }

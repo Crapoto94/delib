@@ -50,14 +50,28 @@ function referencesDuTexte(texte) {
   return [...vues.values()];
 }
 
+/**
+ * Rubrique d'une délibération d'archive : le texte commence par « … OBJET : <RUBRIQUE> <titre> ». On retient la plus longue rubrique connue qui suit « OBJET : »
+ * (comparaison sans accents ni casse) ; null si aucune ne correspond.
+ */
+function rubriqueDuTexte(texte, rubriques) {
+  const plat = (x) => sansAccent(String(x).replace(/\s+/g, ' ')).toUpperCase().trim();
+  const m = /OBJET\s*:\s*([^]{0,120})/i.exec(String(texte || ''));
+  if (!m) return null;
+  const apres = plat(m[1]); let meilleure = null;
+  for (const r of rubriques) { const p = plat(r); if (apres.startsWith(p) && (!meilleure || p.length > plat(meilleure).length)) meilleure = r; }
+  return meilleure;
+}
+
 /** Cumul sur plusieurs délibérations : `ajouter(refs, annee)` pour chacune, puis `candidats({ min })`. */
 function creerCumul() {
   const m = new Map();
   return {
-    ajouter(refs, annee = null) {
+    ajouter(refs, annee = null, rubrique = null) {
       for (const r of refs) {
-        const e = m.get(r.cle) || { cle: r.cle, type: r.type, code: r.code, article: r.article, libelle: r.libelle, delibs: 0, premiere: null, derniere: null, exemple: r.exemple };
+        const e = m.get(r.cle) || { cle: r.cle, type: r.type, code: r.code, article: r.article, libelle: r.libelle, delibs: 0, premiere: null, derniere: null, exemple: r.exemple, rubriques: {} };
         e.delibs++;
+        if (rubrique) e.rubriques[rubrique] = (e.rubriques[rubrique] || 0) + 1;
         if (annee) { e.premiere = e.premiere === null ? annee : Math.min(e.premiere, annee); e.derniere = e.derniere === null ? annee : Math.max(e.derniere, annee); }
         if (r.exemple.length < e.exemple.length) e.exemple = r.exemple;   // la formulation la plus courte : la plus lisible
         m.set(r.cle, e);
@@ -65,6 +79,14 @@ function creerCumul() {
     },
     candidats({ min = 2 } = {}) { return [...m.values()].filter((e) => e.delibs >= min).sort((a, b) => b.delibs - a.delibs || (a.cle < b.cle ? -1 : 1)); },
     get total() { return m.size; },
+  };
+}
+
+/** Usage constaté d'un candidat dans l'historique (stocké dans `usage_stats` : factuel, jamais réécrit par l'IA). */
+function statsUsage(c, total) {
+  return {
+    total, citations: c.delibs, de: c.premiere, a: c.derniere, formulation: c.exemple.slice(0, 400),
+    rubriques: Object.entries(c.rubriques || {}).sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1)).slice(0, 8).map(([libelle, n]) => ({ libelle, n })),
   };
 }
 
@@ -77,4 +99,4 @@ function entreeBibliotheque(c) {
   };
 }
 
-module.exports = { reparerEspaces, paragraphesVu, referencesDuTexte, creerCumul, entreeBibliotheque, TYPES_BIBLIOTHEQUE };
+module.exports = { rubriqueDuTexte, statsUsage, reparerEspaces, paragraphesVu, referencesDuTexte, creerCumul, entreeBibliotheque, TYPES_BIBLIOTHEQUE };

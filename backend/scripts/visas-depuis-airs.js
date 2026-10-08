@@ -95,36 +95,43 @@ async function ecrireSorties(cumul, stats) {
     let docs = q.rows.map((x) => ({ CH: x.CH, an: anneeDe(x.NOM) })); const limite = Number(arg('limite', 0)); if (limite > 0) docs = docs.slice(0, limite);
     console.log(`${docs.length} délibérations archivées (PDF « Délibération ») à analyser — partage : ${share}`);
 
-    const cumul = V.creerCumul(); const stats = { pdfTrouves: docs.length, lus: 0, sansVisa: 0, illisibles: 0 };
+    const rubriques = (await db.all("SELECT DISTINCT libelle FROM ref_items WHERE kind = 'rubrique' AND actif")).map((x) => x.libelle);
+    const cumul = V.creerCumul(); const stats = { pdfTrouves: docs.length, lus: 0, sansVisa: 0, illisibles: 0, sansRubrique: 0 };
     await enParallele(docs, 4, async (d, k) => {
       try {
         const buf = await fs.promises.readFile(path.join(share, String(d.CH).replace(/^\//, '').split('/').join(path.sep)));
-        const refs = V.referencesDuTexte(await texteDuPdf(buf));
-        stats.lus++; if (!refs.length) stats.sansVisa++;
-        cumul.ajouter(refs, d.an);
+        const texte = await texteDuPdf(buf); const refs = V.referencesDuTexte(texte); const rub = V.rubriqueDuTexte(texte, rubriques);
+        stats.lus++; if (!refs.length) stats.sansVisa++; if (!rub) stats.sansRubrique++;
+        cumul.ajouter(refs, d.an, rub);
       } catch { stats.illisibles++; }
       if ((k + 1) % 100 === 0) process.stdout.write(`\r${k + 1}/${docs.length}  (${stats.illisibles} illisibles)   `);
     });
     const cand = await ecrireSorties(cumul, stats);
-    console.log(`PDF lus : ${stats.lus} ; sans visa reconnu : ${stats.sansVisa} ; illisibles : ${stats.illisibles}`);
+    console.log(`PDF lus : ${stats.lus} ; sans visa reconnu : ${stats.sansVisa} ; sans rubrique reconnue : ${stats.sansRubrique} ; illisibles : ${stats.illisibles}`);
     if (stats.lus < docs.length * 0.5) console.log('Attention : moins de la moitié des PDF ont pu être lus (partage ou droits ?). Vérifiez avant d\'importer.');
 
     // ---- création dans la bibliothèque (jamais vérifiée, jamais d'écrasement)
     if (!drapeau('importer')) { console.log('\nEssai terminé : rien n\'a été écrit en base. Relisez le fichier, puis relancez avec --importer.'); return; }
     const org = Number(arg('org')) || (await db.get('SELECT id FROM organismes WHERE is_default'))?.id;
     if (!org) throw new Error('Organisme introuvable (--org)');
-    const audit = createAudit(db); let crees = 0; let existantes = 0; let rejetees = 0;
+    const audit = createAudit(db); let crees = 0; let existantes = 0; let rejetees = 0; let maj = 0;
+    const annees = cand.flatMap((c) => [c.premiere, c.derniere]).filter(Boolean); const de = annees.length ? Math.min(...annees) : null; const a = annees.length ? Math.max(...annees) : null;
     await db.tx(async (t) => {
       for (const c of cand) {
         let cle; try { cle = normaliserCle(c.cle); } catch { rejetees++; continue; }
-        const e = V.entreeBibliotheque({ ...c, cle });
+        const e = V.entreeBibliotheque({ ...c, cle }); const us = JSON.stringify(V.statsUsage(c, stats.lus));
         const res = await t.run(
-          `INSERT INTO visa_library (organisme_id, cle, type, code, article, intitule, statut, source, note, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'@historique')
-           ON CONFLICT (organisme_id, cle) DO NOTHING`, [org, e.cle, e.type, e.code, e.article, e.intitule, e.statut, e.source, e.note]);
+          `INSERT INTO visa_library (organisme_id, cle, type, code, article, intitule, statut, source, note, created_by, citations, cite_de, cite_a, usage_stats) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'@historique',$10,$11,$12,$13::jsonb)
+           ON CONFLICT (organisme_id, cle) DO NOTHING`, [org, e.cle, e.type, e.code, e.article, e.intitule, e.statut, e.source, e.note, c.delibs, c.premiere, c.derniere, us]);
         if (res.changes) crees++; else existantes++;
+        // l'usage constaté (factuel) est rafraîchi pour toute entrée, y compris celles que le juridique a rédigées ; le reste de la fiche n'est jamais touché
+        const m = await t.run('UPDATE visa_library SET citations = $3, cite_de = $4, cite_a = $5, usage_stats = $6::jsonb WHERE organisme_id = $1 AND cle = $2', [org, e.cle, c.delibs, c.premiere, c.derniere, us]);
+        if (!res.changes && m.changes) maj++;
       }
+      await t.run(`INSERT INTO settings (scope, scope_id, key, value, updated_by) VALUES ('organisme', $1, 'visas.historique', $2::jsonb, '@historique')
+        ON CONFLICT (scope, scope_id, key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`, [String(org), JSON.stringify({ total: stats.lus, de, a, le: new Date().toISOString() })]);
     }, { bypass: true });
-    await audit.log({ username: '@historique' }, { organismeId: org, action: 'visa.import_historique', entity: 'visa_library', after: { crees, existantes, rejetees, min: MIN, pdfLus: stats.lus } });
-    console.log(`\nBibliothèque de visas : ${crees} entrée(s) créée(s), ${existantes} déjà présente(s) (inchangées), ${rejetees} rejetée(s). Toutes « jamais vérifiées » : à contrôler par le juridique.`);
+    await audit.log({ username: '@historique' }, { organismeId: org, action: 'visa.import_historique', entity: 'visa_library', after: { crees, existantes, usageMisAJour: maj, rejetees, min: MIN, pdfLus: stats.lus } });
+    console.log(`\nBibliothèque de visas : ${crees} entrée(s) créée(s), ${existantes} déjà présente(s) (fiche inchangée, usage constaté mis à jour), ${rejetees} rejetée(s). Les nouvelles sont « jamais vérifiées » : à contrôler par le juridique.`);
   } finally { if (conn) await conn.close().catch(() => {}); await db.close(); }
 })().catch((e) => { console.error('ERREUR :', e.message); process.exitCode = 1; });

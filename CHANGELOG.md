@@ -9,6 +9,13 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.53.0 — Bibliothèque de textes : descriptions, vérification IA, règles issues de l'historique
+
+- **Fiche d'un texte** : description, emploi (quand le viser) et usage constaté dans l'historique AIRS (citations, période, rubriques, formulation) — migration 0088. Saisie par le juridique (`PUT /visas/:id/fiche`) ou rédigée par l'IA (`POST /visas/:id/description-ia`, marquée « IA, à relire », l'emploi déjà saisi n'est jamais écrasé).
+- **« Bonbon » de vérification IA** (`POST /visas/:id/verification-ia`) : cohérence de la clé, du type, de l'article et de l'intitulé. Ne touche ni au statut ni à `verifie_le` ; la consigne interdit tout avis sur l'état en vigueur. Actions en lot séquentielles dans l'écran. Usages désactivables (`ai.actif.visas_description`, `ai.actif.visas_verification`).
+- **Règles issues de l'historique** (`GET/POST /visas/controles/historique`) : visas cités dans au moins 50 % des délibérations, « à revoir » à 80 % et plus, sinon « information ».
+- L'outil `visas-depuis-airs.js` rafraîchit l'usage constaté et le réglage `visas.historique`.
+
 ## 0.52.0 — Sites autorisés à intégrer les pages publiques
 
 - **Sites autorisés** : un réglage de Paramétrage › Mise à disposition et affichage (`publication.sites_autorises`) fixe les sites qui peuvent **intégrer les pages publiques** (iframe) et **lire l'API publique avec le script d'intégration**. Par défaut : `ivry94.fr`, `*.ivry94.fr` et `*.ivry.local`. Plus rien à régler dans le `.env` de la DMZ (la variable `ELUS_FRAME_ANCESTORS` disparaît) : le nginx lit la liste auprès du backend (`auth_request`, cache 30 s) ; liste absente → seul le site lui-même peut intégrer. Le backend répond le CORS (et `OPTIONS`) seulement pour ces origines ; les entrées invalides sont ignorées. Protection de navigateur : l'API publique reste lisible par programme.

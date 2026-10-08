@@ -11,9 +11,18 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.52.0';
+export const VERSION = '0.53.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.53.0', type: 'minor', titre: 'Bibliothèque de textes : descriptions, vérification IA et règles issues de l'historique',
+    items: [
+      "Chaque texte de la bibliothèque des visas a une fiche : ce qu'il est, quand le viser, et son usage constaté dans l'historique (nombre de délibérations, période, rubriques, formulation habituelle).",
+      "Un « bonbon » IA (vert, orange ou gris) indique si l'entrée est cohérente ; le bouton « Vérifier par l'IA » le met à jour, texte par texte ou en lot. L'IA ne se prononce jamais sur l'état en vigueur : seule la vérification à la source du juridique fait foi.",
+      "L'IA peut rédiger la description et l'emploi d'un texte ; ils sont marqués « IA, à relire » jusqu'à ce que le juridique les reprenne.",
+      "Listes de contrôle : « Règles issues de l'historique » crée en un clic les règles des visas cités dans au moins la moitié des délibérations (alerte « à revoir » à 80 % et plus, sinon information).",
+    ],
+  },
   {
     version: '0.52.0', type: 'minor', titre: 'Sites autorisés à intégrer les pages publiques',
     items: [
