@@ -11,9 +11,16 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.51.0';
+export const VERSION = '0.51.1';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.51.1', type: 'patch', titre: 'Les dossiers rappelés restent visibles',
+    items: [
+      "Un dossier rappelé du circuit n'avait plus de place dans « Mes actes » ni dans « Tous les actes » : il y reste désormais visible, avec l'étape « Rappelé ».",
+      "La fiche d'un dossier rappelé indique la date et le motif du rappel.",
+    ],
+  },
   {
     version: '0.51.0', type: 'minor', titre: 'Publication publique, arrêtés du site et arrêtés déjà signés',
     items: [

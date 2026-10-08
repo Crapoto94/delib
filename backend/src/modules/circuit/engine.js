@@ -17,14 +17,14 @@ const { addBusinessDays } = require('../../shared/time');
 /** Statuts où l'acte parcourt le circuit ; « en_attente_scc » = étape SCC en cours (l'acte y reste une fois le circuit terminé). */
 const IN_CIRCUIT = ['en_circuit', 'modification_demandee', 'en_attente_scc'];
 // Actes qui ne sont pas encore passés au conseil (rédaction → prêts), pour la vue « Tous les actes ».
-const EN_COURS_ACTIFS = ['brouillon', 'modification_demandee', 'en_circuit', 'valide_dgs', 'en_attente_scc', 'mis_a_disposition', 'avis_rendu', 'inscrit_odj', 'texte_definitif_pret', 'pret_a_transmettre', 'a_signer', 'signe', 'signature_refusee'];
+const EN_COURS_ACTIFS = ['brouillon', 'rappele', 'modification_demandee', 'en_circuit', 'valide_dgs', 'en_attente_scc', 'mis_a_disposition', 'avis_rendu', 'inscrit_odj', 'texte_definitif_pret', 'pret_a_transmettre', 'a_signer', 'signe', 'signature_refusee'];
 // Actes dont le circuit est terminé (plus d'étape courante) mais pas encore passés en séance, pour la rubrique « dans le circuit ».
 const POST_CIRCUIT = ['valide_dgs', 'en_attente_scc', 'mis_a_disposition', 'avis_rendu', 'inscrit_odj', 'texte_definitif_pret', 'pret_a_transmettre', 'a_signer', 'signe', 'signature_refusee'];
 // Libellé d'étape pour les actes sortis du circuit (plus d'étape courante) : chacun a sa rupture.
 const ETAPE_HORS_CIRCUIT = {
   valide_dgs: 'Validé DGS', en_attente_scc: 'En attente SCC', mis_a_disposition: 'Mis à disposition', avis_rendu: 'Avis rendu',
   inscrit_odj: 'Inscrit au conseil', texte_definitif_pret: 'Texte définitif prêt', pret_a_transmettre: 'Prêt à transmettre',
-  a_signer: 'À signer', signe: 'Signé', signature_refusee: 'Signature refusée',
+  a_signer: 'À signer', signe: 'Signé', signature_refusee: 'Signature refusée', rappele: 'Rappelé',
 };
 
 function createEngine({ db, audit, actes, acl, titulaires, delegations, comments, settings, bus, late }) {
@@ -629,9 +629,10 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       // une décision qui ne vise aucune séance (elle ne passera pas au conseil).
       const mesBrouillons = await db.all(
         `SELECT a.*, t.code AS type_code, t.libelle AS type_libelle FROM actes a LEFT JOIN ref_items t ON t.id = a.type_id
-         WHERE a.organisme_id = $1 AND a.statut = 'brouillon' AND (a.redacteur = $2 OR a.co_redacteurs ? $2)`,
+         WHERE a.organisme_id = $1 AND a.statut IN ('brouillon', 'rappele') AND (a.redacteur = $2 OR a.co_redacteurs ? $2)`,
         [org, ctx.username]);
-      for (const r of mesBrouillons) put(actes.toActe(r), 'mes_brouillons', { key: 'redaction', label: 'Rédaction' });
+      // Un dossier rappelé du circuit reste à son rédacteur : il le retrouve ici (« Rappelé »), jusqu'à ce qu'il le reprenne ou le supprime.
+      for (const r of mesBrouillons) put(actes.toActe(r), 'mes_brouillons', r.statut === 'rappele' ? { key: 'rappele', label: 'Rappelé' } : { key: 'redaction', label: 'Rédaction' });
       for (const t of suivi.equipe) put(t.acte, t.phase ?? 'validation', t.step);
       for (const t of suivi.valides) put(t.acte, 'valide', t.step);
       // « Plus à moi » (rubrique « Dans le circuit » de l'écran « Mes actes ») : les actes que je suis qui ne sont plus à mon étape — encore en circuit chez un autre,

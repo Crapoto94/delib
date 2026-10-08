@@ -18,7 +18,7 @@ const toActe = (r) => r && ({
   seanceViseeId: r.seance_visee_id, seanceId: r.seance_id, urgence: r.urgence, dateLimite: r.date_limite, confidentialite: r.confidentialite,
   commentaireInitial: r.commentaire_initial, custom: r.custom, currentStepKey: r.current_step_key, participants: r.participants,
   directionsInfo: r.directions_info ?? [],
-  submittedAt: r.submitted_at, abandonedAt: r.abandoned_at, abandonMotif: r.abandon_motif, createdAt: r.created_at, updatedAt: r.updated_at,
+  submittedAt: r.submitted_at, abandonedAt: r.abandoned_at, abandonMotif: r.abandon_motif, rappelMotif: r.rappel_motif ?? null, rappelAt: r.rappel_at ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
   signeAt: r.signe_at ?? null, signePar: r.signe_par ?? null, parapheurEnvoiId: r.parapheur_envoi_id ?? null,
 signataireNom: r.signataire_nom ?? null,
   documentSourceTrame: r.document_source_trame ?? null,

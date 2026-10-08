@@ -9,6 +9,10 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.51.1 — Les dossiers rappelés restent visibles
+
+- **Dossier rappelé du circuit** : un acte rappelé (statut « rappelé ») disparaissait de « Mes actes » et de « Tous les actes ». Il reste désormais visible — dans « En cours de rédaction » pour son rédacteur, et dans « Tous les actes » pour l'administration et le SCC — avec l'étape « Rappelé », une pastille dédiée et, dans la fiche, un bandeau indiquant la date et le motif du rappel. (`engine.js`, `Dossier.tsx`, `format.ts`.)
+
 ## 0.51.0 — Publication publique, arrêtés du site et arrêtés déjà signés
 
 - **Journal de l'acte** (administrateur et SCC) : toutes les actions réalisées sur un dossier — annexes, textes, commentaires, commissions, ordre du jour, télétransmission — de la plus récente à la plus ancienne, tirées du journal d'audit immuable. Carte « Journal de l'acte » dans la fiche du dossier. (`GET /organismes/:orgId/actes/:id/journal`.)

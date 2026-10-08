@@ -996,6 +996,7 @@ export default function Dossier() {
       {c?.submitted && <div className="card p-4"><Frise circuit={c} />{c.statut === 'modification_demandee' && <p className="mt-2 rounded bg-warn-bg p-2 text-warn">Modification demandée — voir la discussion pour le motif.</p>}</div>}
       <div className={signe ? 'grid gap-6' : 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]'}>
         <div className="space-y-6">
+          {a.statut === 'rappele' && <div role="note" className="rounded border border-warn/40 bg-warn-bg p-3 text-[13px] text-warn"><b>Dossier rappelé du circuit</b>{a.rappelAt ? ` le ${dt(a.rappelAt, { dateStyle: 'long' })}` : ''}{a.rappelMotif ? <> — motif : <i>{a.rappelMotif}</i></> : null}. Il n'est plus en circuit ; le rédacteur peut le supprimer.</div>}
           {a.statut === 'signe' && a.custom?.controleLegalite && <ControleLegalite acte={a} onChanged={reloadAll} toast={toast} />}
           <Fiche acte={a} editable={editable} onSaved={() => { reloadAll(); toast('Fiche enregistrée'); }} onCommissions={reloadAll} />
           {a.typeInfo?.meta?.autorisations && <Autorisations acte={a} editable={editable} onChanged={() => { reloadAll(); toast('Délibérations d\'autorisation mises à jour'); }} toast={toast} />}

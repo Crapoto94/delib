@@ -102,3 +102,18 @@ describe('suivi du tableau de bord', () => {
     expect(s.equipe.length).toBeGreaterThan(0);
   });
 });
+
+describe('dossier rappelé du circuit', () => {
+  it("reste visible : dans « Mes actes » de sa rédactrice et dans « Tous les actes » de l’administration", async () => {
+    const a = await acte('Dossier rappelé du circuit', { submit: true });
+    const r = await as(t.dupont).post(`${A(a.id)}/rappeler`, { motif: 'Erreur de destinataire' });
+    expect(r.status).toBe(200); expect(r.body.statut).toBe('rappele');
+    const mes = (await as(t.dupont).get(`${base()}/circuit/portefeuille`)).body.items.find((i) => i.acte.id === a.id);
+    expect(mes).toBeTruthy(); expect(mes.raisons).toContain('mes_brouillons'); expect(mes.step.label).toBe('Rappelé');
+    const tous = (await as(admin).get(`${base()}/circuit/en-cours`)).body.items.find((i) => i.acte.id === a.id);
+    expect(tous).toBeTruthy(); expect(tous.etape.label).toBe('Rappelé');
+    const fiche = (await as(t.dupont).get(A(a.id))).body;
+    expect(fiche).toMatchObject({ statut: 'rappele', rappelMotif: 'Erreur de destinataire' });
+  });
+});
+
