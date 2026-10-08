@@ -2487,3 +2487,60 @@ Quelques points de conception :
   2. à défaut, un **cadre** réglé sur le collecteur (page, centre x/y en %, largeur et hauteur en points).
   Sans repère trouvé ni cadre réglé, le cadre par défaut s'applique (page 1, 75 % / 85 %, 150 × 60). L'origine retenue
   est inscrite dans le dossier (`custom.collecteur.signature`) pour que l'administration sache d'où vient la position.
+
+## 38. Publication publique, arrêtés du site et arrêtés déjà signés (version 0.51.0)
+
+### 38.1 Journal de l'acte
+`GET /api/v1/organismes/:orgId/actes/:id/journal` (administrateur et SCC : `acl.isAdmin`) renvoie, du plus récent au plus ancien (500 lignes au plus), les traces du
+journal d'audit immuable (`audit_log`) qui concernent l'acte : `entity = 'actes'`, les écritures dont le détail porte `acteId` (textes, commentaires, commissions, liens),
+l'inscription à un ordre du jour (`odj.affecter`), et les pièces liées (annexes, délibérations, transmissions) retrouvées par leur acte. Les traces d'annexes portent
+désormais l'identifiant de l'acte, pour que la suppression d'une annexe reste rattachée à son dossier. Interface : `frontend/src/pages/JournalActe.tsx`.
+
+### 38.2 Clés d'API et API externe
+Une clé (`api_keys`, migration 0085) porte un **périmètre** : `types` (codes de types d'actes, vide = tous), `duree_mois` (1 à 24 — jamais plus de deux ans, d'après la
+date de séance, à défaut de création) et `contenus` (`acte`, `expose`, `annexes`, au moins un). Le périmètre s'applique à la liste, à la fiche, aux téléchargements
+et aux listes de choix ; un acte hors périmètre répond 404. Recherche de `/externe/actes` : `q` (plein texte du titre, lexèmes français sans accents, puis sous-chaîne),
+`motCle`, `rapporteurId`, `dateDebut`/`dateFin`, `type`, `matiere`, `seanceId`, `annee`. Listes de choix : `/externe/seances` (conseils passés), `/rapporteurs`, `/types`.
+La spécification publique (`/api/v1/externe/openapi.json`) ne décrit que l'API externe et l'API publique (§38.3) : jamais une route interne.
+
+### 38.3 Publication sans connexion (DMZ)
+Quatre pages **nues**, sans connexion, destinées à une iframe, et leurs pages « -code » : `/deliberations`, `/deliberations-recherche`, `/arretes`, `/arretes-recherche`
+(`elus-dmz/src/main.tsx`). L'affichage est un script autonome (`deliberations-widget.js`, `arretes-widget.js`) : la page et le code proposé à l'intégration sont le même fichier.
+- **Activation** par organisme, désactivée par défaut (Paramétrage › Mise à disposition et affichage) : `publication.deliberations_actif`, `publication.recherche_actif`,
+  `publication.deliberations_mois`, `publication.arretes_actif`, `publication.arretes_recherche_actif`, `publication.arretes_mois` (période en mois, sans plafond à 24).
+- **Contenu publié** : délibérations **exécutoires** non confidentielles, arrêtés **signés** non confidentiels ; annexes marquées publiables et disponibles en PDF ; **jamais
+  l'exposé des motifs** (ni affiché, ni cherché : le « corps » d'une délibération est constitué des visas et du dispositif).
+- **Document d'une délibération** : son **extrait du registre** (tamponné quand l'accusé de réception est reçu), sans recomposition ; à défaut, le document signé, le PDF
+  transmis à la préfecture, le PDF figé ou le document source. Aucun téléchargement n'est inscrit à l'audit.
+- **Liens** : jetons chiffrés AES-256-GCM (`backend/src/modules/externe/jeton.js`), dérivés du secret du serveur, déterministes (un document garde son adresse) ; aucun numéro d'acte
+  n'est exposé. Un jeton altéré ou forgé répond 404 ; un document hors périmètre aussi.
+- **Moteur de recherche** : sans limite de durée. Délibérations : séance, rapporteur, thématique (rubrique), dates, texte du titre et/ou du corps. Arrêtés : texte de l'objet ou numéro,
+  année, dates.
+- **nginx** (`elus-dmz/nginx.conf.template`) : seuls `/api/v1/public/deliberations` et `/api/v1/public/arretes` sont relayés (GET/HEAD, quota `pub`, CORS ouvert en lecture) ; le cadrage
+  est autorisé sur les quatre pages seulement (`ELUS_FRAME_ANCESTORS`, `*` par défaut) ; `/api-docs/` sert Swagger UI en local.
+
+### 38.4 Arrêtés « site »
+`actes.site` (migration 0086) marque les arrêtés repris du site internet de la Ville. Un déclencheur `BEFORE DELETE` ignore la suppression de ces lignes : un effacement général
+des données ne les emporte pas (la suppression volontaire exige `SET LOCAL vibedelib.supprimer_site = 'on'`). L'application refuse aussi de les supprimer, et la télétransmission
+les ignore (ils ont été envoyés par ailleurs).
+**Reprise** (`backend/src/modules/arretes-site`, `POST /organismes/:orgId/arretes-site/reprise`, administrateur) : la page du site (réglage `arretes.site_url`, HTTPS, nom de domaine
+public) est lue côté serveur ; seuls les PDF du même site sont repris. Chaque arrêté devient un acte `statut = 'signe'`, rédacteur `@site`, direction `_site`, le PDF étant le document
+source ; la **date** est lue dans le texte du PDF (identifiant de l'accusé de réception `094-…-AAAAMMJJ-…`), à défaut le mois du dossier. La reprise est rejouable (adresse du PDF
+dans `custom.site.url`), en arrière-plan (4 téléchargements en parallèle), avec état et erreurs. **À lancer depuis l'application de production** : les PDF sont écrits dans le stockage
+de l'instance qui exécute la reprise.
+
+### 38.5 Arrêté déjà signé
+`POST /organismes/:orgId/actes/arrete-signe` (multipart : `arrete` PDF, `annexes`, `annexesTitres`, `titre`, `dateSignature`, `signataire`, `numeroArrete`, `controleLegalite`).
+Le dossier est créé comme tout acte (droits de rédaction, direction du rédacteur), le document est joint, les annexes ajoutées, puis l'acte passe à `signe` à la date de signature ;
+en cas d'échec le dossier à moitié créé est supprimé. Pas de circuit, pas d'exposé des motifs ; l'acte est dans la bibliothèque. **Contrôle de légalité** :
+`custom.controleLegalite = { etat: 'a_transmettre' }` (l'acte est proposé dans la télétransmission hors séance) ou `{ etat: 'deja_envoye', dateEnvoi, dateAr?, numeroAr? }` (il en sort) ;
+`PUT /actes/:id/controle-legalite` bascule l'état (refusé si une transmission est en cours).
+
+### 38.6 Exploitation
+- **Migrations** 0085 (clés d'API) et 0086 (actes « site ») : appliquées au démarrage ; une migration appliquée ne doit plus être modifiée (somme de contrôle).
+- **Base et stockage** : un backend lancé sur un poste avec la base de production écrit ses lignes dans la base, mais ses fichiers dans son **propre** dossier de stockage — les
+  documents créés ainsi ne sont pas visibles côté production. Les imports et dépôts se font depuis l'instance de production.
+- **Index de recherche** : le texte du PDF d'un acte dont le document est joint (arrêté repris ou déposé) est indexé avec le dispositif ; après la reprise des arrêtés, lancer
+  une ré-indexation (Paramétrage › Recherche).
+- **Schémas de test** : les tests d'intégration créent un schéma `vibedelib_test_<8 hex>` dans la base ; un test interrompu le laisse. `node scripts/purge-schemas-test.js` liste (essai
+  à blanc) puis, avec `--apply`, supprime ceux qui correspondent exactement au motif et ont plus de 15 minutes.

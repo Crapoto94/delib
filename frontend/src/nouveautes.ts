@@ -11,9 +11,21 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.50.0';
+export const VERSION = '0.51.0';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.51.0', type: 'minor', titre: 'Publication publique, arrêtés du site et arrêtés déjà signés',
+    items: [
+      "Journal de l'acte (administrateur et SCC) : toutes les actions réalisées sur un dossier, de la plus récente à la plus ancienne.",
+      "« Mes actes » : les participants du circuit hors de leur hiérarchie, et ceux qui ont déjà approuvé une étape à plusieurs validateurs, retrouvent leurs dossiers.",
+      "Pages publiques des délibérations et des arrêtés, à intégrer dans le site de la collectivité : liste des derniers mois et moteur de recherche (séance, rapporteur, thématique, dates, texte du titre et/ou du corps). Extrait du registre, annexes publiables, jamais l'exposé des motifs. Chaque publication s'active dans Paramétrage, Mise à disposition et affichage.",
+      "Arrêtés du site de la Ville : reprise des arrêtés publiés sur le site, conservés même en cas d'effacement général des données, consultables dans la bibliothèque.",
+      "Nouvel arrêté : choix entre un arrêté qui suit un parcours et un arrêté déjà signé (dépôt du PDF et des annexes, directement en bibliothèque), avec le contrôle de légalité à transmettre ou déjà envoyé.",
+      "Clés d'API : types d'actes, durée (2 ans au plus) et contenus (acte, exposé des motifs, annexes) réglés clé par clé ; documentation Swagger publiée sur la DMZ.",
+      "Bibliothèque : recherche par numéro d'arrêté et par texte du PDF ; l'extrait du registre d'un arrêté affiche l'arrêté.",
+    ],
+  },
   {
     version: '0.50.0', type: 'minor', titre: "L'espace des élus ouvre en ligne",
     items: [

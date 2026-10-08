@@ -59,7 +59,7 @@ export function Pagination({ total, limit, page, onPage, itemLabel = 'élément'
 const TONES: Record<string, string> = {
   gray: 'bg-slate-100 text-slate-700 border-slate-300/70', blue: 'bg-action/10 text-action border-action/30', ok: 'bg-ok-bg text-ok-text border-ok/30', warn: 'bg-warn-bg text-warn border-warn/30', ko: 'bg-ko-bg text-ko border-ko/30',
 };
-export const Badge = ({ tone = 'gray', children, title }: { tone?: keyof typeof TONES; children: ReactNode; title?: string }) => <span className={`badge ${TONES[tone]}`} title={title}>{children}</span>;
+export const Badge = ({ tone = 'gray', children, title, className = '' }: { tone?: keyof typeof TONES; children: ReactNode; title?: string; className?: string }) => <span className={`badge ${TONES[tone]} ${className}`.trim()} title={title}>{children}</span>;
 /**
  * Pastille d'état. Pour un acte **à signer**, le nom du signataire est affiché quand on le connaît
  * (« À signer (Ayoub RAGBI) ») : dire « (maire) » était souvent faux, et « (signataire) » ne dit rien.

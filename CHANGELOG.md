@@ -9,6 +9,20 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.51.0 — Publication publique, arrêtés du site et arrêtés déjà signés
+
+- **Journal de l'acte** (administrateur et SCC) : toutes les actions réalisées sur un dossier — annexes, textes, commentaires, commissions, ordre du jour, télétransmission — de la plus récente à la plus ancienne, tirées du journal d'audit immuable. Carte « Journal de l'acte » dans la fiche du dossier. (`GET /organismes/:orgId/actes/:id/journal`.)
+- **« Mes actes »** : les participants du circuit hors de la hiérarchie, et ceux qui ont déjà approuvé une étape à plusieurs validateurs, retrouvent désormais leurs dossiers dans « Dans le circuit ».
+- **API externe à périmètre** : chaque clé d'API fixe ses **types d'actes**, une **durée** (2 ans au plus) et les **contenus** téléchargeables (acte seul, exposé des motifs, annexes) — migration 0085. Recherche plein texte du titre sans accents, mot-clé, rapporteur, dates ; listes de choix `/seances`, `/rapporteurs`, `/types` ; PDF de l'exposé ; spécification OpenAPI publique, limitée à l'API externe et à l'API publique.
+- **DMZ — Swagger et relais** : le nginx de la DMZ ne relaie que `/api/v1/externe/`, `/api/v1/public/deliberations` et `/api/v1/public/arretes` (GET/HEAD, quotas dédiés) ; la documentation Swagger est servie localement sous `/api-docs/` (aucun CDN). Le proxy de développement suit la même liste blanche.
+- **Pages publiques des délibérations** (sans connexion, nues, pour iframe) : `/deliberations` (derniers mois, une rupture par séance avec la date du conseil, **extrait du registre**, annexes en modale, pagination) et `/deliberations-recherche` (moteur sans limite de durée : séance, rapporteur, thématique, dates, texte du titre et/ou du corps — jamais l'exposé des motifs). Pages `-code` : extrait à coller, script autonome complet et aperçu. Liens **chiffrés** (non devinables) ; publication **désactivée par défaut**.
+- **Menu « Mise à disposition et affichage »** (Paramétrage) : activation, période (sans plafond à 24 mois) et codes d'intégration des pages publiques ; les réglages propres aux élus restent dans « Espace élus ».
+- **Arrêtés du site de la Ville** : reprise des arrêtés publiés sur le site (496 PDF à ce jour), chacun devenant un arrêté signé marqué **« site »**, daté d'après l'accusé de réception de la préfecture. Les actes « site » **survivent à un effacement général** des données, ne se suppriment pas depuis l'application et sont exclus de la télétransmission. Carte d'administration : lancement, progression, erreurs — migration 0086.
+- **Arrêté déjà signé** : à la création d'un arrêté, choix entre « suit un parcours » et « est déjà signé » — saisie des éléments, dépôt de l'arrêté et des annexes, sans circuit ni exposé des motifs, directement en bibliothèque. Contrôle de légalité **à transmettre** (proposé dans la télétransmission) ou **déjà envoyé** (date d'envoi, accusé de réception), modifiable depuis la fiche.
+- **Arrêtés publics** : `/arretes` et `/arretes-recherche` (texte de l'objet ou numéro, année, dates), pages `-code` et API `/api/v1/public/arretes`.
+- **Bibliothèque** : recherche par numéro d'arrêté et par texte du PDF (l'arrêté repris ou déposé est indexé) ; l'extrait du registre d'un arrêté sans séance est le PDF de l'arrêté (« Séance introuvable » corrigé) ; le résultat « Signé par le maire » est une pastille compacte.
+- **Exploitation** : script `purge-schemas-test.js` (supprime les schémas jetables de tests restés dans la base, essai à blanc par défaut). Migrations **0085** et **0086**.
+
 ## 0.50.0 — L'espace des élus ouvre en ligne
 
 - **Le front des élus est en ligne** sur une **adresse publique** (première version) : connexion par lien personnel, ordre du jour, dossier de séance, lecture et annotation des pièces, recherche. Le réglage par organisme `elus.url_base` porte cette adresse, utilisée dans les invitations envoyées aux élus.
