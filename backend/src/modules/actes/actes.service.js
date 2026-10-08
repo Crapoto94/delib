@@ -378,6 +378,16 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
       return toActe(await db.get('SELECT * FROM actes WHERE id = $1', [id]));
     },
 
+    /** Reprend la rédaction d'un dossier rappelé : il redevient un brouillon (le motif du rappel reste au journal), à compléter puis à renvoyer au circuit. */
+    async reprendre(ctx, organismeId, id) {
+      const a = await svc.load(ctx, organismeId, id);
+      if (!(a.redacteur === ctx.username || (a.co_redacteurs || []).includes(ctx.username) || acl.isAdmin(ctx, a.organisme_id))) throw E.forbidden('Seul le rédacteur, l\u2019administrateur ou le SCC peut reprendre ce dossier');
+      if (a.statut !== 'rappele') throw E.conflict('Seul un dossier rappelé peut être repris');
+      const r = await db.get("UPDATE actes SET statut = 'brouillon', current_step_key = NULL, rappel_motif = NULL, rappel_at = NULL WHERE id = $1 RETURNING *", [id]);
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'acte.reprise_rappel', entity: 'actes', entityId: id, before: { statut: 'rappele', motif: a.rappel_motif ?? null }, after: { statut: 'brouillon' } });
+      return toActe(r);
+    },
+
     async duplicate(ctx, organismeId, id) {
       const src = await svc.load(ctx, organismeId, id);
       const copy = await svc.create(ctx, src.organisme_id, {

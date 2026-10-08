@@ -115,5 +115,19 @@ describe('dossier rappelé du circuit', () => {
     const fiche = (await as(t.dupont).get(A(a.id))).body;
     expect(fiche).toMatchObject({ statut: 'rappele', rappelMotif: 'Erreur de destinataire' });
   });
+
+  it("la rédactrice reprend la rédaction du dossier rappelé, puis le renvoie au circuit", async () => {
+    const a = await acte('Dossier rappelé puis repris', { submit: true });
+    expect((await as(t.dupont).post(`${A(a.id)}/reprendre`)).status).toBe(409);                 // pas rappelé : rien à reprendre
+    await as(t.dupont).post(`${A(a.id)}/rappeler`, { motif: 'À revoir' });
+    expect((await as(t.leroy).post(`${A(a.id)}/reprendre`)).status).toBeGreaterThanOrEqual(403);   // ni rédacteur ni administration
+    const r = await as(t.dupont).post(`${A(a.id)}/reprendre`);
+    expect(r.status).toBe(200); expect(r.body.statut).toBe('brouillon'); expect(r.body.rappelMotif).toBeNull();
+    const mes = (await as(t.dupont).get(`${base()}/circuit/portefeuille`)).body.items.find((i) => i.acte.id === a.id);
+    expect(mes.step.label).toBe('Rédaction');
+    expect((await as(t.dupont).post(`${A(a.id)}/envoi`)).status).toBeLessThan(300);               // renvoi au circuit
+    expect((await as(t.dupont).get(A(a.id))).body.statut).toBe('en_circuit');
+    expect((await as(admin).get(`/api/v1/audit?organismeId=${ville.id}&action=acte.reprise_rappel`)).body.items.length).toBe(1);
+  });
 });
 

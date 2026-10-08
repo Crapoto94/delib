@@ -7,7 +7,7 @@ import { Empty, ErrorBox, Loading, useLoad } from '../ui';
 /** Libellé lisible de chaque action tracée dans le journal d'audit (ce qui n'est pas listé s'affiche tel quel). */
 const LIBELLE: Record<string, string> = {
   'acte.create': 'Dossier créé', 'acte.update': 'Fiche modifiée', 'acte.copie': 'Dossier copié depuis un autre', 'acte.depuis_modele': 'Dossier créé depuis un modèle',
-  'acte.delete': 'Dossier supprimé', 'acte.abandon': 'Dossier abandonné', 'acte.reactivate': 'Dossier réactivé', 'acte.rappele': 'Dossier rappelé',
+  'acte.delete': 'Dossier supprimé', 'acte.abandon': 'Dossier abandonné', 'acte.reactivate': 'Dossier réactivé', 'acte.rappele': 'Dossier rappelé', 'acte.reprise_rappel': 'Rédaction reprise après rappel',
   'acte.assiste': 'Mode assisté modifié', 'acte.collecte': 'Dossier collecté (arrêté)', 'acte.document_source': 'Document source déposé', 'acte.document_source_retire': 'Document source retiré',
   'acte.signature_position': 'Emplacement de la signature défini', 'acte.retour_signe': 'Retour du document signé', 'acte.report': 'Reporté à une autre séance',
   'acte.lien.ajout': 'Lien ajouté vers un autre acte', 'acte.lien.retrait': 'Lien retiré', 'acte.commission.add': 'Commission saisie', 'acte.commission.remove': 'Commission retirée', 'acte.commission.avis': 'Avis de commission',

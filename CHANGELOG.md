@@ -9,6 +9,10 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.51.2 — Reprendre la rédaction d'un dossier rappelé
+
+- **« Reprendre la rédaction »** : un dossier rappelé du circuit peut être remis en brouillon par son rédacteur, l'administrateur ou le SCC (bouton du bandeau « Dossier rappelé », `POST /actes/:id/reprendre`). Il est alors à compléter puis à renvoyer au circuit ; le motif du rappel et la reprise restent au journal de l'acte.
+
 ## 0.51.1 — Les dossiers rappelés restent visibles
 
 - **Dossier rappelé du circuit** : un acte rappelé (statut « rappelé ») disparaissait de « Mes actes » et de « Tous les actes ». Il reste désormais visible — dans « En cours de rédaction » pour son rédacteur, et dans « Tous les actes » pour l'administration et le SCC — avec l'étape « Rappelé », une pastille dédiée et, dans la fiche, un bandeau indiquant la date et le motif du rappel. (`engine.js`, `Dossier.tsx`, `format.ts`.)

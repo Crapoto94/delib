@@ -11,9 +11,16 @@
 export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.51.1';
+export const VERSION = '0.51.2';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.51.2', type: 'patch', titre: "Reprendre la rédaction d'un dossier rappelé",
+    items: [
+      "Un dossier rappelé du circuit peut être repris : le bouton « Reprendre la rédaction » le remet en brouillon, à compléter puis à renvoyer au circuit.",
+      "Le rappel et la reprise figurent dans le journal de l'acte.",
+    ],
+  },
   {
     version: '0.51.1', type: 'patch', titre: 'Les dossiers rappelés restent visibles',
     items: [

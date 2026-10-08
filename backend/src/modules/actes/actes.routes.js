@@ -78,6 +78,9 @@ module.exports = ({ makeRouter, actes }) => {
 
   r.post('/:id/abandon', { summary: 'Abandonne un acte (motif obligatoire, jamais de suppression)', tags: ['actes'], org: true, params: IdP, body: Abandon },
     async (req, res) => res.json(await actes.abandon(req.ctx, req.org.id, req.valid.params.id, req.valid.body.motif)));
+  r.post('/:id/reprendre', { summary: 'Reprend la rédaction d\u2019un dossier rappelé : il redevient un brouillon', tags: ['actes'], org: true, params: IdP,
+    description: 'Le rédacteur, l\u2019administrateur ou le SCC. Le dossier est à compléter puis à renvoyer au circuit ; le motif du rappel reste dans le journal de l\u2019acte.' },
+  async (req, res) => res.json(await actes.reprendre(req.ctx, req.org.id, req.valid.params.id)));
   r.post('/:id/reactivate', { summary: 'Réactive un acte abandonné', tags: ['actes'], org: true, params: IdP },
     async (req, res) => res.json(await actes.reactivate(req.ctx, req.org.id, req.valid.params.id)));
   r.post('/:id/rappeler', { summary: "Rappelle un acte en circuit (motif obligatoire) : casse le circuit, nouvel état « rappele »", tags: ['actes'], org: true, params: IdP, body: Abandon },
