@@ -19,6 +19,7 @@ import DossierAssiste, { ActiverAssiste } from '../DossierAssiste';
 import EnvoiBravo from '../EnvoiBravo';
 import SignaturePlacement from '../SignaturePlacement';
 import Bureau, { useBureau, peutEditer } from '../Bureau';
+import JournalActe from './JournalActe';
 
 /* ------------------------------------------------------------------------------------------------ frise du circuit */
 const IGNOREE: Record<string, string> = {
@@ -1011,8 +1012,10 @@ export default function Dossier() {
           <CommissionsBox acte={a} editable={editable} toast={toast} />
           {(a.statut === 'brouillon' || a.statut === 'modification_demandee') && <ActesProches acte={a} />}
           <Historique circuit={c} />
+          {a.droits?.administrer && <JournalActe acteId={a.id} />}
         </aside>}
       </div>
+      {signe && a.droits?.administrer && <JournalActe acteId={a.id} />}
       {copying && <CopieModal acte={a} onClose={() => setCopying(false)} toast={toast} />}
       {a.custom?.assiste?.actif && <DossierAssiste acte={a} editable={editable} onReload={reloadAll} onApercu={apercuDossier} toast={toast} />}
       {envoi && <EnvoiBravo data={envoi.data} premier={envoi.premier} onClose={() => setEnvoi(null)} />}

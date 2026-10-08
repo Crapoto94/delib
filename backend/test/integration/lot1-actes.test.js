@@ -391,6 +391,14 @@ describe('annexes (PDF)', () => {
     expect(audit[0].after.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("journal de l'acte : réservé à l'administrateur et au SCC, avec les annexes déposées", async () => {
+    const j = `${base()}/actes/${a.id}/journal`;
+    const r = await as(admin).get(j);
+    expect(r.status).toBe(200);
+    expect(r.body.items.map((x) => x.action)).toContain('annexe.add');
+    expect((await as(t.durand).get(j)).status).toBe(403);
+  });
+
   it('accepte un document Word / Excel : l\'original est conservé, un PDF de consultation est préparé', async () => {
     // l'en-tête PK (ZIP) est reconnu comme un document Office : le dépôt est accepté, sans conversion immédiate.
     const xlsx = Buffer.concat([Buffer.from('PK\x03\x04'), Buffer.from('contenu tableur')]);

@@ -21,6 +21,26 @@ function createAudit(db) {
       ));
     },
 
+    /**
+     * Journal d'UN acte : toutes les traces d'audit qui le concernent, de la plus récente à la plus ancienne.
+     * L'acte lui-même (`entity = 'actes'`), ses pièces liées (annexes, délibérations, transmissions) et les écritures
+     * dont le détail porte son identifiant (textes, commentaires, commissions, liens, inscription à un ordre du jour).
+     */
+    async forActe(organismeId, acteId, { limit = 500 } = {}) {
+      const id = String(acteId);
+      const rows = await db.withCtx({ isPlatformAdmin: true }, (q) => q.all(
+        `SELECT * FROM audit_log WHERE organisme_id = $1 AND (
+           (entity = 'actes' AND entity_id = $2)
+           OR after->>'acteId' = $2 OR before->>'acteId' = $2
+           OR (action = 'odj.affecter' AND after->'acteIds' @> to_jsonb($3::int))
+           OR (entity = 'annexes' AND entity_id IN (SELECT id::text FROM annexes WHERE acte_id = $3))
+           OR (entity = 'deliberations' AND entity_id IN (SELECT id::text FROM deliberations WHERE acte_id = $3))
+           OR (entity = 'tlt_transactions' AND entity_id IN (SELECT id::text FROM tlt_transactions WHERE acte_id = $3))
+         ) ORDER BY id DESC LIMIT $4`,
+        [organismeId, id, Number(acteId), limit]));
+      return { items: rows.map(toRow) };
+    },
+
     async list(ctx, { organismeId, action, actor, limit = 50, offset = 0 }) {
       const where = []; const p = [];
       if (organismeId) { p.push(organismeId); where.push(`organisme_id = $${p.length}`); }

@@ -638,7 +638,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       // ou circuit terminé/validé sans être encore passé en séance (périmètre : moi et mon équipe hiérarchique).
       const h = await titulaires.hierarchyScope(ctx.username, org);
       const isDgs = (await titulaires.resolve(org, 'dgs', {})).some((t) => t.username === ctx.username || t.suppleant === ctx.username);
-      const p = [org, ctx.username]; const or = ['a.redacteur = $2', 'a.co_redacteurs ? $2'];
+      // `participants` : toute personne du circuit voit l'acte dès l'envoi (VIS-01), même hors de ma hiérarchie.
+      const p = [org, ctx.username]; const or = ['a.redacteur = $2', 'a.co_redacteurs ? $2', 'a.participants ? $2'];
       if (isDgs || h.dgaOrganisme) or.push('TRUE');
       if (h.directions.length) { p.push(h.directions); or.push(`a.direction_code = ANY($${p.length}::text[])`); }
       for (const [d, sv] of h.services) { p.push(d, sv); or.push(`(a.direction_code = $${p.length - 1} AND a.service_code = $${p.length})`); }
@@ -653,7 +654,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
              OR (a.statut = ANY($${p.length}::text[]) AND a.current_step_key IS NULL))
            -- Un acte signé entre aussitôt dans la bibliothèque : il ne reste ici que 15 jours.
            AND NOT (a.statut = 'signe' AND a.signe_at < now() - interval '15 days')
-           AND NOT (COALESCE(i.holders, '[]'::jsonb) ? $2)`, p);
+           -- (déjà dans « Action attendue » si c'est à moi d'agir : le portefeuille dédoublonne par acte, la première rubrique l'emporte)
+           ORDER BY a.id`, p);
       for (const r of poursuite) {
         const step = r.current_step_key
           ? { key: r.cur_key, label: r.cur_label || r.cur_key, holders: r.cur_holders, dueAt: r.cur_due, late: !!r.cur_due && new Date(r.cur_due) < new Date() }

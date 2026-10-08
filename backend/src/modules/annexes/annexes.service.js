@@ -128,7 +128,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bure
         [a.id, meta.titre, typeId, ordre, f.id, meta.communicable ?? true, meta.publiable ?? true, meta.transmissible ?? true, ctx.username]);
       await db.run('INSERT INTO annexe_versions (annexe_id, version, file_id, replaced_by) VALUES ($1, 1, $2, $3)', [r.id, f.id, ctx.username]);
       const out = toAnnexe(await db.get(`${SELECT} WHERE a.id = $1`, [r.id]));
-      await audit.log(ctx, { organismeId: a.organisme_id, action: 'annexe.add', entity: 'annexes', entityId: r.id, after: { titre: out.titre, sha256: f.sha256, pages: f.pages } });
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'annexe.add', entity: 'annexes', entityId: r.id, after: { acteId: a.id, titre: out.titre, sha256: f.sha256, pages: f.pages } });
       await bus.emit('annexe.added', { organismeId: a.organisme_id, acteId: a.id, annexeId: r.id, ctx });
       return out;
     },
@@ -164,7 +164,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bure
       // ou lors de la validation finale ; l'ancien PDF reste consultable dans l'historique.
       await db.run('UPDATE annexes SET file_id = $2, version = $3, pdf_file_id = NULL WHERE id = $1', [id, f.id, version]);
       await db.run('INSERT INTO annexe_versions (annexe_id, version, file_id, replaced_by) VALUES ($1,$2,$3,$4)', [id, version, f.id, username]);
-      await audit.log(ctx || { username }, { organismeId: a.organisme_id, action: 'annexe.replace', entity: 'annexes', entityId: id, before: { version: versionAvant }, after: { version, sha256: f.sha256 } });
+      await audit.log(ctx || { username }, { organismeId: a.organisme_id, action: 'annexe.replace', entity: 'annexes', entityId: id, before: { version: versionAvant }, after: { acteId: a.id, version, sha256: f.sha256 } });
       await bus.emit('annexe.replaced', { organismeId: a.organisme_id, acteId: a.id, annexeId: id, version, ctx: ctx || { username } });
       if (force) svc.pdfEnArrierePlan(a.organisme_id, id);   // en arrière-plan : l'enregistrement n'attend pas le PDF
       return toAnnexe(await db.get(`${SELECT} WHERE a.id = $1`, [id]));
@@ -208,7 +208,7 @@ function createAnnexes({ db, audit, storage, refs, actes, bus, uploadLimit, bure
       const a = await actes.load(ctx, organismeId, acteId, { attach: true });
       const r = await db.get('DELETE FROM annexes WHERE id = $1 AND acte_id = $2 RETURNING *', [id, a.id]);
       if (!r) throw E.notFound('Annexe introuvable');
-      await audit.log(ctx, { organismeId: a.organisme_id, action: 'annexe.delete', entity: 'annexes', entityId: id, before: { titre: r.titre } });
+      await audit.log(ctx, { organismeId: a.organisme_id, action: 'annexe.delete', entity: 'annexes', entityId: id, before: { acteId: a.id, titre: r.titre } });
     },
 
     async reorder(ctx, organismeId, acteId, ids) {

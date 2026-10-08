@@ -9,7 +9,9 @@ const Query = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-module.exports = ({ makeRouter, audit, access }) => {
+const Org = z.object({ orgId: z.coerce.number().int().positive(), id: z.coerce.number().int().positive() });
+
+module.exports = ({ makeRouter, audit, access, acl, actes }) => {
   const r = makeRouter('/api/v1/audit');
 
   r.get('/', {
@@ -24,5 +26,16 @@ module.exports = ({ makeRouter, audit, access }) => {
     res.json(await audit.list(req.ctx, q));
   });
 
-  return [r];
+  const j = makeRouter('/api/v1/organismes/:orgId/actes/:id/journal');
+  j.get('/', {
+    summary: "Journal de l'acte : les actions réalisées sur ce dossier", tags: ['audit'], org: true, params: Org,
+    description: "Administrateur et SCC uniquement. Tiré du journal d'audit immuable : qui, quoi, quand, avec le détail avant/après. Du plus récent au plus ancien (500 lignes au plus).",
+  }, async (req, res) => {
+    const { id } = req.valid.params;
+    if (!acl.isAdmin(req.ctx, req.org.id)) throw E.forbidden("Réservé à l'administrateur et au SCC");
+    const a = await actes.load(req.ctx, req.org.id, id);
+    res.json(await audit.forActe(a.organisme_id, a.id));
+  });
+
+  return [r, j];
 };
