@@ -13,6 +13,6 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # APK des tablettes (page d'installation + fichier publié par scripts/publier-apk.mjs), servi sous /apk/
 COPY apk /usr/share/nginx/html/apk
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-ENV BACKEND_HOST=backend BACKEND_PORT=3121
+ENV BACKEND_HOST=backend BACKEND_PORT=3121 FRAME_ANCESTORS=*
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1/api/status >/dev/null || exit 1

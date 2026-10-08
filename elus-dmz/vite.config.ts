@@ -17,6 +17,13 @@ const buildTime = new Date().toISOString();
 export default defineConfig({
   plugins: [
     react(),
+    // Dev : /api-docs/ sert la page Swagger statique (public/api-docs) au lieu du repli SPA ; nginx fait de même en production.
+    {
+      name: 'vd-api-docs',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => { if (req.url === '/api-docs' || req.url === '/api-docs/') req.url = '/api-docs/index.html'; next(); });
+      },
+    },
     // dist/version.json : identifiant du build, lu par le script de publication de l'APK.
     {
       name: 'vd-version',
@@ -28,5 +35,8 @@ export default defineConfig({
   base: './',
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __BUILD_TIME__: JSON.stringify(buildTime) },
   build: { outDir: 'dist', emptyOutDir: true },
-  server: { port: 5161, strictPort: true, proxy: { '/api': { target: process.env.VITE_API_TARGET || 'http://localhost:3121', changeOrigin: true } } },
+  server: { port: 5161, strictPort: true, proxy: {
+    // Même liste blanche que nginx.conf.template : un préfixe '/api' attraperait aussi /api-docs (Swagger complet du backend).
+    '^/api/v1/(elus|elus-auth|externe)/|^/api/v1/elus-auth/etat$|^/api/v1/public/(deliberations|branding$|organismes/[0-9]+/logo$)': { target: process.env.VITE_API_TARGET || 'http://localhost:3121', changeOrigin: true },
+  } },
 });

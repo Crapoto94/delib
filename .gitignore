@@ -37,3 +37,7 @@ pulldocker-*.ini
 pulldmz.ini
 pulldmz-*.ini
 elus-dmz/.env
+# ressources Swagger UI copiees au build (elus-dmz/scripts/copy-swagger-assets.mjs) ; index.html et init.js restent versionnes
+elus-dmz/public/api-docs/swagger-ui-bundle.js
+elus-dmz/public/api-docs/swagger-ui.css
+elus-dmz/public/api-docs/favicon-32x32.png

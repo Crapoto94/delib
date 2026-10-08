@@ -19,6 +19,20 @@ Copier `.env.example` en `.env` (non versionné) sur l'hôte Docker DMZ :
 Côté backend : `ELUS_URL` (ou le paramètre `elus.url_base`) = adresse publique de l'espace (sans suffixe de page, ex. `https://elus.ivry94.fr`), utilisée dans les invitations ;
 `CORS_ORIGINS` doit lister l'origine de l'APK (`https://localhost`) si l'application mobile appelle l'API directement.
 
+## API publique des actes
+La DMZ relaie en plus **un seul** préfixe d'API, en lecture seule (GET/HEAD) : `/api/v1/externe/` — l'API des applications externes (site de la Ville, portail…).
+Les clés sont créées dans **Paramétrage > Clés API** de VibeDélib ; chaque clé fixe son **périmètre** : types d'actes, durée (2 ans au plus) et contenus
+téléchargeables (acte seul, exposé des motifs, annexes). La DMZ ne stocke aucune clé : l'en-tête `Authorization: Bearer vd_…` (ou `X-API-Key`) est relayé et vérifié par le backend.
+
+| Adresse | Rôle |
+|---|---|
+| `/api-docs/` | documentation Swagger (spécification relayée depuis `/api/v1/externe/openapi.json`) |
+| `/api/v1/externe/actes` | liste et recherche (`q` titre plein texte, `motCle`, `seanceId`, `rapporteurId`, `dateDebut`/`dateFin`, `type`, `matiere`…) |
+| `/api/v1/externe/seances`, `/rapporteurs`, `/types` | listes de choix pour les filtres |
+| `/api/v1/externe/actes/{id}`, `/pdf`, `/expose`, `/annexes/{annexeId}` | fiche et téléchargements |
+
+Les adresses IP autorisées d'une clé sont celles vues par le backend (`X-Forwarded-For` posé par ce nginx) : renseigner les IP des clients finaux, pas celle de la DMZ.
+
 ## Construire et lancer
 ```
 docker compose up -d --build

@@ -12,6 +12,8 @@ const PORTEES = {
   'actes:adoptes': 'Délibérations adoptées, avant ou pendant la transmission : mêmes contenus, marqués « adopté, pas encore exécutoire »',
   'actes:encours': 'Actes en rédaction ou en circuit : métadonnées seulement (jamais les textes, PDF ni annexes)',
 };
+const CONTENUS = { acte: "L'acte seul (PDF de la délibération, en téléchargement)", expose: "L'exposé des motifs (texte et PDF)", annexes: 'Les annexes publiables (PDF)' };
+const DUREE_MAX = 24; // mois : jamais plus de deux ans
 const FORMAT = /^vd_([0-9a-f]{8})_([A-Za-z0-9_-]{32})$/;
 const sha = (x) => crypto.createHash('sha256').update(String(x)).digest('hex');
 const same = (a, b) => { const x = Buffer.from(String(a)); const y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
@@ -37,7 +39,7 @@ function createApiKeys({ db, audit, log }) {
   const fenetres = new Map(); // id -> [horodatages] (débit par clé, en mémoire)
 
   const vue = (r) => ({
-    id: r.id, nom: r.nom, prefixe: `vd_${r.prefixe}_…`, portees: r.portees, ips: r.ips, limiteMinute: r.limite_minute, expireLe: r.expire_le, actif: r.actif && !r.revoquee_le && (!r.expire_le || new Date(r.expire_le) > new Date()),
+    id: r.id, nom: r.nom, prefixe: `vd_${r.prefixe}_…`, portees: r.portees, ips: r.ips, limiteMinute: r.limite_minute, expireLe: r.expire_le, types: r.types, dureeMois: r.duree_mois, contenus: r.contenus, actif: r.actif && !r.revoquee_le && (!r.expire_le || new Date(r.expire_le) > new Date()),
     revoquee: !!r.revoquee_le, revoqueeLe: r.revoquee_le, dernierUsage: r.dernier_usage, nbAppels: Number(r.nb_appels), creePar: r.created_by, creeLe: r.created_at,
   });
   function verifPortees(portees) {
@@ -45,25 +47,35 @@ function createApiKeys({ db, audit, log }) {
     for (const p of portees) if (!PORTEES[p]) throw E.badRequest(`Droit inconnu : ${p}`);
     return [...new Set(portees)];
   }
+  /** Périmètre d'une clé : types (vide = tous), durée 1 à 24 mois, contenus téléchargeables (au moins un). */
+  function verifPerimetre(b, cur = {}) {
+    const types = b.types !== undefined ? [...new Set((b.types || []).map(String))] : (cur.types ?? []);
+    const dureeMois = b.dureeMois !== undefined ? Number(b.dureeMois) : (cur.duree_mois ?? DUREE_MAX);
+    if (!Number.isInteger(dureeMois) || dureeMois < 1 || dureeMois > DUREE_MAX) throw E.badRequest(`La durée doit être de 1 à ${DUREE_MAX} mois (2 ans au plus)`);
+    const contenus = { acte: true, expose: true, annexes: true, ...(cur.contenus || {}), ...(b.contenus || {}) };
+    for (const k of Object.keys(contenus)) if (!CONTENUS[k]) delete contenus[k]; else contenus[k] = !!contenus[k];
+    if (!Object.values(contenus).some(Boolean)) throw E.badRequest('Choisissez au moins un contenu à exposer (acte, exposé des motifs ou annexes)');
+    return { types, dureeMois, contenus };
+  }
   function genere() {
     const prefixe = crypto.randomBytes(4).toString('hex'); const secret = crypto.randomBytes(24).toString('base64url');
     return { prefixe, secret, cle: `vd_${prefixe}_${secret}` };
   }
 
   const svc = {
-    PORTEES, ipAutorisee,
+    PORTEES, CONTENUS, DUREE_MAX, ipAutorisee,
 
     async lister(organismeId) { return (await db.all('SELECT * FROM api_keys WHERE organisme_id = $1 ORDER BY id DESC', [requireOrg(organismeId)])).map(vue); },
 
     /** Crée une clé : la clé complète n'est renvoyée QUE ici. */
     async creer(ctx, organismeId, b, { remplace = null } = {}) {
-      const org = requireOrg(organismeId); const portees = verifPortees(b.portees); valideIps(b.ips);
+      const org = requireOrg(organismeId); const portees = verifPortees(b.portees); valideIps(b.ips); const per = verifPerimetre(b);
       if (b.expireLe && new Date(b.expireLe) <= new Date()) throw E.badRequest('La date d\'expiration doit être dans le futur');
       const k = genere();
       const r = await db.get(
-        `INSERT INTO api_keys (organisme_id, nom, prefixe, secret_hash, portees, ips, limite_minute, expire_le, remplace_id, created_by) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9,$10) RETURNING *`,
-        [org, b.nom, k.prefixe, sha(k.secret), JSON.stringify(portees), JSON.stringify(b.ips || []), b.limiteMinute ?? 120, b.expireLe ?? null, remplace, ctx.username]);
-      await audit.log(ctx, { organismeId: org, action: 'cle_api.creation', entity: 'api_keys', entityId: r.id, after: { nom: b.nom, portees, ips: b.ips || [], expireLe: b.expireLe ?? null } }); // jamais la clé
+        `INSERT INTO api_keys (organisme_id, nom, prefixe, secret_hash, portees, ips, limite_minute, expire_le, remplace_id, created_by, types, duree_mois, contenus) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12,$13::jsonb) RETURNING *`,
+        [org, b.nom, k.prefixe, sha(k.secret), JSON.stringify(portees), JSON.stringify(b.ips || []), b.limiteMinute ?? 120, b.expireLe ?? null, remplace, ctx.username, JSON.stringify(per.types), per.dureeMois, JSON.stringify(per.contenus)]);
+      await audit.log(ctx, { organismeId: org, action: 'cle_api.creation', entity: 'api_keys', entityId: r.id, after: { nom: b.nom, portees, ips: b.ips || [], expireLe: b.expireLe ?? null, ...per } }); // jamais la clé
       return { ...vue(r), cle: k.cle };
     },
 
@@ -78,10 +90,14 @@ function createApiKeys({ db, audit, log }) {
       if (b.ips !== undefined) { valideIps(b.ips); add('ips', JSON.stringify(b.ips), '::jsonb'); }
       if (b.limiteMinute !== undefined) add('limite_minute', b.limiteMinute);
       if (b.expireLe !== undefined) add('expire_le', b.expireLe);
+      if (b.types !== undefined || b.dureeMois !== undefined || b.contenus !== undefined) {
+        const per = verifPerimetre(b, cur);
+        add('types', JSON.stringify(per.types), '::jsonb'); add('duree_mois', per.dureeMois); add('contenus', JSON.stringify(per.contenus), '::jsonb');
+      }
       if (b.actif !== undefined) add('actif', b.actif);
       if (!set.length) return vue(cur);
       const r = await db.get(`UPDATE api_keys SET ${set.join(', ')} WHERE id = $1 RETURNING *`, p);
-      await audit.log(ctx, { organismeId: org, action: 'cle_api.modification', entity: 'api_keys', entityId: id, before: { portees: cur.portees, actif: cur.actif }, after: { portees: r.portees, actif: r.actif } });
+      await audit.log(ctx, { organismeId: org, action: 'cle_api.modification', entity: 'api_keys', entityId: id, before: { portees: cur.portees, actif: cur.actif, types: cur.types, dureeMois: cur.duree_mois, contenus: cur.contenus }, after: { portees: r.portees, actif: r.actif, types: r.types, dureeMois: r.duree_mois, contenus: r.contenus } });
       return vue(r);
     },
 
@@ -98,7 +114,7 @@ function createApiKeys({ db, audit, log }) {
       const org = requireOrg(organismeId);
       const cur = await db.get('SELECT * FROM api_keys WHERE id = $1 AND organisme_id = $2', [id, org]);
       if (!cur || cur.revoquee_le) throw E.notFound('Clé introuvable ou déjà révoquée');
-      const nouvelle = await svc.creer(ctx, org, { nom: cur.nom, portees: cur.portees, ips: cur.ips, limiteMinute: cur.limite_minute, expireLe: cur.expire_le && new Date(cur.expire_le) > new Date() ? cur.expire_le : null }, { remplace: id });
+      const nouvelle = await svc.creer(ctx, org, { nom: cur.nom, portees: cur.portees, ips: cur.ips, limiteMinute: cur.limite_minute, types: cur.types, dureeMois: cur.duree_mois, contenus: cur.contenus, expireLe: cur.expire_le && new Date(cur.expire_le) > new Date() ? cur.expire_le : null }, { remplace: id });
       if (finAncienneLe) await db.run('UPDATE api_keys SET expire_le = $2 WHERE id = $1', [id, finAncienneLe]); else await svc.revoquer(ctx, org, id);
       await audit.log(ctx, { organismeId: org, action: 'cle_api.renouvellement', entity: 'api_keys', entityId: id, after: { nouvelle: nouvelle.id } });
       return nouvelle;
@@ -120,7 +136,7 @@ function createApiKeys({ db, audit, log }) {
         if (w.length >= r.limite_minute) { res.setHeader('Retry-After', '30'); throw E.tooMany("Trop d'appels : limite de la clé atteinte"); }
         w.push(t); fenetres.set(r.id, w);
         db.run('UPDATE api_keys SET nb_appels = nb_appels + 1, dernier_usage = CASE WHEN dernier_usage IS NULL OR dernier_usage < now() - interval \'1 minute\' THEN now() ELSE dernier_usage END WHERE id = $1', [r.id]).catch((e) => log?.warn?.({ err: e.message }, 'clé d\'API : compteur non mis à jour'));
-        req.apiKey = { id: r.id, organismeId: r.organisme_id, nom: r.nom, portees: r.portees };
+        req.apiKey = { id: r.id, organismeId: r.organisme_id, nom: r.nom, portees: r.portees, types: r.types || [], dureeMois: r.duree_mois, contenus: r.contenus };
         next();
       } catch (err) { next(err); }
     },
@@ -128,4 +144,4 @@ function createApiKeys({ db, audit, log }) {
   return svc;
 }
 
-module.exports = { createApiKeys, PORTEES, ipAutorisee };
+module.exports = { createApiKeys, PORTEES, CONTENUS, DUREE_MAX, ipAutorisee };

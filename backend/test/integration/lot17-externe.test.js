@@ -188,3 +188,131 @@ describe('droits : exécutoires / adoptés / en cours (EXT-02, EXT-03)', () => {
     expect((await avec(exe).get(X('/registre'))).status).toBe(400);
   });
 });
+
+describe('API publique : périmètre de la clé, recherche et spécification', () => {
+  const cle = async (extra) => (await as(admin).post(K(), { nom: 'Portail', portees: ['actes:executoires', 'actes:adoptes', 'actes:encours'], ...extra }));
+
+  it('paramétrage de la clé : durée de 2 ans au plus, au moins un contenu', async () => {
+    expect((await cle({ dureeMois: 25 })).status).toBe(400);
+    expect((await cle({ dureeMois: 0 })).status).toBe(400);
+    expect((await cle({ contenus: { acte: false, expose: false, annexes: false } })).status).toBe(400);
+    const ok = await cle({ dureeMois: 12, types: ['deliberation'], contenus: { annexes: false } });
+    expect(ok.status).toBe(201); expect(ok.body).toMatchObject({ dureeMois: 12, types: ['deliberation'], contenus: { acte: true, expose: true, annexes: false } });
+    const defaut = await cle({}); expect(defaut.body).toMatchObject({ dureeMois: 24, types: [], contenus: { acte: true, expose: true, annexes: true } });
+    expect((await as(admin).put(K(`/${defaut.body.id}`), { dureeMois: 30 })).status).toBe(400);
+    expect((await as(admin).put(K(`/${defaut.body.id}`), { dureeMois: 6 })).body.dureeMois).toBe(6);
+  });
+
+  it('filtre par type, par durée et par contenus', async () => {
+    const autreType = await cle({ types: ['arrete'] });
+    expect((await avec(autreType.body.cle).get(X('/actes'))).body.total).toBe(0);
+    expect((await avec(autreType.body.cle).get(X(`/actes/${ids.exe}`))).status).toBe(404);
+    const court = (await cle({ dureeMois: 1 })).body.cle;
+    const avant = (await avec(court).get(X('/actes'))).body.total;
+    await env.db.run("UPDATE actes SET created_at = now() - interval '3 months' WHERE id = $1", [ids.exe2]);
+    expect((await avec(court).get(X('/actes'))).body.total).toBe(avant - 1);
+    expect((await avec(court).get(X(`/actes/${ids.exe2}`))).status).toBe(404);
+    const large = (await cle({})).body.cle;
+    expect((await avec(large).get(X(`/actes/${ids.exe2}`))).status).toBe(200);
+
+    const sansAnnexes = (await cle({ contenus: { annexes: false } })).body.cle;
+    const d = (await avec(sansAnnexes).get(X(`/actes/${ids.exe}`))).body;
+    expect(d.annexes).toBeUndefined(); expect(d.expose).toBeDefined(); expect(d.deliberations.length).toBeGreaterThan(0);
+    expect((await avec(sansAnnexes).get(X(`/actes/${ids.exe}/annexes/${ids.annexePublique}`))).status).toBe(403);
+    const exposeSeul = (await cle({ contenus: { acte: false, annexes: false } })).body.cle;
+    const e = (await avec(exposeSeul).get(X(`/actes/${ids.exe}`))).body;
+    expect(e.deliberations).toBeUndefined(); expect(e.annexes).toBeUndefined(); expect(e.liens.pdf).toBeUndefined();
+    expect((await avec(exposeSeul).get(X(`/actes/${ids.exe}/pdf`))).status).toBe(403);
+  });
+
+  it('recherche : titre plein texte sans accents, mot-clé, rapporteur, dates, listes de choix', async () => {
+    const k = (await cle({})).body.cle;
+    expect((await avec(k).get(X('/actes?q=subvention'))).body.items.map((i) => i.id)).toContain(ids.exe);
+    expect((await avec(k).get(X('/actes?q=EXECUTOIRE'))).body.total).toBeGreaterThan(0);
+    expect((await avec(k).get(X('/actes?q=executoire'))).body.items.some((i) => i.id === ids.exe)).toBe(true);   // sans accent
+    await env.db.run("UPDATE actes SET custom = custom || '{\"motsCles\": [\"Sport\"]}'::jsonb WHERE id = $1", [ids.exe]);
+    expect((await avec(k).get(X('/actes?motCle=sport'))).body.items.map((i) => i.id)).toEqual([ids.exe]);
+    expect((await avec(k).get(X('/actes?motCle=inconnu'))).body.total).toBe(0);
+    const auj = new Date().toISOString().slice(0, 10);
+    expect((await avec(k).get(X(`/actes?dateDebut=${auj}&dateFin=${auj}`))).body.total).toBeGreaterThan(0);
+    expect((await avec(k).get(X('/actes?dateFin=2000-01-01'))).body.total).toBe(0);
+    expect((await avec(k).get(X('/actes?dateDebut=pas-une-date'))).status).toBe(400);
+    for (const l of ['seances', 'rapporteurs', 'types']) { const r = await avec(k).get(X(`/${l}`)); expect(r.status).toBe(200); expect(Array.isArray(r.body.items)).toBe(true); }
+    expect((await avec(k).get(X('/types'))).body.items.map((t) => t.code)).toContain('deliberation');
+    expect((await env.http().get(X('/seances'))).status).toBe(401);
+  });
+
+  it('la spécification OpenAPI est publique et ne décrit que l’API externe', async () => {
+    const r = await env.http().get(X('/openapi.json'));
+    expect(r.status).toBe(200);
+    const chemins = Object.keys(r.body.paths);
+    expect(chemins.length).toBeGreaterThan(5);
+    expect(chemins.every((c) => c.startsWith('/api/v1/externe/'))).toBe(true);
+    expect(chemins).toEqual(expect.arrayContaining(['/api/v1/externe/actes', '/api/v1/externe/seances', '/api/v1/externe/rapporteurs', '/api/v1/externe/actes/{id}/expose']));
+    expect(chemins).not.toContain('/api/v1/externe/openapi.json');
+  });
+});
+
+describe('spécification publique (DMZ)', () => {
+  it('ne contient aucun schéma d’authentification des agents', async () => {
+    const r = await env.http().get(X('/openapi.json'));
+    expect(Object.keys(r.body.components.securitySchemes)).toEqual(['apiKeyAuth']);
+    expect(JSON.stringify(r.body)).not.toMatch(/cles-api|bearerAuth|\/organismes\//);
+  });
+});
+
+describe('publication sans authentification', () => {
+  const P = (u = '') => `/api/v1/public/deliberations${u}`;
+  const regler = (key, val) => env.c.settings.put({ username: 'test' }, { scope: 'organisme', organismeId: ville.id, key, val });
+  const binaire = (u) => env.http().get(u).buffer(true).parse((res, cb) => { const c = []; res.on('data', (d) => c.push(d)); res.on('end', () => cb(null, Buffer.concat(c))); });
+
+  it('désactivée par défaut : rien n’est publié', async () => {
+    expect((await env.http().get(P())).status).toBe(404);
+  });
+
+  it('activée : exécutoires non confidentielles, liens chiffrés, annexes publiables, jamais l’exposé', async () => {
+    await regler('publication.deliberations_actif', true);
+    const r = await env.http().get(P());
+    expect(r.status).toBe(200);
+    const exe = r.body.items.find((i) => i.titre === 'Subvention exécutoire');
+    expect(exe).toBeTruthy();
+    for (const t of ['Délibération adoptée', 'Projet en rédaction', 'Huis clos exécutoire', 'Délibération rejetée', 'Acte abandonné']) expect(r.body.items.map((i) => i.titre)).not.toContain(t);
+    expect(exe.annexes.map((a) => a.titre)).toEqual(['Convention signée']);              // l'annexe non publiable n'apparaît pas
+    expect(JSON.stringify(r.body)).not.toMatch(/expose|dupont|redacteur|"id"/i);          // aucun identifiant interne
+    expect(exe.pdf).toMatch(/\/f\/[A-Za-z0-9_-]{30,}$/);
+    const pdf = await binaire(exe.pdf);
+    expect(pdf.status).toBe(200); expect(pdf.headers['content-type']).toMatch(/pdf/);
+    expect((await binaire(exe.annexes[0].url)).status).toBe(200);
+  });
+
+  it('un lien ne se devine pas ni ne se forge', async () => {
+    const exe = (await env.http().get(P())).body.items.find((i) => i.titre === 'Subvention exécutoire');
+    const jeton = exe.pdf.split('/f/')[1];
+    expect((await env.http().get(P(`/${ids.exe}/pdf`))).status).toBe(404);                 // plus d'adresse par numéro
+    expect((await env.http().get(P(`/f/${ids.exe}`))).status).toBe(400);
+    const altere = jeton.slice(0, -2) + (jeton.endsWith('AA') ? 'BB' : 'AA');
+    expect((await env.http().get(P(`/f/${altere}`))).status).toBe(404);
+    expect((await env.http().get(P(`/f/${'A'.repeat(60)}`))).status).toBe(404);
+  });
+
+  it('le PDF figé est servi tel quel, sans recomposition', async () => {
+    const annexe = await env.db.get('SELECT file_id FROM annexes WHERE id = $1', [ids.annexePublique]);
+    const delib = await env.db.get('SELECT id FROM deliberations WHERE acte_id = $1 ORDER BY ordre, id LIMIT 1', [ids.exe]);
+    await env.db.run("INSERT INTO actes_documents_figes (organisme_id, acte_id, cible, deliberation_id, version, file_id) VALUES ($1,$2,'deliberation',$3,'v-test',$4)", [ville.id, ids.exe, delib.id, annexe.file_id]);
+    const exe = (await env.http().get(P())).body.items.find((i) => i.titre === 'Subvention exécutoire');
+    const servi = await binaire(exe.pdf); const attendu = await binaire(exe.annexes[0].url);
+    expect(Buffer.compare(servi.body, attendu.body)).toBe(0);
+  });
+
+  it('pagination et durée bornée par le réglage', async () => {
+    const p1 = (await env.http().get(P('?limit=1'))).body;
+    expect(p1.items).toHaveLength(1); expect(p1.total).toBeGreaterThan(1); expect(p1.limit).toBe(1);
+    const p2 = (await env.http().get(P('?limit=1&page=2'))).body;
+    expect(p2.items[0].titre).not.toBe(p1.items[0].titre);
+    expect((await env.http().get(P('?limit=51'))).status).toBe(400);
+    await regler('publication.deliberations_mois', 1);
+    await env.db.run("UPDATE actes SET created_at = now() - interval '3 months' WHERE id = $1", [ids.exe]);
+    expect((await env.http().get(P('?mois=24'))).body.items.map((i) => i.titre)).not.toContain('Subvention exécutoire');   // 24 demandés, 1 autorisé
+    expect((await env.http().get(P('?mois=25'))).status).toBe(400);
+  });
+});

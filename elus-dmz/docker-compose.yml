@@ -7,6 +7,7 @@ services:
     environment:
       BACKEND_HOST: ${ELUS_BACKEND_HOST:?adresse du backend VibeDélib sur le LAN}
       BACKEND_PORT: ${ELUS_BACKEND_PORT:-3121}
+      FRAME_ANCESTORS: ${ELUS_FRAME_ANCESTORS:-*}   # sites autorisés à incruster /deliberations (iframe), ex. "https://www.ville.fr https://*.ville.fr"
     read_only: true
     tmpfs: [/var/cache/nginx, /var/run, /tmp, /etc/nginx/conf.d]
     security_opt: ["no-new-privileges:true"]
