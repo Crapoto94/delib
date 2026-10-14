@@ -7,6 +7,7 @@
  *  - RATTACHEMENT DES DIRECTIONS : chaque direction relève d'un DGA (ou directement de la DGS), choix d'organisation défini ici (D66) ;
  *  - DGS : le titulaire « dgs » désigné ; à défaut, le DIRECTEUR de la direction générale des services de l'organigramme RH (D76) ;
  *  - un service qui porte le nom de sa direction (ou l'absence de service) : le responsable de service est le directeur (D68) ;
+ *  - un service dont le code se termine par 1 (BF1, XX1…) : toujours le directeur ; tout autre service sans chef désigné : le directeur aussi ;
  *  - modifiables par l'administrateur, et par le directeur / le chef de service pour SON périmètre (D31).
  */
 const { E } = require('../../shared/errors');
@@ -86,7 +87,9 @@ function createTitulaires({ db, audit, access }) {
           if (p) return { holders: [p.username, p.suppleant].filter(Boolean), vacant: false, direct: null, via: 'rattachement', poste: p.libelle };
         }
       }
-      if (fonction === 'chef_service' && (serviceSameAsDirection || !serviceCode)) {
+      // un service dont le code se termine par 1 (BF1, XX1…) est le service de la direction elle-même : son chef est toujours le directeur
+      const serviceDirection = /^(?!hist:)[A-Za-z0-9_-]*1$/.test(serviceCode || '');
+      if (fonction === 'chef_service' && (serviceSameAsDirection || serviceDirection || !serviceCode)) {
         const r = svc.resolveIn(data, 'directeur', { directionCode }, rhv);
         return { ...r, via: r.via || 'directeur' };
       }
@@ -104,6 +107,11 @@ function createTitulaires({ db, audit, access }) {
       if (rhv && ['directeur', 'chef_service'].includes(fonction)) {
         const v = rhv(directionCode, serviceCode);
         if (fonction === 'directeur' ? v?.direction : v?.service) return { holders: [], vacant: true, direct: null, via: 'rh', poste: null };
+      }
+      // aucun chef de service désigné (ni personne, ni poste vacant) : le directeur de la direction tient le rôle (BF1, XX1, DSI…)
+      if (fonction === 'chef_service' && directionCode) {
+        const r = svc.resolveIn(data, 'directeur', { directionCode }, rhv);
+        if (r.holders.length || r.vacant) return { ...r, via: r.via || 'directeur' };
       }
       return { holders: [], vacant: false, direct: null, via: null, poste: null };
     },

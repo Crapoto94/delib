@@ -277,7 +277,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
       const missing = preview.filter((p) => p.missing);
       if (missing.length) {
         await bus.emit('circuit.missing_holders', { organismeId: a0.organisme_id, acteId: a0.id, steps: missing.map((m) => ({ key: m.key, label: m.label })) });
-        throw E.conflict(`Étape(s) sans titulaire : ${missing.map((m) => m.label).join(', ')} — l'administrateur doit désigner un titulaire`, { steps: missing.map((m) => ({ key: m.key, label: m.label })) });
+        const ou = [a0.service_label && `service « ${a0.service_label} »`, a0.direction_label && `direction « ${a0.direction_label} »`].filter(Boolean).join(', ');
+        throw E.conflict(`Étape(s) sans titulaire : ${missing.map((m) => m.label).join(', ')}${ou ? ` pour le ${ou}` : ''}. Le directeur ou l'administrateur doit désigner la personne (Paramétrages › Titulaires & droits), ou déclarer le poste vacant pour que l'étape soit contournée.`,{ steps: missing.map((m) => ({ key: m.key, label: m.label })) });
       }
       if (!returned) await late.texts.startTracking(a0.id, ctx);
 
@@ -515,7 +516,8 @@ function createEngine({ db, audit, actes, acl, titulaires, delegations, comments
         const v = await actorOf(ctx, a, inst, 'validate'); const r = await actorOf(ctx, a, inst, 'refuse');
         canValidate = v.ok; canRefuse = r.ok; onBehalfOf = v.onBehalfOf || r.onBehalfOf;
       }
-      const returnedToMe = a.statut === 'modification_demandee' && a.current_step_key === graph.start && (IS_DRAFTER(ctx, a) || acl.isAdmin(ctx, a.organisme_id));
+      // Renvoi après modification demandée, ou nouvel envoi d'un brouillon déjà passé au circuit (dossier rappelé puis repris).
+      const returnedToMe = (a.statut === 'modification_demandee' && a.current_step_key === graph.start || a.statut === 'brouillon') && (IS_DRAFTER(ctx, a) || acl.isAdmin(ctx, a.organisme_id));
       const baseTargets = curIdx > 0 && canRefuse ? trail.slice(0, curIdx).map((k) => ({ key: k, label: path.find((p) => p.key === k)?.label || k, first: k === trail[0] })) : [];
       let targets = baseTargets;
       // Le DGA peut aussi renvoyer l'acte à la direction (étape du directeur), même si elle a été sautée.

@@ -208,6 +208,33 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
       return { total, limit: f.limit || 50, offset: f.offset || 0, items: await svc.attachSeance(rows.map(toActe)) };
     },
 
+    /**
+     * Habitudes de saisie du rédacteur connecté : valeurs (matière, rubrique, nature) déjà utilisées dans ses actes,
+     * les plus fréquentes puis les plus récentes d'abord, et élu rapporteur + commission(s) les plus fréquents.
+     * Sert à proposer des valeurs par défaut sur la fiche ; jamais imposé.
+     */
+    async habitudes(ctx, organismeId) {
+      const org = requireOrg(organismeId);
+      const mine = "a.organisme_id = $1 AND a.redacteur = $2 AND a.statut <> 'abandonne'";
+      const top = async (col) => (await db.all(
+        `SELECT a.${col} AS id, count(*)::int AS n, max(a.created_at) AS dernier FROM actes a WHERE ${mine} AND a.${col} IS NOT NULL
+         GROUP BY a.${col} ORDER BY n DESC, dernier DESC, a.${col} LIMIT 50`, [org, ctx.username])).map((r) => ({ id: r.id, n: r.n }));
+      const [matieres, rubriques, natures] = await Promise.all([top('matiere_id'), top('rubrique_id'), top('nature_id')]);
+      const rapporteurs = (await db.all(
+        `SELECT a.rapporteur_id AS id, count(*)::int AS n, max(a.created_at) AS dernier FROM actes a WHERE ${mine} AND a.rapporteur_id IS NOT NULL
+         GROUP BY a.rapporteur_id ORDER BY n DESC, dernier DESC LIMIT 1`, [org, ctx.username]));
+      let rapporteur = null;
+      if (rapporteurs.length) {
+        const r = rapporteurs[0];
+        // la commission la plus fréquente parmi les actes de ce rapporteur
+        const com = await db.all(
+          `SELECT ac.commission_id AS id, count(*)::int AS n FROM acte_commissions ac JOIN actes a ON a.id = ac.acte_id
+            WHERE ${mine} AND a.rapporteur_id = $3 AND ac.retiree_at IS NULL GROUP BY ac.commission_id ORDER BY n DESC, max(ac.created_at) DESC, ac.commission_id LIMIT 1`, [org, ctx.username, r.id]);
+        rapporteur = { eluId: r.id, n: r.n, commissionId: com[0]?.id ?? null };
+      }
+      return { matieres, rubriques, natures, rapporteur };
+    },
+
     async update(ctx, organismeId, id, patch) {
       const before = await svc.load(ctx, organismeId, id);
       const org = before.organisme_id;
@@ -388,7 +415,18 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
       return toActe(r);
     },
 
-    async duplicate(ctx, organismeId, id) {
+    /** Reprend les annexes choisies d'un acte source (les fichiers sont partagés, jamais recopiés). `ids` : sous-ensemble de ses annexes ; absent = toutes ; [] = aucune. */
+    async _reprendreAnnexes(ctx, srcId, dstId, ids) {
+      if (Array.isArray(ids) && !ids.length) return 0;
+      const filtre = Array.isArray(ids) ? ' AND id = ANY($4::int[])' : '';
+      const r = await db.all(
+        `INSERT INTO annexes (acte_id, titre, ordre, file_id, publiable, communicable, transmissible, created_by)
+         SELECT $1, titre, ordre, file_id, publiable, communicable, transmissible, $2 FROM annexes WHERE acte_id = $3${filtre} ORDER BY ordre, id RETURNING id`,
+        Array.isArray(ids) ? [dstId, ctx.username, srcId, ids] : [dstId, ctx.username, srcId]);
+      return r.length;
+    },
+
+    async duplicate(ctx, organismeId, id, { annexes } = {}) {
       const src = await svc.load(ctx, organismeId, id);
       const copy = await svc.create(ctx, src.organisme_id, {
         typeId: src.type_id, titre: `${src.titre} (copie)`, directionCode: src.direction_code, serviceCode: src.service_code, natureId: src.nature_id,
@@ -396,15 +434,19 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
         confidentialite: src.confidentialite, custom: src.custom,
       });
       await bus.emit('acte.duplicated', { organismeId: src.organisme_id, sourceId: src.id, acteId: copy.id, ctx });
+      // Copie d'un dossier : les annexes ne sont reprises que si l'agent les a cochées.
+      if (Array.isArray(annexes)) await svc._reprendreAnnexes(ctx, src.id, copy.id, annexes);
       return copy;
     },
 
     /**
-     * Crée un dossier en reprenant TOUT d'une délibération passée (modèle) : champs, textes (exposé, visas, dispositif),
-     * délibérations et annexes. Les fichiers d'annexes sont partagés (contenu immuable) : aucune copie inutile.
+     * Crée un dossier en reprenant d'une délibération passée (modèle) : champs, textes (exposé des motifs, visas, dispositif)
+     * et délibérations. Le nouveau dossier est un BROUILLON : les textes repris ne sont ni validés ni figés, l'agent les relit.
+     * Les annexes sont reprises au choix de l'agent (`annexes` : ids cochés ; [] = aucune ; absent = toutes, pour les anciens appels).
+     * Les fichiers d'annexes sont partagés (contenu immuable) : aucune copie inutile.
      * La direction reste celle du rédacteur (on ne peut pas rédiger pour une autre direction) ; les mots-clés sont mémorisés.
      */
-    async creerDepuisModele(ctx, organismeId, { modeleId, typeId, titre, serviceLabel, motsCles } = {}) {
+    async creerDepuisModele(ctx, organismeId, { modeleId, typeId, titre, serviceLabel, motsCles, annexes } = {}) {
       const org = requireOrg(organismeId);
       const modele = await svc.load(ctx, org, modeleId);
       const custom = { ...(modele.custom || {}) };
@@ -423,12 +465,9 @@ function createActes({ db, audit, refs, redaction, dir, acl, bus, late, settings
       const dst = await db.all('SELECT id FROM deliberations WHERE acte_id = $1 ORDER BY ordre, id', [copy.id]);
       for (let i = dst.length; i < srcDelibs.length; i++) await db.run('INSERT INTO deliberations (acte_id, ordre, titre) VALUES ($1,$2,$3)', [copy.id, srcDelibs[i].ordre, srcDelibs[i].titre]);
       await late.texts.copyTexts(modele.id, copy.id);
-      await db.run(
-        `INSERT INTO annexes (acte_id, titre, ordre, file_id, publiable, communicable, transmissible, created_by)
-         SELECT $1, titre, ordre, file_id, publiable, communicable, transmissible, $2 FROM annexes WHERE acte_id = $3`,
-        [copy.id, ctx.username, modele.id]);
+      const reprises = await svc._reprendreAnnexes(ctx, modele.id, copy.id, annexes);
       await bus.emit('acte.duplicated', { organismeId: org, sourceId: modele.id, acteId: copy.id, ctx });
-      await audit.log(ctx, { organismeId: org, action: 'acte.depuis_modele', entity: 'actes', entityId: copy.id, after: { modeleId: modele.id, motsCles: liste } });
+      await audit.log(ctx, { organismeId: org, action: 'acte.depuis_modele', entity: 'actes', entityId: copy.id, after: { modeleId: modele.id, motsCles: liste, annexesReprises: reprises } });
       return copy;
     },
 

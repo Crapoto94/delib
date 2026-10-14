@@ -127,10 +127,10 @@ describe('règles de résolution en mémoire (service du nom de la direction, va
   const row = (fonction, perimetre, over = {}) => ({ fonction, perimetre, direction_code: 'D1', service_code: null, username: 'x', suppleant: null, vacant: false, ...over });
 
   it('le chef d\'un service qui porte le nom de sa direction (ou sans service) est le directeur', () => {
-    const d = data([row('directeur', 'direction', { username: 'dir' }), row('chef_service', 'service', { service_code: 'S1', username: 'chef' })]);
+    const d = data([row('directeur', 'direction', { username: 'dir' }), row('chef_service', 'service', { service_code: 'S2', username: 'chef' })]);
     expect(tit.resolveIn(d, 'chef_service', { directionCode: 'D1', serviceCode: 'S1', serviceSameAsDirection: true })).toMatchObject({ holders: ['dir'], via: 'directeur' });
     expect(tit.resolveIn(d, 'chef_service', { directionCode: 'D1' })).toMatchObject({ holders: ['dir'], via: 'directeur' });
-    expect(tit.resolveIn(d, 'chef_service', { directionCode: 'D1', serviceCode: 'S1' })).toMatchObject({ holders: ['chef'], via: null });
+    expect(tit.resolveIn(d, 'chef_service', { directionCode: 'D1', serviceCode: 'S2' })).toMatchObject({ holders: ['chef'], via: null });
   });
 
   it('un directeur vacant rend vacant le chef de service du même nom ; la vacance RH ne joue que si personne n\'est désigné', () => {
@@ -140,7 +140,7 @@ describe('règles de résolution en mémoire (service du nom de la direction, va
     expect(tit.resolveIn(data(), 'directeur', { directionCode: 'D1' }, rhv)).toMatchObject({ vacant: true, via: 'rh' });
     expect(tit.resolveIn(data([row('directeur', 'direction', { username: 'dir' })]), 'directeur', { directionCode: 'D1' }, rhv)).toMatchObject({ vacant: false, holders: ['dir'] });
     expect(tit.resolveIn(data(), 'chef_service', { directionCode: 'D1', serviceCode: 'S9' }, rhv)).toMatchObject({ vacant: true, via: 'rh' });
-    expect(tit.resolveIn(data(), 'chef_service', { directionCode: 'D1', serviceCode: 'S1' }, rhv)).toMatchObject({ vacant: false, holders: [] });
+    expect(tit.resolveIn(data(), 'chef_service', { directionCode: 'D2', serviceCode: 'S2' }, rhv)).toMatchObject({ vacant: false, holders: [] });
     expect(tit.resolveIn(data(), 'dgs', {}, rhv)).toMatchObject({ vacant: false, holders: [] }); // jamais de vacance présumée pour la DGS
   });
 

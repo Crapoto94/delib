@@ -58,6 +58,7 @@ const MODULES = [
   require('../modules/arretes-publics/arretes-publics.routes'),
   require('../modules/publication/origines.routes'),
   require('../modules/bandeaux/bandeaux.routes'),
+  require('../modules/backlog/backlog.routes'),
   require('../modules/titulaires/organisation.routes'),
   require('../modules/organigramme/organigramme.routes'),
   require('../modules/convocations/convocations.routes'),

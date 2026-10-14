@@ -15,6 +15,7 @@ import { useIa } from '../useIa';
 import { useLimitePJ } from '../usePJ';
 import { Select } from '../Select';
 import { MatiereTree } from '../MatiereTree';
+import { ChoixAnnexes } from '../ChoixAnnexes';
 import DossierAssiste, { ActiverAssiste } from '../DossierAssiste';
 import EnvoiBravo from '../EnvoiBravo';
 import SignaturePlacement from '../SignaturePlacement';
@@ -87,8 +88,30 @@ function ChampInput({ c, v, onChange, disabled, elus }: { c: any; v: any; onChan
   }
 }
 
+/** Liste déroulante d'un référentiel (rubrique, nature) : par défaut les valeurs déjà utilisées par le rédacteur, « Tout afficher » pour le référentiel complet. */
+function ChoixReferentiel({ items, habituels, value, onChange, disabled }: { items: any[] | null; habituels: number[]; value: any; onChange: (v: string) => void; disabled: boolean }) {
+  const [tout, setTout] = useState(false);
+  const liste = items ?? [];
+  const hab = habituels.map((id) => liste.find((m) => m.id === id)).filter(Boolean) as any[];
+  const sel = value !== '' && value != null ? liste.find((m) => String(m.id) === String(value)) : undefined;
+  const filtre = !disabled && hab.length > 0 && !tout;
+  const options = filtre ? [...hab, ...(sel && !hab.includes(sel) ? [sel] : [])] : liste;
+  return (
+    <>
+      <Select className="input" disabled={disabled} value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— choisir —</option>{options.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select>
+      {!disabled && hab.length > 0 && liste.length > hab.length && (
+        <button type="button" className="mt-1 text-[12px] font-semibold text-action hover:underline" onClick={() => setTout((v) => !v)}>
+          {tout ? 'Seulement mes valeurs habituelles' : `Mes valeurs habituelles — Tout afficher (${liste.length})`}</button>)}
+    </>
+  );
+}
+
+type EtatSauvegarde = 'repos' | 'attente' | 'cours' | 'ok' | 'erreur' | 'invalide';
+const DELAI_AUTOSAVE = 1200;
+
 /* --------------------------------------------------------------------------------------------------- fiche de l'acte */
-function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable: boolean; onSaved: () => void; onCommissions: () => void }) {
+function Fiche({ acte, editable, onSaved, onCommissions, flushRef }: { acte: any; editable: boolean; onSaved: () => void; onCommissions: () => void; flushRef?: React.MutableRefObject<(() => Promise<boolean>) | null> }) {
   const { org } = useAuth(); const o = org!.id;
   const rubriques = useLoad(async () => (await api.get(orgPath(o, '/referentiels/rubrique'))).data.items as any[], [o]);
   const natures = useLoad(async () => (await api.get(orgPath(o, '/referentiels/nature'))).data.items as any[], [o]);
@@ -102,15 +125,27 @@ function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable
   const [cv, setCv] = useState<Record<string, any>>({}); // valeurs des champs personnalisés
   const [selCommission, setSelCommission] = useState('');
   const [dirsInfo, setDirsInfo] = useState<any[]>([]);
-  const [err, setErr] = useState<string | null>(null); const [saving, setSaving] = useState(false);
+  const habitudes = useLoad(async () => (editable ? (await api.get(orgPath(o, '/actes/habitudes'))).data : null) as any, [o, editable]);
+  const [err, setErr] = useState<string | null>(null);
+  const [etat, setEtat] = useState<EtatSauvegarde>('repos');
+  const [propose, setPropose] = useState(false); // élu rapporteur préproposé d'après les actes précédents
+  // Sauvegarde automatique : modifications en attente, dernier état envoyé, file d'envoi (un seul PUT à la fois).
+  const pending = useRef<{ id: number; body: any; key: string } | null>(null);
+  const sentKey = useRef<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chain = useRef<Promise<void>>(Promise.resolve());
+  const lastOk = useRef(true); const invalide = useRef(false); const mounted = useRef(true);
+  const onSavedRef = useRef(onSaved); onSavedRef.current = onSaved;
+  const prefait = useRef(false);
   // Un acte signé par le maire (décision, arrêté) ne passe pas au conseil : ni séance à viser, ni élu rapporteur.
   const signature = !!acte.typeInfo?.meta?.signature;
-  useEffect(() => { setCv(Object.fromEntries((acte.champs || []).map((c: any) => [c.code, c.valeur]))); }, [acte.champs]);
+  // Un rechargement de l'acte (après une sauvegarde automatique) ne doit pas écraser une saisie encore non envoyée.
+  useEffect(() => { if (pending.current) return; setCv(Object.fromEntries((acte.champs || []).map((c: any) => [c.code, c.valeur]))); }, [acte.champs]);
   // Recharge les valeurs de la fiche UNIQUEMENT quand on change de dossier : un rechargement de l'acte (ajout d'une
   // commission, validation d'une étape…) ne doit pas écraser les saisies en cours (matière, rubrique, élu…).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setF({ titre: acte.titre, matiereId: acte.matiereId ?? '', rubriqueId: acte.rubriqueId ?? '', natureId: acte.natureId ?? '', incidenceFinanciere: acte.incidenceFinanciere, montant: acte.montant ?? '', rapporteurId: acte.rapporteurId ?? '', rapporteurDelegation: acte.rapporteurDelegation ?? '', seanceViseeId: acte.seanceViseeId ?? '', urgence: acte.urgence }); }, [acte.id]);
-  useEffect(() => { setDirsInfo(Array.isArray(acte.directionsInfo) ? acte.directionsInfo.map((d: any) => ({ ...d })) : []); }, [acte.directionsInfo]);
+  useEffect(() => { if (pending.current) return; setDirsInfo(Array.isArray(acte.directionsInfo) ? acte.directionsInfo.map((d: any) => ({ ...d })) : []); }, [acte.directionsInfo]);
   const nv = (v: any) => (v === '' ? null : Number(v));
   // Champs obligatoires non renseignés : surlignés pour guider la saisie tant que la fiche est modifiable (CRE-02).
   const manque = {
@@ -139,22 +174,78 @@ function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable
     catch (x) { setErr(errMsg(x)); }
   };
 
-  const save = async () => {
-    setSaving(true); setErr(null);
-    try {
-      await api.put(orgPath(o, `/actes/${acte.id}`), {
-        titre: f.titre, matiereId: nv(f.matiereId), rubriqueId: nv(f.rubriqueId), natureId: nv(f.natureId), incidenceFinanciere: f.incidenceFinanciere,
-        montant: f.incidenceFinanciere && f.montant !== '' ? Number(f.montant) : null, rapporteurId: signature ? null : nv(f.rapporteurId), rapporteurDelegation: signature ? null : (f.rapporteurDelegation || null), seanceViseeId: signature ? null : nv(f.seanceViseeId), urgence: !!f.urgence,
-        directionsInfo: dirsInfo.map((d: any) => d.code),
-        ...((acte.champs || []).length ? { custom: { ...(acte.custom || {}), ...Object.fromEntries((acte.champs || []).filter((c: any) => c.modifiable).map((c: any) => [c.code, cv[c.code] ?? ''])) } } : {}),
-      });
-      onSaved();
-    } catch (x) { setErr(errMsg(x)); } finally { setSaving(false); }
+  const corps = () => ({
+    titre: f.titre, matiereId: nv(f.matiereId), rubriqueId: nv(f.rubriqueId), natureId: nv(f.natureId), incidenceFinanciere: f.incidenceFinanciere,
+    montant: f.incidenceFinanciere && f.montant !== '' ? Number(f.montant) : null, rapporteurId: signature ? null : nv(f.rapporteurId), rapporteurDelegation: signature ? null : (f.rapporteurDelegation || null), seanceViseeId: signature ? null : nv(f.seanceViseeId), urgence: !!f.urgence,
+    directionsInfo: dirsInfo.map((d: any) => d.code),
+    ...((acte.champs || []).length ? { custom: { ...(acte.custom || {}), ...Object.fromEntries((acte.champs || []).filter((c: any) => c.modifiable).map((c: any) => [c.code, cv[c.code] ?? ''])) } } : {}),
+  });
+  const persister = (p: { id: number; body: any; key: string }) => {
+    const avant = sentKey.current; sentKey.current = p.key;
+    chain.current = chain.current.then(async () => {
+      if (mounted.current) setEtat('cours');
+      try {
+        await api.put(orgPath(o, `/actes/${p.id}`), p.body);
+        lastOk.current = true;
+        if (mounted.current) { setEtat(pending.current ? 'attente' : 'ok'); setErr(null); onSavedRef.current(); }
+      } catch (x) {
+        lastOk.current = false; sentKey.current = avant;
+        if (!pending.current) pending.current = p; // sera retenté (nouvelle saisie, « Réessayer » ou envoi)
+        if (mounted.current) { setEtat('erreur'); setErr(errMsg(x)); }
+      }
+    });
+    return chain.current;
   };
+  /** Enregistre tout de suite ce qui est en attente ; vrai si la fiche est à jour sur le serveur (appelé avant « Envoyer »). */
+  const flush = async (): Promise<boolean> => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    if (invalide.current) { setErr('Le titre doit comporter au moins 3 caractères avant de continuer.'); return false; }
+    const p = pending.current;
+    if (p) { pending.current = null; await persister(p); } else await chain.current;
+    return lastOk.current && !pending.current;
+  };
+  if (flushRef) flushRef.current = flush;
+  useEffect(() => () => { if (flushRef) flushRef.current = null; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Démontage (changement de page) : ce qui est en attente part quand même.
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; if (timer.current) clearTimeout(timer.current); const p = pending.current; if (p) { pending.current = null; persister(p); } }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => { if (pending.current) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', h); return () => window.removeEventListener('beforeunload', h);
+  }, []);
+  // Autoenregistrement : toute saisie programme un envoi différé ; la première passe fixe l'état de référence.
+  useEffect(() => {
+    if (!editable || f.titre === undefined) return;
+    const body = corps(); const key = JSON.stringify(body);
+    if (sentKey.current === null) { sentKey.current = key; return; }
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    if (String(f.titre ?? '').trim().length < 3) { invalide.current = true; pending.current = null; setEtat('invalide'); return; }
+    invalide.current = false;
+    if (key === sentKey.current) { pending.current = null; setEtat((e) => (e === 'attente' || e === 'invalide' ? 'repos' : e)); return; }
+    pending.current = { id: acte.id, body, key }; setEtat('attente');
+    timer.current = setTimeout(() => { timer.current = null; const p = pending.current; if (p) { pending.current = null; persister(p); } }, DELAI_AUTOSAVE);
+  }, [f, cv, dirsInfo, editable]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Propositions d'après les actes précédents du rédacteur : seulement si le champ est encore vide, toujours modifiables.
+  useEffect(() => {
+    const h = habitudes.data?.rapporteur;
+    if (prefait.current || !editable || signature || !h || f.titre === undefined || !elus.data || !commissions.data) return;
+    prefait.current = true;
+    if (acte.rapporteurId != null || (f.rapporteurId !== '' && f.rapporteurId != null)) return;
+    const elu = elus.data.find((m: any) => m.id === h.eluId);
+    if (!elu) return;
+    setF((x: any) => ({ ...x, rapporteurId: String(elu.id), rapporteurDelegation: elu.delegations?.length === 1 ? elu.delegations[0] : '' })); setPropose(true);
+    const aucune = !(commissions.data.items ?? []).some((c: any) => !c.retireeAt);
+    if (aucune && h.commissionId != null && (allCommissions.data ?? []).some((c: any) => c.id === h.commissionId)) {
+      api.post(orgPath(o, `/actes/${acte.id}/commissions`), { commissionId: h.commissionId }).then(() => { commissions.reload(); onCommissions(); }).catch(() => { /* simple proposition : sans effet si refusée */ });
+    }
+  }, [habitudes.data, elus.data, commissions.data, allCommissions.data, f.titre]); // eslint-disable-line react-hooks/exhaustive-deps
+  const libelleEtat = { repos: '', attente: 'Modifications en attente…', cours: 'Enregistrement…', ok: 'Enregistré', erreur: 'Erreur d\u2019enregistrement', invalide: 'Titre trop court : non enregistré' }[etat];
   const dis = !editable;
   return (
     <section className="card p-5" aria-labelledby="fiche">
-      <h3 id="fiche" className="mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-action" /> Informations clés de l'acte</h3>
+      <h3 id="fiche" className="mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-action" /> Informations clés de l'acte
+        {editable && <span role="status" aria-live="polite" className={`ml-auto flex items-center gap-1.5 text-[12px] font-normal ${etat === 'erreur' || etat === 'invalide' ? 'text-ko' : 'text-mute'}`}>
+          {etat === 'cours' && <Spinner />}{etat === 'ok' && <CheckCircle2 className="h-3.5 w-3.5 text-ok-text" aria-hidden="true" />}{libelleEtat}
+          {etat === 'erreur' && <button type="button" className="font-semibold underline" onClick={() => flush()}>Réessayer</button>}</span>}</h3>
       {acte.statut === 'signe' && <p className="mb-3 rounded bg-ok-bg p-2 text-[13px] text-ok-text">Acte signé : les informations sont en <b>lecture seule</b>.</p>}
       <ErrorBox msg={err} />
       <div className="grid gap-4 md:grid-cols-2">
@@ -167,13 +258,11 @@ function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable
         </Field>)}
         <div className="md:col-span-2"><Field label="Titre explicite de l'acte *" missing={mq('titre')}><input className="input" disabled={dis} value={f.titre ?? ''} onChange={(e) => setF({ ...f, titre: e.target.value })} /></Field></div>
         <Field label="Domaine d'intervention (matière) *" missing={mq('matiere')} hint="Nomenclature de la préfecture : parcourez l'arborescence, seules les matières précises (feuilles) sont sélectionnables.">
-          <MatiereTree disabled={dis} value={f.matiereId} onChange={(id) => setF({ ...f, matiereId: id ?? '' })} /></Field>
-        <Field label="Rubrique *" missing={mq('rubrique')}><Select className="input" disabled={dis} value={f.rubriqueId ?? ''} onChange={(e) => setF({ ...f, rubriqueId: e.target.value })}>
-          <option value="">— choisir —</option>{rubriques.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
-        <Field label="Nature *" missing={mq('nature')}><Select className="input" disabled={dis} value={f.natureId ?? ''} onChange={(e) => setF({ ...f, natureId: e.target.value })}>
-          <option value="">— choisir —</option>{natures.data?.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}</Select></Field>
+          <MatiereTree disabled={dis} value={f.matiereId} habituelles={(habitudes.data?.matieres ?? []).map((x: any) => x.id)} onChange={(id) => setF({ ...f, matiereId: id ?? '' })} /></Field>
+        <Field label="Rubrique *" missing={mq('rubrique')}><ChoixReferentiel items={rubriques.data} habituels={(habitudes.data?.rubriques ?? []).map((x: any) => x.id)} disabled={dis} value={f.rubriqueId} onChange={(v) => setF({ ...f, rubriqueId: v })} /></Field>
+        <Field label="Nature *" missing={mq('nature')}><ChoixReferentiel items={natures.data} habituels={(habitudes.data?.natures ?? []).map((x: any) => x.id)} disabled={dis} value={f.natureId} onChange={(v) => setF({ ...f, natureId: v })} /></Field>
         {!signature && (
-        <Field label="Élu rapporteur *" missing={mq('rapporteur')}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => { const id = e.target.value; const elu = (elus.data ?? []).find((m: any) => String(m.id) === id); setF({ ...f, rapporteurId: id, rapporteurDelegation: elu?.delegations?.length === 1 ? elu.delegations[0] : '' }); }}>
+        <Field label="Élu rapporteur *" missing={mq('rapporteur')} hint={propose ? 'Proposé d’après vos actes précédents (élu le plus fréquent), ainsi que sa commission : modifiable.' : undefined}><Select className="input" disabled={dis} value={f.rapporteurId ?? ''} onChange={(e) => { setPropose(false); const id = e.target.value; const elu = (elus.data ?? []).find((m: any) => String(m.id) === id); setF({ ...f, rapporteurId: id, rapporteurDelegation: elu?.delegations?.length === 1 ? elu.delegations[0] : '' }); }}>
           <option value="">— choisir —</option>{elus.data?.map((m) => <option key={m.id} value={m.id}><b>{m.nomComplet}</b></option>)}</Select></Field>)}
         {!signature && delegationsElu.length > 1 && (
         <Field label="Délégation de l'élu rapporteur *" missing={editable && !f.rapporteurDelegation} hint="Cet élu porte plusieurs délégations : précisez celle concernée. Elle sert au tri des dossiers à l'ordre du jour.">
@@ -222,7 +311,6 @@ function Fiche({ acte, editable, onSaved, onCommissions }: { acte: any; editable
           </Field>))}
         <label className="flex items-center gap-2 md:col-span-2"><input type="checkbox" disabled={dis} checked={!!f.urgence} onChange={(e) => setF({ ...f, urgence: e.target.checked })} /> Dossier urgent</label>
       </div>
-      {editable && <div className="mt-4 flex justify-end"><button className="btn-secondary" onClick={save} disabled={saving}>{saving && <Spinner />} Enregistrer la fiche</button></div>}
     </section>
   );
 }
@@ -683,7 +771,7 @@ function Signature({ acte, toast, onChanged }: { acte: any; toast: (m: string, k
 }
 
 /* ------------------------------------------------------------------------------------- panneau latéral : actions */
-function Actions({ acte, circuit, reload, toast, onEnvoye }: { acte: any; circuit: any; reload: () => void; toast: (m: string, k?: 'ok' | 'ko') => void; onEnvoye?: (data: any) => void }) {
+function Actions({ acte, circuit, reload, toast, onEnvoye, avant }: { acte: any; circuit: any; reload: () => void; toast: (m: string, k?: 'ok' | 'ko') => void; onEnvoye?: (data: any) => void; avant?: () => Promise<boolean> }) {
   const { org, me } = useAuth(); const o = org!.id;
   const [busy, setBusy] = useState(false); const [refus, setRefus] = useState(false); const [motif, setMotif] = useState('');
   const [rappel, setRappel] = useState(false); const [rappelMotif, setRappelMotif] = useState(''); const [recap, setRecap] = useState<string[] | null>(null);
@@ -697,7 +785,9 @@ function Actions({ acte, circuit, reload, toast, onEnvoye }: { acte: any; circui
   const a = circuit?.actions ?? {};
   // Le rappel (interruption du circuit) ne concerne pas un acte déjà signé, et porte le nom du type d'acte.
   const rappelLibelle = acte.typeCode === 'decision' ? 'la décision' : acte.typeCode === 'arrete' ? "l'arrêté" : 'la délibération';
-  const peutRappeler = !!circuit?.submitted && acte.statut !== 'signe' && (acte.redacteur === me?.username || acte.droits?.administrer);
+  const peutRappeler = !!circuit?.submitted && acte.statut !== 'signe' && acte.statut !== 'rappele' && acte.statut !== 'brouillon' && (acte.redacteur === me?.username || acte.droits?.administrer);
+  // Un dossier déjà rappelé ne se rappelle pas deux fois : on le reprend (brouillon), puis on le renvoie au circuit.
+  const peutReprendre = acte.statut === 'rappele' && (acte.redacteur === me?.username || acte.droits?.administrer);
   const ouvrirRappel = async () => {
     setRappelMotif(''); setRecap(null); setRappel(true);
     try { const r = await api.get(orgPath(o, `/actes/${acte.id}/notifications/destinataires`), { params: { code: 'acte.rappele' } }); setRecap(r.data.items || []); } catch { setRecap([]); }
@@ -712,11 +802,12 @@ function Actions({ acte, circuit, reload, toast, onEnvoye }: { acte: any; circui
     <>
       <div className="card p-5" id="actions">
         <h3 className="mb-2">Actions</h3>
-        {a.submit && <button className="btn-primary w-full" disabled={busy} onClick={async () => { const r = await act(() => api.post(orgPath(o, `/actes/${acte.id}/envoi`)), 'Dossier envoyé au circuit'); if (r?.data) onEnvoye?.(r.data); }}><Send className="h-4 w-4" /> {acte.statut === 'modification_demandee' ? 'Renvoyer au circuit' : 'Envoyer pour validation'}</button>}
-        {a.validate && <button className="btn-ok mt-2 w-full" disabled={busy} onClick={() => act(() => api.post(orgPath(o, `/actes/${acte.id}/validation`), {}), 'Étape validée')}><Check className="h-4 w-4" /> Valider{a.onBehalfOf ? ` (pour ${a.onBehalfOf})` : ''}</button>}
+        {a.submit && <button className="btn-primary w-full" disabled={busy} onClick={async () => { if (avant && !(await avant())) { toast('La fiche n’a pas pu être enregistrée : corrigez-la avant l’envoi.', 'ko'); return; } const r = await act(() => api.post(orgPath(o, `/actes/${acte.id}/envoi`)), 'Dossier envoyé au circuit'); if (r?.data) onEnvoye?.(r.data); }}><Send className="h-4 w-4" /> {acte.statut === 'modification_demandee' ? 'Renvoyer au circuit' : 'Envoyer pour validation'}</button>}
+        {a.validate && <button className="btn-ok mt-2 w-full" disabled={busy} onClick={async () => { if (avant && !(await avant())) { toast('La fiche n’a pas pu être enregistrée : corrigez-la avant de valider.', 'ko'); return; } act(() => api.post(orgPath(o, `/actes/${acte.id}/validation`), {}), 'Étape validée'); }}><Check className="h-4 w-4" /> Valider{a.onBehalfOf ? ` (pour ${a.onBehalfOf})` : ''}</button>}
         {a.refuse && <button className="btn-ko mt-2 w-full" disabled={busy} onClick={() => setRefus(true)}><RotateCcw className="h-4 w-4" /> Demander une modification…</button>}
+        {peutReprendre && <button className="btn-primary w-full" disabled={busy} onClick={() => act(() => api.post(orgPath(o, `/actes/${acte.id}/reprendre`)), 'Rédaction reprise : le dossier est de nouveau un brouillon, vous pouvez le renvoyer au circuit')}><Undo2 className="h-4 w-4" /> Reprendre la rédaction</button>}
         {peutRappeler && <button className="btn-secondary mt-2 w-full" disabled={busy} onClick={ouvrirRappel}><Undo2 className="h-4 w-4" /> Rappeler {rappelLibelle}…</button>}
-        {!a.submit && !a.validate && !a.refuse && <p className="text-mute">{circuit?.submitted ? 'Vous n\'avez rien à faire sur ce dossier pour le moment.' : 'Vous ne pouvez pas envoyer ce dossier.'}</p>}
+        {!a.submit && !a.validate && !a.refuse && !peutReprendre && <p className="text-mute">{circuit?.submitted ? 'Vous n\'avez rien à faire sur ce dossier pour le moment.' : 'Vous ne pouvez pas envoyer ce dossier.'}</p>}
         {circuit?.blocked && <p className="mt-2 rounded bg-ko-bg p-2 text-ko">Étape sans titulaire : contactez l'administrateur.</p>}
       </div>
       {refus && (
@@ -812,11 +903,11 @@ function CommissionsBox({ acte, editable, toast }: { acte: any; editable: boolea
 /* ------------------------------------------------------------------------------- copie et assistant IA (D40) */
 function CopieModal({ acte, onClose, toast }: { acte: any; onClose: () => void; toast: (m: string, k?: 'ok' | 'ko') => void }) {
   const { org } = useAuth(); const o = org!.id; const nav = useNavigate();
-  const ia = useIa(); const [adapter0, setAdapter] = useState(true); const adapter = adapter0 && ia.copie; const [contexte, setContexte] = useState(''); const [busy, setBusy] = useState(false);
+  const ia = useIa(); const [adapter0, setAdapter] = useState(true); const adapter = adapter0 && ia.copie; const [contexte, setContexte] = useState(''); const [busy, setBusy] = useState(false); const [annexes, setAnnexes] = useState<number[]>([]);
   const go = async () => {
     setBusy(true);
     try {
-      const r = (await api.post(orgPath(o, `/actes/${acte.id}/copie`), adapter ? { adapter: true, contexte } : {})).data;
+      const r = (await api.post(orgPath(o, `/actes/${acte.id}/copie`), adapter ? { adapter: true, contexte, annexes } : { annexes })).data;
       if (r.iaError) toast(`Copie créée, mais l'IA n'a pas pu être sollicitée : ${r.iaError}`, 'ko'); else toast(adapter ? "Copie créée. L'IA prépare ses propositions en arrière plan : vous pouvez continuer à travailler." : 'Copie créée');
       onClose(); nav(`/dossiers/${r.acte.id}`);
     } catch (e) { toast(errMsg(e), 'ko'); setBusy(false); }
@@ -824,7 +915,8 @@ function CopieModal({ acte, onClose, toast }: { acte: any; onClose: () => void; 
   return (
     <Modal title="Copier ce dossier" onClose={onClose} wide>
       <div className="space-y-4">
-        <p className="text-mute">Un nouveau <b>brouillon</b> est créé avec la fiche et les textes de « {acte.titre} ».</p>
+        <p className="text-mute">Un nouveau <b>brouillon</b> est créé avec la fiche, l'exposé des motifs, les visas et le dispositif de « {acte.titre} » (textes en brouillon, à relire).</p>
+        <ChoixAnnexes acteId={acte.id} onChange={setAnnexes} />
         <label className="flex items-start gap-3 rounded border border-line p-3"><input type="radio" className="mt-1" checked={!adapter} onChange={() => setAdapter(false)} /><span><b>Copie simple</b><br /><span className="text-mute">Vous adaptez les textes à la main.</span></span></label>
         {ia.copie && <label className="flex items-start gap-3 rounded border border-action bg-soft p-3"><input type="radio" className="mt-1" checked={adapter} onChange={() => setAdapter(true)} /><span><Sparkles className="mr-1 inline h-4 w-4 text-action" /><b>Copie adaptée avec l'IA</b><br /><span className="text-mute">L'IA <b>propose</b> les modifications pour le nouveau contexte ; vous acceptez ou refusez chacune. Rien n'est appliqué sans vous.</span></span></label>}
         {adapter && <Field label="Décrivez le nouveau contexte" hint="Objet, bénéficiaire, montants, dates, ce qui change par rapport à ce dossier."><textarea className="input" rows={5} autoFocus value={contexte} onChange={(e) => setContexte(e.target.value)} placeholder="Ex. : subvention 2027 à l'association Ivry Théâtre, 8 000 €, versée en deux fois…" /></Field>}
@@ -945,6 +1037,7 @@ export default function Dossier() {
   const reloadAll = useCallback(() => { acte.reload(); circuit.reload(); }, [acte, circuit]);
   const [copying, setCopying] = useState(false);
   const [envoi, setEnvoi] = useState<{ data: any; premier: boolean } | null>(null);
+  const flushFiche = useRef<(() => Promise<boolean>) | null>(null); // enregistre la fiche avant envoi / validation
   if (acte.loading && !acte.data) return <Loading />;
   if (acte.error || !acte.data) return <div><ErrorBox msg={acte.error || 'Dossier introuvable'} /><Link className="mt-4 inline-block text-action" to="/">← Retour aux dossiers</Link></div>;
   const a = acte.data; const c = circuit.data;
@@ -998,7 +1091,7 @@ export default function Dossier() {
         <div className="space-y-6">
           {a.statut === 'rappele' && <div role="note" className="rounded border border-warn/40 bg-warn-bg p-3 text-[13px] text-warn"><b>Dossier rappelé du circuit</b>{a.rappelAt ? ` le ${dt(a.rappelAt, { dateStyle: 'long' })}` : ''}{a.rappelMotif ? <> — motif : <i>{a.rappelMotif}</i></> : null}. Il n'est plus en circuit.{(a.redacteur === me?.username || a.droits?.administrer) && <span className="ml-3 inline-flex gap-2 align-middle"><button className="btn-secondary !py-1" onClick={async () => { try { await api.post(orgPath(o, `/actes/${a.id}/reprendre`)); toast('Rédaction reprise : le dossier est de nouveau un brouillon'); reloadAll(); } catch (e) { toast(errMsg(e), 'ko'); } }}>Reprendre la rédaction</button></span>}</div>}
           {a.statut === 'signe' && a.custom?.controleLegalite && <ControleLegalite acte={a} onChanged={reloadAll} toast={toast} />}
-          <Fiche acte={a} editable={editable} onSaved={() => { reloadAll(); toast('Fiche enregistrée'); }} onCommissions={reloadAll} />
+          <Fiche key={a.id} acte={a} editable={editable} onSaved={reloadAll} onCommissions={reloadAll} flushRef={flushFiche} />
           {a.typeInfo?.meta?.autorisations && <Autorisations acte={a} editable={editable} onChanged={() => { reloadAll(); toast('Délibérations d\'autorisation mises à jour'); }} toast={toast} />}
           <Textes acte={a} editable={editable || !!c?.actions?.validate} onChanged={acte.reload} onApercu={apercuDossier} toast={toast} />
           {a.typeInfo?.meta?.signature && <Signature acte={a} toast={toast} onChanged={reloadAll} />}          <Annexes acte={a} editable={editable || !!c?.actions?.validate} toast={toast} />
@@ -1008,7 +1101,7 @@ export default function Dossier() {
         {!signe && <aside className="space-y-4">
           {a.custom?.entrainement && <div role="note" className="rounded border border-primary/30 bg-primary/5 p-3 text-[13px]"><b>Dossier d’entraînement</b> : essayez tout librement. Il ne partira jamais dans un vrai circuit et se supprime tout seul au bout de 14 jours.</div>}
           <ActiverAssiste acte={a} editable={editable} onReload={reloadAll} toast={toast} />
-          <Actions acte={a} circuit={c} reload={reloadAll} toast={toast} onEnvoye={onEnvoye} />
+          <Actions acte={a} circuit={c} reload={reloadAll} toast={toast} onEnvoye={onEnvoye} avant={async () => (flushFiche.current ? flushFiche.current() : true)} />
           {/* Propositions de l'IA : utiles en rédaction seulement — masquées une fois signé, validé DGS ou renvoyé. */}
           {!['signe', 'valide_dgs', 'modification_demandee'].includes(a.statut) && <IaPanel acte={a} editable={editable} onApplied={acte.reload} toast={toast} />}
           {a.statut === 'brouillon' || a.statut === 'modification_demandee' ? <Completude c={a.completude} /> : null}

@@ -3,11 +3,30 @@
 > Convention avant la mise en production : l'application est en **0.x.y**.
 > - **x** (version mineure) : ajout d'un module ou d'une fonctionnalité.
 > - **y** (correctif) : correction, débogage ou amélioration sans nouveau module.
-> - **1.0.0** : version de production. **Aucune date n'est indiquée avant la 1.0.0** ; elle sera ajoutée le jour de la mise en production.
+> - **1.0.0** : version de production.
+> - Chaque version porte sa **date de livraison** (AAAA-MM-JJ), affichée dans le journal des versions.
 >
 > La version affichée par l'application est celle de `frontend/package.json` et `backend/package.json`. Le présent fichier et `frontend/src/nouveautes.ts` sont tenus en phase.
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
+
+## 0.54.2 — 2026-10-14 — Copie d'un acte : choix des annexes ; chef de service
+
+- La copie depuis un modèle reprend l'exposé, les visas et les délibérants en brouillon et **demande quelles annexes reprendre** (cases cochées par défaut ; rien n'est repris pour les annexes décochées).
+- **Chef de service** : pour les services dont le code se termine par 1, le directeur de la direction tient le rôle de chef de service (plus d'étape « sans titulaire » pour eux).
+
+## 0.54.1 — 2026-10-14 — Fiche de l'acte : enregistrement automatique et saisie facilitée
+
+- **Autoenregistrement** de la fiche (saisie différée de 1,2 s, indicateur « en attente / enregistrement / enregistré / erreur » avec « Réessayer ») ; le bouton « Enregistrer la fiche » est supprimé. La fiche est enregistrée avant « Envoyer pour validation » / « Valider » (l'action est bloquée si l'enregistrement échoue) et au démontage de la page. Un titre de moins de 3 caractères n'est pas envoyé.
+- **Valeurs habituelles** : `GET /organismes/:orgId/actes/habitudes` (matières, rubriques, natures utilisées dans les actes dont on est rédacteur, par fréquence puis récence) ; la fiche ne liste d'abord que celles-ci (arborescence des matières restreinte aux feuilles utilisées et à leurs groupes), « Plus » / « Tout afficher » donne tout le référentiel.
+- **Élu rapporteur et commission** les plus fréquents des actes du rédacteur, proposés (modifiables) seulement sur un acte dont le rapporteur est vide.
+
+## 0.54.0 — 2026-10-14 — Backlog : déclarer un bug, demander une évolution
+
+- **Nouveautés** : toutes les versions sur une seule vue, chacune avec sa date (champ `date` de `nouveautes.ts`, reconstitué d'après l'historique git pour les versions passées).
+- **Deux boutons** « Déclarer un bug » et « Demander une évolution » (titre, description, version) — `POST /organismes/:orgId/backlog`, `GET …/backlog/mes-demandes`. Migration 0090 (`backlog_demandes`).
+- **Pièces jointes** : jusqu'à 5 fichiers de 10 Mo (images, PDF, texte, Word, Excel, PowerPoint, OpenDocument ; type et contenu contrôlés) par demande, par sélection, glisser-déposer ou **collage d'image (Ctrl+V)** nommée `capture-AAAAMMJJ-HHMM.png`. Migration 0091 (`backlog_pieces`), stockage catégorie `backlog`, `GET …/backlog/:id/pieces/:pieceId/file` (demandeur, SCC, administrateur). Aperçu des images dans Paramétrage › Backlog.
+- **Paramétrage › Backlog** (SCC et administrateurs) : liste filtrable par état avec le demandeur, acceptation, refus (**motif obligatoire**) et déclaration « réalisée » (`GET …/backlog`, `PUT …/backlog/:id/etat`). Chaque changement d'état envoie un **courriel au demandeur** (échec d'envoi sans effet sur l'état, signalé à l'écran) ; journal d'audit.
 
 ## 0.53.1 — Textes de la bibliothèque : délibérations qui les citent
 

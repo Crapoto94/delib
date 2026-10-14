@@ -32,7 +32,7 @@ const LienP = IdP.extend({ lienId: Id });
 const Lien = z.object({ cibleActeId: Id.describe('Acte (délibération adoptée) qui autorise cette décision') });
 const DelibUpd = z.object({ titre: z.string().trim().min(3).max(500).optional(), ordre: z.number().int().min(1).optional() });
 const Abandon = z.object({ motif: z.string().trim().min(3).max(1000) });
-const DepuisModele = z.object({ modeleId: Id, typeId: Id.optional(), titre: z.string().trim().min(3).max(500).optional(), serviceLabel: z.string().trim().max(120).optional(), motsCles: z.array(z.string().trim().min(1).max(60)).max(20).optional() });
+const DepuisModele = z.object({ modeleId: Id, typeId: Id.optional(), titre: z.string().trim().min(3).max(500).optional(), serviceLabel: z.string().trim().max(120).optional(), motsCles: z.array(z.string().trim().min(1).max(60)).max(20).optional(), annexes: z.array(Id).max(200).optional().describe('Annexes du modèle à reprendre (ids) ; [] = aucune ; absent = toutes') });
 const Assiste = z.object({
   actif: z.boolean().optional(), bienvenue: z.boolean().optional(),
   passees: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
@@ -54,9 +54,14 @@ module.exports = ({ makeRouter, actes }) => {
   }, async (req, res) => res.status(201).json(await actes.create(req.ctx, req.org.id, req.valid.body)));
 
   r.post('/depuis-modele', {
-    summary: 'Crée un dossier à partir d’une délibération passée (modèle) : champs, textes et annexes repris', tags: ['actes'], org: true, params: Org, body: DepuisModele, responses: { 201: 'Créé' },
-    description: "Reprend TOUT du modèle : champs, exposé, visas, dispositif, délibérations et annexes (les fichiers sont partagés, pas recopiés). La direction reste celle du rédacteur ; les mots-clés sont mémorisés dans le dossier.",
+    summary: 'Crée un dossier à partir d’une délibération passée (modèle) : champs et textes repris (brouillon), annexes au choix', tags: ['actes'], org: true, params: Org, body: DepuisModele, responses: { 201: 'Créé' },
+    description: "Reprend du modèle : champs, exposé des motifs, visas, dispositif et délibérations, en brouillon (rien n'est validé : l'agent relit). Les annexes ne sont reprises que si elles sont listées dans `annexes` (les fichiers sont partagés, pas recopiés). La direction reste celle du rédacteur ; les mots-clés sont mémorisés dans le dossier.",
   }, async (req, res) => res.status(201).json(await actes.creerDepuisModele(req.ctx, req.org.id, req.valid.body)));
+
+  r.get('/habitudes', {
+    summary: 'Habitudes de saisie du rédacteur connecté', tags: ['actes'], org: true, params: Org,
+    description: "Matières, rubriques et natures déjà utilisées dans les actes dont je suis rédacteur (plus fréquentes puis plus récentes d'abord), et élu rapporteur + commission les plus fréquents. Sert aux propositions par défaut de la fiche.",
+  }, async (req, res) => res.json(await actes.habitudes(req.ctx, req.org.id)));
 
   r.get('/:id', { summary: "Fiche d'un acte, avec droits et complétude", tags: ['actes'], org: true, params: IdP },
     async (req, res) => res.json(await actes.get(req.ctx, req.org.id, req.valid.params.id)));

@@ -9,6 +9,7 @@ import { Empty, ErrorBox, Field, Loading, Modal, Pagination, PageTitle, Spinner,
 import { AgentName } from '../AgentName';
 import { Select } from '../Select';
 import { AVATAR_NOM, Mascotte } from '../DossierAssiste';
+import { ChoixAnnexes } from '../ChoixAnnexes';
 import ArreteSigne, { ChoixParcours } from './ArreteSigne';
 
 /** REC-08 : des actes proches existent déjà (dans la limite de mes droits) — consulter avant de rédiger. */
@@ -68,6 +69,7 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
   const [parcours, setParcours] = useState<'parcours' | 'signe'>('parcours');   // arrêté : suit un parcours, ou déjà signé
   const estArrete = sel?.code === 'arrete'; const dejaSigne = estArrete && parcours === 'signe';
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [busyModele, setBusyModele] = useState<number | null>(null);
+  const [choixModele, setChoixModele] = useState<any | null>(null); const [annexesModele, setAnnexesModele] = useState<number[]>([]);
   useEffect(() => { if (types.data?.length && !typeId) setTypeId(types.data[0].id); }, [types.data]);
   const cles = mots.split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
   useEffect(() => {
@@ -78,7 +80,7 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
   const prendreModele = async (p: any) => {
     setBusyModele(p.acteId); setErr(null);
     try {
-      const body: any = { modeleId: p.acteId, ...(typeId ? { typeId } : {}), ...(titre.trim().length >= 3 ? { titre: titre.trim() } : {}), ...(serviceLibre.trim() ? { serviceLabel: serviceLibre.trim() } : {}), ...(cles.length ? { motsCles: cles } : {}) };
+      const body: any = { modeleId: p.acteId, ...(typeId ? { typeId } : {}), ...(titre.trim().length >= 3 ? { titre: titre.trim() } : {}), ...(serviceLibre.trim() ? { serviceLabel: serviceLibre.trim() } : {}), ...(cles.length ? { motsCles: cles } : {}), annexes: annexesModele };
       const r = await api.post(orgPath(org!.id, '/actes/depuis-modele'), body); nav(`/dossiers/${r.data.id}`);
     } catch (x) { setErr(errMsg(x)); setBusyModele(null); }
   };
@@ -136,11 +138,11 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
                     <span className="block truncate font-semibold text-head">{p.titre}</span>
                     <span className="block truncate text-[12px] text-mute">#{p.numeroSuivi}{p.dateSeance ? ` · séance du ${dt(p.dateSeance, { dateStyle: 'short' })}` : p.annee ? ` · ${p.annee}` : ''}{p.numero ? ` · ${p.numero}` : ''}{p.direction ? ` · ${p.direction}` : ''}{p.correspondances ? ` · ${p.correspondances} mot(s)-clé(s)` : ''}</span>
                   </span>
-                  <button type="button" className="btn-secondary shrink-0" disabled={busyModele !== null} onClick={() => prendreModele(p)}>{busyModele === p.acteId && <Spinner />} Utiliser comme modèle</button>
+                  <button type="button" className="btn-secondary shrink-0" disabled={busyModele !== null} onClick={() => setChoixModele(p)}>{busyModele === p.acteId && <Spinner />} Utiliser comme modèle</button>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[12px] text-mute">Le nouveau dossier reprend tout du modèle (titre, textes, annexes) ; la direction reste la vôtre.</p>
+            <p className="mt-2 text-[12px] text-mute">Le nouveau dossier reprend du modèle la fiche, l'exposé des motifs, les visas et le dispositif en brouillon (à relire) ; vous choisissez ensuite les annexes. La direction reste la vôtre.</p>
           </div>
         )}
         <Similaires titre={titre} />
@@ -156,6 +158,15 @@ export function NewDossier({ onClose, assisterParDefaut = false }: { onClose: ()
         <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={onClose}>Annuler</button><button className="btn-primary" disabled={busy || !typeId}>{busy && <Spinner />} Créer le brouillon</button></div>
       </form>)}
       </div>
+      {choixModele && (
+        <Modal title="Utiliser comme modèle" onClose={() => busyModele === null && setChoixModele(null)}>
+          <div className="space-y-3">
+            <p className="text-[13px]"><b>{choixModele.titre}</b></p>
+            <p className="text-[13px] text-mute">L'exposé des motifs, les visas et le dispositif sont repris <b>en brouillon</b> : rien n'est validé, relisez-les et adaptez-les à votre dossier.</p>
+            <ChoixAnnexes acteId={choixModele.acteId} onChange={setAnnexesModele} />
+            <div className="flex justify-end gap-2"><button type="button" className="btn-secondary" disabled={busyModele !== null} onClick={() => setChoixModele(null)}>Annuler</button><button type="button" className="btn-primary" disabled={busyModele !== null} onClick={() => prendreModele(choixModele)}>{busyModele !== null && <Spinner />} Créer le brouillon</button></div>
+          </div>
+        </Modal>)}
     </Modal>
   );
 }

@@ -4,7 +4,7 @@ const Id = z.coerce.number().int().positive();
 const P = z.object({ orgId: Id, id: Id });
 const PS = P.extend({ sid: Id });
 const Contexte = z.string().trim().min(10).max(3000).describe("Nouveau contexte : objet, bénéficiaire, montants, dates, ce qui change par rapport à l'ancien dossier");
-const Copie = z.object({ adapter: z.boolean().default(false).describe("Demander à l'IA de proposer les adaptations"), contexte: Contexte.optional() })
+const Copie = z.object({ adapter: z.boolean().default(false).describe("Demander à l'IA de proposer les adaptations"), contexte: Contexte.optional(), annexes: z.array(Id).max(200).optional().describe('Annexes à reprendre (ids) ; absent ou [] = aucune') })
   .refine((d) => !d.adapter || !!d.contexte, { message: 'Le contexte est obligatoire pour une copie assistée par IA', path: ['contexte'] });
 const Adapt = z.object({ contexte: Contexte });
 const Analyse = z.object({ type: z.enum(['orthographe', 'style', 'visas', 'complet']), textId: Id.optional().describe('Texte à analyser (par défaut : tous les textes du dossier)') });

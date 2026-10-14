@@ -52,9 +52,9 @@ function createAi({ db, audit, ai, actes, textes, acl, log, queue, prompts, visa
 
   const svc = {
     /** Copie simple (CPY-01) ; avec `adapter`, l'adaptation est DÉPOSÉE dans la file d'attente (arrière plan) — la copie est immédiate. */
-    async copy(ctx, organismeId, sourceId, { contexte, adapter = false } = {}) {
+    async copy(ctx, organismeId, sourceId, { contexte, adapter = false, annexes } = {}) {
       if (adapter && (!contexte || contexte.trim().length < 10)) throw E.badRequest('Décrivez le nouveau contexte (objet, bénéficiaire, montant, dates…) — au moins une phrase');
-      const copy = await actes.duplicate(ctx, organismeId, sourceId);
+      const copy = await actes.duplicate(ctx, organismeId, sourceId, { annexes });
       let job = null; let iaError = null;
       if (adapter && !(await prompts.actif(copy.organismeId, 'copie'))) iaError = 'La copie assistée par l’IA est désactivée par l’administration : copie simple';
       else if (adapter) {

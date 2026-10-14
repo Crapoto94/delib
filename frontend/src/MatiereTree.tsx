@@ -13,9 +13,12 @@ const ligneTexte = (n: Noeud) => `${n.code} — ${n.libelle}`;
  * Choix d'une matière en arborescence (MAT-04) : la nomenclature de la préfecture est présentée par niveaux,
  * seules les feuilles sont sélectionnables (même règle que le serveur). L'arbre vient de `/referentiels/matiere/tree`.
  */
-export function MatiereTree({ value, onChange, disabled, className = 'input' }: {
+export function MatiereTree({ value, onChange, disabled, className = 'input', habituelles }: {
   value?: number | string | null; onChange: (id: number | null) => void; disabled?: boolean; className?: string;
+  /** Matières déjà utilisées par l'utilisateur : l'arborescence ne liste d'abord que celles-ci (« Tout afficher » pour la nomenclature complète). */
+  habituelles?: number[];
 }) {
+  const [toutes, setToutes] = useState(false);
   const { org } = useAuth();
   const [items, setItems] = useState<Noeud[]>([]);
   const [ouvert, setOuvert] = useState(false);
@@ -65,22 +68,25 @@ export function MatiereTree({ value, onChange, disabled, className = 'input' }: 
   const basculer = (id: number) => setOuverts((prev) => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
 
   const mots = sansAccent(filtre).split(/\s+/).filter(Boolean);
+  // Par défaut (et sans recherche), seules les matières déjà utilisées par l'utilisateur sont listées, avec leurs groupes parents.
+  const habSet = useMemo(() => new Set((habituelles ?? []).filter((id) => parId.has(id))), [habituelles, parId]);
+  const restreint = habSet.size > 0 && !toutes && !mots.length;
   const garde = useMemo(() => {
     const ok = new Set<number>();
     const marcher = (n: Noeud): boolean => {
       const enfantsGardes = (n.enfants ?? []).map(marcher).some(Boolean);
-      const trouve = !mots.length || mots.every((m) => sansAccent(`${n.code} ${n.libelle}`).includes(m)) || enfantsGardes;
+      const trouve = restreint ? (habSet.has(n.id) || n.id === choix?.id || enfantsGardes) : (!mots.length || mots.every((m) => sansAccent(`${n.code} ${n.libelle}`).includes(m)) || enfantsGardes);
       if (trouve) ok.add(n.id);
       return trouve;
     };
     items.forEach(marcher); return ok;
-  }, [items, filtre]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [items, filtre, restreint, habSet, choix?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lignes = (l: Noeud[], depth: number): ReactNode[] => l.flatMap((n) => {
     if (!garde.has(n.id)) return [];
     const enfants = n.enfants ?? [];
     const selectionnable = n.selectionnable ?? n.feuille ?? enfants.length === 0;
-    const estOuvert = mots.length > 0 || ouverts.has(n.id);
+    const estOuvert = mots.length > 0 || restreint || ouverts.has(n.id);
     const courant = choix?.id === n.id;
     const row = (
       <li key={n.id} role="treeitem" aria-level={depth + 1} aria-selected={courant} aria-expanded={enfants.length ? estOuvert : undefined}>
@@ -115,6 +121,7 @@ export function MatiereTree({ value, onChange, disabled, className = 'input' }: 
             {!garde.size && <li className="px-3 py-2 text-[13px] text-mute">Aucune matière trouvée</li>}
             {lignes(items, 0)}
           </ul>
+          {habSet.size > 0 && !mots.length && <div className="border-t border-line p-2"><button type="button" className="text-[12px] font-semibold text-action hover:underline" onClick={() => setToutes((v) => !v)}>{toutes ? 'Seulement mes domaines habituels' : 'Plus : tout afficher la nomenclature'}</button></div>}
           {choix && <div className="border-t border-line p-2 text-right"><button type="button" className="text-[12px] font-semibold text-action hover:underline" onClick={() => { onChange(null); fermer(); }}>Retirer la matière</button></div>}
         </div>, document.body)}
     </span>

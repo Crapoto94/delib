@@ -4,24 +4,52 @@
  * Convention (avant la production) : l'application est en 0.x.y.
  *   - x (mineure) : ajout d'un module ou d'une fonctionnalité.
  *   - y (correctif) : correction, débogage ou amélioration sans nouveau module.
- *   - 1.0.0 : version de production (la date y sera ajoutée le jour venu ; aucune date avant).
+ *   - 1.0.0 : version de production.
+ *   - date : jour de livraison (AAAA-MM-JJ), affichée dans le journal ; à renseigner pour chaque version.
  * Ce fichier est la source affichée dans l'application ; il est tenu en phase avec CHANGELOG.md.
  */
 
-export type Version = { version: string; type: 'minor' | 'patch'; titre: string; items: string[] };
+export type Version = { version: string; date: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.53.1';
+export const VERSION = '0.54.2';
 
 export const VERSIONS: Version[] = [
   {
-    version: '0.53.1', type: 'patch', titre: "Textes de la bibliothèque : délibérations qui les citent",
+    version: '0.54.2', date: '2026-10-14', type: 'patch', titre: 'Copie d’un acte : choix des annexes ; chef de service',
+    items: [
+      "Quand on crée un acte à partir d'un autre (acte modèle), l'exposé des motifs, les visas et les délibérants sont repris en brouillon.",
+      "L'application demande quelles annexes reprendre : toutes sont cochées par défaut, et celles que l'on décoche ne sont pas reprises.",
+      "Chef de service : pour les services dont le code se termine par 1, le directeur de la direction tient le rôle de chef de service, et l'étape n'est plus signalée « sans titulaire ».",
+    ],
+  },
+  {
+    version: '0.54.1', date: '2026-10-14', type: 'patch', titre: 'Fiche de l’acte : enregistrement automatique et saisie facilitée',
+    items: [
+      "La fiche de l'acte s'enregistre toute seule quelques instants après la saisie, avec un indicateur discret (en attente, enregistrement, enregistré, erreur). Le bouton « Enregistrer la fiche » disparaît.",
+      "La fiche est enregistrée avant l'envoi pour validation ou la validation d'une étape, et au changement de page : aucune saisie n'est perdue.",
+      "Domaines d'intervention (arborescence), rubriques et natures : seules vos valeurs déjà utilisées sont listées d'abord ; « Plus » / « Tout afficher » donne accès à l'ensemble.",
+      "Sur un acte dont l'élu rapporteur est encore vide, l'élu le plus fréquent de vos actes et sa commission sont proposés ; vous pouvez les modifier.",
+    ],
+  },
+  {
+    version: '0.54.0', date: '2026-10-14', type: 'minor', titre: 'Backlog : déclarer un bug, demander une évolution',
+    items: [
+      "Le journal des versions affiche toutes les versions sur une seule page, chacune avec sa date de livraison.",
+      "Deux boutons permettent de déclarer un bug ou de demander une évolution depuis les Nouveautés.",
+      "Nouvel écran Paramétrages, Backlog : le SCC et les administrateurs voient les demandes et leurs auteurs, les acceptent, les refusent (avec un motif) ou les déclarent réalisées.",
+      "Une demande peut recevoir jusqu'à cinq pièces jointes : fichiers choisis, glissés-déposés, ou images collées depuis le presse-papier (Ctrl+V), avec aperçu avant l'envoi.",
+      "Chaque changement d'état est signalé par courriel à la personne qui a fait la demande.",
+    ],
+  },
+  {
+    version: '0.53.1', date: '2026-10-08', type: 'patch', titre: "Textes de la bibliothèque : délibérations qui les citent",
     items: [
       "La fiche d'un texte liste les délibérations de l'historique qui le citent (date et objet), les plus récentes d'abord, par tranches de 50.",
     ],
   },
   {
-    version: '0.53.0', type: 'minor', titre: "Bibliothèque de textes : descriptions, vérification IA et règles issues de l'historique",
+    version: '0.53.0', date: '2026-10-08', type: 'minor', titre: "Bibliothèque de textes : descriptions, vérification IA et règles issues de l'historique",
     items: [
       "Chaque texte de la bibliothèque des visas a une fiche : ce qu'il est, quand le viser, et son usage constaté dans l'historique (nombre de délibérations, période, rubriques, formulation habituelle).",
       "Un « bonbon » IA (vert, orange ou gris) indique si l'entrée est cohérente ; le bouton « Vérifier par l'IA » le met à jour, texte par texte ou en lot. L'IA ne se prononce jamais sur l'état en vigueur : seule la vérification à la source du juridique fait foi.",
@@ -30,7 +58,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.52.0', type: 'minor', titre: 'Sites autorisés à intégrer les pages publiques',
+    version: '0.52.0', date: '2026-10-08', type: 'minor', titre: 'Sites autorisés à intégrer les pages publiques',
     items: [
       "Les sites qui peuvent intégrer les pages publiques (délibérations, arrêtés) ou lire leurs données se règlent dans Paramétrage, Mise à disposition et affichage : par défaut ivry94.fr et ses sous-domaines, et ivry.local.",
       "Nouvel article d'aide « Raccourcis clavier » : la touche / place le curseur dans la recherche, Échap ferme les fenêtres, les flèches changent de document.",
@@ -41,21 +69,21 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.51.2', type: 'patch', titre: "Reprendre la rédaction d'un dossier rappelé",
+    version: '0.51.2', date: '2026-10-08', type: 'patch', titre: "Reprendre la rédaction d'un dossier rappelé",
     items: [
       "Un dossier rappelé du circuit peut être repris : le bouton « Reprendre la rédaction » le remet en brouillon, à compléter puis à renvoyer au circuit.",
       "Le rappel et la reprise figurent dans le journal de l'acte.",
     ],
   },
   {
-    version: '0.51.1', type: 'patch', titre: 'Les dossiers rappelés restent visibles',
+    version: '0.51.1', date: '2026-10-08', type: 'patch', titre: 'Les dossiers rappelés restent visibles',
     items: [
       "Un dossier rappelé du circuit n'avait plus de place dans « Mes actes » ni dans « Tous les actes » : il y reste désormais visible, avec l'étape « Rappelé ».",
       "La fiche d'un dossier rappelé indique la date et le motif du rappel.",
     ],
   },
   {
-    version: '0.51.0', type: 'minor', titre: 'Publication publique, arrêtés du site et arrêtés déjà signés',
+    version: '0.51.0', date: '2026-10-08', type: 'minor', titre: 'Publication publique, arrêtés du site et arrêtés déjà signés',
     items: [
       "Journal de l'acte (administrateur et SCC) : toutes les actions réalisées sur un dossier, de la plus récente à la plus ancienne.",
       "« Mes actes » : les participants du circuit hors de leur hiérarchie, et ceux qui ont déjà approuvé une étape à plusieurs validateurs, retrouvent leurs dossiers.",
@@ -67,7 +95,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.50.0', type: 'minor', titre: "L'espace des élus ouvre en ligne",
+    version: '0.50.0', date: '2026-09-27', type: 'minor', titre: "L'espace des élus ouvre en ligne",
     items: [
       "Les élus disposent de leur propre espace en ligne, à une adresse publique (hors du réseau de la collectivité) : connexion par lien personnel, ordre du jour, dossier de séance, pièces à lire et à annoter, recherche dans les actes.",
       "Un hébergement séparé de l'application de saisie : le front des élus ne contient ni base de données ni secret, et le jeton d'un élu est signé avec un secret et une audience qui lui sont propres — il est refusé par l'API des agents.",
@@ -76,7 +104,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.49.0', type: 'minor', titre: 'Deux serveurs de documents au choix, organisme par organisme',
+    version: '0.49.0', date: '2026-09-27', type: 'minor', titre: 'Deux serveurs de documents au choix, organisme par organisme',
     items: [
       "L'administration choisit, pour chaque organisme, le serveur de documents qui ouvre les annexes : ONLYOFFICE Docs ou Collabora Online (Paramétrages, Pièces jointes).",
       "Les deux peuvent être déployés ensemble ; le sélecteur n'apparaît que si les deux le sont.",
@@ -102,7 +130,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.48.0', type: 'minor', titre: 'Bureau en ligne : éditer une annexe Word, Excel ou présentation dans le navigateur',
+    version: '0.48.0', date: '2026-09-27', type: 'minor', titre: 'Bureau en ligne : éditer une annexe Word, Excel ou présentation dans le navigateur',
     items: [
       "Bouton Modifier sur une annexe Word, Excel ou présentation : le document s'ouvre dans le navigateur, sans Word sur le poste, sans plugin ni macro.",
       "Les annexes acceptent désormais aussi les présentations (.pptx, .ppt, .odp), converties en PDF comme les autres.",
@@ -116,7 +144,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.47.0', type: 'minor', titre: 'Pièces jointes à chaque étape, rapporteur sans délégation, étape SCC garantie et stockage GED classé',
+    version: '0.47.0', date: '2026-09-25', type: 'minor', titre: 'Pièces jointes à chaque étape, rapporteur sans délégation, étape SCC garantie et stockage GED classé',
     items: [
       "Élu rapporteur : la liste ne montre que les noms et prénoms (en gras) — ni fonction ni délégations. La délégation concernée se choisit au champ suivant quand l'élu en porte plusieurs.",
       "Pièces jointes : on peut en ajouter (et en retirer, remplacer ou réordonner) à toutes les étapes du circuit, pas seulement pendant la rédaction — le détenteur de l'étape courante et le rédacteur sont autorisés.",
@@ -126,7 +154,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.46.0', type: 'minor', titre: 'Annexes Word/Excel, taille des pièces jointes, suivi des modifications et ordre du jour interne',
+    version: '0.46.0', date: '2026-09-24', type: 'minor', titre: 'Annexes Word/Excel, taille des pièces jointes, suivi des modifications et ordre du jour interne',
     items: [
       "Annexes : PDF, Word et Excel acceptés. Les fichiers Word et Excel sont convertis en PDF associé à la validation finale du dossier (l'original reste conservé).",
       "Ré-upload d'un fichier de même nom sur un dossier : il remplace l'annexe existante et crée une nouvelle version (l'ancienne reste consultable), au lieu d'ajouter un doublon.",
@@ -145,7 +173,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.45.0', type: 'minor', titre: 'Commissions, directions en info, rétroplanning et confort de rédaction',
+    version: '0.45.0', date: '2026-09-23', type: 'minor', titre: 'Commissions, directions en info, rétroplanning et confort de rédaction',
     items: [
       "Rétroplanning d'une séance paramétrable en jours calendaires (week-ends et jours fériés compris) ou en jours ouvrés, au choix dans Paramétrages › Rétroplanning ; le simulateur de dates en tient compte.",
       "Décisions et arrêtés : ils comportent désormais des vus et considérants et un « Décide » (leur dispositif, là où une délibération a un « délibéré ») ; l'exposé des motifs est facultatif (possible, non obligatoire).",
@@ -163,7 +191,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.44.0', type: 'minor', titre: 'Décisions et arrêtés : signature du maire par parapheur',
+    version: '0.44.0', date: '2026-09-22', type: 'minor', titre: 'Décisions et arrêtés : signature du maire par parapheur',
     items: [
       "Nouveaux types d'acte « Décision » et « Arrêté », proposés dès la création. Une décision est prise par le maire dans le cadre d'une délégation du conseil ; un arrêté est un acte réglementaire ou individuel du maire. Ni l'un ni l'autre ne passe au conseil.",
       "À la fin du circuit d'une décision ou d'un arrêté, le dossier passe à l'état « À signer » et part en signature du maire au lieu d'être inscrit à l'ordre du jour. Le circuit reste le même que pour les délibérations ; il peut être spécialisé par type d'acte dans Paramétrages › Circuits.",
@@ -176,7 +204,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.43.0', type: 'minor', titre: 'Gabarits Word, éditeur enrichi (images, tableaux, alignement) et bibliothèque multi-documents',
+    version: '0.43.0', date: '2026-09-22', type: 'minor', titre: 'Gabarits Word, éditeur enrichi (images, tableaux, alignement) et bibliothèque multi-documents',
     items: [
       "Gabarits Word (.docx) à variables : chaque document (exposé des motifs, délibération, visas et considérants, délibéré, dossier complet) est produit à partir du modèle Word défini pour son gabarit s'il existe, sinon de la mise en page PDF. La fusion remplit les zones (exposé, visas, dispositif, présences, transmission…), insère les tableaux et les images, puis convertit en PDF sur le serveur. On peut déposer, télécharger, prévisualiser et retirer le modèle de chaque gabarit (Paramétrages › Gabarits).",
       "Variable {numero} : le numéro du dossier au conseil, dans l'ordre de passage (figé à l'arrêt de l'ordre du jour, provisoire avant), utilisable dans les modèles Word et les en-têtes PDF.",
@@ -190,7 +218,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.42.0', type: 'minor', titre: 'Mes actes, « Tous les actes », bibliothèque enrichie et import AIRS des conseils récents',
+    version: '0.42.0', date: '2026-09-21', type: 'minor', titre: 'Mes actes, « Tous les actes », bibliothèque enrichie et import AIRS des conseils récents',
     items: [
       "Accueil « Mes actes » : une seule page qui rassemble tous les actes qui vous concernent et ne sont pas encore passés au conseil, séparés en rubriques — action attendue de vous, rédaction/validation de votre équipe, actes que vous avez validés et qui poursuivent leur circuit, actes inscrits au conseil. Les actes en retard sont distingués d'emblée.",
       "Nouvelle page « Tous les actes » (administrateur, SCC) : les actes qui ne sont pas encore passés au conseil, avec une rupture au choix — par étape du circuit (rédaction, validation directeur, visa finance, inscrit au conseil…) ou par date du conseil pressenti.",
@@ -205,7 +233,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.41.0', type: 'minor', titre: 'Dossier assisté : un guide pas à pas à la rédaction',
+    version: '0.41.0', date: '2026-09-21', type: 'minor', titre: 'Dossier assisté : un guide pas à pas à la rédaction',
     items: [
       "Créer un dossier en mode assisté (case à la création, ou carte « Dossier assisté » sur un brouillon existant) : un avatar d'aide, Evelyne Del-IA, accompagne la rédaction.",
       "Evelyne Del-IA dit quoi faire à chaque étape — fiche, exposé des motifs, visas, dispositif, annexes, relecture, envoi — donne des conseils, et suit la progression. L'étape courante est déduite automatiquement de l'état du dossier.",
@@ -223,7 +251,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.40.0', type: 'minor', titre: 'Mode simulation de séance, numéro d’origine à l’ordre du jour, CGU et licence',
+    version: '0.40.0', date: '2026-09-21', type: 'minor', titre: 'Mode simulation de séance, numéro d’origine à l’ordre du jour, CGU et licence',
     items: [
       "Ouvrir une séance un autre jour que sa date est désormais possible : l'application passe en mode simulation, avec un bandeau visible, et tout ce qui est saisi peut être annulé d'un geste (présences, pouvoirs, votes, points) pour revenir à l'état d'avant ouverture.",
       "À la création de l'ordre du jour, le numéro d'origine d'un acte repris d'AIRS est affiché (n° source), à côté du numéro généré.",
@@ -231,7 +259,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.39.0', type: 'minor', titre: 'Import AIRS DELIB : sas, concordances et publication',
+    version: '0.39.0', date: '2026-09-21', type: 'minor', titre: 'Import AIRS DELIB : sas, concordances et publication',
     items: [
       "Nouvel écran Paramétrages › Import AIRS DELIB : reprise de l'historique de l'ancien logiciel en trois temps — sas (données brutes, invisibles), concordances (rapprochement avec vos élus, directions, services, agents et référentiels déjà paramétrés), puis publication des actes des séances passées.",
       "Un lot de reprise se charge depuis un export JSON du HUB DSI (ou un jeu d'essai), s'analyse, puis se valide : la publication reste bloquée tant que les concordances obligatoires (direction, service) ne sont pas tranchées.",
@@ -241,13 +269,13 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.38.1', type: 'patch', titre: 'Séance visée : inscrit ou pas encore',
+    version: '0.38.1', date: '2026-09-21', type: 'patch', titre: 'Séance visée : inscrit ou pas encore',
     items: [
       "La séance visée s'affiche en gras quand le dossier est inscrit à l'ordre du jour de cette séance, et en italique (« pas encore inscrit ») quand elle n'est que visée : tableau de bord, liste des dossiers et fiche du dossier.",
     ],
   },
   {
-    version: '0.38.0', type: 'minor', titre: 'Séances : nouvelle liste, relance des services, lien Outlook ; se souvenir de moi',
+    version: '0.38.0', date: '2026-09-21', type: 'minor', titre: 'Séances : nouvelle liste, relance des services, lien Outlook ; se souvenir de moi',
     items: [
       "Liste des séances refondue d'après la maquette : une carte par séance (compte à rebours, délibérations inscrites, étape du workflow, jalons), onglets à compteurs, année, instances, filtre, vue détaillée ou compacte.",
       "« Relancer les services » : relance, direction par direction, les détenteurs des dossiers non terminés d'une séance (garde-fou de 24 h).",
@@ -258,19 +286,19 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.37.0', type: 'minor', titre: 'Alertes de recherche par e-mail',
+    version: '0.37.0', date: '2026-09-20', type: 'minor', titre: 'Alertes de recherche par e-mail',
     items: [
       "Alertes de recherche par e-mail (facultatif) : l'enveloppe à côté de la cloche d'une recherche enregistrée envoie aussi le message par mail.",
     ],
   },
   {
-    version: '0.36.1', type: 'patch', titre: 'Visite guidée et aide mises à jour',
+    version: '0.36.1', date: '2026-09-20', type: 'patch', titre: 'Visite guidée et aide mises à jour',
     items: [
       "Visite guidée (version 2) et aide : « Mes actes », « Bibliothèque » et « Vérifier les références » sont expliqués ; la visite est reproposée à ceux qui avaient terminé la précédente.",
     ],
   },
   {
-    version: '0.36.0', type: 'minor', titre: 'Listes filtrables, président de séance et date d’affichage',
+    version: '0.36.0', date: '2026-09-20', type: 'minor', titre: 'Listes filtrables, président de séance et date d’affichage',
     items: [
       "Toutes les listes déroulantes ont une zone de saisie pour filtrer les choix (dès 7 choix), utilisable au clavier.",
       "Au conseil, le président de séance est le maire par défaut à l'ouverture du suivi de séance (modifiable).",
@@ -278,7 +306,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.35.0', type: 'minor', titre: 'Contrôle de légalité, workflow de séance, bibliothèque et trajet des actes',
+    version: '0.35.0', date: '2026-09-20', type: 'minor', titre: 'Contrôle de légalité, workflow de séance, bibliothèque et trajet des actes',
     items: [
       "Contrôle de légalité : envoi et confirmation en masse (cases à cocher dans le suivi, « Préparer et envoyer »), sans s'arrêter à la première erreur.",
       "Contrôle de légalité : le SCC peut modifier le texte d'une délibération avant la transmission ; workflow d'envoi paramétrable (rôles, préparation, envoi et confirmation automatiques).",
@@ -289,14 +317,14 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.34.0', type: 'minor', titre: 'Pré-contrôle juridique et visas habituels',
+    version: '0.34.0', date: '2026-09-20', type: 'minor', titre: 'Pré-contrôle juridique et visas habituels',
     items: [
       "Pré-contrôle automatique des références à l'entrée du dossier dans l'étape « Service juridique » (sans IA, non bloquant).",
       "Visas habituels : l'assistant signale un visa présent dans la plupart des délibérations similaires adoptées et absent du dossier.",
     ],
   },
   {
-    version: '0.33.0', type: 'minor', titre: 'Références juridiques vérifiées par le code',
+    version: '0.33.0', date: '2026-09-20', type: 'minor', titre: 'Références juridiques vérifiées par le code',
     items: [
       "Bibliothèque de visas (Paramétrages › Visas et références) : textes normalisés avec statut, validité et dernière vérification ; import JSON/CSV ; fournie vide, maintenue par le juridique.",
       "« Vérifier les références » dans l'assistant : codes, lois, décrets, arrêtés et délibérations citées sont extraits par règles et vérifiés par le code contre la bibliothèque, à la date de la séance (sans IA).",
@@ -305,7 +333,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.32.0', type: 'minor', titre: 'Nouveau design, mode sombre et menu latéral des paramétrages',
+    version: '0.32.0', date: '2026-09-20', type: 'minor', titre: 'Nouveau design, mode sombre et menu latéral des paramétrages',
     items: [
       "Interface plus colorée et plus contrastée (bandeau de navigation bleu, cartes, tableaux et badges renforcés), inspirée des maquettes Stitch.",
       "Mode sombre : Automatique (suit l'appareil), Clair ou Sombre, depuis le bouton de l'en-tête ou le menu utilisateur ; aussi dans l'espace des élus.",
@@ -313,21 +341,21 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.31.0', type: 'minor', titre: 'Alertes de recherche et amendements dans l’espace élus',
+    version: '0.31.0', date: '2026-09-20', type: 'minor', titre: 'Alertes de recherche et amendements dans l’espace élus',
     items: [
       "Cloche « Me prévenir quand un nouvel acte correspond » sur une recherche enregistrée : vérification au plus horaire, avec les droits de la personne, notification dans l'application.",
       "Amendements consultables dans l'espace élus (ELU-41).",
     ],
   },
   {
-    version: '0.30.0', type: 'minor', titre: 'API externe et clés d’accès',
+    version: '0.30.0', date: '2026-09-20', type: 'minor', titre: 'API externe et clés d’accès',
     items: [
       "API de lecture seule pour les applications tierces (site de la ville), avec clés hachées à affichage unique, portées distinguant actes exécutoires / adoptés / en cours, IP autorisées et limite de débit.",
       "Synchronisation incrémentale des actes, notamment une fois revenus du contrôle de légalité.",
     ],
   },
   {
-    version: '0.29.0', type: 'minor', titre: 'RGPD : archivage intermédiaire et pseudonymisation',
+    version: '0.29.0', date: '2026-09-20', type: 'minor', titre: 'RGPD : archivage intermédiaire et pseudonymisation',
     items: [
       "Menu RGPD : archivage intermédiaire des actes terminés et anciens, avec aperçu avant application (les actes restent conservés).",
       "Pseudonymisation des actions et journaux : les identités et adresses IP anciennes sont remplacées par des pseudonymes stables, sans réécrire le journal d'audit (immuable).",
@@ -335,7 +363,7 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.28.0', type: 'minor', titre: 'Documents techniques (DAT & DEX) et mode opératoire',
+    version: '0.28.0', date: '2026-09-20', type: 'minor', titre: 'Documents techniques (DAT & DEX) et mode opératoire',
     items: [
       "DAT (document d'architecture technique) et DEX (dossier d'exploitation) disponibles dans l'aide administrateur, exportables en PDF.",
       "Le DAT expose l'architecture, le schéma des flux, les interfaces avec les applications tierces, les variables, le SGBD et le stockage.",
@@ -343,212 +371,212 @@ export const VERSIONS: Version[] = [
     ],
   },
   {
-    version: '0.27.0', type: 'minor', titre: 'Sauvegarde vers un dossier réseau',
+    version: '0.27.0', date: '2026-09-20', type: 'minor', titre: 'Sauvegarde vers un dossier réseau',
     items: [
       "Export logique cohérent et copie SMB avec identifiants chiffrés, planification, rétention et restauration outillée.",
     ],
   },
   {
-    version: '0.26.0', type: 'minor', titre: 'Alfresco comme stockage des fichiers',
+    version: '0.26.0', date: '2026-09-20', type: 'minor', titre: 'Alfresco comme stockage des fichiers',
     items: [
       "Les fichiers peuvent être stockés dans Alfresco (clés alf:), avec cache et sonde ; migration dans les deux sens.",
     ],
   },
   {
-    version: '0.25.0', type: 'minor', titre: 'Gestion des élus et mot de passe oublié par SMS',
+    version: '0.25.0', date: '2026-09-20', type: 'minor', titre: 'Gestion des élus et mot de passe oublié par SMS',
     items: [
       "Création, édition, suppression prudente et désactivation persistante des élus.",
       "Réinitialisation du mot de passe de l'espace élus par SMS.",
     ],
   },
   {
-    version: '0.24.0', type: 'minor', titre: "Centre d'aide",
+    version: '0.24.0', date: '2026-09-20', type: 'minor', titre: "Centre d'aide",
     items: [
       "Trois aides accessibles depuis l'en-tête et affichées selon le profil : rédaction et circuit, séances et commissions (SCC), paramétrages.",
       "Séparation explicite des paramétrages fonctionnels (SCC) et techniques (administrateur).",
     ],
   },
   {
-    version: '0.23.0', type: 'minor', titre: 'Amendements en séance et synchronisation GED',
+    version: '0.23.0', date: '2026-09-20', type: 'minor', titre: 'Amendements en séance et synchronisation GED',
     items: [
       "Dépôt et vote des amendements pendant la séance ; le vote du texte est bloqué tant qu'un amendement est en attente.",
       "Synchronisation VibeDélib / GED et archivage du cahier dès sa fin.",
     ],
   },
   {
-    version: '0.22.0', type: 'minor', titre: "Dossier d'entraînement",
+    version: '0.22.0', date: '2026-09-20', type: 'minor', titre: "Dossier d'entraînement",
     items: [
       "Bac à sable de la visite guidée : jamais envoyé, hors recherche, purgé automatiquement.",
     ],
   },
   {
-    version: '0.21.0', type: 'minor', titre: 'Champs personnalisés et export/import de configuration',
+    version: '0.21.0', date: '2026-09-20', type: 'minor', titre: 'Champs personnalisés et export/import de configuration',
     items: [
       "Champs personnalisés de la fiche (type, obligatoire, droits de saisie, condition d'affichage).",
       "Export et import de la configuration d'un organisme (référentiels, circuits, champs, instances).",
     ],
   },
   {
-    version: '0.20.2', type: 'patch', titre: '« Se souvenir de moi » à la connexion',
+    version: '0.20.2', date: '2026-09-20', type: 'patch', titre: '« Se souvenir de moi » à la connexion',
     items: ["Mémorisation de l'identifiant seulement (jamais du mot de passe), agents et élus."],
   },
   {
-    version: '0.20.1', type: 'patch', titre: 'Visite guidée orientée utilisateur de base',
+    version: '0.20.1', date: '2026-09-20', type: 'patch', titre: 'Visite guidée orientée utilisateur de base',
     items: ["Contenu de la visite centré sur la rédaction, les visas, le circuit, l'assistant IA et la validation."],
   },
   {
-    version: '0.20.0', type: 'minor', titre: "Annotations sur les PDF et actes proches",
+    version: '0.20.0', date: '2026-09-20', type: 'minor', titre: "Annotations sur les PDF et actes proches",
     items: [
       "Annotations sur les PDF de l'espace élus (ELU-71 à ELU-76).",
       "Actes proches proposés sur la fiche du dossier.",
     ],
   },
   {
-    version: '0.19.0', type: 'minor', titre: 'Visite guidée de première connexion',
+    version: '0.19.0', date: '2026-09-20', type: 'minor', titre: 'Visite guidée de première connexion',
     items: [
       "Visite guidée à projecteur, reprise là où on s'est arrêté, badges, rejeu depuis le menu.",
       "Mesure anonymisée pour améliorer le tutoriel.",
     ],
   },
   {
-    version: '0.18.0', type: 'minor', titre: 'Recherche plein texte et choix du tiers de télétransmission',
+    version: '0.18.0', date: '2026-09-20', type: 'minor', titre: 'Recherche plein texte et choix du tiers de télétransmission',
     items: [
       "Recherche plein texte (titres, textes, annexes), insensible aux accents.",
       "Choix du tiers de télétransmission.",
     ],
   },
   {
-    version: '0.17.0', type: 'minor', titre: 'Archivage en GED Alfresco',
+    version: '0.17.0', date: '2026-09-20', type: 'minor', titre: 'Archivage en GED Alfresco',
     items: [
       "Port et adaptateurs (Alfresco REST v1, simulateur), paramétrage avec test de connexion.",
       "Plan de classement et archivage versionné des séances.",
     ],
   },
   {
-    version: '0.16.0', type: 'minor', titre: "Espace élus : application en DMZ",
+    version: '0.16.0', date: '2026-09-20', type: 'minor', titre: "Espace élus : application en DMZ",
     items: [
       "Front distinct (PWA/APK), téléchargement en arrière-plan, visionneuse, notes, suivi en direct.",
       "Gestion des accès côté SCC ; déploiement en DMZ.",
     ],
   },
   {
-    version: '0.15.0', type: 'minor', titre: "Espace élus : API",
+    version: '0.15.0', date: '2026-09-20', type: 'minor', titre: "Espace élus : API",
     items: [
       "Authentification par invitation, mot de passe et code par mail ; documents PDF filigranés, lectures, notes, suivi direct.",
     ],
   },
   {
-    version: '0.14.0', type: 'minor', titre: 'Télétransmission S²LOW et groupes politiques',
+    version: '0.14.0', date: '2026-09-20', type: 'minor', titre: 'Télétransmission S²LOW et groupes politiques',
     items: [
       "Chaîne complète S²LOW en mode simulation.",
       "Groupes politiques issus du Hub, activation par usage de l'IA, écran « Paramétrages ».",
     ],
   },
   {
-    version: '0.13.0', type: 'minor', titre: 'Procès-verbal et registre en PDF',
+    version: '0.13.0', date: '2026-09-20', type: 'minor', titre: 'Procès-verbal et registre en PDF',
     items: [
       "Procès-verbal, liste des délibérations et extrait du registre générés en PDF depuis le suivi de séance.",
     ],
   },
   {
-    version: '0.12.1', type: 'patch', titre: "Jeu d'exemple sur l'organisation réelle",
+    version: '0.12.1', date: '2026-09-20', type: 'patch', titre: "Jeu d'exemple sur l'organisation réelle",
     items: ["Séance d'exemple sur l'organisation réelle et noms des modèles IA."],
   },
   {
-    version: '0.12.0', type: 'minor', titre: 'Suivi de séance (page) et modèles IA',
+    version: '0.12.0', date: '2026-09-20', type: 'minor', titre: 'Suivi de séance (page) et modèles IA',
     items: [
       "Page de suivi de séance, modification et suppression de séance.",
       "Consignes et modèles de l'IA par fonction ; canal mail / outil par règle ; refus par règle.",
     ],
   },
   {
-    version: '0.11.0', type: 'minor', titre: 'Suivi de séance en direct (backend)',
+    version: '0.11.0', date: '2026-09-20', type: 'minor', titre: 'Suivi de séance en direct (backend)',
     items: [
       "Suivi de séance en direct, purge des données de démonstration, AD en repli, étape en rédaction surlignée.",
     ],
   },
   {
-    version: '0.10.2', type: 'patch', titre: 'Organisation RH et noms',
+    version: '0.10.2', date: '2026-09-20', type: 'patch', titre: 'Organisation RH et noms',
     items: ["DGS dérivée de la direction générale des services, « Directeur·trice », noms composés."],
   },
   {
-    version: '0.10.1', type: 'patch', titre: 'Frise et responsables',
+    version: '0.10.1', date: '2026-09-20', type: 'patch', titre: 'Frise et responsables',
     items: ["Frise fusionnée quand le rédacteur est directeur, désignation du responsable RH, noms des agents inconnus."],
   },
   {
-    version: '0.10.0', type: 'minor', titre: 'Visibilité des actes et commissions',
+    version: '0.10.0', date: '2026-09-20', type: 'minor', titre: 'Visibilité des actes et commissions',
     items: [
       "Visibilité des actes paramétrable (général et par utilisateur).",
       "Type de commission, dossiers simples (description et pièces jointes), convocation par commission.",
     ],
   },
   {
-    version: '0.9.0', type: 'minor', titre: 'Éditeur de circuits et organisation',
+    version: '0.9.0', date: '2026-09-20', type: 'minor', titre: 'Éditeur de circuits et organisation',
     items: [
       "Organisation des responsables, postes vacants contournés, étape de refus par étape, éditeur de circuits.",
     ],
   },
   {
-    version: '0.8.0', type: 'minor', titre: 'Convocation des élus',
+    version: '0.8.0', date: '2026-09-20', type: 'minor', titre: 'Convocation des élus',
     items: [
       "Convocation avec lien personnel unique, suivi de lecture, journal de preuve, statistiques, relance et modificatif.",
     ],
   },
   {
-    version: '0.7.1', type: 'patch', titre: 'Renommage VibeDélib',
+    version: '0.7.1', date: '2026-09-20', type: 'patch', titre: 'Renommage VibeDélib',
     items: ["L'outil devient VibeDélib ; salutation par le prénom."],
   },
   {
-    version: '0.7.0', type: 'minor', titre: 'Indicateurs de séance et multi-collectivités',
+    version: '0.7.0', date: '2026-09-20', type: 'minor', titre: 'Indicateurs de séance et multi-collectivités',
     items: [
       "Indicateurs de séance (compte à rebours, taux de réalisation, actes à terminer, directions en retard).",
       "Administration multi-collectivités.",
     ],
   },
   {
-    version: '0.6.0', type: 'minor', titre: 'Cahier de séance',
+    version: '0.6.0', date: '2026-09-20', type: 'minor', titre: 'Cahier de séance',
     items: [
       "Génération asynchrone, versions, contrôles, profils, recto-verso, filigrane, traçabilité ; intitulé de poste d'après l'organigramme RH.",
     ],
   },
   {
-    version: '0.5.0', type: 'minor', titre: 'Réunions de commission et outillage',
+    version: '0.5.0', date: '2026-09-20', type: 'minor', titre: 'Réunions de commission et outillage',
     items: [
       "Réunions de commission avec projets présentés et Teams.",
       "Outils IA de l'éditeur, visionneuse PDF unique, docker-compose complet.",
     ],
   },
   {
-    version: '0.4.0', type: 'minor', titre: 'IA en arrière-plan et identité',
+    version: '0.4.0', date: '2026-09-20', type: 'minor', titre: 'IA en arrière-plan et identité',
     items: [
       "Assistant IA en arrière-plan (file d'attente paramétrable).",
       "Identité et logo de l'organisme, séances passées, dossiers visant une séance, liste des utilisateurs.",
     ],
   },
   {
-    version: '0.3.1', type: 'patch', titre: 'Tableau de bord',
+    version: '0.3.1', date: '2026-09-20', type: 'patch', titre: 'Tableau de bord',
     items: ["Tableau de bord avec l'équipe et les actes validés en cours de circuit."],
   },
   {
-    version: '0.3.0', type: 'minor', titre: 'Gabarits PDF et « afficher en tant que »',
+    version: '0.3.0', date: '2026-09-20', type: 'minor', titre: 'Gabarits PDF et « afficher en tant que »',
     items: [
       "Gabarits PDF (police, marges, en-tête, pied de page, fond).",
       "« Afficher en tant que » et autocomplétion des agents partout.",
     ],
   },
   {
-    version: '0.2.0', type: 'minor', titre: 'Ordre du jour, utilisateurs et rôles',
+    version: '0.2.0', date: '2026-09-20', type: 'minor', titre: 'Ordre du jour, utilisateurs et rôles',
     items: [
       "Ordre du jour et numérotation.",
       "Utilisateurs et rôles, connexion de développement, jeu de démonstration, commissions réelles.",
     ],
   },
   {
-    version: '0.1.1', type: 'patch', titre: 'Séances, dérogations, commissions et élus',
+    version: '0.1.1', date: '2026-09-20', type: 'patch', titre: 'Séances, dérogations, commissions et élus',
     items: ["Tests et compléments sur les séances, dérogations, commissions et élus ; erreur 423 pour la date limite."],
   },
   {
-    version: '0.1.0', type: 'minor', titre: 'Socle applicatif',
+    version: '0.1.0', date: '2026-09-20', type: 'minor', titre: 'Socle applicatif',
     items: [
       "Backend (lots 0 à 4a) : actes, textes suivis, rendu PDF, circuit et délégations, notifications et relances, élus, commissions, séances et dérogations.",
       "Premier frontend d'après les maquettes.",
