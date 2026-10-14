@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BadgeCheck, BookOpen, Pencil, Plus, Sparkles, Trash2, Upload, Users } from 'lucide-react';
+import { BadgeCheck, BookOpen, List, Pencil, Plus, Sparkles, Trash2, Upload, Users } from 'lucide-react';
 import { api, errMsg, org as orgPath } from '../api';
 import { useAuth } from '../auth';
 import { dt } from '../format';
@@ -166,14 +166,14 @@ function ReglesHistorique({ onClose, onDone }: { onClose: () => void; onDone: ()
   );
 }
 
-function Concernes({ entree, onClose }: { entree: any; onClose: () => void }) {
+function Concernes({ entree, tous = false, onClose }: { entree: any; tous?: boolean; onClose: () => void }) {
   const { org } = useAuth(); const o = org!.id;
-  const d = useLoad(async () => (await api.get(orgPath(o, `/visas/${entree.id}/actes-concernes`))).data.items as any[], [entree.id]);
+  const d = useLoad(async () => (await api.get(orgPath(o, `/visas/${entree.id}/actes-concernes`), { params: tous ? { tous: 'true' } : undefined })).data.items as any[], [entree.id, tous]);
   return (
-    <Modal title={`Actes en cours qui citent « ${entree.cle} »`} onClose={onClose} wide>
-      {d.loading ? <Loading /> : !d.data?.length ? <Empty>Aucun acte en cours ne cite ce texte.</Empty> : (
-        <table className="w-full"><thead><tr><th>Dossier</th><th>Rédacteur</th><th>Extrait</th></tr></thead><tbody>{d.data.map((c) => (
-          <tr key={c.acteId}><td className="font-semibold">n° {c.numeroSuivi} — {c.titre}</td><td><AgentName u={c.redacteur} /></td><td className="text-[12px] italic text-mute">« {c.extrait} »</td></tr>))}</tbody></table>)}
+    <Modal title={tous ? `Tous les actes qui citent « ${entree.cle} »` : `Actes en cours qui citent « ${entree.cle} »`} onClose={onClose} wide>
+      {d.loading ? <Loading /> : !d.data?.length ? <Empty>{tous ? 'Aucun acte ne cite ce texte.' : 'Aucun acte en cours ne cite ce texte.'}</Empty> : (
+        <table className="w-full"><thead><tr><th>Dossier</th>{tous && <th>État</th>}<th>Rédacteur</th><th>Extrait</th></tr></thead><tbody>{d.data.map((c) => (
+          <tr key={c.acteId}><td className="font-semibold">n° {c.numeroSuivi} — {c.titre}</td>{tous && <td className="text-[12px]">{c.statut}</td>}<td><AgentName u={c.redacteur} /></td><td className="text-[12px] italic text-mute">« {c.extrait} »</td></tr>))}</tbody></table>)}
     </Modal>
   );
 }
@@ -182,7 +182,7 @@ function Bibliotheque() {
   const { org } = useAuth(); const o = org!.id; const { toast, node } = useToast();
   const [q, setQ] = useState(''); const [statut, setStatut] = useState('');
   const d = useLoad(async () => (await api.get(orgPath(o, '/visas'), { params: { q: q || undefined, statut: statut || undefined } })).data.items as any[], [o, q, statut]);
-  const [edit, setEdit] = useState<any | 'nouvelle' | null>(null); const [imp, setImp] = useState(false); const [conc, setConc] = useState<any | null>(null); const [fiche, setFiche] = useState<any | null>(null);
+  const [edit, setEdit] = useState<any | 'nouvelle' | null>(null); const [imp, setImp] = useState(false); const [conc, setConc] = useState<{ e: any; tous: boolean } | null>(null); const [fiche, setFiche] = useState<any | null>(null);
   const [verif, setVerif] = useState<number | null>(null); const [lot, setLot] = useState<{ fait: number; total: number; quoi: string } | null>(null);
   /** Applique une action IA à chaque texte qui n'en a pas encore bénéficié, un par un (l'IA répond en quelques secondes) ; une erreur arrête le lot. */
   const enLot = async (quoi: 'verification' | 'description') => {
@@ -214,7 +214,8 @@ function Bibliotheque() {
               <td className="text-[12px]">{e.verifieLe ? <>{jour(e.verifieLe)}{e.verifiePar && <div className="text-mute">par <AgentName u={e.verifiePar} /></div>}</> : <span className="text-warn">jamais vérifié</span>}</td>
               <td className="whitespace-nowrap text-right">
                 <button className="rounded p-2 hover:bg-slate-100" title="Vérifié aujourd'hui" aria-label={`Marquer ${e.cle} vérifié aujourd'hui`} onClick={() => agir(() => api.post(orgPath(o, `/visas/${e.id}/verification`), {}), 'Marqué comme vérifié aujourd’hui')}><BadgeCheck className="h-4 w-4 text-ok" /></button>
-                <button className="rounded p-2 hover:bg-slate-100" title="Actes en cours qui citent ce texte" aria-label={`Actes concernés par ${e.cle}`} onClick={() => setConc(e)}><Users className="h-4 w-4" /></button>
+                <button className="rounded p-2 hover:bg-slate-100" title="Actes en cours qui citent ce texte" aria-label={`Actes concernés par ${e.cle}`} onClick={() => setConc({ e, tous: false })}><Users className="h-4 w-4" /></button>
+                <button className="rounded p-2 hover:bg-slate-100" title="Tous les actes qui citent ce texte (quel que soit leur état)" aria-label={`Tous les actes qui citent ${e.cle}`} onClick={() => setConc({ e, tous: true })}><List className="h-4 w-4" /></button>
                 <button className="rounded p-2 hover:bg-slate-100" title="Modifier" aria-label={`Modifier ${e.cle}`} onClick={() => setEdit(e)}><Pencil className="h-4 w-4" /></button>
                 <button className="rounded p-2 text-ko hover:bg-slate-100" title="Supprimer" aria-label={`Supprimer ${e.cle}`} onClick={() => window.confirm(`Supprimer « ${e.cle} » de la bibliothèque ?`) && agir(() => api.delete(orgPath(o, `/visas/${e.id}`)), 'Entrée supprimée')}><Trash2 className="h-4 w-4" /></button>
               </td>
@@ -222,7 +223,7 @@ function Bibliotheque() {
       </div>
       {edit && <FormEntree entree={edit === 'nouvelle' ? null : edit} onClose={() => setEdit(null)} onSaved={(r) => { setEdit(null); d.reload(); toast(r?.veille?.actesConcernes ? `Enregistré — ${r.veille.actesConcernes} rédacteur(s) prévenu(s)` : 'Enregistré'); }} />}
       {imp && <Importer onClose={() => setImp(false)} onDone={d.reload} />}
-      {conc && <Concernes entree={conc} onClose={() => setConc(null)} />}
+      {conc && <Concernes entree={conc.e} tous={conc.tous} onClose={() => setConc(null)} />}
       {fiche && <FicheTexte entree={fiche} onClose={() => setFiche(null)} onChanged={d.reload} />}
       {node}
     </div>

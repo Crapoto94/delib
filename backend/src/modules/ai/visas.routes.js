@@ -77,8 +77,8 @@ module.exports = ({ makeRouter, visas, ai }) => {
     async (req, res) => res.json(await visas.remove(req.ctx, req.org.id, req.valid.params.id)));
   r.post('/:id/verification', { summary: "« Vérifié aujourd'hui » : atteste que le texte a été contrôlé à la source", tags: T, org: true, roles: ECRITURE, params: IdP },
     async (req, res) => res.json(await visas.marquerVerifie(req.ctx, req.org.id, req.valid.params.id)));
-  r.get('/:id/actes-concernes', { summary: 'Actes en cours qui citent ce texte (veille : texte devenu obsolète)', tags: T, org: true, roles: ECRITURE, params: IdP },
-    async (req, res) => res.json({ items: await visas.concernes(req.org.id, req.valid.params.id) }));
+  r.get('/:id/actes-concernes', { summary: 'Actes en cours qui citent ce texte (veille : texte devenu obsolète) ; tous=true : tous les actes', tags: T, org: true, roles: ECRITURE, params: IdP, query: z.object({ tous: z.enum(['true', 'false']).default('false') }) },
+    async (req, res) => res.json({ items: await visas.concernes(req.org.id, req.valid.params.id, { tous: req.valid.query.tous === 'true' }) }));
 
   r.get('/:id/delibs-historique', { summary: "Délibérations de l'historique (AIRS) qui citent ce texte, les plus récentes d'abord", tags: T, org: true, roles: ECRITURE, params: IdP,
     query: z.object({ limit: z.coerce.number().int().min(1).max(200).default(50), offset: z.coerce.number().int().min(0).default(0) }) },

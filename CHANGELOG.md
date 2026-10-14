@@ -10,6 +10,15 @@
 >
 > **Pour incrémenter** : ajouter un module ou une fonctionnalité → +1 sur x, y remis à 0 ; correction ou amélioration sans nouveau module → +1 sur y. Mettre à jour les deux `package.json`, ce fichier et `nouveautes.ts`.
 
+## 0.54.4 — 2026-10-14 — Bibliothèque des visas : plus de textes, tous les actes citant un texte
+
+- `GET /actes/:id/visas/usuels` complète les lignes tirées des actes adoptés par les textes de la bibliothèque les plus cités dans l'historique (formulation habituelle, `source: 'historique'`), triés par fréquence. **Non couvert par un test automatisé** (un test écrit n'a pas abouti).
+- `GET /visas/:id/actes-concernes?tous=true` : tous les actes qui citent le texte (hors abandonnés) ; bouton dédié dans Paramétrage › Visas (test ajouté à `lot18-visas`).
+
+## 0.54.3 — 2026-10-14 — Modifications suivies : affichées, sans validation
+
+- Le panneau « Modifications suivies » des textes : qui a modifié quoi reste affiché, mais les boutons « Accepter », « Rejeter » et « Tout accepter » sont retirés (le texte d'origine est conservé). L'API `POST …/modifications` n'est pas supprimée.
+
 ## 0.54.2 — 2026-10-14 — Copie d'un acte : choix des annexes ; chef de service
 
 - La copie depuis un modèle reprend l'exposé, les visas et les délibérants en brouillon et **demande quelles annexes reprendre** (cases cochées par défaut ; rien n'est repris pour les annexes décochées).

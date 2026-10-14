@@ -12,9 +12,22 @@
 export type Version = { version: string; date: string; type: 'minor' | 'patch'; titre: string; items: string[] };
 
 /** Version courante de l'application. */
-export const VERSION = '0.54.2';
+export const VERSION = '0.54.4';
 
 export const VERSIONS: Version[] = [
+  {
+    version: '0.54.4', date: '2026-10-14', type: 'patch', titre: 'Bibliothèque des visas : plus de textes, tous les actes citant un texte',
+    items: [
+      "La bibliothèque de vus et considérants propose aussi les textes les plus cités dans l'historique des délibérations, sous leur formulation habituelle, et plus seulement ceux des quelques actes adoptés disposant d'un texte.",
+      "Paramétrage des visas : un second bouton liste tous les actes qui citent un texte, quel que soit leur état, en plus des actes en cours.",
+    ],
+  },
+  {
+    version: '0.54.3', date: '2026-10-14', type: 'patch', titre: 'Modifications suivies : affichées, sans validation',
+    items: [
+      "Le panneau « Modifications suivies » d'un texte montre toujours qui a modifié quoi (une couleur par auteur), mais ne propose plus d'accepter ou de rejeter. Le texte d'origine est conservé, il n'y a rien à valider.",
+    ],
+  },
   {
     version: '0.54.2', date: '2026-10-14', type: 'patch', titre: 'Copie d’un acte : choix des annexes ; chef de service',
     items: [

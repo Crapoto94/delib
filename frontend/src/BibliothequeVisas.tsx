@@ -6,7 +6,7 @@ import { Loading, useLoad } from './ui';
 import { d } from './format';
 
 type Item = {
-  texte: string; occurrences: number; etat: string; cle: string | null;
+  texte: string; occurrences: number; etat: string; cle: string | null; source?: string;
   libelle: string | null; intitule: string | null; verifieLe: string | null;
 };
 
@@ -64,7 +64,7 @@ export default function BibliothequeVisas({ acteId, peutInserer, onInserer, toas
                         <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${p.cls}`} title={`${INFO[it.etat] ?? ''}${it.verifieLe ? ` Dernière vérification : ${d(it.verifieLe)}.` : ''}`}>{p.label}</span>
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-[11px] text-mute">
-                        <span>utilisé {it.occurrences}×</span>
+                        <span>{it.source === 'historique' ? 'cité' : 'utilisé'} {it.occurrences}×{it.source === 'historique' ? ' dans l’historique' : ''}</span>
                         {it.intitule && it.cle && <span className="min-w-0 truncate">· {it.intitule}</span>}
                         {peutInserer && <button type="button" className="ml-auto flex shrink-0 items-center gap-1 font-semibold text-action hover:underline" onClick={() => { onInserer(it.texte); toast('Visa inséré dans le texte'); }}><Plus className="h-3.5 w-3.5" /> Insérer</button>}
                       </div>

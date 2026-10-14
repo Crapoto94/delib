@@ -1,7 +1,7 @@
 {
   "name": "vibedelib-frontend",
   "private": true,
-  "version": "0.54.2",
+  "version": "0.54.4",
   "license": "SEE LICENSE IN LICENCE.md",
   "type": "module",
   "scripts": {

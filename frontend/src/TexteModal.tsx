@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentName } from './AgentName';
-import { CheckCircle2, Eye, Info, Pencil, Sparkles, X, XCircle } from 'lucide-react';
+import { Eye, Info, Pencil, Sparkles, X } from 'lucide-react';
 import { api, errMsg, openPdf, org as orgPath } from './api';
 import { useAuth } from './auth';
 import { dt } from './format';
@@ -76,9 +76,6 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush, top, onTermi
   const change = (md: string) => { setText(md); latest.current.text = md; latest.current.dirty = true; setState('dirty'); clearTimeout(timer.current); timer.current = setTimeout(commit, 1200); };
   /** Insère un visa depuis la bibliothèque, à la fin du texte (une ligne par visa). */
   const inserer = (visa: string) => { const base = text.replace(/\s+$/, ''); change(`${base ? `${base}\n` : ''}${visa}\n`); };
-  const resolve = async (decision: 'accept' | 'reject', cid?: string) => {
-    try { await commit(); await api.post(`${base}/modifications`, cid ? { decision, cids: [cid] } : { decision, all: true }); latest.current.dirty = false; await load(); onChanged(); } catch (e) { toast(errMsg(e), 'ko'); }
-  };
   // Aperçu au gabarit : si un modèle Word (.docx) est défini pour le gabarit correspondant, on le fusionne et le
   // convertit en PDF. Exposé des motifs → gabarit « expose » ; visas/considérants et délibéré → gabarit « deliberation ».
   const docType = t.kind === 'expose' ? 'expose' : 'deliberation';
@@ -147,17 +144,14 @@ function Pane({ acte, t, editable, onChanged, toast, registerFlush, top, onTermi
           <div className="min-h-0 flex-1"><AssistantPanel acte={acte} t={t} canEdit={canEdit} toast={toast} beforeApply={commit} afterApply={async () => { latest.current.dirty = false; await load(); onChanged(); }} /></div>)}
         {view.tracking && side === 'suivi' && (
         <div className="min-h-0 flex-1 overflow-auto" aria-label="Modifications suivies">
-          <div className="border-b border-line px-4 py-3"><h3 className="text-[14px]">Modifications suivies</h3><p className="text-[12px] text-mute">Une couleur par auteur.</p></div>
+          <div className="border-b border-line px-4 py-3"><h3 className="text-[14px]">Modifications suivies</h3><p className="text-[12px] text-mute">Qui a modifié quoi, une couleur par auteur. Le texte d’origine est conservé : il n’y a rien à valider.</p></div>
           {view.authors?.length > 0 && <ul className="flex flex-wrap gap-2 border-b border-line px-4 py-2">{view.authors.map((a: any) => <li key={a.username} className="flex items-center gap-1 text-[12px]"><span className="h-3 w-3 rounded-full" style={{ background: a.color }} /><AgentName u={a.username} /></li>)}</ul>}
-          {!tracking ? <p className="p-4 text-[12px] text-mute">Aucune modification en attente de décision.</p> : (
+          {!tracking ? <p className="p-4 text-[12px] text-mute">Aucune modification suivie.</p> : (
             <>
-              {canEdit && <div className="border-b border-line px-4 py-2"><button className="btn-ok w-full" onClick={() => resolve('accept')}>Tout accepter ({view.changes.length})</button></div>}
               <ul>{view.changes.map((c: any) => (
                 <li key={c.cid} className="border-b border-line px-4 py-3">
                   <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ background: c.color }} /><b className="text-[12px]"><AgentName u={c.author} /></b><span className="ml-auto text-[11px] text-mute">{dt(c.at, { dateStyle: 'short', timeStyle: 'short' })}</span></div>
                   <div className="mt-1 text-[13px]">{c.deleted && <del className="mr-1 text-ko">{c.deleted}</del>}{c.inserted && <ins className="text-ok-text no-underline">{c.inserted}</ins>}</div>
-                  {canEdit && <div className="mt-2 flex gap-2"><button className="flex items-center gap-1 text-[12px] font-semibold text-ok" onClick={() => resolve('accept', c.cid)}><CheckCircle2 className="h-4 w-4" /> Accepter</button>
-                    <button className="flex items-center gap-1 text-[12px] font-semibold text-ko" onClick={() => resolve('reject', c.cid)}><XCircle className="h-4 w-4" /> Rejeter</button></div>}
                 </li>))}</ul>
             </>)}
         </div>)}

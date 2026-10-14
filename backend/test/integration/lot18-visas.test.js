@@ -257,6 +257,7 @@ describe('veille (IA-38) : un texte abrogé ou modifié prévient les rédacteur
     // un acte terminé n'est plus concerné
     await env.db.run("UPDATE actes SET statut = 'executoire' WHERE id = $1", [acte.id]);
     expect((await as(admin).get(V(`/${e.id}/actes-concernes`))).body.items.map((x) => x.acteId)).not.toContain(acte.id);
+    expect((await as(admin).get(V(`/${e.id}/actes-concernes?tous=true`))).body.items.map((x) => x.acteId)).toContain(acte.id); // « tous les actes » : même terminé
     await env.db.run("UPDATE actes SET statut = 'brouillon' WHERE id = $1", [acte.id]);
     // le même statut à nouveau ne prévient personne
     expect((await as(admin).put(V(`/${e.id}`), { intitule: 'Article L. 2121-29 du CGCT' })).body.veille).toBeNull();

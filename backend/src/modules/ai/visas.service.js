@@ -262,11 +262,11 @@ function createVisas({ db, audit, actes, settings, log, ai, prompts }) {
     },
 
     // ------------------------------------------------------------------------------------------------ actes concernés / veille
-    /** Actes EN COURS dont un texte cite l'entrée (clé identique). */
-    async concernes(organismeId, entree) {
+    /** Actes EN COURS dont un texte cite l'entrée (clé identique) ; `tous` : tous les actes, quel que soit leur état (hors abandonnés). */
+    async concernes(organismeId, entree, { tous = false } = {}) {
       const org = requireOrg(organismeId); const e = typeof entree === 'number' ? await svc.get(org, entree) : entree;
       const rows = await db.all(`SELECT t.id, t.kind, t.markdown, a.id AS acte_id, a.numero_suivi, a.titre, a.statut, a.redacteur
-        FROM tracked_texts t JOIN actes a ON a.id = t.acte_id WHERE a.organisme_id = $1 AND a.statut = ANY($2::text[]) ORDER BY a.id`, [org, EN_COURS]);
+        FROM tracked_texts t JOIN actes a ON a.id = t.acte_id WHERE a.organisme_id = $1 AND ${tous ? "a.statut <> 'abandonne'" : 'a.statut = ANY($2::text[])'} ORDER BY a.id`, tous ? [org] : [org, EN_COURS]);
       const par = new Map();
       for (const t of rows) {
         const hit = R.extraire({ id: t.id, kind: t.kind, markdown: t.markdown }).find((r) => r.cle === e.cle);
@@ -467,7 +467,17 @@ function createVisas({ db, audit, actes, settings, log, ai, prompts }) {
           ? { texte: l.texte, occurrences: l.occurrences, ...pire }
           : { texte: l.texte, occurrences: l.occurrences, etat: 'sans_reference', cle: null, libelle: null, intitule: null, verifieLe: null };
       });
-      return { items, dateReference: ref, actesAnalyses: actesVus.size, bibliotheque: { entrees: lib.size, verifMois: mois } };
+      // Complément : textes de la bibliothèque les plus cités dans l'historique des délibérations (AIRS), sous leur formulation habituelle.
+      const vus = new Set(items.map((i) => i.cle).filter(Boolean));
+      const max = Math.max(1, Math.min(50, limit));
+      const historiques = [...lib.values()].filter((e) => (e.citations || 0) > 0 && !vus.has(e.cle) && e.statut !== 'abroge')
+        .sort((a, b) => (b.citations || 0) - (a.citations || 0)).slice(0, max).map((e) => {
+          const f = String(e.usage_stats?.formulation || '').trim();
+          const texte = f ? `${f.charAt(0).toUpperCase()}${f.slice(1)}`.replace(/[,.;\s]+$/, ' ;') : `Vu ${e.intitule.charAt(0).toLowerCase()}${e.intitule.slice(1)} ;`;
+          return { texte, occurrences: e.citations, source: 'historique', etat: jauger(e, ref, mois, ajd).etat, cle: e.cle, libelle: e.intitule, intitule: e.intitule, verifieLe: iso(e.verifie_le) };
+        });
+      const tous = [...items.map((i) => ({ ...i, source: 'actes' })), ...historiques].sort((a, b) => b.occurrences - a.occurrences).slice(0, max);
+      return { items: tous, dateReference: ref, actesAnalyses: actesVus.size, bibliotheque: { entrees: lib.size, verifMois: mois } };
     },
 
     /** L'identifiant d'une matière et de tous ses ancêtres (une règle posée sur « Finances » vaut pour ses sous-matières). */
